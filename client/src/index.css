@@ -1,0 +1,223 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 0%; /* pure black */
+    --foreground: 220 15% 85%; /* soft light gray */
+    --card: 0 0% 0%;
+    --card-foreground: 220 15% 85%;
+    --popover: 0 0% 0%;
+    --popover-foreground: 220 15% 85%;
+    --primary: 255 90% 60%; /* vibrant blue-violet */
+    --primary-foreground: 220 15% 85%;
+    --secondary: 240 6% 20%; /* dark gray for contrast */
+    --secondary-foreground: 220 15% 85%;
+    --muted: 240 6% 20%;
+    --muted-foreground: 220 10% 60%; /* muted gray */
+    --accent: 265 100% 65%; /* vibrant purple */
+    --accent-foreground: 220 15% 85%;
+    --destructive: 0 90% 65%;
+    --destructive-foreground: 220 15% 85%;
+    --border: 240 6% 20%;
+    --input: 240 6% 20%;
+    --ring: 255 90% 60%;
+    --radius: 0.5rem;
+    font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    font-family: inherit;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+  }
+}
+
+/* Floating animation for login background icons */
+@keyframes float {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(5deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+}
+
+@keyframes float-slow {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-15px) rotate(-5deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+}
+
+/* Pulse animations for gradient circles */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes pulse-slower {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+}
+
+/* Dots animation */
+@keyframes dots {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 24px 24px;
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float-slow 8s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 8s ease-in-out infinite;
+}
+
+.animate-pulse-slower {
+  animation: pulse-slower 12s ease-in-out infinite;
+}
+
+.animate-dots {
+  animation: dots 20s linear infinite;
+}
+
+@layer components {
+  .sidebar-nav-item {
+    @apply text-gray-600 hover:bg-gray-50 flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors;
+  }
+  
+  .sidebar-nav-item.active {
+    @apply bg-blue-50 text-blue-700;
+  }
+  
+  .sidebar-nav-item.active i {
+    @apply text-blue-500;
+  }
+  
+  .sidebar-nav-item i {
+    @apply mr-3 text-gray-400;
+  }
+  
+  .stat-card {
+    @apply bg-white rounded-xl shadow-sm p-6 border border-gray-100;
+  }
+  
+  .status-badge {
+    @apply inline-flex px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .status-badge.new {
+    @apply bg-blue-100 text-blue-800;
+  }
+  
+  .status-badge.contacted {
+    @apply bg-purple-100 text-purple-800;
+  }
+  
+  .status-badge.interested {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+  
+  .status-badge.enrolled {
+    @apply bg-green-100 text-green-800;
+  }
+  
+  .status-badge.dropped {
+    @apply bg-red-100 text-red-800;
+  }
+}
+
+/* Custom scrollbar for tables */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Glassmorphism utility */
+.glass-card {
+  background: rgba(36, 39, 48, 0.7);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-radius: 1.25rem;
+  border: 1px solid rgba(120, 120, 140, 0.18);
+  box-shadow: 0 4px 32px 0 rgba(0,0,0,0.18);
+}
+
+/* Custom sidebar active state styles */
+.sidebar-nav-item.active {
+  background: none !important;
+  color: #643ae5 !important;
+  border-left: 4px solid #643ae5;
+  box-shadow: none;
+}
+.sidebar-nav-item .border-l-4 {
+  border-left-width: 4px;
+}
+.sidebar-nav-item .border-\[#643ae5\] {
+  border-left-color: #643ae5;
+}
+.sidebar-nav-item .text-\[\#643ae5\] {
+  color: #643ae5;
+}
+.sidebar-nav-item .dot-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #643ae5;
+  margin-right: 0.75rem;
+  display: inline-block;
+}
+
+/* Custom black soft-glow shadow for sidebar */
+.sidebar-black-shadow {
+  box-shadow: 0 0 32px 8px rgba(0,0,0,0.65);
+}
