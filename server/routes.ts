@@ -198,17 +198,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
-      if (username === "admin" && password === "admin") {
+      
+      // Check if username and password are provided
+      if (!username || !password) {
+        return res.status(400).json({ success: false, message: "Username and password are required" });
+      }
+      
+      console.log("Login attempt with username:", username);
+      
+      // Get user from database
+      const user = await storage.getUserByUsername(username);
+      
+      console.log("User found:", user);
+      
+      // Check if user exists and password matches
+      if (user && user.password === password) {
+        console.log("Login successful for user:", username);
         res.json({
           success: true,
           user: {
-            id: 1,
-            username: "admin",
-            name: "Sarah Johnson",
-            role: "admin"
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            email: user.email
           }
         });
       } else {
+        console.log("Login failed for username:", username);
         res.status(401).json({ success: false, message: "Invalid credentials" });
       }
     } catch (error) {
@@ -219,11 +235,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { username, password, name, email } = req.body;
+      const { username, password, email } = req.body;
+      
+      console.log("Signup attempt with data:", { username, password, email });
       
       // Check if username already exists
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
+        console.log("Username already exists:", username);
         return res.status(400).json({ success: false, message: "Username already exists" });
       }
 
@@ -231,17 +250,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.createUser({
         username,
         password,
-        name,
         email,
         role: "counselor" // Default role for new signups
       });
+
+      console.log("User created successfully:", user);
 
       res.status(201).json({
         success: true,
         user: {
           id: user.id,
           username: user.username,
-          name: user.name,
           role: user.role
         }
       });
@@ -258,14 +277,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User profile route
   app.get("/api/auth/profile", async (req, res) => {
     try {
+      // For now, we'll return the admin user profile
+      // In a real implementation, this would use authentication middleware to get the current user
       const user = await storage.getUserByUsername("admin");
       if (user) {
-        res.json({ 
-          id: user.id, 
-          username: user.username, 
-          name: user.name, 
+        res.json({
+          id: user.id,
+          username: user.username,
           role: user.role,
-          email: user.email 
+          email: user.email
         });
       } else {
         res.status(404).json({ message: "User not found" });

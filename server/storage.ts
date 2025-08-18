@@ -268,7 +268,6 @@ export class DatabaseStorage implements IStorage {
         address: schema.leads.address,
         counselor: {
           id: schema.users.id,
-          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           password: schema.users.password,
@@ -314,7 +313,6 @@ export class DatabaseStorage implements IStorage {
         deletedAt: schema.leads.deletedAt,
         counselor: {
           id: schema.users.id,
-          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           password: schema.users.password,
@@ -363,7 +361,6 @@ export class DatabaseStorage implements IStorage {
         address: schema.leads.address,
         counselor: {
           id: schema.users.id,
-          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           password: schema.users.password,
@@ -407,7 +404,6 @@ export class DatabaseStorage implements IStorage {
         address: schema.leads.address,
         counselor: {
           id: schema.users.id,
-          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           password: schema.users.password,
@@ -451,7 +447,6 @@ export class DatabaseStorage implements IStorage {
         address: schema.leads.address,
         counselor: {
           id: schema.users.id,
-          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           password: schema.users.password,
@@ -579,7 +574,6 @@ export class DatabaseStorage implements IStorage {
         address: schema.leads.address,
         counselor: {
           id: schema.users.id,
-          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           password: schema.users.password,
@@ -1168,7 +1162,6 @@ export class DatabaseStorage implements IStorage {
         updatedAt: schema.expenses.updatedAt,
         approver: {
           id: schema.users.id,
-          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           role: schema.users.role,
@@ -1199,7 +1192,6 @@ export class DatabaseStorage implements IStorage {
         updatedAt: schema.expenses.updatedAt,
         approver: {
           id: schema.users.id,
-          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           role: schema.users.role,
@@ -1229,7 +1221,6 @@ export class DatabaseStorage implements IStorage {
         updatedAt: schema.expenses.updatedAt,
         approver: {
           id: schema.users.id,
-          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           role: schema.users.role,
@@ -1260,7 +1251,6 @@ export class DatabaseStorage implements IStorage {
         updatedAt: schema.expenses.updatedAt,
         approver: {
           id: schema.users.id,
-          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           role: schema.users.role,
@@ -2053,25 +2043,32 @@ export class DatabaseStorage implements IStorage {
 
 // Initialize database with admin user and CSV data
 async function initializeBasicData() {
-  const db = new DatabaseStorage();
-  
   try {
-    // Create admin user only
-    await db.createUser({
-      username: "admin",
-      password: "admin123",
-      role: "admin",
-      name: "Admin User",
-      email: "admin@school.com"
-    });
+    // Check if admin user already exists
+    const existingAdmin = await storage.getUserByUsername("admin");
+    if (!existingAdmin) {
+      // Create admin user only if it doesn't exist
+      await storage.createUser({
+        username: "admin",
+        password: "admin123",
+        role: "admin",
+        email: "admin@school.com"
+      });
+      console.log("Admin user created successfully!");
+    } else {
+      console.log("Admin user already exists.");
+    }
 
     // Import real CSV data
-    const { importCSVLeads, realLeadsData } = await import("./csv-import");
-    await importCSVLeads(realLeadsData);
-
-    console.log("Admin user and CSV leads data imported successfully!");
+    try {
+      const { importCSVLeads, realLeadsData } = await import("./csv-import");
+      await importCSVLeads(realLeadsData);
+      console.log("CSV leads data imported successfully!");
+    } catch (error) {
+      console.log("CSV import skipped or error occurred:", error);
+    }
   } catch (error) {
-    console.log("Basic data already exists or error occurred:", error);
+    console.error("Error initializing basic data:", error);
   }
 }
 

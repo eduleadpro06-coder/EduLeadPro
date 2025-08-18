@@ -253,7 +253,6 @@ export default function Login() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -288,7 +287,7 @@ export default function Login() {
   });
 
   const signupMutation = useMutation({
-    mutationFn: async (userData: { username: string; password: string; name: string; email: string }) => {
+    mutationFn: async (userData: { username: string; password: string; email: string }) => {
       const response = await apiRequest("POST", "/api/auth/signup", userData);
       if (!response.ok) {
         throw new Error("Signup failed");
@@ -323,7 +322,7 @@ export default function Login() {
   
   const handleSignupSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    signupMutation.mutate({ username, password, name, email });
+    signupMutation.mutate({ username, password, email });
   };
 
   return (
@@ -389,7 +388,7 @@ export default function Login() {
                 <a href="#" className="social"><i className="fab fa-linkedin-in"></i></a>
               </div>
               <span>or use your email for registration</span>
-              <input type="text" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
+              <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               <button type="submit" disabled={signupMutation.isPending}>
