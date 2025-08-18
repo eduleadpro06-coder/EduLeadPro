@@ -2074,5 +2074,11 @@ async function initializeBasicData() {
 
 export const storage = new DatabaseStorage();
 
-// Initialize basic admin user and CSV data only
-initializeBasicData();
+// Only seed when explicitly enabled in non-production environments
+const shouldSeed = process.env.NODE_ENV !== 'production' && process.env.SEED_ON_START === 'true';
+
+if (shouldSeed) {
+  initializeBasicData().catch((err) => {
+    console.error("Error initializing basic data:", err);
+  });
+}
