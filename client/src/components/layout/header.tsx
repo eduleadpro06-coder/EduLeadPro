@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import NotificationCenter from "@/components/notifications/notification-center";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface HeaderProps {
   title?: string;
@@ -16,6 +17,7 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
   const [, setLocation] = useLocation();
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { user, signOut } = useAuth();
 
   return (
     <header className={`bg-black shadow-sm px-6 py-4 ${className || ''}`}>
@@ -31,8 +33,8 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
               onClick={() => setShowProfileDropdown(!showProfileDropdown)}
             >
               <div className="text-right">
-                <p className="text-sm font-medium text-foreground">Sarah Johnson</p>
-                <p className="text-xs text-muted-foreground">Admissions Head</p>
+                <p className="text-sm font-medium text-foreground">{user?.email || 'User'}</p>
+                <p className="text-xs text-muted-foreground">Signed in</p>
               </div>
               <Avatar className="w-8 h-8">
                 <AvatarFallback className="bg-blue-100 text-blue-600">SJ</AvatarFallback>
@@ -48,8 +50,8 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
                       <AvatarFallback className="bg-primary/20 text-primary">SJ</AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="text-sm font-medium text-foreground">Sarah Johnson</p>
-                      <p className="text-xs text-muted-foreground">sarah.johnson@school.edu</p>
+                      <p className="text-sm font-medium text-foreground">{user?.email || 'User'}</p>
+                      <p className="text-xs text-muted-foreground">{user?.id?.slice(0,8)}</p>
                     </div>
                   </div>
                 </div>
@@ -83,8 +85,8 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
                     variant="ghost"
                     size="sm"
                     className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => {
-                      localStorage.removeItem("user");
+                    onClick={async () => {
+                      await signOut();
                       setLocation("/login");
                       setShowProfileDropdown(false);
                     }}

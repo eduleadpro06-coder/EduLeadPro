@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import { 
   GraduationCap, 
   BookOpen, 
@@ -251,79 +251,44 @@ export default function Login() {
     };
   }, []);
 
-  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const loginMutation = useMutation({
-    mutationFn: async (credentials: { username: string; password: string }) => {
-      const response = await apiRequest("POST", "/api/auth/login", credentials);
-      if (!response.ok) {
-        throw new Error("Login failed");
-      }
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-        toast({
-          title: "Login successful",
-          description: `Welcome back, ${data.user.name}!`,
-        });
-        setLocation("/dashboard");
-      } else {
-        throw new Error(data.message || "Login failed");
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Login failed",
-        description: error.message || "Invalid username or password",
-        variant: "destructive",
-      });
-    },
-  });
+  const { signIn, signUp, resendConfirmation } = useAuth();
 
-  const signupMutation = useMutation({
-    mutationFn: async (userData: { username: string; password: string; email: string }) => {
-      const response = await apiRequest("POST", "/api/auth/signup", userData);
-      console.log("Signup response:", response);  
-      if (!response.ok) {
-        throw new Error("Signup failed");
-      }
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-        toast({
-          title: "Signup successful",
-          description: `Welcome to EduLead Pro, ${data.user.name}!`,
-        });
-        setLocation("/dashboard");
-      } else {
-        throw new Error(data.message || "Signup failed");
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Signup failed",
-        description: error.message || "Failed to create account",
-        variant: "destructive",
-      });
-    },
-  });
+  const [loadingLogin, setLoadingLogin] = useState(false);
+  const [loadingSignup, setLoadingSignup] = useState(false);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    loginMutation.mutate({ username, password });
+    setLoadingLogin(true);
+    const res = await signIn(email, password);
+    setLoadingLogin(false);
+    if (res.error) {
+      if (res.needsConfirmation) {
+        toast({ title: "Email not confirmed", description: "Please confirm your email. You can resend the verification link below.", variant: "destructive" });
+      } else {
+        toast({ title: "Login failed", description: res.error, variant: "destructive" });
+      }
+    } else {
+      toast({ title: "Login successful", description: `Welcome back!` });
+      setLocation("/dashboard");
+    }
   };
-  
-  const handleSignupSubmit = (e: React.FormEvent) => {
+
+  const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    signupMutation.mutate({ username, password, email });
+    setLoadingSignup(true);
+    const res = await signUp(email, password);
+    setLoadingSignup(false);
+    if (res.error) {
+      toast({ title: "Signup failed", description: res.error, variant: "destructive" });
+    } else {
+      toast({ title: "Check your email", description: "We sent you a confirmation link." });
+      setRightPanelActive(false);
+    }
   };
 
   return (
@@ -389,11 +354,10 @@ export default function Login() {
                 <a href="#" className="social"><i className="fab fa-linkedin-in"></i></a>
               </div>
               <span>or use your email for registration</span>
-              <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-              <button type="submit" disabled={signupMutation.isPending}>
-                {signupMutation.isPending ? "Creating account..." : "Sign Up"}
+              <button type="submit" disabled={loadingSignup}>
+                {loadingSignup ? "Creating account..." : "Sign Up"}
               </button>
             </form>
           </div>
@@ -406,11 +370,43 @@ export default function Login() {
                 <a href="#" className="social"><i className="fab fa-linkedin-in"></i></a>
               </div>
               <span>or use your account</span>
-              <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-              <a href="#">Forgot your password?</a>
-              <button type="submit" disabled={loginMutation.isPending}>
-                {loginMutation.isPending ? "Signing in..." : "Sign In"}
+              <a href="#" onClick={async (e) => {
+                e.preventDefault();
+                if (!email) {
+                  toast({ title: "Enter email", description: "Please enter your email above first.", variant: "destructive" });
+                  return;
+                }
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                  redirectTo: window.location.origin + "/login",
+                });
+                if (error) {
+                  toast({ title: "Reset failed", description: error.message, variant: "destructive" });
+                } else {
+                  toast({ title: "Email sent", description: "Check your inbox for a reset link." });
+                }
+              }}>Forgot your password?</a>
+              <button type="submit" disabled={loadingLogin}>
+                {loadingLogin ? "Signing in..." : "Sign In"}
+              </button>
+              <button
+                type="button"
+                className="mt-2 underline text-sm"
+                onClick={async () => {
+                  if (!email) {
+                    toast({ title: "Enter email", description: "Please enter your email above first.", variant: "destructive" });
+                    return;
+                  }
+                  const { error } = await resendConfirmation(email);
+                  if (error) {
+                    toast({ title: "Could not resend", description: error, variant: "destructive" });
+                  } else {
+                    toast({ title: "Verification sent", description: "Check your inbox for the link." });
+                  }
+                }}
+              >
+                Resend verification email
               </button>
             </form>
           </div>
