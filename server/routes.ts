@@ -239,12 +239,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Signup attempt with data:", { username, password, email });
       
+      // Validate required fields
+      if (!username || !password) {
+        console.log("Missing required fields");
+        return res.status(400).json({ success: false, message: "Username and password are required" });
+      }
+      
       // Check if username already exists
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
         console.log("Username already exists:", username);
         return res.status(400).json({ success: false, message: "Username already exists" });
       }
+
+      console.log("About to create user with data:", {
+        username,
+        password: password ? "[REDACTED]" : null,
+        email,
+        role: "counselor"
+      });
 
       // Create new user
       const user = await storage.createUser({
@@ -265,8 +278,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
     } catch (error) {
-      console.error("Signup error:", error);
-      res.status(500).json({ success: false, message: "Signup failed" });
+      console.error("Signup error details:", error);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+      res.status(500).json({ success: false, message: "Signup failed", error: error.message });
     }
   });
 
