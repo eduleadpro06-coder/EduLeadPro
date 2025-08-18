@@ -25,6 +25,8 @@ import AddLeadPage from "@/pages/leads-add";
 import HealthDashboard from "@/pages/health-dashboard";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/layout/ProtectedRoute";
 
 function Router() {
   return (
@@ -35,132 +37,158 @@ function Router() {
       <Route path="/pricing" component={Pricing} />
       <Route path="/dashboard">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <Dashboard />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <Dashboard />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/leads">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <LeadManagement />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <LeadManagement />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/leads/add">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <AddLeadPage />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <AddLeadPage />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/ai-forecasting">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <AIForecasting />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <AIForecasting />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/ai-marketing">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <AIMarketing />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <AIMarketing />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/reports">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <Reports />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <Reports />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/settings">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <Settings />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <Settings />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/expenses">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <Expenses />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <Expenses />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/students">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <Students />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <Students />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/e-mandate">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <EMandate />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <EMandate />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/student-fees">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <StudentFees />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <StudentFees />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/staff-ai">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <StaffAI />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <StaffAI />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/communication">
         {() => (
-          <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-            <Sidebar />
-            <div className="flex-1 ml-64">
-              <Communication />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <Communication />
+              </div>
             </div>
-          </div>
+          )} />
         )}
       </Route>
       <Route path="/analytics">
@@ -185,10 +213,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <NotificationProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
+          <AuthProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </AuthProvider>
         </NotificationProvider>
       </ThemeProvider>
     </QueryClientProvider>

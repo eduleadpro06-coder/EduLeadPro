@@ -21,12 +21,15 @@ export * from "../shared/schema";
 // Export db
 export { db };
 
-// Test the connection
-(async () => {
-  try {
-    const result = await db.select().from(schema.leads).limit(1);
-    console.log("Database connection successful");
-  } catch (error) {
-    console.error("Database connection failed:", error);
-  }
-})();
+// Optional: Test the connection only when explicitly enabled.
+// This avoids running an async query at import time in serverless environments.
+if (process.env.DB_TEST_AT_START === 'true') {
+  (async () => {
+    try {
+      await db.select().from(schema.leads).limit(1);
+      console.log("Database connection successful");
+    } catch (error) {
+      console.error("Database connection failed:", error);
+    }
+  })();
+}
