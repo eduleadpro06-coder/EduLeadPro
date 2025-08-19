@@ -86,11 +86,26 @@ const LoginStyles = `
   }
 
   .login-container input {
-    background-color: #eee;
-    border: none;
+    background-color: #f3f0ff;
+    border: 2px solid #e0d4ff;
+    border-radius: 8px;
     padding: 12px 15px;
     margin: 8px 0;
     width: 100%;
+    transition: all 0.3s ease;
+    color: #4c1d95;
+  }
+
+  .login-container input:focus {
+    outline: none;
+    background-color: #ede9fe;
+    border-color: #643ae5;
+    box-shadow: 0 0 0 3px rgba(100, 58, 229, 0.1);
+  }
+
+  .login-container input::placeholder {
+    color: #8b5cf6;
+    opacity: 0.7;
   }
 
   .login-container .container {
