@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { getAuthRedirectUrl } from "@/lib/auth-utils";
 import { 
   GraduationCap, 
   BookOpen, 
@@ -244,6 +245,36 @@ export default function Login() {
     link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css';
     document.head.appendChild(link);
 
+    // Handle URL hash parameters for email confirmation errors
+    const handleAuthErrors = () => {
+      if (window.location.hash) {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const error = hashParams.get('error');
+        const errorDescription = hashParams.get('error_description');
+        
+        if (error) {
+          let userMessage = 'Authentication error occurred.';
+          
+          if (error === 'access_denied' && errorDescription?.includes('expired')) {
+            userMessage = 'Your email confirmation link has expired. Please request a new one below.';
+          } else if (error === 'access_denied') {
+            userMessage = 'Email confirmation failed. The link may be invalid or already used.';
+          }
+          
+          toast({ 
+            title: "Email Confirmation Error", 
+            description: userMessage, 
+            variant: "destructive" 
+          });
+          
+          // Clear the hash to prevent repeated error messages
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      }
+    };
+
+    handleAuthErrors();
+
     return () => {
       document.documentElement.classList.remove('dark');
       document.head.removeChild(style);
@@ -379,7 +410,7 @@ export default function Login() {
                   return;
                 }
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                  redirectTo: window.location.origin + "/login",
+                  redirectTo: getAuthRedirectUrl("/login"),
                 });
                 if (error) {
                   toast({ title: "Reset failed", description: error.message, variant: "destructive" });

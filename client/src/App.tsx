@@ -14,6 +14,7 @@ import Settings from "@/pages/settings";
 import Login from "@/pages/login";
 import Landing from "@/pages/landing";
 import BookDemo from "@/pages/book-demo";
+import AuthCallback from "@/pages/auth/callback";
 import Pricing from "@/pages/pricing";
 import Students from "@/pages/students";
 import EMandate from "@/pages/e-mandate";
@@ -35,6 +36,7 @@ function Router() {
     <Switch>
       <Route path="/landing" component={Landing} />
       <Route path="/login" component={Login} />
+      <Route path="/auth/callback" component={AuthCallback} />
       <Route path="/book-demo" component={BookDemo} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/dashboard">

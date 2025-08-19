@@ -28,6 +28,29 @@ if (!isConfigured) {
   console.error('Please set these environment variables in your Vercel project settings.')
 }
 
+// Get the correct redirect URL based on environment
+const getRedirectUrl = () => {
+  // Use production URL from environment variable if available
+  const productionUrl = import.meta.env.VITE_PRODUCTION_URL;
+  
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    
+    // If we have a production URL configured and we're not on localhost
+    if (productionUrl && !hostname.includes('localhost')) {
+      return productionUrl;
+    }
+    
+    // For Vercel deployments or custom domains
+    if (hostname.includes('vercel.app') || !hostname.includes('localhost')) {
+      return window.location.origin;
+    }
+  }
+  
+  // Fallback to current origin or localhost for development
+  return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+};
+
 // Create the Supabase client with actual values or fallbacks if missing
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
@@ -38,6 +61,7 @@ export const supabase = createClient(
       autoRefreshToken: true,
       detectSessionInUrl: true,
       storageKey: 'eduleadpro.auth',
+      redirectTo: getRedirectUrl(),
     },
   }
 )

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getAuthRedirectUrl } from '@/lib/auth-utils'
 
 export type AuthUser = {
   id: string
@@ -24,6 +25,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const init = async () => {
       try {
+        // Handle URL hash parameters for email confirmation
+        if (typeof window !== 'undefined' && window.location.hash) {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const error = hashParams.get('error');
+          const errorDescription = hashParams.get('error_description');
+          
+          if (error) {
+            console.error('Auth error from URL:', error, errorDescription);
+            // Clear the hash to prevent repeated error messages
+            window.history.replaceState(null, '', window.location.pathname);
+            
+            // Show user-friendly error message
+            if (error === 'access_denied' && errorDescription?.includes('expired')) {
+              console.warn('Email confirmation link has expired');
+            }
+          }
+        }
+
         const { data } = await supabase.auth.getSession()
         const sessionUser = data.session?.user
         setUser(sessionUser ? { id: sessionUser.id, email: sessionUser.email } : null)
@@ -36,10 +55,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     init()
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       try {
         const sessionUser = session?.user
         setUser(sessionUser ? { id: sessionUser.id, email: sessionUser.email } : null)
+        
+        // Handle successful email confirmation
+        if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
+          console.log('Email confirmed successfully');
+          // Clear any error hash parameters
+          if (typeof window !== 'undefined' && window.location.hash.includes('error')) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+        }
       } catch (error) {
         console.error("Auth state change error:", error)
         setUser(null)
@@ -72,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         options: {
-          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin + '/login' : undefined,
+          emailRedirectTo: getAuthRedirectUrl('/login'),
         },
       })
       if (error) return { error: error.message }
@@ -85,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         type: 'signup',
         email,
         options: {
-          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin + '/login' : undefined,
+          emailRedirectTo: getAuthRedirectUrl('/login'),
         },
       })
       if (error) return { error: error.message }
