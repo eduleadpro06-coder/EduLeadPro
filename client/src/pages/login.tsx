@@ -427,24 +427,7 @@ export default function Login() {
           <div className="form-container sign-up-container">
             <form onSubmit={handleSignupSubmit}>
               <h1>Create Account</h1>
-              <div className="social-container">
-                <a href="#" className="social"><i className="fab fa-facebook-f"></i></a>
-                <a href="#" className="social" onClick={async (e) => {
-                  e.preventDefault();
-                  const { error } = await supabase.auth.signInWithOAuth({
-                    provider: 'google',
-                    options: {
-                      redirectTo: getAuthRedirectUrl('/auth/callback'),
-                      queryParams: { access_type: 'offline', prompt: 'consent' },
-                    },
-                  });
-                  if (error) {
-                    toast({ title: 'Google sign-in failed', description: error.message, variant: 'destructive' });
-                  }
-                }}><i className="fab fa-google"></i></a>
-                <a href="#" className="social"><i className="fab fa-linkedin-in"></i></a>
-              </div>
-              <span>or use your email for registration</span>
+              <span>Use your email for registration</span>
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               <button type="submit" disabled={loadingSignup}>
