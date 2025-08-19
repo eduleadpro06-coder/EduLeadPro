@@ -23,16 +23,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
-      const { data } = await supabase.auth.getSession()
-      const sessionUser = data.session?.user
-      setUser(sessionUser ? { id: sessionUser.id, email: sessionUser.email } : null)
-      setLoading(false)
+      try {
+        const { data } = await supabase.auth.getSession()
+        const sessionUser = data.session?.user
+        setUser(sessionUser ? { id: sessionUser.id, email: sessionUser.email } : null)
+      } catch (error) {
+        console.error("Auth initialization error:", error)
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
     }
     init()
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      const sessionUser = session?.user
-      setUser(sessionUser ? { id: sessionUser.id, email: sessionUser.email } : null)
+      try {
+        const sessionUser = session?.user
+        setUser(sessionUser ? { id: sessionUser.id, email: sessionUser.email } : null)
+      } catch (error) {
+        console.error("Auth state change error:", error)
+        setUser(null)
+      }
     })
 
     return () => {
