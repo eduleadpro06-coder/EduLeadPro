@@ -316,7 +316,7 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const { signIn, signUp, resendConfirmation } = useAuth();
+  const { signIn, signUp, resendConfirmation, signInWithGoogle } = useAuth();
 
   const [loadingLogin, setLoadingLogin] = useState(false);
   const [loadingSignup, setLoadingSignup] = useState(false);
@@ -429,7 +429,19 @@ export default function Login() {
               <h1>Create Account</h1>
               <div className="social-container">
                 <a href="#" className="social"><i className="fab fa-facebook-f"></i></a>
-                <a href="#" className="social"><i className="fab fa-google-plus-g"></i></a>
+                <a href="#" className="social" onClick={async (e) => {
+                  e.preventDefault();
+                  const { error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                      redirectTo: getAuthRedirectUrl('/auth/callback'),
+                      queryParams: { access_type: 'offline', prompt: 'consent' },
+                    },
+                  });
+                  if (error) {
+                    toast({ title: 'Google sign-in failed', description: error.message, variant: 'destructive' });
+                  }
+                }}><i className="fab fa-google"></i></a>
                 <a href="#" className="social"><i className="fab fa-linkedin-in"></i></a>
               </div>
               <span>or use your email for registration</span>
@@ -445,7 +457,19 @@ export default function Login() {
               <h1>Sign in</h1>
               <div className="social-container">
                 <a href="#" className="social"><i className="fab fa-facebook-f"></i></a>
-                <a href="#" className="social"><i className="fab fa-google-plus-g"></i></a>
+                <a href="#" className="social" onClick={async (e) => {
+                  e.preventDefault();
+                  const { error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                      redirectTo: getAuthRedirectUrl('/auth/callback'),
+                      queryParams: { access_type: 'offline', prompt: 'consent' },
+                    },
+                  });
+                  if (error) {
+                    toast({ title: 'Google sign-in failed', description: error.message, variant: 'destructive' });
+                  }
+                }}><i className="fab fa-google"></i></a>
                 <a href="#" className="social"><i className="fab fa-linkedin-in"></i></a>
               </div>
               <span>or use your account</span>

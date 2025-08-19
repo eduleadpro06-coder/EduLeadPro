@@ -13,6 +13,7 @@ type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<{ error?: string; needsConfirmation?: boolean }>
   signUp: (email: string, password: string) => Promise<{ error?: string; pendingConfirmation?: boolean }>
   resendConfirmation: (email: string) => Promise<{ error?: string }>
+  signInWithGoogle: () => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
 
@@ -124,6 +125,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         options: {
           emailRedirectTo: getAuthRedirectUrl('/login'),
+        },
+      })
+      if (error) return { error: error.message }
+      return {}
+    },
+    signInWithGoogle: async () => {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: getAuthRedirectUrl('/auth/callback'),
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       })
       if (error) return { error: error.message }
