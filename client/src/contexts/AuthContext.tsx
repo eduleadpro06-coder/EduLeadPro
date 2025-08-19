@@ -67,6 +67,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (typeof window !== 'undefined' && window.location.hash.includes('error')) {
             window.history.replaceState(null, '', window.location.pathname);
           }
+          // Show success message for email confirmation
+          if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+            // This indicates the user just confirmed their email
+            setTimeout(() => {
+              const event = new CustomEvent('emailConfirmed', { 
+                detail: { message: 'Email confirmed successfully! You can now sign in.' }
+              });
+              window.dispatchEvent(event);
+            }, 1000);
+          }
         }
       } catch (error) {
         console.error("Auth state change error:", error)

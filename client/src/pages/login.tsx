@@ -275,10 +275,24 @@ export default function Login() {
 
     handleAuthErrors();
 
+    // Listen for successful email confirmation
+    const handleEmailConfirmed = (event: CustomEvent) => {
+      toast({ 
+        title: "✅ Email confirmed!", 
+        description: event.detail.message,
+        duration: 5000,
+      });
+      setAwaitingConfirmation(false);
+      setConfirmationEmail("");
+    };
+
+    window.addEventListener('emailConfirmed', handleEmailConfirmed as EventListener);
+
     return () => {
       document.documentElement.classList.remove('dark');
       document.head.removeChild(style);
       document.head.removeChild(link);
+      window.removeEventListener('emailConfirmed', handleEmailConfirmed as EventListener);
     };
   }, []);
 
@@ -291,6 +305,8 @@ export default function Login() {
 
   const [loadingLogin, setLoadingLogin] = useState(false);
   const [loadingSignup, setLoadingSignup] = useState(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState("");
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -305,6 +321,8 @@ export default function Login() {
       }
     } else {
       toast({ title: "Login successful", description: `Welcome back!` });
+      setAwaitingConfirmation(false);
+      setConfirmationEmail("");
       setLocation("/dashboard");
     }
   };
@@ -316,9 +334,24 @@ export default function Login() {
     setLoadingSignup(false);
     if (res.error) {
       toast({ title: "Signup failed", description: res.error, variant: "destructive" });
-    } else {
-      toast({ title: "Check your email", description: "We sent you a confirmation link." });
+    } else if (res.pendingConfirmation) {
+      // Show detailed confirmation message
+      toast({ 
+        title: "📧 Check your email!", 
+        description: `We've sent a confirmation link to ${email}. Please click the link in your email to activate your account, then return here to sign in.`,
+        duration: 8000, // Show for 8 seconds
+      });
       setRightPanelActive(false);
+      setAwaitingConfirmation(true);
+      setConfirmationEmail(email);
+      // Clear the password field for security
+      setPassword("");
+    } else {
+      // Immediate signup success (if email confirmation is disabled)
+      toast({ title: "Account created!", description: "Welcome! You can now sign in." });
+      setRightPanelActive(false);
+      setAwaitingConfirmation(false);
+      setPassword("");
     }
   };
 
@@ -401,7 +434,25 @@ export default function Login() {
                 <a href="#" className="social"><i className="fab fa-linkedin-in"></i></a>
               </div>
               <span>or use your account</span>
-              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              {awaitingConfirmation && confirmationEmail && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
+                  <div className="flex items-center gap-2">
+                    <span>📧</span>
+                    <div>
+                      <p className="font-medium">Email confirmation pending</p>
+                      <p>Check your email ({confirmationEmail}) and click the confirmation link before signing in.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <input type="email" placeholder="Email" value={email} onChange={(e) => {
+                setEmail(e.target.value);
+                // Clear confirmation state if user changes email
+                if (awaitingConfirmation && e.target.value !== confirmationEmail) {
+                  setAwaitingConfirmation(false);
+                  setConfirmationEmail("");
+                }
+              }} required />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               <a href="#" onClick={async (e) => {
                 e.preventDefault();
@@ -415,7 +466,11 @@ export default function Login() {
                 if (error) {
                   toast({ title: "Reset failed", description: error.message, variant: "destructive" });
                 } else {
-                  toast({ title: "Email sent", description: "Check your inbox for a reset link." });
+                  toast({ 
+                    title: "📧 Password reset email sent!", 
+                    description: `We've sent a password reset link to ${email}. Please check your email and follow the instructions to reset your password.`,
+                    duration: 8000,
+                  });
                 }
               }}>Forgot your password?</a>
               <button type="submit" disabled={loadingLogin}>
@@ -433,7 +488,13 @@ export default function Login() {
                   if (error) {
                     toast({ title: "Could not resend", description: error, variant: "destructive" });
                   } else {
-                    toast({ title: "Verification sent", description: "Check your inbox for the link." });
+                    toast({ 
+                      title: "📧 New verification email sent!", 
+                      description: `We've sent a fresh confirmation link to ${email}. Please check your email and click the link to activate your account.`,
+                      duration: 8000,
+                    });
+                    setAwaitingConfirmation(true);
+                    setConfirmationEmail(email);
                   }
                 }}
               >
