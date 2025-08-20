@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import NavBar from '@/components/ui/navbar';
+import { useAuth } from '@/contexts/AuthContext';
 import { Home, BarChart3, Brain, TrendingUp, Star, ChevronDown, GraduationCap } from 'lucide-react';
 
 const navItems = [
@@ -15,15 +16,8 @@ const navItems = [
 
 const PublicLayout = ({ children }: { children: React.ReactNode }) => {
   const [location, setLocation] = useLocation();
-  const [user, setUser] = useState<any>(null);
+  const { user, loading } = useAuth();
   const [activeSection, setActiveSection] = useState(navItems[0].name);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
 
   useEffect(() => {
     const pageNavItem = navItems.find(item => item.url === location && !item.url.includes('#'));
@@ -83,6 +77,7 @@ const PublicLayout = ({ children }: { children: React.ReactNode }) => {
         items={navItems}
         setLocation={setLocation}
         user={user}
+        loading={loading}
         activeTab={activeSection}
         setActiveTab={setActiveSection}
         handleNavClick={handleNavBarNavClick}

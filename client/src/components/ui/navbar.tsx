@@ -8,12 +8,13 @@ interface NavBarProps {
   className?: string;
   setLocation?: (path: string) => void;
   user?: any;
+  loading?: boolean;
   activeTab: string;
   setActiveTab: (name: string) => void;
   handleNavClick?: (item: any) => void;
 }
 
-const NavBar = ({ items, className, setLocation, user, activeTab, setActiveTab, handleNavClick }: NavBarProps) => {
+const NavBar = ({ items, className, setLocation, user, loading, activeTab, setActiveTab, handleNavClick }: NavBarProps) => {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -84,7 +85,8 @@ const NavBar = ({ items, className, setLocation, user, activeTab, setActiveTab, 
             </a>
           );
         })}
-        {user ? (
+        {/* Hide auth CTA while auth is loading to avoid flicker */}
+        {loading ? null : user ? (
           <Button
             onClick={() => (setLocation ? setLocation('/dashboard') : window.location.href = '/dashboard')}
             className="rounded-full px-6 py-2 font-semibold text-white bg-gradient-to-r from-blue-500 to-purple-500 shadow hover:scale-105 hover:brightness-110 transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
