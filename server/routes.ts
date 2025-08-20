@@ -2306,6 +2306,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error("Failed to load AI enhanced routes:", error);
   }
 
+  // Comprehensive AI routes
+  try {
+    const aiComprehensiveRoutes = (await import("./api/ai-comprehensive.js")).default;
+    app.use("/api/ai-comprehensive", aiComprehensiveRoutes);
+  } catch (error) {
+    console.error("Failed to load comprehensive AI routes:", error);
+  }
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -25,7 +25,8 @@ const navigation = [
   { name: "Lead Management", href: "/leads", icon: Users },
   { name: "Employee Management", href: "/staff-ai", icon: UserCheck },
   { name: "Student, Fees & EMI", href: "/student-fees", icon: IndianRupee },
-  { name: "AI Enhanced Hub", href: "/ai-enhanced", icon: Bot },
+  { name: "AI Control Center", href: "/ai-comprehensive", icon: Bot },
+  { name: "AI Enhanced Hub", href: "/ai-enhanced", icon: TrendingUp },
   { name: "AI Forecasting", href: "/ai-forecasting", icon: Brain },
   { name: "AI Marketing", href: "/ai-marketing", icon: Megaphone },
   { name: "Expenses", href: "/expenses", icon: Wallet },
@@ -82,7 +83,7 @@ export default function Sidebar() {
               const isActive = location === item.href;
               const Icon = item.icon;
               // Add divider after certain items for grouping
-              const dividerAfter = [3, 7].includes(idx);
+              const dividerAfter = [3, 8].includes(idx);
               return (
                 <>
                   <Link

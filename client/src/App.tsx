@@ -10,6 +10,7 @@ import LeadManagement from "@/pages/lead-management";
 import AIForecasting from "@/pages/ai-forecasting";
 import AIMarketing from "@/pages/ai-marketing";
 import AIEnhancedDashboard from "@/pages/ai-enhanced-dashboard";
+import ComprehensiveAIDashboard from "@/pages/comprehensive-ai-dashboard";
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
 import Login from "@/pages/login";
@@ -103,6 +104,11 @@ function Router() {
       <Route path="/ai-enhanced">
         {() => (
           <ProtectedRoute component={AIEnhancedDashboard} />
+        )}
+      </Route>
+      <Route path="/ai-comprehensive">
+        {() => (
+          <ProtectedRoute component={ComprehensiveAIDashboard} />
         )}
       </Route>
       <Route path="/reports">
