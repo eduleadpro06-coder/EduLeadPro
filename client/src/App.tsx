@@ -9,6 +9,8 @@ import Dashboard from "@/pages/dashboard";
 import LeadManagement from "@/pages/lead-management";
 import AIForecasting from "@/pages/ai-forecasting";
 import AIMarketing from "@/pages/ai-marketing";
+import AIEnhancedDashboard from "@/pages/ai-enhanced-dashboard";
+import ComprehensiveAIDashboard from "@/pages/comprehensive-ai-dashboard";
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
 import Login from "@/pages/login";
@@ -94,6 +96,23 @@ function Router() {
               <Sidebar />
               <div className="flex-1 ml-64">
                 <AIMarketing />
+              </div>
+            </div>
+          )} />
+        )}
+      </Route>
+      <Route path="/ai-enhanced">
+        {() => (
+          <ProtectedRoute component={AIEnhancedDashboard} />
+        )}
+      </Route>
+      <Route path="/ai-comprehensive">
+        {() => (
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <ComprehensiveAIDashboard />
               </div>
             </div>
           )} />

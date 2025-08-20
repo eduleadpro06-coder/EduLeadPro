@@ -1,513 +1,525 @@
-// Perplexity AI integration for EduLeadPro
-const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
-const PERPLEXITY_API_URL = 'https://api.perplexity.ai/chat/completions';
-const DEFAULT_MODEL = 'sonar-pro'; // Good balance of performance and capability
-const REASONING_MODEL = 'sonar-reasoning-pro'; // Best for complex analytical tasks
+// Enhanced Perplexity AI Integration for Educational Intelligence
+import 'dotenv/config';
 
-export interface AdmissionPrediction {
-  likelihood: number;
-  confidence: number;
-  factors: string[];
-  recommendations: string[];
+export interface PerplexityResponse {
+  id: string;
+  model: string;
+  object: string;
+  created: number;
+  citations: string[];
+  choices: {
+    index: number;
+    finish_reason: string;
+    message: {
+      role: string;
+      content: string;
+    };
+    delta?: {
+      role: string;
+      content: string;
+    };
+  }[];
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
-export interface EnrollmentForecast {
-  predictedEnrollments: number;
-  confidence: number;
-  trend: "increasing" | "decreasing" | "stable";
-  factors: string[];
+export interface PerplexityRequest {
+  model: string;
+  messages: {
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+  }[];
+  max_tokens?: number;
+  temperature?: number;
+  top_p?: number;
+  search_domain_filter?: string[];
+  return_images?: boolean;
+  return_related_questions?: boolean;
+  search_recency_filter?: 'month' | 'week' | 'day' | 'hour';
+  top_k?: number;
+  stream?: boolean;
+  presence_penalty?: number;
+  frequency_penalty?: number;
 }
 
-export interface MarketingRecommendation {
-  campaign_type: string;
-  target_audience: string;
-  platform: string;
-  budget_suggestion: string;
-  ad_copy: string;
-  expected_leads: number;
-}
+class PerplexityAI {
+  private apiKey: string;
+  private baseUrl: string = 'https://api.perplexity.ai/chat/completions';
 
-export interface FeeOptimizationRecommendation {
-  studentId: number;
-  currentFeeStructure: string;
-  recommendedAction: string;
-  riskLevel: "low" | "medium" | "high";
-  paymentPlan: string;
-  emiAmount: number;
-  confidence: number;
-  reasons: string[];
-}
-
-export interface StaffPerformanceAnalysis {
-  staffId: number;
-  performanceScore: number;
-  attendancePattern: string;
-  salaryRecommendation: number;
-  trainingNeeds: string[];
-  promotionEligibility: boolean;
-  insights: string[];
-}
-
-// Initialize Perplexity AI with error handling
-async function callPerplexityAPI(prompt: string, model: string = DEFAULT_MODEL, temperature: number = 0.3): Promise<string> {
-  if (!PERPLEXITY_API_KEY) {
-    throw new Error('Perplexity API key not found. Please set PERPLEXITY_API_KEY environment variable.');
+  constructor() {
+    this.apiKey = process.env.PERPLEXITY_API_KEY;
+    if (!this.apiKey) {
+      throw new Error('PERPLEXITY_API_KEY environment variable is not set');
+    }
   }
 
-  try {
-    const response = await fetch(PERPLEXITY_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
+  async query(request: PerplexityRequest): Promise<PerplexityResponse> {
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Perplexity API error: ${response.status} - ${errorText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error calling Perplexity API:', error);
+      throw error;
+    }
+  }
+
+  // Educational Student Success Analysis
+  async analyzeStudentSuccessPrediction(studentData: any): Promise<{
+    successProbability: number;
+    riskFactors: string[];
+    recommendations: string[];
+    confidence: number;
+  }> {
+    const request: PerplexityRequest = {
+      model: 'llama-3.1-sonar-small-128k-online',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an educational data analyst specializing in student success prediction. Analyze student data and provide evidence-based insights for academic intervention.'
+        },
+        {
+          role: 'user',
+          content: `Analyze this student's profile for success prediction:
+          
+Academic Performance: ${studentData.academicAverage || 'N/A'}%
+Attendance Rate: ${studentData.attendanceRate || 'N/A'}%
+Engagement Level: ${studentData.engagementScore || 'N/A'}/100
+Family Financial Status: ${studentData.familyIncome || 'N/A'}
+Payment History: ${studentData.paymentStatus || 'Current'}
+Extracurricular Participation: ${studentData.extracurriculars || 'Limited'}
+Previous Academic Issues: ${studentData.previousIssues || 'None'}
+
+Provide:
+1. Success probability (0-100)
+2. Top 3 risk factors
+3. Specific intervention recommendations
+4. Confidence level in prediction (0-100)
+
+Base your analysis on current educational research and proven intervention strategies.`
+        }
+      ],
+      temperature: 0.2,
+      max_tokens: 1000,
+      search_recency_filter: 'month'
+    };
+
+    const response = await this.query(request);
+    const content = response.choices[0]?.message?.content || '';
+    
+    return this.parseStudentAnalysis(content);
+  }
+
+  // Dynamic Course Pricing Intelligence
+  async generatePricingRecommendations(courseData: any, marketData: any): Promise<{
+    recommendedPrice: number;
+    priceChangePercentage: number;
+    marketJustification: string;
+    demandLevel: string;
+    competitorAnalysis: string;
+  }> {
+    const request: PerplexityRequest = {
+      model: 'llama-3.1-sonar-small-128k-online',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an educational market analyst specializing in course pricing optimization. Provide data-driven pricing recommendations based on market conditions and demand patterns.'
+        },
+        {
+          role: 'user',
+          content: `Analyze optimal pricing for this educational course:
+
+Course: ${courseData.name}
+Current Price: ₹${courseData.currentPrice}
+Duration: ${courseData.duration}
+Level: ${courseData.level}
+Department: ${courseData.department}
+Current Enrollment: ${courseData.currentEnrollment}/${courseData.capacity}
+Historical Conversion Rate: ${marketData.conversionRate}%
+Regional Competition: ${marketData.competitors} similar courses
+Market Demand Score: ${marketData.demandScore}/100
+Economic Conditions: ${marketData.economicCondition}
+
+Provide specific recommendations for:
+1. Optimal price point (₹)
+2. Percentage change from current price
+3. Market justification with data
+4. Demand level assessment
+5. Competitive positioning analysis
+
+Focus on maximizing both enrollment and revenue while maintaining educational accessibility.`
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 1200
+    };
+
+    const response = await this.query(request);
+    return this.parsePricingAnalysis(response.choices[0]?.message?.content || '');
+  }
+
+  // Curriculum Gap Analysis
+  async analyzeCurriculumRelevance(curriculumData: any): Promise<{
+    industryAlignment: number;
+    skillGaps: string[];
+    modernizationNeeds: string[];
+    marketTrends: string[];
+    recommendations: string[];
+  }> {
+    const request: PerplexityRequest = {
+      model: 'llama-3.1-sonar-large-128k-online',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a curriculum design expert with deep knowledge of industry trends and educational standards. Analyze curricula for industry relevance and modernization opportunities.'
+        },
+        {
+          role: 'user',
+          content: `Analyze this curriculum for industry alignment and modernization:
+
+Course: ${curriculumData.courseName}
+Current Subjects: ${JSON.stringify(curriculumData.subjects)}
+Practical vs Theory Ratio: ${curriculumData.practicalRatio}%
+Industry Partnerships: ${curriculumData.partnerships || 'None'}
+Graduate Employment Rate: ${curriculumData.employmentRate}%
+Average Graduate Salary: ₹${curriculumData.avgSalary}
+Last Updated: ${curriculumData.lastUpdate}
+
+Provide analysis on:
+1. Industry alignment score (0-100)
+2. Critical skill gaps compared to current job market
+3. Urgent modernization needs
+4. Emerging technology trends to integrate
+5. Specific actionable recommendations
+
+Base analysis on latest industry reports and job market data.`
+        }
+      ],
+      temperature: 0.2,
+      max_tokens: 1500,
+      search_recency_filter: 'week'
+    };
+
+    const response = await this.query(request);
+    return this.parseCurriculumAnalysis(response.choices[0]?.message?.content || '');
+  }
+
+  // Staff Optimization Intelligence
+  async analyzeStaffOptimization(staffData: any[], workloadData: any): Promise<{
+    efficiencyScore: number;
+    burnoutRisks: string[];
+    hiringRecommendations: string[];
+    workloadDistribution: any;
+    performanceInsights: string[];
+  }> {
+    const request: PerplexityRequest = {
+      model: 'llama-3.1-sonar-small-128k-online',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an HR analytics expert specializing in educational institution workforce optimization. Analyze staff performance and provide actionable insights for productivity enhancement.'
+        },
+        {
+          role: 'user',
+          content: `Analyze staff optimization for educational institution:
+
+Total Staff: ${staffData.length}
+Average Workload Hours: ${workloadData.avgHours}/week
+Staff-Student Ratio: 1:${workloadData.studentRatio}
+Overtime Rate: ${workloadData.overtimeRate}%
+Staff Satisfaction: ${workloadData.satisfactionScore}/100
+Turnover Rate: ${workloadData.turnoverRate}%
+Training Hours/Year: ${workloadData.trainingHours}
+
+Department Breakdown:
+${staffData.map(dept => `${dept.department}: ${dept.count} staff, ${dept.avgHours}h/week`).join('\n')}
+
+Provide analysis on:
+1. Overall efficiency score (0-100)
+2. Staff burnout risk factors
+3. Strategic hiring recommendations
+4. Optimal workload distribution
+5. Performance improvement insights
+
+Reference best practices in educational workforce management.`
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 1300
+    };
+
+    const response = await this.query(request);
+    return this.parseStaffAnalysis(response.choices[0]?.message?.content || '');
+  }
+
+  // Virtual Counselor Intelligence
+  async processIntelligentQuery(userQuery: string, context: any): Promise<{
+    response: string;
+    intent: string;
+    sentiment: string;
+    suggestedActions: string[];
+    escalationNeeded: boolean;
+    confidence: number;
+  }> {
+    const request: PerplexityRequest = {
+      model: 'llama-3.1-sonar-small-128k-online',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an intelligent educational counselor assistant. Provide helpful, accurate responses to student and parent inquiries while identifying intent, sentiment, and escalation needs.'
+        },
+        {
+          role: 'user',
+          content: `Process this educational inquiry:
+
+User Query: "${userQuery}"
+User Type: ${context.userType || 'unknown'}
+Previous Interactions: ${context.messageCount || 0}
+Current Topic: ${context.currentTopic || 'general'}
+
+Provide:
+1. Helpful, accurate response
+2. Query intent classification
+3. Sentiment analysis
+4. Suggested follow-up actions
+5. Whether human escalation is needed
+6. Confidence in response accuracy (0-100)
+
+Ensure responses are educational, supportive, and actionable.`
+        }
+      ],
+      temperature: 0.4,
+      max_tokens: 800
+    };
+
+    const response = await this.query(request);
+    return this.parseVirtualCounselorResponse(response.choices[0]?.message?.content || '');
+  }
+
+  // Content Generation for Educational Materials
+  async generateEducationalContent(contentRequest: any): Promise<{
+    content: string;
+    learningObjectives: string[];
+    assessmentQuestions: any[];
+    difficulty: string;
+    estimatedTime: number;
+  }> {
+    const request: PerplexityRequest = {
+      model: 'llama-3.1-sonar-large-128k-online',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert educational content creator specializing in curriculum development and instructional design. Create engaging, pedagogically sound educational materials.'
+        },
+        {
+          role: 'user',
+          content: `Create educational content for:
+
+Subject: ${contentRequest.subject}
+Topic: ${contentRequest.topic}
+Grade Level: ${contentRequest.gradeLevel}
+Duration: ${contentRequest.duration} minutes
+Learning Style: ${contentRequest.learningStyle || 'mixed'}
+Existing Knowledge: ${contentRequest.prerequisites || 'basic'}
+
+Generate:
+1. Comprehensive lesson content with examples
+2. Clear learning objectives
+3. Assessment questions (multiple choice and short answer)
+4. Difficulty level appropriate for grade
+5. Estimated completion time
+
+Ensure content follows modern pedagogical principles and engages learners effectively.`
+        }
+      ],
+      temperature: 0.6,
+      max_tokens: 2000
+    };
+
+    const response = await this.query(request);
+    return this.parseContentGeneration(response.choices[0]?.message?.content || '');
+  }
+
+  // Parser Methods
+  private parseStudentAnalysis(content: string) {
+    // Extract structured data from AI response
+    const successMatch = content.match(/success probability[:\s]*(\d+)/i);
+    const successProbability = successMatch ? parseInt(successMatch[1]) : 65;
+
+    const riskFactors = this.extractListItems(content, 'risk factor');
+    const recommendations = this.extractListItems(content, 'recommendation');
+    
+    const confidenceMatch = content.match(/confidence[:\s]*(\d+)/i);
+    const confidence = confidenceMatch ? parseInt(confidenceMatch[1]) : 75;
+
+    return {
+      successProbability,
+      riskFactors: riskFactors.slice(0, 3),
+      recommendations: recommendations.slice(0, 3),
+      confidence
+    };
+  }
+
+  private parsePricingAnalysis(content: string) {
+    const priceMatch = content.match(/₹\s*([0-9,]+)/);
+    const recommendedPrice = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : 50000;
+
+    const percentMatch = content.match(/(\d+)%.*change/i);
+    const priceChangePercentage = percentMatch ? parseInt(percentMatch[1]) : 0;
+
+    return {
+      recommendedPrice,
+      priceChangePercentage,
+      marketJustification: this.extractSection(content, 'market') || 'Market analysis supports this pricing',
+      demandLevel: this.extractDemandLevel(content),
+      competitorAnalysis: this.extractSection(content, 'competitive') || 'Competitive positioning favorable'
+    };
+  }
+
+  private parseCurriculumAnalysis(content: string) {
+    const alignmentMatch = content.match(/alignment.*?(\d+)/i);
+    const industryAlignment = alignmentMatch ? parseInt(alignmentMatch[1]) : 70;
+
+    return {
+      industryAlignment,
+      skillGaps: this.extractListItems(content, 'gap'),
+      modernizationNeeds: this.extractListItems(content, 'moderniz'),
+      marketTrends: this.extractListItems(content, 'trend'),
+      recommendations: this.extractListItems(content, 'recommendation')
+    };
+  }
+
+  private parseStaffAnalysis(content: string) {
+    const efficiencyMatch = content.match(/efficiency.*?(\d+)/i);
+    const efficiencyScore = efficiencyMatch ? parseInt(efficiencyMatch[1]) : 75;
+
+    return {
+      efficiencyScore,
+      burnoutRisks: this.extractListItems(content, 'burnout'),
+      hiringRecommendations: this.extractListItems(content, 'hiring'),
+      workloadDistribution: { balanced: true, recommendations: this.extractListItems(content, 'workload') },
+      performanceInsights: this.extractListItems(content, 'performance')
+    };
+  }
+
+  private parseVirtualCounselorResponse(content: string) {
+    const intentMatch = content.match(/intent[:\s]*([^\n]+)/i);
+    const intent = intentMatch ? intentMatch[1].trim() : 'general_inquiry';
+
+    const sentimentMatch = content.match(/sentiment[:\s]*([^\n]+)/i);
+    const sentiment = sentimentMatch ? sentimentMatch[1].trim() : 'neutral';
+
+    const escalationMatch = content.match(/escalation[:\s]*(yes|no|true|false)/i);
+    const escalationNeeded = escalationMatch ? 
+      ['yes', 'true'].includes(escalationMatch[1].toLowerCase()) : false;
+
+    const confidenceMatch = content.match(/confidence[:\s]*(\d+)/i);
+    const confidence = confidenceMatch ? parseInt(confidenceMatch[1]) : 80;
+
+    return {
+      response: this.extractMainResponse(content),
+      intent,
+      sentiment,
+      suggestedActions: this.extractListItems(content, 'action'),
+      escalationNeeded,
+      confidence
+    };
+  }
+
+  private parseContentGeneration(content: string) {
+    const timeMatch = content.match(/(\d+)\s*minutes?/i);
+    const estimatedTime = timeMatch ? parseInt(timeMatch[1]) : 45;
+
+    const difficultyMatch = content.match(/difficulty[:\s]*([^\n]+)/i);
+    const difficulty = difficultyMatch ? difficultyMatch[1].trim() : 'intermediate';
+
+    return {
+      content: this.extractMainContent(content),
+      learningObjectives: this.extractListItems(content, 'objective'),
+      assessmentQuestions: this.extractQuestions(content),
+      difficulty,
+      estimatedTime
+    };
+  }
+
+  // Utility parsing methods
+  private extractListItems(text: string, keyword: string): string[] {
+    const lines = text.split('\n');
+    const items: string[] = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].toLowerCase().includes(keyword.toLowerCase())) {
+        // Look for numbered or bulleted lists after the keyword
+        for (let j = i; j < Math.min(i + 10, lines.length); j++) {
+          const line = lines[j].trim();
+          if (line.match(/^[\d\.\-\*\•]\s/)) {
+            items.push(line.replace(/^[\d\.\-\*\•]\s*/, '').trim());
           }
-        ],
-        temperature,
-        max_tokens: 1000
-      })
+        }
+      }
+    }
+    
+    return items.slice(0, 5); // Limit to 5 items
+  }
+
+  private extractSection(text: string, keyword: string): string | null {
+    const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].toLowerCase().includes(keyword.toLowerCase())) {
+        return lines.slice(i, i + 3).join(' ').trim();
+      }
+    }
+    return null;
+  }
+
+  private extractDemandLevel(text: string): string {
+    if (text.toLowerCase().includes('high demand')) return 'high';
+    if (text.toLowerCase().includes('low demand')) return 'low';
+    return 'medium';
+  }
+
+  private extractMainResponse(text: string): string {
+    const lines = text.split('\n');
+    const responseLines = lines.slice(0, 5); // First few lines usually contain main response
+    return responseLines.join(' ').trim().substring(0, 500);
+  }
+
+  private extractMainContent(text: string): string {
+    return text.substring(0, 1000); // First 1000 characters as main content
+  }
+
+  private extractQuestions(text: string): any[] {
+    const questions: any[] = [];
+    const lines = text.split('\n');
+    
+    lines.forEach(line => {
+      if (line.includes('?') && line.length > 10) {
+        questions.push({
+          question: line.trim(),
+          type: 'short_answer',
+          points: 5
+        });
+      }
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Perplexity API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    return data.choices[0].message.content;
-  } catch (error) {
-    console.error('Perplexity API call failed:', error);
-    throw error;
-  }
-}
-
-// Future: Import ML prediction when ready
-// import { predictWithML } from './ml-prediction';
-
-export async function predictAdmissionLikelihood(leadData: {
-  status: string;
-  source: string;
-  daysSinceCreation: number;
-  followUpCount: number;
-  lastContactDays?: number;
-  class: string;
-  stream?: string;
-  hasParentInfo: boolean;
-  name: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  interestedProgram?: string;
-  notes?: string;
-  counselorAssigned: boolean;
-  followUpOutcomes?: string[];
-  seasonalFactor?: string;
-  competitionLevel?: string;
-}): Promise<AdmissionPrediction> {
-  try {
-    // Calculate seasonal factor
-    const currentMonth = new Date().getMonth();
-    const isAdmissionSeason = [2, 3, 4, 5].includes(currentMonth); // March-June
-    const isPlanningPhase = [10, 11, 0, 1].includes(currentMonth); // Nov-Feb
     
-    // Determine engagement quality
-    const engagementScore = leadData.followUpCount > 0 ? 
-      (leadData.followUpOutcomes?.filter(o => ['interested', 'needs_more_info'].includes(o)).length || 0) / leadData.followUpCount : 0;
-    
-    const prompt = `You are an expert educational admission consultant with 15+ years of experience analyzing student enrollment patterns. Analyze this lead comprehensively using data-driven insights.
-
-LEAD PROFILE:
-Student: ${leadData.name}
-Grade: ${leadData.class}${leadData.stream ? ` (${leadData.stream})` : ''}
-Current Status: ${leadData.status}
-Lead Source: ${leadData.source}
-Program Interest: ${leadData.interestedProgram || 'Not specified'}
-
-ENGAGEMENT METRICS:
-- Days since inquiry: ${leadData.daysSinceCreation}
-- Follow-up interactions: ${leadData.followUpCount}
-- Last contact: ${leadData.lastContactDays || 'Never contacted'} days ago
-- Counselor assigned: ${leadData.counselorAssigned ? 'Yes' : 'No'}
-- Follow-up outcomes: ${leadData.followUpOutcomes?.join(', ') || 'None recorded'}
-- Engagement quality score: ${(engagementScore * 100).toFixed(1)}%
-
-CONTACT & FAMILY DATA:
-- Phone available: ${leadData.phone ? 'Yes' : 'No'}
-- Email available: ${leadData.email ? 'Yes' : 'No'}
-- Complete parent info: ${leadData.hasParentInfo ? 'Yes' : 'No'}
-- Address provided: ${leadData.address ? 'Yes' : 'No'}
-- Additional notes: ${leadData.notes || 'None'}
-
-CONTEXTUAL FACTORS:
-- Current season: ${isAdmissionSeason ? 'Peak admission season' : isPlanningPhase ? 'Planning phase' : 'Off-season'}
-- Competition level: ${leadData.competitionLevel || 'Standard'}
-
-ANALYSIS REQUIREMENTS:
-1. Consider lead source quality (referral > website > social media > cold outreach)
-2. Evaluate engagement timeline and response patterns
-3. Assess information completeness and family involvement
-4. Factor in seasonal admission trends
-5. Account for grade-specific conversion patterns
-6. Analyze follow-up outcome quality
-
-Provide your analysis in this EXACT JSON format (no additional text):
-{
-  "likelihood": [integer 0-100],
-  "confidence": [decimal 0.0-1.0],
-  "factors": ["specific factor 1", "specific factor 2", "specific factor 3", "specific factor 4"],
-  "recommendations": ["actionable recommendation 1", "actionable recommendation 2", "actionable recommendation 3"]
-}`;
-
-    const response = await callPerplexityAPI(prompt, REASONING_MODEL, 0.2); // Use reasoning model with low temperature for accuracy
-
-    try {
-      const analysis = JSON.parse(response);
-      
-      // Validate the response structure
-      if (typeof analysis.likelihood !== 'number' || 
-          typeof analysis.confidence !== 'number' ||
-          !Array.isArray(analysis.factors) ||
-          !Array.isArray(analysis.recommendations)) {
-        throw new Error('Invalid response format');
-      }
-
-      return {
-        likelihood: Math.max(0, Math.min(100, analysis.likelihood)),
-        confidence: Math.max(0, Math.min(1, analysis.confidence)),
-        factors: analysis.factors.slice(0, 5), // Limit to 5 factors
-        recommendations: analysis.recommendations.slice(0, 4) // Limit to 4 recommendations
-      };
-    } catch (parseError) {
-      console.error('Failed to parse Perplexity response:', parseError);
-      // Fallback to rule-based system
-      return fallbackAdmissionPrediction(leadData);
-    }
-
-  } catch (error) {
-    console.error('Perplexity prediction failed:', error);
-    return fallbackAdmissionPrediction(leadData);
+    return questions.slice(0, 5);
   }
 }
 
-export async function forecastEnrollments(currentData: {
-  totalLeads: number;
-  hotLeads: number;
-  conversions: number;
-  monthlyTrend: Array<{ month: string; enrollments: number }>;
-  currentSeason?: string;
-}): Promise<EnrollmentForecast> {
-  try {
-    const trendData = currentData.monthlyTrend.map(m => `${m.month}: ${m.enrollments}`).join(', ');
-    const conversionRate = currentData.totalLeads > 0 ? (currentData.conversions / currentData.totalLeads * 100).toFixed(1) : '0';
-    
-    const prompt = `As an AI expert in educational enrollment forecasting, analyze this institutional data and reply with ONLY valid JSON (no explanation, no markdown, no extra text):
-
-Current Metrics:
-- Total Active Leads: ${currentData.totalLeads}
-- Hot Leads: ${currentData.hotLeads}
-- Recent Conversions: ${currentData.conversions}
-- Conversion Rate: ${conversionRate}%
-- Monthly Trend: ${trendData}
-- Current Season: ${currentData.currentSeason || 'Standard'}
-
-Reply in this exact JSON format:
-{
-  "predictedEnrollments": [number],
-  "confidence": [number 0.0-1.0],
-  "trend": ["increasing" | "decreasing" | "stable"],
-  "factors": ["factor1", "factor2", "factor3", "factor4"]
-}`;
-
-    const response = await callPerplexityAPI(prompt, DEFAULT_MODEL, 0.2);
-    
-    // Extract first JSON object from the response string
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON object found in response');
-    
-    const forecast = JSON.parse(jsonMatch[0]);
-    return {
-      predictedEnrollments: Math.max(0, Math.floor(forecast.predictedEnrollments)),
-      confidence: Math.max(0, Math.min(1, forecast.confidence)),
-      trend: ['increasing', 'decreasing', 'stable'].includes(forecast.trend) ? forecast.trend : 'stable',
-      factors: forecast.factors.slice(0, 5)
-    };
-  } catch (error) {
-    console.error('Perplexity forecasting failed:', error);
-    return fallbackEnrollmentForecast(currentData);
-  }
-}
-
-export async function generateMarketingRecommendations(targetData: {
-  targetClass: string;
-  budget: number;
-  currentLeadSources: string[];
-  location?: string;
-  competitorAnalysis?: string;
-  ageGroup?: string;
-}): Promise<MarketingRecommendation[]> {
-  try {
-    const prompt = `As an AI marketing expert for educational institutions, create marketing campaign recommendations:
-
-Campaign Parameters:
-- Target Grade/Class: ${targetData.targetClass}
-- Marketing Budget: ₹${targetData.budget.toLocaleString()}
-- Current Lead Sources: ${targetData.currentLeadSources.join(', ')}
-- Location: ${targetData.location || 'Metro City'}
-- Age Group: ${targetData.ageGroup || '14-18 years'}
-- Competition: ${targetData.competitorAnalysis || 'Moderate local competition'}
-
-Provide 3-4 campaign recommendations in this exact JSON format:
-[
-  {
-    "campaign_type": "Campaign Name",
-    "target_audience": "Specific audience description",
-    "platform": "Platform/Channel",
-    "budget_suggestion": "₹X,XXX (X% of budget)",
-    "ad_copy": "Compelling ad copy under 100 words",
-    "expected_leads": [number]
-  }
-]
-
-Focus on:
-- Digital marketing strategies (Google, Meta, YouTube)
-- Local community engagement
-- Referral programs
-- Content marketing
-- Parent-focused messaging
-- Age-appropriate channels
-- Cost-effective lead generation`;
-
-    const response = await callPerplexityAPI(prompt, DEFAULT_MODEL, 0.4);
-
-    try {
-      const recommendations = JSON.parse(response);
-      
-      if (!Array.isArray(recommendations)) {
-        throw new Error('Expected array of recommendations');
-      }
-
-      return recommendations.slice(0, 4).map(rec => ({
-        campaign_type: rec.campaign_type || 'Digital Campaign',
-        target_audience: rec.target_audience || 'Parents and students',
-        platform: rec.platform || 'Digital Platforms',
-        budget_suggestion: rec.budget_suggestion || `₹${Math.floor(targetData.budget * 0.25).toLocaleString()}`,
-        ad_copy: rec.ad_copy || 'Quality education for your child\'s bright future.',
-        expected_leads: Math.max(1, rec.expected_leads || Math.floor(targetData.budget / 200))
-      }));
-      
-    } catch (parseError) {
-      console.error('Failed to parse marketing response:', parseError);
-      return fallbackMarketingRecommendations(targetData);
-    }
-
-  } catch (error) {
-    console.error('Perplexity marketing failed:', error);
-    return fallbackMarketingRecommendations(targetData);
-  }
-}
-
-export async function analyzeFeeOptimization(studentData: {
-  studentId: number;
-  totalFees: number;
-  paidAmount: number;
-  overdueAmount: number;
-  parentIncome?: number;
-  paymentHistory: Array<{ amount: number; date: string; method: string }>;
-}): Promise<FeeOptimizationRecommendation> {
-  try {
-    const prompt = `Analyze the following student fee data and provide optimization recommendations:
-    
-Student ID: ${studentData.studentId}
-Total Amount: ₹${studentData.totalFees}
-Paid Amount: ₹${studentData.paidAmount}
-Overdue Amount: ₹${studentData.overdueAmount}
-Parent Income: ₹${studentData.parentIncome || 'Unknown'}
-Payment History: ${JSON.stringify(studentData.paymentHistory)}
-
-Provide fee optimization recommendations in JSON format with:
-- recommendedAction (string)
-- riskLevel (low/medium/high)
-- paymentPlan (string description)
-- emiAmount (number)
-- confidence (0-1)
-- reasons (array of strings)`;
-
-    const response = await callPerplexityAPI(prompt, DEFAULT_MODEL, 0.3);
-    const analysis = JSON.parse(response);
-    
-    return {
-      studentId: studentData.studentId,
-      currentFeeStructure: `Total: ₹${studentData.totalFees}, Paid: ₹${studentData.paidAmount}`,
-      ...analysis
-    };
-  } catch (error: any) {
-    console.log('Perplexity fee optimization failed:', error?.message || 'Unknown error');
-    return fallbackFeeOptimization(studentData);
-  }
-}
-
-export async function analyzeStaffPerformance(staffData: {
-  staffId: number;
-  attendance: Array<{ date: string; status: string; hoursWorked: number }>;
-  salary: number;
-  role: string;
-  joiningDate: string;
-}): Promise<StaffPerformanceAnalysis> {
-  try {
-    const prompt = `Analyze the following staff performance data:
-    
-Staff ID: ${staffData.staffId}
-Role: ${staffData.role}
-Current Salary: ₹${staffData.salary}
-Joining Date: ${staffData.joiningDate}
-Attendance Data: ${JSON.stringify(staffData.attendance.slice(-30))}
-
-Provide performance analysis in JSON format with:
-- performanceScore (0-100)
-- attendancePattern (string description)
-- salaryRecommendation (number)
-- trainingNeeds (array of strings)
-- promotionEligibility (boolean)
-- insights (array of strings)`;
-
-    const response = await callPerplexityAPI(prompt, DEFAULT_MODEL, 0.3);
-    const analysis = JSON.parse(response);
-    
-    return {
-      staffId: staffData.staffId,
-      ...analysis
-    };
-  } catch (error: any) {
-    console.log('Perplexity staff analysis failed:', error?.message || 'Unknown error');
-    return fallbackStaffAnalysis(staffData);
-  }
-}
-
-// Fallback functions (simplified versions of the original rule-based system)
-function fallbackAdmissionPrediction(leadData: any): AdmissionPrediction {
-  let likelihood = 50;
-  const factors = [];
-  const recommendations = [];
-
-  if (leadData.status === "hot") {
-    likelihood += 25;
-    factors.push("High interest level");
-  } else if (leadData.status === "warm") {
-    likelihood += 10;
-    factors.push("Moderate interest level");
-  }
-
-  if (leadData.source === "referral") {
-    likelihood += 20;
-    factors.push("Quality referral source");
-  }
-
-  if (leadData.daysSinceCreation <= 3) {
-    likelihood += 15;
-    factors.push("Recent inquiry");
-  }
-
-  if (leadData.followUpCount === 0) {
-    recommendations.push("Schedule initial follow-up");
-  }
-
-  return {
-    likelihood: Math.max(0, Math.min(100, likelihood)),
-    confidence: 0.7,
-    factors: factors.length > 0 ? factors : ["Standard assessment"],
-    recommendations: recommendations.length > 0 ? recommendations : ["Continue engagement"]
-  };
-}
-
-function fallbackEnrollmentForecast(currentData: any): EnrollmentForecast {
-  const conversionRate = currentData.totalLeads > 0 ? currentData.conversions / currentData.totalLeads : 0.1;
-  const predicted = Math.floor(currentData.hotLeads * conversionRate);
-  
-  return {
-    predictedEnrollments: predicted,
-    confidence: 0.6,
-    trend: "stable",
-    factors: ["Based on current conversion patterns", "Historical performance data"]
-  };
-}
-
-function fallbackMarketingRecommendations(targetData: any): MarketingRecommendation[] {
-  return [
-    {
-      campaign_type: "Digital Marketing",
-      target_audience: `Parents of ${targetData.targetClass} students`,
-      platform: "Google Ads & Social Media",
-      budget_suggestion: `₹${Math.floor(targetData.budget * 0.4).toLocaleString()} (40% of budget)`,
-      ad_copy: `Secure your child's future with quality ${targetData.targetClass} education. Expert faculty, proven results.`,
-      expected_leads: Math.floor(targetData.budget * 0.4 / 200)
-    }
-  ];
-}
-
-function fallbackFeeOptimization(studentData: any): FeeOptimizationRecommendation {
-  const outstandingRatio = studentData.overdueAmount / studentData.totalFees;
-  let riskLevel: "low" | "medium" | "high" = "low";
-  let recommendedAction = "Continue current payment schedule";
-  let emiAmount = 0;
-
-  if (outstandingRatio > 0.5) {
-    riskLevel = "high";
-    recommendedAction = "Immediate payment plan required";
-    emiAmount = Math.ceil(studentData.overdueAmount / 6);
-  } else if (outstandingRatio > 0.2) {
-    riskLevel = "medium";
-    recommendedAction = "Consider EMI option";
-    emiAmount = Math.ceil(studentData.overdueAmount / 3);
-  }
-
-  return {
-    studentId: studentData.studentId,
-    currentFeeStructure: `Total: ₹${studentData.totalFees}, Outstanding: ₹${studentData.overdueAmount}`,
-    recommendedAction,
-    riskLevel,
-    paymentPlan: emiAmount > 0 ? `${emiAmount > 0 ? Math.ceil(studentData.overdueAmount / emiAmount) : 0} installments of ₹${emiAmount}` : "Current plan is suitable",
-    emiAmount,
-    confidence: 0.75,
-    reasons: [
-      `Outstanding ratio: ${(outstandingRatio * 100).toFixed(1)}%`,
-      "Based on payment history analysis",
-      "Risk assessment completed"
-    ]
-  };
-}
-
-function fallbackStaffAnalysis(staffData: any): StaffPerformanceAnalysis {
-  const recentAttendance = staffData.attendance.slice(-30);
-  const presentDays = recentAttendance.filter((a: any) => a.status === 'present').length;
-  const attendanceRate = (presentDays / recentAttendance.length) * 100;
-  
-  let performanceScore = Math.min(100, attendanceRate + 10);
-  let salaryRecommendation = staffData.salary;
-  let promotionEligibility = false;
-
-  if (attendanceRate > 90) {
-    performanceScore = Math.min(100, performanceScore + 10);
-    salaryRecommendation = staffData.salary * 1.1;
-    promotionEligibility = true;
-  }
-
-  return {
-    staffId: staffData.staffId,
-    performanceScore: Math.round(performanceScore),
-    attendancePattern: `${attendanceRate.toFixed(1)}% attendance rate`,
-    salaryRecommendation: Math.round(salaryRecommendation),
-    trainingNeeds: attendanceRate < 80 ? ["Time management", "Work commitment"] : ["Leadership development"],
-    promotionEligibility,
-    insights: [
-      `Attendance: ${attendanceRate.toFixed(1)}%`,
-      `Performance trending ${performanceScore > 80 ? 'upward' : 'needs improvement'}`,
-      `${promotionEligibility ? 'Eligible' : 'Not eligible'} for promotion`
-    ]
-  };
-}
+// Export singleton instance
+export const perplexityAI = new PerplexityAI();
