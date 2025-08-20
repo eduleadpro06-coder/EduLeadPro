@@ -2298,6 +2298,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // AI Enhanced routes
+  try {
+    const aiEnhancedRoutes = (await import("./api/ai-enhanced.js")).default;
+    app.use("/api/ai", aiEnhancedRoutes);
+  } catch (error) {
+    console.error("Failed to load AI enhanced routes:", error);
+  }
+
   const httpServer = createServer(app);
   return httpServer;
 }

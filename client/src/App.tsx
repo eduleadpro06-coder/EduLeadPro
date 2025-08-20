@@ -9,6 +9,7 @@ import Dashboard from "@/pages/dashboard";
 import LeadManagement from "@/pages/lead-management";
 import AIForecasting from "@/pages/ai-forecasting";
 import AIMarketing from "@/pages/ai-marketing";
+import AIEnhancedDashboard from "@/pages/ai-enhanced-dashboard";
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
 import Login from "@/pages/login";
@@ -97,6 +98,11 @@ function Router() {
               </div>
             </div>
           )} />
+        )}
+      </Route>
+      <Route path="/ai-enhanced">
+        {() => (
+          <ProtectedRoute component={AIEnhancedDashboard} />
         )}
       </Route>
       <Route path="/reports">
