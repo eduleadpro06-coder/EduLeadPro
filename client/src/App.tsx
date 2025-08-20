@@ -108,7 +108,14 @@ function Router() {
       </Route>
       <Route path="/ai-comprehensive">
         {() => (
-          <ProtectedRoute component={ComprehensiveAIDashboard} />
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <ComprehensiveAIDashboard />
+              </div>
+            </div>
+          )} />
         )}
       </Route>
       <Route path="/reports">

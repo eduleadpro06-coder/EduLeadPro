@@ -282,6 +282,140 @@ export const recentlyDeletedEmployee = pgTable("recently_deleted_employee", {
   deleted_at: timestamp("deleted_at").notNull(),
 });
 
+// AI Analytics and Predictions Tables
+export const aiPredictions = pgTable("ai_predictions", {
+  id: serial("id").primaryKey(),
+  entityType: varchar("entity_type", { length: 50 }).notNull(), // student, lead, staff, course
+  entityId: integer("entity_id").notNull(),
+  predictionType: varchar("prediction_type", { length: 100 }).notNull(), // success_probability, dropout_risk, pricing, etc.
+  predictionValue: decimal("prediction_value", { precision: 10, scale: 4 }).notNull(),
+  confidence: decimal("confidence", { precision: 5, scale: 2 }).notNull(), // 0-100
+  metadata: text("metadata"), // JSON string for additional data
+  modelVersion: varchar("model_version", { length: 50 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const aiInterventions = pgTable("ai_interventions", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").references(() => students.id).notNull(),
+  predictionId: integer("prediction_id").references(() => aiPredictions.id),
+  interventionType: varchar("intervention_type", { length: 100 }).notNull(),
+  priority: varchar("priority", { length: 20 }).notNull(), // immediate, high, medium, low
+  description: text("description").notNull(),
+  recommendedActions: text("recommended_actions"), // JSON array
+  assignedTo: integer("assigned_to").references(() => users.id),
+  status: varchar("status", { length: 20 }).default("pending"), // pending, in_progress, completed, dismissed
+  effectivenessScore: decimal("effectiveness_score", { precision: 5, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const aiAnalytics = pgTable("ai_analytics", {
+  id: serial("id").primaryKey(),
+  analysisType: varchar("analysis_type", { length: 100 }).notNull(), // curriculum, staff_optimization, pricing, etc.
+  analysisData: text("analysis_data").notNull(), // JSON string
+  insights: text("insights"), // JSON array of insights
+  recommendations: text("recommendations"), // JSON array of recommendations
+  validUntil: timestamp("valid_until"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const aiConversations = pgTable("ai_conversations", {
+  id: serial("id").primaryKey(),
+  sessionId: varchar("session_id", { length: 100 }).notNull(),
+  userId: integer("user_id"), // Can be null for anonymous users
+  userType: varchar("user_type", { length: 50 }), // student, parent, staff, anonymous
+  messageCount: integer("message_count").default(0),
+  satisfaction: decimal("satisfaction", { precision: 5, scale: 2 }), // 0-100
+  resolved: boolean("resolved").default(false),
+  escalated: boolean("escalated").default(false),
+  tags: text("tags"), // JSON array of conversation tags
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  endedAt: timestamp("ended_at"),
+});
+
+export const aiMessages = pgTable("ai_messages", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").references(() => aiConversations.id).notNull(),
+  role: varchar("role", { length: 20 }).notNull(), // user, assistant, system
+  content: text("content").notNull(),
+  intent: varchar("intent", { length: 100 }), // admission_inquiry, fee_query, technical_support, etc.
+  sentiment: varchar("sentiment", { length: 20 }), // positive, negative, neutral, frustrated
+  responseTime: integer("response_time"), // milliseconds
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const aiModelPerformance = pgTable("ai_model_performance", {
+  id: serial("id").primaryKey(),
+  modelType: varchar("model_type", { length: 100 }).notNull(),
+  modelVersion: varchar("model_version", { length: 50 }).notNull(),
+  accuracyScore: decimal("accuracy_score", { precision: 5, scale: 2 }).notNull(),
+  predictionCount: integer("prediction_count").default(0),
+  correctPredictions: integer("correct_predictions").default(0),
+  lastEvaluated: timestamp("last_evaluated").defaultNow().notNull(),
+  evaluationMetrics: text("evaluation_metrics"), // JSON object with detailed metrics
+});
+
+// Academic Performance Tracking for Enhanced AI
+export const academicRecords = pgTable("academic_records", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").references(() => students.id).notNull(),
+  term: varchar("term", { length: 50 }).notNull(), // semester/quarter/year
+  subject: varchar("subject", { length: 100 }).notNull(),
+  marksObtained: decimal("marks_obtained", { precision: 5, scale: 2 }),
+  totalMarks: decimal("total_marks", { precision: 5, scale: 2 }),
+  grade: varchar("grade", { length: 5 }),
+  attendance: decimal("attendance", { precision: 5, scale: 2 }), // percentage
+  teacherRemarks: text("teacher_remarks"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const studentEngagement = pgTable("student_engagement", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").references(() => students.id).notNull(),
+  activityType: varchar("activity_type", { length: 100 }).notNull(), // assignment, quiz, project, extracurricular
+  engagementScore: decimal("engagement_score", { precision: 5, scale: 2 }), // 0-100
+  timeSpent: integer("time_spent"), // minutes
+  participationLevel: varchar("participation_level", { length: 20 }), // high, medium, low
+  date: date("date").notNull(),
+  metadata: text("metadata"), // JSON for additional engagement data
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Enhanced Course and Curriculum Tables
+export const courses = pgTable("courses", {
+  id: serial("id").primaryKey(),
+  courseCode: varchar("course_code", { length: 50 }).unique().notNull(),
+  courseName: varchar("course_name", { length: 200 }).notNull(),
+  description: text("description"),
+  credits: integer("credits"),
+  duration: varchar("duration", { length: 50 }), // "6 months", "1 year", etc.
+  level: varchar("level", { length: 50 }), // beginner, intermediate, advanced
+  department: varchar("department", { length: 100 }),
+  prerequisites: text("prerequisites"), // JSON array of prerequisite course codes
+  learningOutcomes: text("learning_outcomes"), // JSON array
+  industryRelevance: decimal("industry_relevance", { precision: 5, scale: 2 }), // 0-100
+  marketDemand: decimal("market_demand", { precision: 5, scale: 2 }), // 0-100
+  currentPrice: decimal("current_price", { precision: 10, scale: 2 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const coursePricing = pgTable("course_pricing", {
+  id: serial("id").primaryKey(),
+  courseId: integer("course_id").references(() => courses.id).notNull(),
+  priceType: varchar("price_type", { length: 50 }).notNull(), // base, promotional, dynamic
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  validFrom: timestamp("valid_from").notNull(),
+  validUntil: timestamp("valid_until"),
+  demandLevel: varchar("demand_level", { length: 20 }), // low, medium, high
+  capacityUtilization: decimal("capacity_utilization", { precision: 5, scale: 2 }),
+  aiRecommended: boolean("ai_recommended").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true });
@@ -307,6 +441,18 @@ export const insertEmiPlanSchema = createInsertSchema(emiPlans).omit({ id: true,
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRecentlyDeletedEmployeeSchema = createInsertSchema(recentlyDeletedEmployee).omit({ id: true, created_at: true, updated_at: true });
 
+// AI-related insert schemas
+export const insertAIPredictionSchema = createInsertSchema(aiPredictions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAIInterventionSchema = createInsertSchema(aiInterventions).omit({ id: true, createdAt: true });
+export const insertAIAnalyticsSchema = createInsertSchema(aiAnalytics).omit({ id: true, createdAt: true });
+export const insertAIConversationSchema = createInsertSchema(aiConversations).omit({ id: true, startedAt: true });
+export const insertAIMessageSchema = createInsertSchema(aiMessages).omit({ id: true, createdAt: true });
+export const insertAIModelPerformanceSchema = createInsertSchema(aiModelPerformance).omit({ id: true, lastEvaluated: true });
+export const insertAcademicRecordSchema = createInsertSchema(academicRecords).omit({ id: true, createdAt: true });
+export const insertStudentEngagementSchema = createInsertSchema(studentEngagement).omit({ id: true, createdAt: true });
+export const insertCourseSchema = createInsertSchema(courses).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCoursePricingSchema = createInsertSchema(coursePricing).omit({ id: true, createdAt: true });
+
 // Create types
 export type User = typeof users.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
@@ -326,6 +472,18 @@ export type EmiPlan = typeof emiPlans.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type RecentlyDeletedEmployee = typeof recentlyDeletedEmployee.$inferSelect;
 
+// AI-related types
+export type AIPrediction = typeof aiPredictions.$inferSelect;
+export type AIIntervention = typeof aiInterventions.$inferSelect;
+export type AIAnalytics = typeof aiAnalytics.$inferSelect;
+export type AIConversation = typeof aiConversations.$inferSelect;
+export type AIMessage = typeof aiMessages.$inferSelect;
+export type AIModelPerformance = typeof aiModelPerformance.$inferSelect;
+export type AcademicRecord = typeof academicRecords.$inferSelect;
+export type StudentEngagement = typeof studentEngagement.$inferSelect;
+export type Course = typeof courses.$inferSelect;
+export type CoursePricing = typeof coursePricing.$inferSelect;
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 export type InsertFollowUp = z.infer<typeof insertFollowUpSchema>;
@@ -342,6 +500,18 @@ export type InsertEMandate = z.infer<typeof insertEMandateSchema>;
 export type InsertEmiSchedule = z.infer<typeof insertEmiScheduleSchema>;
 export type InsertEmiPlan = z.infer<typeof insertEmiPlanSchema>;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// AI-related insert types
+export type InsertAIPrediction = z.infer<typeof insertAIPredictionSchema>;
+export type InsertAIIntervention = z.infer<typeof insertAIInterventionSchema>;
+export type InsertAIAnalytics = z.infer<typeof insertAIAnalyticsSchema>;
+export type InsertAIConversation = z.infer<typeof insertAIConversationSchema>;
+export type InsertAIMessage = z.infer<typeof insertAIMessageSchema>;
+export type InsertAIModelPerformance = z.infer<typeof insertAIModelPerformanceSchema>;
+export type InsertAcademicRecord = z.infer<typeof insertAcademicRecordSchema>;
+export type InsertStudentEngagement = z.infer<typeof insertStudentEngagementSchema>;
+export type InsertCourse = z.infer<typeof insertCourseSchema>;
+export type InsertCoursePricing = z.infer<typeof insertCoursePricingSchema>;
 
 // Complex types for joins
 export type LeadWithCounselor = Lead & {

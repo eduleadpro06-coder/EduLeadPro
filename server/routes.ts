@@ -2,9 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertLeadSchema, insertFollowUpSchema, Lead, InsertLead, InsertEmiPlan } from "@shared/schema";
-import { forecastEnrollments, generateMarketingRecommendations, predictAdmissionLikelihood } from "./perplexity-ai";
+import { perplexityAI } from "./perplexity-ai.js";
 import PDFDocument from "pdfkit";
-import { db } from "./lib/db";
+import { db } from "./db.js";
+import aiComprehensiveRouter from "./api/ai-comprehensive.js";
 import { sql } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -2313,6 +2314,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   } catch (error) {
     console.error("Failed to load comprehensive AI routes:", error);
   }
+
+  // Mount AI Comprehensive Analytics Routes
+  app.use("/api/ai", aiComprehensiveRouter);
 
   const httpServer = createServer(app);
   return httpServer;
