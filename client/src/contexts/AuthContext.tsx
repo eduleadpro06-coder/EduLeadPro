@@ -5,13 +5,15 @@ import { getAuthRedirectUrl } from '@/lib/auth-utils'
 export type AuthUser = {
   id: string
   email: string | null
+  displayName: string | null
+  avatarUrl?: string | null
 }
 
 type AuthContextValue = {
   user: AuthUser | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error?: string; needsConfirmation?: boolean }>
-  signUp: (email: string, password: string) => Promise<{ error?: string; pendingConfirmation?: boolean }>
+  signUp: (email: string, password: string, fullName?: string) => Promise<{ error?: string; pendingConfirmation?: boolean }>
   resendConfirmation: (email: string) => Promise<{ error?: string }>
   signInWithGoogle: () => Promise<{ error?: string }>
   signOut: () => Promise<void>
@@ -47,7 +49,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Prime state from storage but do NOT end loading yet; wait for INITIAL_SESSION
         const { data } = await supabase.auth.getSession()
         const sessionUser = data.session?.user
-        setUser(sessionUser ? { id: sessionUser.id, email: sessionUser.email } : null)
+        setUser(sessionUser ? {
+          id: sessionUser.id,
+          email: sessionUser.email,
+          displayName: (sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || sessionUser.user_metadata?.display_name || sessionUser.user_metadata?.preferred_username || null),
+          avatarUrl: sessionUser.user_metadata?.avatar_url || null,
+        } : null)
       } catch (error) {
         console.error("Auth initialization error:", error)
         setUser(null)
@@ -59,7 +66,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       try {
         const sessionUser = session?.user
-        setUser(sessionUser ? { id: sessionUser.id, email: sessionUser.email } : null)
+        setUser(sessionUser ? {
+          id: sessionUser.id,
+          email: sessionUser.email,
+          displayName: (sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || sessionUser.user_metadata?.display_name || sessionUser.user_metadata?.preferred_username || null),
+          avatarUrl: sessionUser.user_metadata?.avatar_url || null,
+        } : null)
         
         // End loading once we receive the initial snapshot from Supabase
         if (event === 'INITIAL_SESSION') {
@@ -118,12 +130,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return {}
     },
-    signUp: async (email: string, password: string) => {
+    signUp: async (email: string, password: string, fullName?: string) => {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: getAuthRedirectUrl('/login'),
+          data: fullName ? { full_name: fullName } : undefined,
         },
       })
       if (error) return { error: error.message }
@@ -153,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         },
       })
+      // Supabase OAuth will populate user.user_metadata with name & avatar_url
       if (error) return { error: error.message }
       return {}
     },

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Bell, User, LogOut, Settings, ChevronDown, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import NotificationCenter from "@/components/notifications/notification-center";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,11 +33,21 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
               onClick={() => setShowProfileDropdown(!showProfileDropdown)}
             >
               <div className="text-right">
-                <p className="text-sm font-medium text-foreground">{user?.email || 'User'}</p>
+                <p className="text-sm font-medium text-foreground">{user?.displayName || user?.email || 'User'}</p>
                 <p className="text-xs text-muted-foreground">Signed in</p>
               </div>
               <Avatar className="w-8 h-8">
-                <AvatarFallback className="bg-blue-100 text-blue-600">SJ</AvatarFallback>
+                {user?.avatarUrl ? (
+                  <AvatarImage src={user.avatarUrl} alt={user.displayName || user.email || 'User avatar'} />
+                ) : null}
+                <AvatarFallback className="bg-blue-100 text-blue-600">
+                  {(user?.displayName || user?.email || 'U')
+                    .split(/\s+/)
+                    .map(p => p[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase()}
+                </AvatarFallback>
               </Avatar>
               <ChevronDown className="h-4 w-4 text-gray-500" />
             </Button>
@@ -47,10 +57,20 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
                 <div className="p-3 border-b border-border">
                   <div className="flex items-center space-x-3">
                     <Avatar className="w-10 h-10">
-                      <AvatarFallback className="bg-primary/20 text-primary">SJ</AvatarFallback>
+                      {user?.avatarUrl ? (
+                        <AvatarImage src={user.avatarUrl} alt={user.displayName || user.email || 'User avatar'} />
+                      ) : null}
+                      <AvatarFallback className="bg-primary/20 text-primary">
+                        {(user?.displayName || user?.email || 'U')
+                          .split(/\s+/)
+                          .map(p => p[0])
+                          .slice(0, 2)
+                          .join('')
+                          .toUpperCase()}
+                      </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="text-sm font-medium text-foreground">{user?.email || 'User'}</p>
+                      <p className="text-sm font-medium text-foreground">{user?.displayName || user?.email || 'User'}</p>
                       <p className="text-xs text-muted-foreground">{user?.id?.slice(0,8)}</p>
                     </div>
                   </div>

@@ -317,6 +317,7 @@ export default function Login() {
   const { toast } = useToast();
 
   const { signIn, signUp, resendConfirmation, signInWithGoogle } = useAuth();
+  const [fullName, setFullName] = useState("");
 
   const [loadingLogin, setLoadingLogin] = useState(false);
   const [loadingSignup, setLoadingSignup] = useState(false);
@@ -345,7 +346,7 @@ export default function Login() {
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoadingSignup(true);
-    const res = await signUp(email, password);
+    const res = await signUp(email, password, fullName.trim() || undefined);
     setLoadingSignup(false);
     if (res.error) {
       toast({ title: "Signup failed", description: res.error, variant: "destructive" });
@@ -428,6 +429,7 @@ export default function Login() {
             <form onSubmit={handleSignupSubmit}>
               <h1>Create Account</h1>
               <span>Use your email for registration</span>
+              <input type="text" placeholder="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               <button type="submit" disabled={loadingSignup}>
