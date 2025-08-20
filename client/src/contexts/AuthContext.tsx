@@ -44,23 +44,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        // Prime state from storage but do NOT end loading yet; wait for INITIAL_SESSION
         const { data } = await supabase.auth.getSession()
         const sessionUser = data.session?.user
         setUser(sessionUser ? { id: sessionUser.id, email: sessionUser.email } : null)
       } catch (error) {
         console.error("Auth initialization error:", error)
         setUser(null)
-      } finally {
-        setLoading(false)
+        // Do not set loading false here; rely on INITIAL_SESSION below
       }
     }
-    init()
 
+    setLoading(true)
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       try {
         const sessionUser = session?.user
         setUser(sessionUser ? { id: sessionUser.id, email: sessionUser.email } : null)
         
+        // End loading once we receive the initial snapshot from Supabase
+        if (event === 'INITIAL_SESSION') {
+          setLoading(false)
+        }
+
         // Handle successful email confirmation
         if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
           console.log('Email confirmed successfully');
@@ -79,11 +84,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }, 1000);
           }
         }
+
+        if (event === 'SIGNED_OUT') {
+          setLoading(false)
+        }
       } catch (error) {
         console.error("Auth state change error:", error)
         setUser(null)
+        setLoading(false)
       }
     })
+
+    init()
 
     return () => {
       sub.subscription.unsubscribe()
