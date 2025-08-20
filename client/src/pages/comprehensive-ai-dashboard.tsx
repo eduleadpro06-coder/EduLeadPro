@@ -162,156 +162,164 @@ export default function ComprehensiveAIDashboard() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="min-h-screen w-full bg-black text-white px-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between py-6">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Brain className="h-8 w-8 text-blue-600" />
+          <h1 className="text-3xl font-bold flex items-center gap-2 text-white">
+            <Brain className="h-8 w-8 text-purple-400" />
             AI Control Center
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-gray-300 mt-2">
             Comprehensive artificial intelligence analytics powered by real database insights
           </p>
         </div>
-        <Button onClick={refreshAllData} variant="outline" className="flex items-center gap-2">
+        <Button onClick={refreshAllData} variant="outline" className="flex items-center gap-2 border-gray-600 text-white hover:bg-gray-800">
           <RefreshCw className="h-4 w-4" />
           Refresh All Data
         </Button>
       </div>
 
       {/* System Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">AI Model Accuracy</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {modelPerformance?.modelPerformance?.[0]?.accuracyScore || '87.3'}%
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <Card className="bg-[#62656e] text-white border-none shadow-lg">
+          <CardContent className="p-6 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-white">AI Model Accuracy</p>
+                <p className="text-2xl font-bold mt-1 text-white">
+                  {modelPerformance?.modelPerformance?.[0]?.accuracyScore || '87.3'}%
+                </p>
+                <p className="text-xs text-gray-300">Real-time predictions active</p>
+              </div>
+              <Zap className="h-8 w-8 text-purple-400" />
             </div>
-            <p className="text-xs text-muted-foreground">Real-time predictions active</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Students Analyzed</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{studentAnalytics?.analytics?.totalStudents || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {studentAnalytics?.analytics?.atRiskStudents || 0} high-risk identified
-            </p>
+        <Card className="bg-[#62656e] text-white border-none shadow-lg">
+          <CardContent className="p-6 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-white">Students Analyzed</p>
+                <p className="text-2xl font-bold mt-1 text-white">{studentAnalytics?.analytics?.totalStudents || 0}</p>
+                <p className="text-xs text-gray-300">
+                  {studentAnalytics?.analytics?.atRiskStudents || 0} high-risk identified
+                </p>
+              </div>
+              <Users className="h-8 w-8 text-blue-400" />
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Courses Optimized</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pricingAnalytics?.summary?.totalCourses || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {pricingAnalytics?.summary?.avgUtilization || 0}% avg utilization
-            </p>
+        <Card className="bg-[#62656e] text-white border-none shadow-lg">
+          <CardContent className="p-6 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-white">Courses Optimized</p>
+                <p className="text-2xl font-bold mt-1 text-white">{pricingAnalytics?.summary?.totalCourses || 0}</p>
+                <p className="text-xs text-gray-300">
+                  {pricingAnalytics?.summary?.avgUtilization || 0}% avg utilization
+                </p>
+              </div>
+              <BookOpen className="h-8 w-8 text-green-400" />
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">System Status</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">Operational</div>
-            <p className="text-xs text-muted-foreground">All AI systems online</p>
+        <Card className="bg-[#62656e] text-white border-none shadow-lg">
+          <CardContent className="p-6 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-white">System Status</p>
+                <p className="text-2xl font-bold mt-1 text-green-400">Operational</p>
+                <p className="text-xs text-gray-300">All AI systems online</p>
+              </div>
+              <BarChart3 className="h-8 w-8 text-orange-400" />
+            </div>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="students" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="students">Student Success</TabsTrigger>
-          <TabsTrigger value="pricing">Dynamic Pricing</TabsTrigger>
-          <TabsTrigger value="staff">Staff Optimization</TabsTrigger>
-          <TabsTrigger value="curriculum">Curriculum AI</TabsTrigger>
-          <TabsTrigger value="counselor">Virtual Counselor</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5 bg-[#62656e] border-none">
+          <TabsTrigger value="students" className="text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white">Student Success</TabsTrigger>
+          <TabsTrigger value="pricing" className="text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white">Dynamic Pricing</TabsTrigger>
+          <TabsTrigger value="staff" className="text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white">Staff Optimization</TabsTrigger>
+          <TabsTrigger value="curriculum" className="text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white">Curriculum AI</TabsTrigger>
+          <TabsTrigger value="counselor" className="text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white">Virtual Counselor</TabsTrigger>
         </TabsList>
 
         {/* Student Success Prediction */}
         <TabsContent value="students" className="space-y-4">
-          <Card>
+          <Card className="bg-[#62656e] text-white border-none shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-white">
+                <TrendingUp className="h-5 w-5 text-purple-400" />
                 Intelligent Student Success Prediction Engine
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-gray-300">
                 AI-powered analysis of student success probability using real academic data
               </CardDescription>
             </CardHeader>
             <CardContent>
               {studentsLoading ? (
                 <div className="text-center py-8">
-                  <RefreshCw className="h-8 w-8 animate-spin mx-auto" />
-                  <p className="mt-2">Analyzing student data with AI...</p>
+                  <RefreshCw className="h-8 w-8 animate-spin mx-auto text-purple-400" />
+                  <p className="mt-2 text-gray-300">Analyzing student data with AI...</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <Card>
+                    <Card className="bg-[#4a4d56] text-white border-none">
                       <CardContent className="pt-6">
-                        <div className="text-2xl font-bold">
+                        <div className="text-2xl font-bold text-white">
                           {studentAnalytics?.analytics?.avgSuccessRate || 0}%
                         </div>
-                        <p className="text-sm text-muted-foreground">Average Success Rate</p>
+                        <p className="text-sm text-gray-300">Average Success Rate</p>
                       </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="bg-[#4a4d56] text-white border-none">
                       <CardContent className="pt-6">
-                        <div className="text-2xl font-bold text-red-600">
+                        <div className="text-2xl font-bold text-red-400">
                           {studentAnalytics?.analytics?.atRiskStudents || 0}
                         </div>
-                        <p className="text-sm text-muted-foreground">High-Risk Students</p>
+                        <p className="text-sm text-gray-300">High-Risk Students</p>
                       </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="bg-[#4a4d56] text-white border-none">
                       <CardContent className="pt-6">
-                        <div className="text-2xl font-bold text-green-600">
+                        <div className="text-2xl font-bold text-green-400">
                           {(studentAnalytics?.predictions?.length || 0) - (studentAnalytics?.analytics?.atRiskStudents || 0)}
                         </div>
-                        <p className="text-sm text-muted-foreground">On-Track Students</p>
+                        <p className="text-sm text-gray-300">On-Track Students</p>
                       </CardContent>
                     </Card>
                   </div>
 
                   <div className="space-y-3">
                     {studentAnalytics?.predictions?.map((prediction: StudentPrediction) => (
-                      <Card key={prediction.student.id} className="border-l-4 border-l-blue-500">
+                      <Card key={prediction.student.id} className="bg-[#4a4d56] text-white border-none border-l-4 border-l-blue-400">
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-3 mb-2">
-                                <h3 className="font-semibold">{prediction.student.name}</h3>
-                                <Badge variant="outline">{prediction.student.rollNumber}</Badge>
-                                <Badge variant="secondary">{prediction.student.class}</Badge>
+                                <h3 className="font-semibold text-white">{prediction.student.name}</h3>
+                                <Badge variant="outline" className="border-gray-400 text-gray-300">{prediction.student.rollNumber}</Badge>
+                                <Badge variant="secondary" className="bg-gray-600 text-gray-200">{prediction.student.class}</Badge>
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                                 <div>
-                                  <span className="text-muted-foreground">Academic Average: </span>
-                                  <span className="font-medium">{Math.round(prediction.realTimeData.academicAverage)}%</span>
+                                  <span className="text-gray-300">Academic Average: </span>
+                                  <span className="font-medium text-white">{Math.round(prediction.realTimeData.academicAverage)}%</span>
                                 </div>
                                 <div>
-                                  <span className="text-muted-foreground">Attendance: </span>
-                                  <span className="font-medium">{Math.round(prediction.realTimeData.attendanceRate)}%</span>
+                                  <span className="text-gray-300">Attendance: </span>
+                                  <span className="font-medium text-white">{Math.round(prediction.realTimeData.attendanceRate)}%</span>
                                 </div>
                                 <div>
-                                  <span className="text-muted-foreground">Engagement: </span>
-                                  <span className="font-medium">{Math.round(prediction.realTimeData.engagementScore)}/100</span>
+                                  <span className="text-gray-300">Engagement: </span>
+                                  <span className="font-medium text-white">{Math.round(prediction.realTimeData.engagementScore)}/100</span>
                                 </div>
                               </div>
                             </div>
@@ -326,12 +334,12 @@ export default function ComprehensiveAIDashboard() {
                           </div>
                           
                           {prediction.analysis.riskFactors.length > 0 && (
-                            <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
-                              <h4 className="font-medium text-yellow-800 mb-2 flex items-center gap-2">
+                            <div className="mt-4 p-3 bg-yellow-900/30 rounded-lg border border-yellow-600/30">
+                              <h4 className="font-medium text-yellow-300 mb-2 flex items-center gap-2">
                                 <AlertTriangle className="h-4 w-4" />
                                 Risk Factors
                               </h4>
-                              <ul className="text-sm text-yellow-700 space-y-1">
+                              <ul className="text-sm text-yellow-200 space-y-1">
                                 {prediction.analysis.riskFactors.map((factor, index) => (
                                   <li key={index}>• {factor}</li>
                                 ))}
@@ -361,35 +369,36 @@ export default function ComprehensiveAIDashboard() {
 
         {/* Dynamic Pricing */}
         <TabsContent value="pricing" className="space-y-4">
-          <Card>
+          <Card className="bg-[#62656e] text-white border-none shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-white">
+                <DollarSign className="h-5 w-5 text-green-400" />
                 Dynamic Pricing & Revenue Optimization
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-gray-300">
                 AI-driven pricing recommendations based on real enrollment and market data
               </CardDescription>
             </CardHeader>
             <CardContent>
               {pricingLoading ? (
                 <div className="text-center py-8">
-                  <RefreshCw className="h-8 w-8 animate-spin mx-auto" />
-                  <p className="mt-2">Analyzing market data...</p>
+                  <RefreshCw className="h-8 w-8 animate-spin mx-auto text-purple-400" />
+                  <p className="mt-2 text-gray-300">Analyzing market data...</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {pricingAnalytics?.pricingRecommendations?.map((pricing: PricingRecommendation) => (
-                    <Card key={pricing.course.id} className="border-l-4 border-l-green-500">
+                    <Card key={pricing.course.id} className="bg-[#4a4d56] text-white border-none border-l-4 border-l-green-400">
                       <CardContent className="pt-6">
                         <div className="flex items-center justify-between mb-4">
                           <div>
-                            <h3 className="font-semibold text-lg">{pricing.course.courseName}</h3>
-                            <Badge variant="outline">{pricing.course.department}</Badge>
+                            <h3 className="font-semibold text-lg text-white">{pricing.course.courseName}</h3>
+                            <Badge variant="outline" className="border-gray-400 text-gray-300">{pricing.course.department}</Badge>
                           </div>
                           <div className="text-right">
-                            <div className="text-2xl font-bold">₹{pricing.aiRecommendation.recommendedPrice.toLocaleString()}</div>
-                            <Badge variant={pricing.aiRecommendation.priceChangePercentage > 0 ? "default" : "secondary"}>
+                            <div className="text-2xl font-bold text-white">₹{pricing.aiRecommendation.recommendedPrice.toLocaleString()}</div>
+                            <Badge variant={pricing.aiRecommendation.priceChangePercentage > 0 ? "default" : "secondary"} 
+                                   className={pricing.aiRecommendation.priceChangePercentage > 0 ? "bg-green-600 text-white" : "bg-gray-600 text-gray-200"}>
                               {pricing.aiRecommendation.priceChangePercentage > 0 ? '+' : ''}{pricing.aiRecommendation.priceChangePercentage}%
                             </Badge>
                           </div>
@@ -425,13 +434,13 @@ export default function ComprehensiveAIDashboard() {
 
         {/* Staff Optimization */}
         <TabsContent value="staff" className="space-y-4">
-          <Card>
+          <Card className="bg-[#62656e] text-white border-none shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-white">
+                <Users className="h-5 w-5 text-blue-400" />
                 Predictive Staff Management & Optimization
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-gray-300">
                 AI analysis of staff performance and workload optimization
               </CardDescription>
             </CardHeader>
@@ -717,33 +726,33 @@ export default function ComprehensiveAIDashboard() {
       </Tabs>
 
       {/* System Performance Footer */}
-      <Card>
+      <Card className="bg-[#62656e] text-white border-none shadow-lg">
         <CardHeader>
-          <CardTitle className="text-lg">AI System Performance Metrics</CardTitle>
+          <CardTitle className="text-lg text-white">AI System Performance Metrics</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-green-400">
                 {modelPerformance?.recentActivity?.totalPredictions || 0}
               </div>
-              <p className="text-sm text-muted-foreground">Total Predictions</p>
+              <p className="text-sm text-gray-300">Total Predictions</p>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
+              <div className="text-2xl font-bold text-blue-400">
                 {modelPerformance?.recentActivity?.avgConfidence || 0}%
               </div>
-              <p className="text-sm text-muted-foreground">Avg Confidence</p>
+              <p className="text-sm text-gray-300">Avg Confidence</p>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
+              <div className="text-2xl font-bold text-purple-400">
                 {modelPerformance?.systemHealth?.uptime || '99.8%'}
               </div>
-              <p className="text-sm text-muted-foreground">System Uptime</p>
+              <p className="text-sm text-gray-300">System Uptime</p>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">High</div>
-              <p className="text-sm text-muted-foreground">Data Quality</p>
+              <div className="text-2xl font-bold text-orange-400">High</div>
+              <p className="text-sm text-gray-300">Data Quality</p>
             </div>
           </div>
         </CardContent>

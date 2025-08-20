@@ -1,5 +1,6 @@
 // Enhanced Perplexity AI Integration for Educational Intelligence
 import 'dotenv/config';
+import { getModelConfig, MODEL_USE_CASES, DEFAULT_CONFIGS } from './config/ai-models';
 
 export interface PerplexityResponse {
   id: string;
@@ -86,8 +87,11 @@ class PerplexityAI {
     recommendations: string[];
     confidence: number;
   }> {
+    const modelConfig = getModelConfig('STUDENT_ANALYSIS');
+    const defaultConfig = DEFAULT_CONFIGS.EDUCATIONAL_ANALYSIS;
+    
     const request: PerplexityRequest = {
-      model: 'llama-3.1-sonar-small-128k-online',
+      model: modelConfig.model,
       messages: [
         {
           role: 'system',
@@ -114,8 +118,8 @@ Provide:
 Base your analysis on current educational research and proven intervention strategies.`
         }
       ],
-      temperature: 0.2,
-      max_tokens: 1000,
+      temperature: defaultConfig.temperature,
+      max_tokens: defaultConfig.maxTokens,
       search_recency_filter: 'month'
     };
 
@@ -133,8 +137,11 @@ Base your analysis on current educational research and proven intervention strat
     demandLevel: string;
     competitorAnalysis: string;
   }> {
+    const modelConfig = getModelConfig('PRICING_OPTIMIZATION');
+    const defaultConfig = DEFAULT_CONFIGS.EDUCATIONAL_ANALYSIS;
+    
     const request: PerplexityRequest = {
-      model: 'llama-3.1-sonar-small-128k-online',
+      model: modelConfig.model,
       messages: [
         {
           role: 'system',
@@ -165,8 +172,8 @@ Provide specific recommendations for:
 Focus on maximizing both enrollment and revenue while maintaining educational accessibility.`
         }
       ],
-      temperature: 0.3,
-      max_tokens: 1200
+      temperature: defaultConfig.temperature,
+      max_tokens: defaultConfig.maxTokens
     };
 
     const response = await this.query(request);
@@ -182,7 +189,7 @@ Focus on maximizing both enrollment and revenue while maintaining educational ac
     recommendations: string[];
   }> {
     const request: PerplexityRequest = {
-      model: 'llama-3.1-sonar-large-128k-online',
+      model: 'sonar',
       messages: [
         {
           role: 'system',
@@ -228,7 +235,7 @@ Base analysis on latest industry reports and job market data.`
     performanceInsights: string[];
   }> {
     const request: PerplexityRequest = {
-      model: 'llama-3.1-sonar-small-128k-online',
+      model: 'sonar',
       messages: [
         {
           role: 'system',
@@ -277,7 +284,7 @@ Reference best practices in educational workforce management.`
     confidence: number;
   }> {
     const request: PerplexityRequest = {
-      model: 'llama-3.1-sonar-small-128k-online',
+      model: 'sonar',
       messages: [
         {
           role: 'system',
@@ -320,7 +327,7 @@ Ensure responses are educational, supportive, and actionable.`
     estimatedTime: number;
   }> {
     const request: PerplexityRequest = {
-      model: 'llama-3.1-sonar-large-128k-online',
+      model: 'sonar',
       messages: [
         {
           role: 'system',
