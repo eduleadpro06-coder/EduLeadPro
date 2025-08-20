@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const sessionUser = data.session?.user
         setUser(sessionUser ? {
           id: sessionUser.id,
-          email: sessionUser.email,
+          email: sessionUser.email ?? null,
           displayName: (sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || sessionUser.user_metadata?.display_name || sessionUser.user_metadata?.preferred_username || null),
           avatarUrl: sessionUser.user_metadata?.avatar_url || null,
         } : null)
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const sessionUser = session?.user
         setUser(sessionUser ? {
           id: sessionUser.id,
-          email: sessionUser.email,
+          email: sessionUser.email ?? null,
           displayName: (sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || sessionUser.user_metadata?.display_name || sessionUser.user_metadata?.preferred_username || null),
           avatarUrl: sessionUser.user_metadata?.avatar_url || null,
         } : null)
