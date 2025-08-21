@@ -5,6 +5,7 @@ import { insertLeadSchema, insertFollowUpSchema, Lead, InsertLead, InsertEmiPlan
 import { perplexityAI } from "./perplexity-ai.js";
 import PDFDocument from "pdfkit";
 import { db } from "./db.js";
+import { predictAdmissionLikelihood, forecastEnrollments, generateMarketingRecommendations } from "./ai.js";
 import aiComprehensiveRouter from "./api/ai-comprehensive.js";
 import { sql } from "drizzle-orm";
 
