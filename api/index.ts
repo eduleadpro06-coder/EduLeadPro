@@ -1,9 +1,9 @@
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "../server/routes";
+import { registerRoutes } from "../server/routes.js";
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
-import logger from '../server/config/logger';
+import logger from '../server/config/logger.js';
 import { StructuredLogger, LogCategory } from '../server/utils/structuredLogger';
 
 const app = express();

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { insertLeadSchema, insertFollowUpSchema, Lead, InsertLead, InsertEmiPlan } from "@shared/schema";
+import { storage } from "./storage.js";
+import { insertLeadSchema, insertFollowUpSchema, Lead, InsertLead, InsertEmiPlan } from "../shared/schema.js";
 import { perplexityAI } from "./perplexity-ai.js";
 import PDFDocument from "pdfkit";
 import { db } from "./db.js";

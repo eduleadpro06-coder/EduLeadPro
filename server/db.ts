@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import * as schema from "../shared/schema";
+import * as schema from "../shared/schema.js";
 
 // Connection string from environment variables
 const connectionString = process.env.DATABASE_URL;
@@ -16,7 +16,7 @@ const client = postgres(connectionString);
 const db = drizzle(client, { schema });
 
 // Export all schema for convenience
-export * from "../shared/schema";
+export * from "../shared/schema.js";
 
 // Export db
 export { db };
