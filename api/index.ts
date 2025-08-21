@@ -4,7 +4,7 @@ import { registerRoutes } from "../server/routes.js";
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import logger from '../server/config/logger.js';
-import { StructuredLogger, LogCategory } from '../server/utils/structuredLogger';
+// structured logger not required in serverless handler entry
 
 const app = express();
 
