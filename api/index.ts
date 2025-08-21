@@ -68,4 +68,6 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   logger.error(err);
 });
 
-export default app; 
+export default function handler(req: any, res: any) {
+  return (app as any)(req, res);
+}

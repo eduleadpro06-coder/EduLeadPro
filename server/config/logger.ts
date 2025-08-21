@@ -34,9 +34,14 @@ const format = winston.format.combine(
 );
 
 // Create logs directory if it doesn't exist
-const logsDir = path.join(process.cwd(), 'logs');
+const isServerless = !!process.env.VERCEL;
+const logsDir = isServerless ? path.join('/tmp', 'logs') : path.join(process.cwd(), 'logs');
 if (!existsSync(logsDir)) {
-  mkdirSync(logsDir);
+  try {
+    mkdirSync(logsDir, { recursive: true });
+  } catch {
+    // In serverless environments, filesystem may be read-only; ignore errors
+  }
 }
 
 // Define which transports the logger must use
