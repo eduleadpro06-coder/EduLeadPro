@@ -1,6 +1,6 @@
 // Enhanced Perplexity AI Integration for Educational Intelligence
 import 'dotenv/config';
-import { getModelConfig, MODEL_USE_CASES, DEFAULT_CONFIGS } from './config/ai-models';
+import { getModelConfig, MODEL_USE_CASES, DEFAULT_CONFIGS } from './config/ai-models.js';
 
 export interface PerplexityResponse {
   id: string;
