@@ -1210,8 +1210,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/staff", async (req, res) => {
     try {
       const staffData = req.body;
+      // Normalize known fields
+      const normalizedSalary = staffData?.salary !== undefined ? Number(staffData.salary) : undefined;
+      const normalizedDoj = staffData?.dateOfJoining
+        ? new Date(staffData.dateOfJoining).toISOString().split('T')[0]
+        : undefined;
+
       // Create staff without employeeId first
-      const newStaff = await storage.createStaff({ ...staffData, employeeId: undefined });
+      const newStaff = await storage.createStaff({
+        ...staffData,
+        salary: normalizedSalary ?? staffData.salary,
+        dateOfJoining: normalizedDoj ?? staffData.dateOfJoining,
+        employeeId: undefined
+      });
       // Generate employeeId and update the record
       const generatedEmployeeId = `EMP${newStaff.id}`;
       const updatedStaff = await storage.updateStaff(newStaff.id, { employeeId: generatedEmployeeId });
@@ -1234,11 +1245,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           staffId: newStaff.id,
           month,
           year,
-          basicSalary: newStaff.salary || 0,
+          basicSalary: Number(newStaff.salary) || 0,
           allowances: 0,
           deductions: 0,
           overtime: 0,
-          netSalary: newStaff.salary || 0,
+          netSalary: Number(newStaff.salary) || 0,
           attendedDays: 30,
           status: 'pending',
         });
@@ -1246,9 +1257,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // --- End payroll insert ---
 
       res.status(201).json(updatedStaff);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Create staff error:", error);
-      res.status(500).json({ message: "Failed to create staff", error: error });
+      // Avoid sending raw error object which may be non-serializable
+      const message = error?.message || "Failed to create staff";
+      res.status(500).json({ message });
     }
   });
 

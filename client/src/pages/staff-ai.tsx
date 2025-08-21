@@ -934,7 +934,13 @@ export default function StaffAI() {
   });
   const addStaffMutation = useMutation({
     mutationFn: async (data: InsertStaff) => {
-      const response = await apiRequest("POST", "/api/staff", data);
+      // Normalize fields to match server expectations
+      const payload: any = {
+        ...data,
+        salary: data.salary !== undefined && data.salary !== null ? Number(data.salary as any) : undefined,
+        dateOfJoining: data.dateOfJoining ? new Date(data.dateOfJoining as any).toISOString().split('T')[0] : undefined,
+      };
+      const response = await apiRequest("POST", "/staff", payload);
       return response.json();
     },
     onSuccess: () => {
@@ -962,9 +968,11 @@ export default function StaffAI() {
     }, 0);
     const nextId = maxId + 1;
     const nextEmployeeId = `EMP${nextId.toString().padStart(3, '0')}`;
-    const payload = {
+    const payload: any = {
       ...data,
       employeeId: nextEmployeeId,
+      salary: data.salary !== undefined && data.salary !== null ? Number(data.salary as any) : undefined,
+      dateOfJoining: data.dateOfJoining ? new Date(data.dateOfJoining as any).toISOString().split('T')[0] : undefined,
     };
     addStaffMutation.mutate(payload);
   };
