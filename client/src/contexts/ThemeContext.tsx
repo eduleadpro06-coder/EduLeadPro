@@ -14,7 +14,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (stored === "light" || stored === "dark") return stored;
       if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
     }
-    return "light";
+    return "dark"; // Default to dark mode to match original behavior
   });
 
   useEffect(() => {

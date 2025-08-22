@@ -33,6 +33,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
 
+
 function Router() {
   return (
     <Switch>
@@ -44,7 +45,7 @@ function Router() {
       <Route path="/dashboard">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <Dashboard />
@@ -56,7 +57,7 @@ function Router() {
       <Route path="/leads">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <LeadManagement />
@@ -68,7 +69,7 @@ function Router() {
       <Route path="/leads/add">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <AddLeadPage />
@@ -80,7 +81,7 @@ function Router() {
       <Route path="/ai-forecasting">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <AIForecasting />
@@ -92,7 +93,7 @@ function Router() {
       <Route path="/ai-marketing">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <AIMarketing />
@@ -109,7 +110,7 @@ function Router() {
       <Route path="/ai-comprehensive">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <ComprehensiveAIDashboard />
@@ -121,7 +122,7 @@ function Router() {
       <Route path="/reports">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <Reports />
@@ -133,7 +134,7 @@ function Router() {
       <Route path="/settings">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <Settings />
@@ -145,7 +146,7 @@ function Router() {
       <Route path="/expenses">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <Expenses />
@@ -157,7 +158,7 @@ function Router() {
       <Route path="/students">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <Students />
@@ -169,7 +170,7 @@ function Router() {
       <Route path="/e-mandate">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <EMandate />
@@ -181,7 +182,7 @@ function Router() {
       <Route path="/student-fees">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <StudentFees />
@@ -193,7 +194,7 @@ function Router() {
       <Route path="/staff-ai">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <StaffAI />
@@ -205,7 +206,7 @@ function Router() {
       <Route path="/communication">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
               <Sidebar />
               <div className="flex-1 ml-64">
                 <Communication />
@@ -266,18 +267,18 @@ function App() {
 
   if (hasError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h2>
-          <p className="text-gray-700 mb-4">{errorMessage || 'An unexpected error occurred. Please try refreshing the page.'}</p>
-          <div className="bg-gray-100 p-4 rounded mb-4 overflow-auto max-h-40">
-            <pre className="text-xs text-gray-800 whitespace-pre-wrap">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 max-w-md w-full">
+          <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">Something went wrong</h2>
+          <p className="text-gray-700 dark:text-gray-300 mb-4">{errorMessage || 'An unexpected error occurred. Please try refreshing the page.'}</p>
+          <div className="bg-gray-100 dark:bg-slate-700 p-4 rounded mb-4 overflow-auto max-h-40">
+            <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
               Error details: {errorMessage}
             </pre>
           </div>
           <button 
             onClick={() => window.location.reload()} 
-            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition duration-200"
+            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 dark:bg-[#643ae5] dark:hover:bg-[#7a5fff] text-white font-semibold rounded-lg transition duration-200"
           >
             Refresh Page
           </button>

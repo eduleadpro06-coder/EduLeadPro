@@ -32,7 +32,7 @@ import {
   MessageSquarePlus
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
-import FeatureSteps from "@/components/ui/feature-steps";
+
 import Earth from "../../../components/ui/globe";
 // Remove the AnimatedInsights import
 // import AnimatedInsights from "../components/dashboard/animated-insights";
@@ -51,6 +51,7 @@ import NavBar from "@/components/ui/navbar";
 import FeedbackButton from "@/components/ui/feedback-button";
 import FeedbackForm from "@/components/forms/feedback-form";
 import PublicLayout from "@/components/layout/public-layout";
+import { useTheme } from "@/contexts/ThemeContext";
 
 
 // --- Unique Visual Components ---
@@ -156,7 +157,7 @@ const taglines = [
   "Admissions, reimagined for the future.",
   "Your growth, powered by intelligence."
 ];
-function RotatingTaglines() {
+function RotatingTaglines({ theme }: { theme: "light" | "dark" }) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setIdx(i => (i + 1) % taglines.length), 4000);
@@ -170,7 +171,7 @@ function RotatingTaglines() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.6 }}
-        className="text-lg text-orange-200 mt-4 font-medium"
+        className={`text-lg mt-4 font-medium ${theme === 'light' ? 'text-gray-600' : 'text-orange-200'}`}
         style={{ minHeight: 32 }}
       >
         {taglines[idx]}
@@ -458,6 +459,7 @@ function AnimatedNumber({ value, duration = 1.2, prefix = "", suffix = "" }: { v
 // Main Landing Page Component (outer structure only for now)
 export default function Landing() {
   useHashScroll();
+  const { theme } = useTheme();
   const [location, setLocation] = useLocation();
   const [contactForm, setContactForm] = useState({
     name: "",
@@ -661,7 +663,7 @@ export default function Landing() {
       repeatType: "mirror",
     });
   }, [color]);
-  const backgroundImage = useMotionTemplate`radial-gradient(125% 80% at 50% 0%, #020617 50%, ${color})`;
+  const backgroundImage = useMotionTemplate`radial-gradient(125% 80% at 50% 0%, ${theme === 'light' ? '#f8fafc' : '#020617'} 50%, ${color})`;
 
   // Features for FeatureSteps (step, title, content, image)
   const features = [
@@ -710,13 +712,7 @@ export default function Landing() {
     },
   ];
 
-  // Force dark mode on mount, revert on unmount
-  useEffect(() => {
-    document.documentElement.classList.add('dark');
-    return () => {
-      document.documentElement.classList.remove('dark');
-    };
-  }, []);
+  // Remove forced dark mode - let theme context handle it
 
   function handleCtaClickWithConfetti(e: React.MouseEvent<HTMLButtonElement>) {
     handleCtaClick(e);
@@ -724,32 +720,32 @@ export default function Landing() {
     setTimeout(() => setShowConfetti(false), 1800);
   }
 
-  // Map feature title to icon (outside the map function)
+  // Map feature title to icon (theme-aware)
   const featureIcons: Record<string, JSX.Element> = {
-    "Intelligent Lead Management": <Users color="white" size={28} />,
-    "AI Admission Predictions": <Brain color="white" size={28} />,
-    "Smart Marketing Automation": <Target color="white" size={28} />,
-    "Real-time Analytics Dashboard": <BarChart3 color="white" size={28} />,
-    "Omnichannel Communication": <MessageSquare color="white" size={28} />,
-    "Smart Scheduling & Automation": <Calendar color="white" size={28} />,
+    "Intelligent Lead Management": <Users className={theme === 'light' ? 'text-gray-800' : 'text-white'} size={28} />,
+    "AI Admission Predictions": <Brain className={theme === 'light' ? 'text-gray-800' : 'text-white'} size={28} />,
+    "Smart Marketing Automation": <Target className={theme === 'light' ? 'text-gray-800' : 'text-white'} size={28} />,
+    "Real-time Analytics Dashboard": <BarChart3 className={theme === 'light' ? 'text-gray-800' : 'text-white'} size={28} />,
+    "Omnichannel Communication": <MessageSquare className={theme === 'light' ? 'text-gray-800' : 'text-white'} size={28} />,
+    "Smart Scheduling & Automation": <Calendar className={theme === 'light' ? 'text-gray-800' : 'text-white'} size={28} />,
   };
 
   return (
     <PublicLayout>
       {/* Hero Section (placeholder for now) */}
-      <motion.section id="home" style={{ backgroundImage }} className="relative min-h-screen flex items-center justify-center overflow-hidden pt-72 pb-24 font-sans">
+      <motion.section id="home" style={{ backgroundImage }} className="relative min-h-screen flex items-center justify-center overflow-hidden pt-40 pb-24 font-sans">
         <div className="relative z-10 flex flex-col items-center justify-center w-full px-4 max-w-6xl mx-auto text-center">
-          <h1 className="text-white font-extrabold text-5xl md:text-7xl leading-tight mb-8">
+          <h1 className={`font-extrabold text-5xl md:text-7xl leading-tight mb-8 drop-shadow-lg ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
             <span>One platform – total control</span><br />
             <span>of your Institution flows</span>
           </h1>
-          <p className="text-lg md:text-xl text-gray-200 mb-12 max-w-2xl mx-auto font-normal">
+          <p className={`text-lg md:text-xl mb-12 max-w-2xl mx-auto font-normal drop-shadow-md ${theme === 'light' ? 'text-gray-700' : 'text-gray-200'}`}>
             Centralizing all your monthly expenses in one place to control your cash flow and excel in financial planning.
           </p>
           <div className="flex flex-row gap-6 justify-center mt-2">
             <Button
               size="lg"
-              className="w-44 h-14 bg-white text-black font-semibold rounded-xl shadow hover:bg-gray-100 transition-colors text-base"
+              className={`w-44 h-14 font-semibold rounded-xl shadow transition-colors text-base ${theme === 'light' ? 'bg-gray-800 hover:bg-gray-900 text-white' : 'bg-white text-black hover:bg-gray-100'}`}
               onClick={handleCtaClickWithConfetti}
             >
               Get started
@@ -757,7 +753,7 @@ export default function Landing() {
             <Button
               variant="outline"
               size="lg"
-              className="w-44 h-14 border border-white text-white font-semibold rounded-xl hover:bg-white/10 transition-colors text-base bg-transparent"
+              className={`w-44 h-14 border-2 font-semibold rounded-xl transition-colors text-base bg-transparent ${theme === 'light' ? 'border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-white' : 'border-white text-white hover:bg-white/10'}`}
               onClick={() => setLocation('/pricing')}
             >
               Learn more
@@ -769,17 +765,17 @@ export default function Landing() {
             initial={{ opacity: 0, scale: 1, rotateX: 50, y: 0 }}
             animate={{ opacity: 1, scale: 1, rotateX: 0, y: 0 }}
             transition={{ type: 'spring', stiffness: 50, damping: 24, delay: 0.4}}
-            className="mt-10 mb-[-4rem] md:mb-[-6rem] rounded-2xl shadow-2xl max-w-6xl w-full mx-auto border border-white/10 scale-110 max-h-[600px] md:max-h-[700px]"
+            className={`mt-10 mb-[-4rem] md:mb-[-6rem] rounded-2xl shadow-2xl max-w-6xl w-full mx-auto scale-110 max-h-[600px] md:max-h-[700px] ${theme === 'light' ? 'border border-gray-300' : 'border border-white/10'}`}
           />
         </div>
       </motion.section>
       {/* All other sections wrapped in a dark background */}
-      <div className="bg-[#010205]">
+      <div className={theme === 'light' ? 'bg-gradient-to-br from-blue-50 to-indigo-100' : 'bg-[#010205]'}>
         {/* Features Section */}
-        <section id="features" className="relative py-24" style={{ background: "#010205" }}>
+        <section id="features" className="relative py-24" style={{ background: theme === 'dark' ? '#010205' : 'transparent' }}>
           <div className="max-w-6xl mx-auto px-4">
             <div className="text-center mb-16">
-              <h2 className="text-5xl font-extrabold text-white mb-10" style={{ letterSpacing: "-0.03em" }}>
+              <h2 className="text-5xl font-extrabold text-gray-900 dark:text-white mb-10" style={{ letterSpacing: "-0.03em" }}>
                 Unparalleled advantages
               </h2>
             </div>
@@ -801,8 +797,8 @@ export default function Landing() {
                       size={80}
                     />
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-3">{feature.title}</h3>
-                  <p className="text-base text-slate-300 max-w-xs mx-auto">{feature.description}</p>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">{feature.title}</h3>
+                  <p className="text-base text-gray-600 dark:text-slate-300 max-w-xs mx-auto">{feature.description}</p>
                 </div>
               ))}
             </div>
@@ -812,32 +808,32 @@ export default function Landing() {
         {/* How It Works Section (Enhanced AI Solutions) */}
         <section
           id="ai-future"
-          className="relative bg-[#010205] overflow-hidden py-20"
-          style={{ minHeight: '300vh' }}
+          className="relative overflow-hidden py-20"
+          style={{ minHeight: '300vh', background: theme === 'dark' ? '#010205' : 'transparent' }}
         >
           <div className="container mx-auto px-4">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
-              className="text-center mb-16"
+              className="text-center"
             >
-              <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white drop-shadow-lg">
+              <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900 dark:text-white drop-shadow-lg">
                 AI-Powered Solutions for <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">Indian Institutions</span>
               </h2>
-              <p className="text-xl text-slate-300 max-w-2xl mx-auto">
+              <p className="text-xl text-gray-700 dark:text-slate-300 max-w-2xl mx-auto">
                 Unlock the full potential of your institution with advanced AI features designed for Indian education. Explore how our platform can forecast enrollments, accelerate revenue, and build stronger parent relationships.
               </p>
             </motion.div>
             <div className="max-w-6xl mx-auto">
               <ScrollStack
-                itemScale={0.04}
-                itemStackDistance={40}
-                stackPosition="25%"
-                scaleEndPosition="15%"
-                baseScale={0.85}
-                scaleDuration={0.6}
-                rotationAmount={0}
+                itemScale={0.02}
+                itemStackDistance={30}
+                stackPosition="20%"
+                scaleEndPosition="10%"
+                baseScale={0.9}
+                scaleDuration={1.2}
+                rotationAmount={2}
               >
                 <ScrollStackItem>
                   <AISolutionCard
@@ -881,11 +877,11 @@ export default function Landing() {
         <DashboardHighlights />
 
         {/* Testimonials Section */}
-        <section className="py-20" style={{ background: "#010205" }}>
+        <section className="py-20" style={{ background: theme === 'dark' ? '#010205' : 'transparent' }}>
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-5xl font-bold mb-6">What Our Clients Say</h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
+              <h2 className="text-3xl md:text-5xl font-bold mb-6 text-gray-900 dark:text-white">What Our Clients Say</h2>
+              <p className="text-xl text-gray-700 dark:text-muted-foreground max-w-2xl mx-auto mb-8">
                 Hear from educational leaders who have transformed their admissions with EduLead Pro.
               </p>
             </div>
@@ -894,7 +890,7 @@ export default function Landing() {
         </section>
 
         {/* FAQ Section */}
-        <section id="faq-section" style={{ background: "#010205" }}>
+        <section id="faq-section" style={{ background: theme === 'dark' ? '#010205' : 'transparent' }}>
           <div className="container mx-auto px-4">
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
@@ -902,10 +898,10 @@ export default function Landing() {
               transition={{ duration: 0.6 }}
               className="text-center mb-16"
             >
-              <h2 className="text-3xl md:text-5xl font-bold mb-6">
+              <h2 className="text-3xl md:text-5xl font-bold mb-6 text-gray-900 dark:text-white">
                 Frequently Asked Questions
               </h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-xl text-gray-700 dark:text-muted-foreground max-w-2xl mx-auto">
                 Everything you need to know about EduLead Pro
               </p>
             </motion.div>
@@ -952,21 +948,21 @@ export default function Landing() {
 
 
         {/* Contact Section */}
-        <section id="contact" className="py-20" style={{ background: "#010205" }}>
+        <section id="contact" className="py-20" style={{ background: theme === 'dark' ? '#010205' : 'transparent' }}>
           <div className="container mx-auto px-4">
             <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold mb-6 text-white">
+              <h2 className="text-3xl md:text-5xl font-bold mb-6 text-gray-900 dark:text-white">
                 Get in Touch
               </h2>
-              <p className="text-xl text-white/80 max-w-2xl mx-auto">
+              <p className="text-xl text-gray-700 dark:text-white/80 max-w-2xl mx-auto">
                 Have questions about EduLead Pro? Our team is here to help you transform your institution's admissions process.
               </p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
               {/* Contact Info */}
               <div className="space-y-8">
-                <div className="rounded-2xl p-8 shadow-lg" style={{ background: '#0e0f12' }}>
-                  <h3 className="text-2xl font-semibold mb-6 text-white">
+                <div className={`rounded-2xl p-8 shadow-lg ${theme === 'light' ? 'bg-gradient-to-br from-white to-blue-50 border border-blue-200' : ''}`} style={{ background: theme === 'dark' ? '#0e0f12' : 'transparent' }}>
+                  <h3 className={`text-2xl font-semibold mb-6 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
                     Contact Information
                   </h3>
                   <div className="space-y-6">
@@ -975,8 +971,8 @@ export default function Landing() {
                         <Mail className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <p className="text-sm text-white/70">Email</p>
-                        <a href="mailto:contact@edulead.pro" className="font-medium text-white hover:text-[#ffd700] transition-colors">
+                        <p className={`text-sm ${theme === 'light' ? 'text-gray-600' : 'text-white/70'}`}>Email</p>
+                        <a href="mailto:contact@edulead.pro" className={`font-medium ${theme === 'light' ? 'text-gray-900 hover:text-blue-600' : 'text-white hover:text-[#ffd700]'} transition-colors`}>
                           contact@edulead.pro
                         </a>
                       </div>
@@ -986,8 +982,8 @@ export default function Landing() {
                         <Phone className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <p className="text-sm text-white/70">Phone</p>
-                        <a href="tel:+915551234567" className="font-medium text-white hover:text-[#ffd700] transition-colors">
+                        <p className={`text-sm ${theme === 'light' ? 'text-gray-600' : 'text-white/70'}`}>Phone</p>
+                        <a href="tel:+915551234567" className={`font-medium ${theme === 'light' ? 'text-gray-900 hover:text-blue-600' : 'text-white hover:text-[#ffd700]'} transition-colors`}>
                           +91 (555) 123-4567
                         </a>
                       </div>
@@ -997,39 +993,39 @@ export default function Landing() {
                         <MapPin className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <p className="text-sm text-white/70">Location</p>
-                        <p className="font-medium text-white">
+                        <p className={`text-sm ${theme === 'light' ? 'text-gray-600' : 'text-white/70'}`}>Location</p>
+                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
                           Mumbai, India
                         </p>
                       </div>
                     </div>
                   </div>
                 </div>
-                <div className="rounded-2xl p-8 shadow-lg" style={{ background: '#0e0f12' }}>
-                  <h3 className="text-2xl font-semibold mb-6 text-white">
+                <div className={`rounded-2xl p-8 shadow-lg ${theme === 'light' ? 'bg-gradient-to-br from-white to-indigo-50 border border-indigo-200' : ''}`} style={{ background: theme === 'dark' ? '#0e0f12' : 'transparent' }}>
+                  <h3 className={`text-2xl font-semibold mb-6 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
                     Business Hours
                   </h3>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-white/70">Monday - Friday</span>
-                      <span className="font-medium text-white">9:00 AM - 6:00 PM</span>
+                      <span className={theme === 'light' ? 'text-gray-600' : 'text-white/70'}>Monday - Friday</span>
+                      <span className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>9:00 AM - 6:00 PM</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-white/70">Saturday</span>
-                      <span className="font-medium text-white">10:00 AM - 4:00 PM</span>
+                      <span className={theme === 'light' ? 'text-gray-600' : 'text-white/70'}>Saturday</span>
+                      <span className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>10:00 AM - 4:00 PM</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-white/70">Sunday</span>
-                      <span className="font-medium text-white">Closed</span>
+                      <span className={theme === 'light' ? 'text-gray-600' : 'text-white/70'}>Sunday</span>
+                      <span className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Closed</span>
                     </div>
                   </div>
                 </div>
               </div>
               {/* Contact Form */}
               <div>
-                <form onSubmit={handleContactSubmit} className="rounded-2xl p-8 shadow-lg space-y-6" style={{ background: '#0e0f12' }}>
+                <form onSubmit={handleContactSubmit} className={`rounded-2xl p-8 shadow-lg space-y-6 ${theme === 'light' ? 'bg-gradient-to-br from-white to-blue-50 border border-blue-200' : ''}`} style={{ background: theme === 'dark' ? '#0e0f12' : 'transparent' }}>
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium mb-2 text-white">
+                    <label htmlFor="name" className={`block text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                       Full Name
                     </label>
                     <input
@@ -1037,13 +1033,13 @@ export default function Landing() {
                       id="name"
                       value={contactForm.name}
                       onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg border border-[#643ae5] bg-[#4a4a5e] text-white focus:ring-2 focus:ring-[#643ae5] focus:border-transparent transition-colors placeholder-white/60"
+                      className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#643ae5] focus:border-transparent transition-colors ${theme === 'light' ? 'border-gray-300 bg-white text-gray-900 placeholder-gray-500' : 'border-[#643ae5] bg-[#4a4a5e] text-white placeholder-white/60'}`}
                       required
                       placeholder="Enter your name"
                     />
                   </div>
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium mb-2 text-white">
+                    <label htmlFor="email" className={`block text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                       Email Address
                     </label>
                     <input
@@ -1051,13 +1047,13 @@ export default function Landing() {
                       id="email"
                       value={contactForm.email}
                       onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg border border-[#643ae5] bg-[#4a4a5e] text-white focus:ring-2 focus:ring-[#643ae5] focus:border-transparent transition-colors placeholder-white/60"
+                      className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#643ae5] focus:border-transparent transition-colors ${theme === 'light' ? 'border-gray-300 bg-white text-gray-900 placeholder-gray-500' : 'border-[#643ae5] bg-[#4a4a5e] text-white placeholder-white/60'}`}
                       required
                       placeholder="Enter your email"
                     />
                   </div>
                   <div>
-                    <label htmlFor="institution" className="block text-sm font-medium mb-2 text-white">
+                    <label htmlFor="institution" className={`block text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                       Institution Name
                     </label>
                     <input
@@ -1065,13 +1061,13 @@ export default function Landing() {
                       id="institution"
                       value={contactForm.institution}
                       onChange={(e) => setContactForm({ ...contactForm, institution: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg border border-[#643ae5] bg-[#4a4a5e] text-white focus:ring-2 focus:ring-[#643ae5] focus:border-transparent transition-colors placeholder-white/60"
+                      className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#643ae5] focus:border-transparent transition-colors ${theme === 'light' ? 'border-gray-300 bg-white text-gray-900 placeholder-gray-500' : 'border-[#643ae5] bg-[#4a4a5e] text-white placeholder-white/60'}`}
                       required
                       placeholder="Your institution"
                     />
                   </div>
                   <div>
-                    <label htmlFor="message" className="block text-sm font-medium mb-2 text-white">
+                    <label htmlFor="message" className={`block text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                       Message
                     </label>
                     <textarea
@@ -1079,7 +1075,7 @@ export default function Landing() {
                       value={contactForm.message}
                       onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
                       rows={4}
-                      className="w-full px-4 py-2 rounded-lg border border-[#643ae5] bg-[#4a4a5e] text-white focus:ring-2 focus:ring-[#643ae5] focus:border-transparent transition-colors resize-none placeholder-white/60"
+                      className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#643ae5] focus:border-transparent transition-colors resize-none ${theme === 'light' ? 'border-gray-300 bg-white text-gray-900 placeholder-gray-500' : 'border-[#643ae5] bg-[#4a4a5e] text-white placeholder-white/60'}`}
                       required
                       placeholder="Type your message..."
                     ></textarea>
@@ -1110,10 +1106,10 @@ export default function Landing() {
               transition={{ duration: 0.6 }}
               className="w-full"
             >
-                <h2 className="text-3xl md:text-5xl font-bold mb-6 text-white">
+                <h2 className={`text-3xl md:text-5xl font-bold mb-6 drop-shadow-lg ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
                   Ready to Transform Your Institution?
                 </h2>
-                <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90 text-white">
+                <p className={`text-xl mb-8 max-w-2xl mx-auto opacity-90 drop-shadow-md ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                   Join 500+ educational institutions that have revolutionized their admissions process with EduLead Pro's AI-powered platform.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
@@ -1121,34 +1117,34 @@ export default function Landing() {
                     Book a Demo Today
                     <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>
-                  <Button size="lg" variant="outline" className="px-8 py-4 rounded-full border-2 border-white text-white hover:bg-white/10 hover:text-white font-bold text-lg" onClick={() => setLocation('/pricing')}>
+                  <Button size="lg" variant="outline" className={`px-8 py-4 rounded-full border-2 font-bold text-lg transition-all ${theme === 'light' ? 'border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-white' : 'border-white text-white hover:bg-white/10 hover:text-white'}`} onClick={() => setLocation('/pricing')}>
                     View Pricing Plans
                   </Button>           
                 </div>
                 {/* Animated Taglines (if present in original) */}
-                <RotatingTaglines />
+                <RotatingTaglines theme={theme} />
             </motion.div>
           </div>
         </section>
 
         {/* Footer (from new template, will adapt to your info) */}
-        <footer className="bg-[#010205] border-t border-white/10 py-12">
+        <footer className={`py-12 border-t ${theme === 'light' ? 'bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200' : 'bg-[#010205] border-white/10'}`}>
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
               {/* About Section */}
               <div className="flex flex-col">
-                <h3 className="text-2xl font-bold text-white mb-4">EduLead Pro</h3>
-                <p className="text-slate-400 mb-6 flex-grow">
+                <h3 className={`text-2xl font-bold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>EduLead Pro</h3>
+                <p className={`mb-6 flex-grow ${theme === 'light' ? 'text-gray-600' : 'text-slate-400'}`}>
                   Empowering educational institutions with AI-driven admissions, predictive analytics, and intelligent marketing.
                 </p>
                 <div className="flex space-x-4">
-                  <a href="#" className="text-slate-400 hover:text-white transition-colors">
+                  <a href="#" className={`transition-colors ${theme === 'light' ? 'text-gray-600 hover:text-gray-900' : 'text-slate-400 hover:text-white'}`}>
                     <Linkedin size={20} />
                   </a>
-                  <a href="#" className="text-slate-400 hover:text-white transition-colors">
+                  <a href="#" className={`transition-colors ${theme === 'light' ? 'text-gray-600 hover:text-gray-900' : 'text-slate-400 hover:text-white'}`}>
                     <Twitter size={20} />
                   </a>
-                  <a href="#" className="text-slate-400 hover:text-white transition-colors">
+                  <a href="#" className={`transition-colors ${theme === 'light' ? 'text-gray-600 hover:text-gray-900' : 'text-slate-400 hover:text-white'}`}>
                     <Facebook size={20} />
                   </a>
                 </div>
@@ -1156,34 +1152,34 @@ export default function Landing() {
         
               {/* Quick Links */}
               <div>
-                <h4 className="font-semibold text-white mb-4 text-lg">Quick Links</h4>
-                <ul className="space-y-3 text-slate-400">
-                  <li><a href="/" className="hover:text-white transition-colors">Home</a></li>
-                  <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                  <li><a href="/pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                  <li><a href="/book-demo" className="hover:text-white transition-colors">Book a Demo</a></li>
+                <h4 className={`font-semibold mb-4 text-lg ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Quick Links</h4>
+                <ul className={`space-y-3 ${theme === 'light' ? 'text-gray-600' : 'text-slate-400'}`}>
+                  <li><a href="/" className={`transition-colors ${theme === 'light' ? 'hover:text-gray-900' : 'hover:text-white'}`}>Home</a></li>
+                  <li><a href="#features" className={`transition-colors ${theme === 'light' ? 'hover:text-gray-900' : 'hover:text-white'}`}>Features</a></li>
+                  <li><a href="/pricing" className={`transition-colors ${theme === 'light' ? 'hover:text-gray-900' : 'hover:text-white'}`}>Pricing</a></li>
+                  <li><a href="/book-demo" className={`transition-colors ${theme === 'light' ? 'hover:text-gray-900' : 'hover:text-white'}`}>Book a Demo</a></li>
                 </ul>
               </div>
         
               {/* Resources */}
               <div>
-                <h4 className="font-semibold text-white mb-4 text-lg">Resources</h4>
-                <ul className="space-y-3 text-slate-400">
-                  <li><a href="#ai-future" className="hover:text-white transition-colors">AI Solutions</a></li>
-                  <li><a href="#faq-section" className="hover:text-white transition-colors">FAQ</a></li>
-                  <li><a href="#contact" className="hover:text-white transition-colors">Contact Us</a></li>
+                <h4 className={`font-semibold mb-4 text-lg ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Resources</h4>
+                <ul className={`space-y-3 ${theme === 'light' ? 'text-gray-600' : 'text-slate-400'}`}>
+                  <li><a href="#ai-future" className={`transition-colors ${theme === 'light' ? 'hover:text-gray-900' : 'hover:text-white'}`}>AI Solutions</a></li>
+                  <li><a href="#faq-section" className={`transition-colors ${theme === 'light' ? 'hover:text-gray-900' : 'hover:text-white'}`}>FAQ</a></li>
+                  <li><a href="#contact" className={`transition-colors ${theme === 'light' ? 'hover:text-gray-900' : 'hover:text-white'}`}>Contact Us</a></li>
                 </ul>
               </div>
         
               {/* Newsletter */}
               <div>
-                <h4 className="font-semibold text-white mb-4 text-lg">Stay up to date</h4>
-                <p className="text-slate-400 mb-4">Get the latest news and updates from EduLead Pro.</p>
-                <form className="flex w-full items-center rounded-full bg-[#0e0f12] p-1 border border-white/20 max-w-sm">
+                <h4 className={`font-semibold mb-4 text-lg ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Stay up to date</h4>
+                <p className={`mb-4 ${theme === 'light' ? 'text-gray-600' : 'text-slate-400'}`}>Get the latest news and updates from EduLead Pro.</p>
+                <form className={`flex w-full items-center rounded-full p-1 max-w-sm ${theme === 'light' ? 'bg-gradient-to-r from-white to-indigo-50 border border-indigo-300' : 'bg-[#0e0f12] border border-white/20'}`}>
                   <input
                     type="email"
                     placeholder="Enter your email"
-                    className="w-full appearance-none bg-transparent px-4 py-1 text-white placeholder-slate-400 focus:outline-none"
+                    className={`w-full appearance-none bg-transparent px-4 py-1 focus:outline-none ${theme === 'light' ? 'text-gray-900 placeholder-gray-500' : 'text-white placeholder-slate-400'}`}
                   />
                   <Button
                     type="submit"
@@ -1193,17 +1189,17 @@ export default function Landing() {
                   </Button>
                 </form>
                 <div className="mt-8">
-                   <h6 className="font-semibold text-white mb-4 text-lg whitespace-nowrap">Have Something To Say?</h6>
+                   <h6 className={`font-semibold mb-4 text-lg whitespace-nowrap ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Have Something To Say?</h6>
                     <FeedbackButton onClick={() => setIsFeedbackFormOpen(true)} />
                   </div>
               </div>  
             </div>
         
-            <div className="border-t border-white/10 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center text-slate-500">
+            <div className={`border-t mt-12 pt-8 flex flex-col md:flex-row justify-between items-center ${theme === 'light' ? 'border-blue-200 text-gray-600' : 'border-white/10 text-slate-500'}`}>
               <p className="mb-4 md:mb-0">&copy; {new Date().getFullYear()} EduLead Pro. All rights reserved.</p>
               <div className="flex space-x-6">
-                <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-                <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+                <a href="#" className={`transition-colors ${theme === 'light' ? 'hover:text-gray-900' : 'hover:text-white'}`}>Privacy Policy</a>
+                <a href="#" className={`transition-colors ${theme === 'light' ? 'hover:text-gray-900' : 'hover:text-white'}`}>Terms of Service</a>
               </div>
             </div>
           </div>

@@ -4,6 +4,32 @@
 
 @layer base {
   :root {
+    /* Light theme variables */
+    --background: 0 0% 100%; /* white */
+    --foreground: 222.2 84% 4.9%; /* dark gray */
+    --card: 0 0% 100%; /* white */
+    --card-foreground: 222.2 84% 4.9%; /* dark gray */
+    --popover: 0 0% 100%; /* white */
+    --popover-foreground: 222.2 84% 4.9%; /* dark gray */
+    --primary: 221.2 83.2% 53.3%; /* blue */
+    --primary-foreground: 210 40% 98%; /* light blue */
+    --secondary: 210 40% 96%; /* light gray */
+    --secondary-foreground: 222.2 84% 4.9%; /* dark gray */
+    --muted: 210 40% 96%; /* light gray */
+    --muted-foreground: 215.4 16.3% 46.9%; /* medium gray */
+    --accent: 210 40% 96%; /* light gray */
+    --accent-foreground: 222.2 84% 4.9%; /* dark gray */
+    --destructive: 0 84.2% 60.2%; /* red */
+    --destructive-foreground: 210 40% 98%; /* light */
+    --border: 214.3 31.8% 91.4%; /* light border */
+    --input: 214.3 31.8% 91.4%; /* light input */
+    --ring: 221.2 83.2% 53.3%; /* blue ring */
+    --radius: 0.5rem;
+    font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+  }
+
+  .dark {
+    /* Dark theme variables (original) */
     --background: 0 0% 0%; /* pure black */
     --foreground: 220 15% 85%; /* soft light gray */
     --card: 0 0% 0%;
@@ -23,8 +49,6 @@
     --border: 240 6% 20%;
     --input: 240 6% 20%;
     --ring: 255 90% 60%;
-    --radius: 0.5rem;
-    font-family: 'Poppins', 'Inter', system-ui, sans-serif;
   }
 }
 
@@ -184,10 +208,16 @@
 
 /* Glassmorphism utility */
 .glass-card {
-  background: rgba(36, 39, 48, 0.7);
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
   border-radius: 1.25rem;
+  border: 1px solid rgba(200, 200, 200, 0.18);
+  box-shadow: 0 4px 32px 0 rgba(0,0,0,0.1);
+}
+
+.dark .glass-card {
+  background: rgba(36, 39, 48, 0.7);
   border: 1px solid rgba(120, 120, 140, 0.18);
   box-shadow: 0 4px 32px 0 rgba(0,0,0,0.18);
 }

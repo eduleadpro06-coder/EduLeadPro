@@ -12,10 +12,10 @@ export default function AISolutionCard({
   image: string;
 }) {
   return (
-    <div className="rounded-3xl bg-[#0e0f12] shadow-2xl p-12 text-white flex flex-col md:flex-row items-center gap-16 min-h-[500px] border border-slate-800">
+    <div className="rounded-3xl bg-white dark:bg-[#0e0f12] shadow-2xl p-12 text-gray-900 dark:text-white flex flex-col md:flex-row items-center gap-16 min-h-[500px] border border-gray-200 dark:border-slate-800">
       <div className="md:w-1/2">
         <h2 className="text-5xl font-bold tracking-tighter mb-8">{title}</h2>
-        <ul className="space-y-4 text-slate-200 mb-10">
+        <ul className="space-y-4 text-gray-700 dark:text-slate-200 mb-10">
           {features.map((feature, i) => (
             <li key={i} className="flex items-center gap-4">
               <Check className="w-6 h-6 text-purple-400 flex-shrink-0" />
@@ -23,7 +23,7 @@ export default function AISolutionCard({
             </li>
           ))}
         </ul>
-        <Button variant="outline" className="text-white border-slate-700 hover:bg-slate-800 hover:text-white text-base py-3 px-6">
+        <Button variant="outline" className="text-gray-900 dark:text-white border-gray-300 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white text-base py-3 px-6">
           Find out more →
         </Button>
       </div>

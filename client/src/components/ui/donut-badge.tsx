@@ -1,12 +1,16 @@
 import React from "react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 type DonutBadgeProps = {
   segments: { color: string; value: number }[]; // value is the percentage (out of 100)
   icon: React.ReactNode;
   size?: number;
+  theme?: 'light' | 'dark';
 };
 
 export function DonutBadge({ segments, icon, size = 80 }: DonutBadgeProps) {
+  const { theme } = useTheme();
+  
   // Calculate the circumference of the circle
   const radius = size / 2 - 6;
   const circumference = 2 * Math.PI * radius;
@@ -41,7 +45,7 @@ export function DonutBadge({ segments, icon, size = 80 }: DonutBadgeProps) {
         cx={size / 2}
         cy={size / 2}
         fill="none"
-        stroke="#222"
+        stroke={theme === 'light' ? '#e5e7eb' : '#222'}
         strokeWidth={10}
       />
       {/* Colored segments */}

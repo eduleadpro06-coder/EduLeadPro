@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getActiveAIFeatures, getComingSoonFeatures, isAIFeaturePath } from "@/config/aiFeatures";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -61,21 +62,24 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="w-64 bg-black fixed h-full z-10 sidebar-black-shadow flex flex-col justify-between">
+    <div className="w-64 bg-white dark:bg-black fixed h-full z-10 sidebar-black-shadow flex flex-col justify-between border-r border-gray-200 dark:border-gray-800">
       <div>
         <div className="p-6 pb-2">
-          <Link href="/landing">
-            <div className="flex flex-col items-start justify-center select-none" style={{ textShadow: '0 2px 8px #0008' }}>
-              <span className="text-2xl font-extrabold tracking-tight">
-                <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">EduLead</span>
-                <span className="text-white"> Pro</span>
-              </span>
-              <span className="text-xs font-medium text-muted-foreground mt-1 ml-0">AI-Powered CRM</span>
-            </div>
-          </Link>
+          <div className="flex items-center justify-between">
+            <Link href="/landing">
+              <div className="flex flex-col items-start justify-center select-none" style={{ textShadow: '0 2px 8px #0008' }}>
+                <span className="text-2xl font-extrabold tracking-tight">
+                  <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">EduLead</span>
+                  <span className="text-gray-900 dark:text-white"> Pro</span>
+                </span>
+                <span className="text-xs font-medium text-muted-foreground mt-1 ml-0">AI-Powered CRM</span>
+              </div>
+            </Link>
+            <ThemeToggle size="sm" className="ml-2" />
+          </div>
         </div>
         {customInstituteName && (
-          <div className="px-6 py-4 bg-black border-b border-[#232a3a]">
+          <div className="px-6 py-4 bg-white dark:bg-black border-b border-gray-200 dark:border-[#232a3a]">
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 rounded-full bg-primary"></div>
               <p className="text-base font-medium text-foreground">{customInstituteName}</p>
@@ -97,19 +101,19 @@ export default function Sidebar() {
                   >
                     <div
                       className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer relative group 
-                        ${isActive ? 'bg-[#181f36] border-l-4 border-[#a259ff]' : 'hover:bg-[#131b2d] hover:text-[#a084fa]'}
+                        ${isActive ? 'bg-blue-50 dark:bg-[#181f36] border-l-4 border-[#643ae5] dark:border-[#a259ff]' : 'hover:bg-gray-100 dark:hover:bg-[#131b2d] hover:text-blue-600 dark:hover:text-[#a084fa]'}
                       `}
                     >
-                      <span className={isActive ? 'text-[#a259ff]' : 'text-[#8b9cc9] group-hover:text-[#a084fa]'}>
+                      <span className={isActive ? 'text-[#643ae5] dark:text-[#a259ff]' : 'text-gray-600 dark:text-[#8b9cc9] group-hover:text-blue-600 dark:group-hover:text-[#a084fa]'}>
                         <Icon size={18} />
                       </span>
-                      <span className={`font-medium text-sm ${isActive ? 'text-[#a259ff]' : 'text-[#8b9cc9] group-hover:text-[#a084fa]'}`}>
+                      <span className={`font-medium text-sm ${isActive ? 'text-[#643ae5] dark:text-[#a259ff]' : 'text-gray-600 dark:text-[#8b9cc9] group-hover:text-blue-600 dark:group-hover:text-[#a084fa]'}`}>
                         {item.name}
                       </span>
                     </div>
                   </Link>
                   {dividerAfter && (
-                    <div className="my-2 border-t border-[#232a3a] mx-2"></div>
+                    <div className="my-2 border-t border-gray-200 dark:border-[#232a3a] mx-2"></div>
                   )}
                 </>
               );
@@ -119,17 +123,17 @@ export default function Sidebar() {
             <div className="mt-4">
               <div
                 onClick={() => setIsAIExpanded(!isAIExpanded)}
-                className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer group hover:bg-[#131b2d]`}
+                className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer group hover:bg-gray-100 dark:hover:bg-[#131b2d]`}
               >
                 <div className="flex items-center space-x-3">
-                  <span className="text-[#8b9cc9] group-hover:text-[#a084fa]">
+                  <span className="text-gray-600 dark:text-[#8b9cc9] group-hover:text-blue-600 dark:group-hover:text-[#a084fa]">
                     <Sparkles size={18} />
                   </span>
-                  <span className="font-medium text-sm text-[#8b9cc9] group-hover:text-[#a084fa]">
+                  <span className="font-medium text-sm text-gray-600 dark:text-[#8b9cc9] group-hover:text-blue-600 dark:group-hover:text-[#a084fa]">
                     AI Features
                   </span>
                 </div>
-                <span className="text-[#8b9cc9] group-hover:text-[#a084fa]">
+                <span className="text-gray-600 dark:text-[#8b9cc9] group-hover:text-blue-600 dark:group-hover:text-[#a084fa]">
                   {isAIExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </span>
               </div>
@@ -145,17 +149,17 @@ export default function Sidebar() {
                       <Link key={feature.id} href={feature.href}>
                         <div
                           className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer relative group
-                            ${isActive ? 'bg-[#181f36] border-l-4 border-[#a259ff]' : 'hover:bg-[#131b2d] hover:text-[#a084fa]'}
+                            ${isActive ? 'bg-blue-50 dark:bg-[#181f36] border-l-4 border-[#643ae5] dark:border-[#a259ff]' : 'hover:bg-gray-100 dark:hover:bg-[#131b2d] hover:text-blue-600 dark:hover:text-[#a084fa]'}
                           `}
                         >
-                          <span className={isActive ? 'text-[#a259ff]' : 'text-[#8b9cc9] group-hover:text-[#a084fa]'}>
+                          <span className={isActive ? 'text-[#643ae5] dark:text-[#a259ff]' : 'text-gray-600 dark:text-[#8b9cc9] group-hover:text-blue-600 dark:group-hover:text-[#a084fa]'}>
                             <Icon size={16} />
                           </span>
                           <div className="flex-1">
-                            <span className={`font-medium text-sm ${isActive ? 'text-[#a259ff]' : 'text-[#8b9cc9] group-hover:text-[#a084fa]'}`}>
+                            <span className={`font-medium text-sm ${isActive ? 'text-[#643ae5] dark:text-[#a259ff]' : 'text-gray-600 dark:text-[#8b9cc9] group-hover:text-blue-600 dark:group-hover:text-[#a084fa]'}`}>
                               {feature.name}
                             </span>
-                            <div className={`text-xs ${isActive ? 'text-[#a259ff]/70' : 'text-[#8b9cc9]/70 group-hover:text-[#a084fa]/70'}`}>
+                            <div className={`text-xs ${isActive ? 'text-[#643ae5]/70 dark:text-[#a259ff]/70' : 'text-gray-500 dark:text-[#8b9cc9]/70 group-hover:text-blue-500 dark:group-hover:text-[#a084fa]/70'}`}>
                               {feature.description}
                             </div>
                           </div>
@@ -168,7 +172,7 @@ export default function Sidebar() {
                   {comingSoonFeatures.length > 0 && (
                     <>
                       <div className="px-3 py-2 mt-3">
-                        <div className="text-xs font-medium text-[#8b9cc9]/60 uppercase tracking-wider">
+                        <div className="text-xs font-medium text-gray-500 dark:text-[#8b9cc9]/60 uppercase tracking-wider">
                           Coming Soon
                         </div>
                       </div>
@@ -179,17 +183,17 @@ export default function Sidebar() {
                             key={feature.id}
                             className="flex items-center space-x-3 px-3 py-2 rounded-lg opacity-60 cursor-not-allowed"
                           >
-                            <span className="text-[#8b9cc9]/50">
+                            <span className="text-gray-400 dark:text-[#8b9cc9]/50">
                               <Icon size={16} />
                             </span>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="font-medium text-sm text-[#8b9cc9]/50">
+                                <span className="font-medium text-sm text-gray-400 dark:text-[#8b9cc9]/50">
                                   {feature.name}
                                 </span>
-                                <Clock size={12} className="text-[#8b9cc9]/40" />
+                                <Clock size={12} className="text-gray-400 dark:text-[#8b9cc9]/40" />
                               </div>
-                              <div className="text-xs text-[#8b9cc9]/40">
+                              <div className="text-xs text-gray-400 dark:text-[#8b9cc9]/40">
                                 {feature.description}
                               </div>
                             </div>

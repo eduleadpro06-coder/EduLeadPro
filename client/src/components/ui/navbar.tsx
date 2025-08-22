@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface NavBarProps {
   items: Array<{ name: string; url: string; icon: React.ElementType }>;
@@ -41,12 +42,11 @@ const NavBar = ({ items, className, setLocation, user, loading, activeTab, setAc
 
   return (
     <div className={cn("fixed top-0 left-1/2 -translate-x-1/2 z-50 pt-4", className)}>
-      <div className="flex items-center gap-4 bg-white/20 backdrop-blur-lg border border-white/30 rounded-full shadow-lg py-0.5 pl-3 pr-1">
+      <div className="flex items-center gap-4 bg-white/90 dark:bg-white/20 backdrop-blur-lg border border-white/60 dark:border-white/30 rounded-full shadow-lg py-0.5 pl-3 pr-1">
         {/* Logo at the start of the NavBar */}
         <a
           href="/"
-          className="flex items-center gap-2 text-white font-extrabold text-2xl md:text-3xl tracking-tight hover:opacity-90 transition-opacity pl-2 pr-4 select-none"
-          style={{ textShadow: '0 2px 8px #0008' }}
+          className="flex items-center gap-2 text-gray-900 dark:text-white font-extrabold text-2xl md:text-3xl tracking-tight hover:opacity-90 transition-opacity pl-2 pr-4 select-none drop-shadow-lg"
         >
           {/* Use logo image if available, otherwise fallback to text */}
           {false ? (
@@ -54,7 +54,7 @@ const NavBar = ({ items, className, setLocation, user, loading, activeTab, setAc
           ) : (
             <>
               <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">EduLead</span>
-              <span className="text-white">Pro</span>
+              <span className="text-gray-900 dark:text-white">Pro</span>
             </>
           )}
         </a>
@@ -70,9 +70,9 @@ const NavBar = ({ items, className, setLocation, user, loading, activeTab, setAc
                 (handleNavClick || defaultHandleNavClick)(item);
               }}
               className={cn(
-                "relative cursor-pointer text-sm font-semibold px-4 py-1 rounded-full transition-colors",
-                "text-white hover:text-white",
-                isActive && "bg-[#643ae5]"
+                "relative cursor-pointer text-sm font-semibold px-4 py-1 rounded-full transition-colors drop-shadow-md",
+                "text-gray-900 dark:text-white hover:text-gray-800 dark:hover:text-white",
+                isActive && "bg-[#643ae5] text-white"
               )}
             >
               <span className="hidden md:inline whitespace-nowrap">{item.name}</span>
@@ -85,6 +85,8 @@ const NavBar = ({ items, className, setLocation, user, loading, activeTab, setAc
             </a>
           );
         })}
+        {/* Theme Toggle */}
+        <ThemeToggle variant="ghost" size="sm" className="mr-2 border-0 border-none shadow-none bg-transparent hover:bg-transparent" />
         {/* Hide auth CTA while auth is loading to avoid flicker */}
         {loading ? null : user ? (
           <Button
