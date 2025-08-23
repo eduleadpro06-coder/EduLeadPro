@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Sector } from "recharts";
 import { FileText, DollarSign, Calendar, Trash2, Pencil, Settings, Filter, ChevronDown, CreditCard, Receipt } from "lucide-react";
 import Header from "@/components/layout/header";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
@@ -33,6 +34,7 @@ interface Expense {
 }
 
 export default function Expenses() {
+  const { theme } = useTheme();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ description: "", amount: "", category: categories[0] });
@@ -172,14 +174,14 @@ export default function Expenses() {
   };
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className={`min-h-screen ${theme === 'light' ? 'bg-gradient-to-br from-blue-50 to-indigo-100' : 'bg-black'}`}>
       <Header />
 
       <main className="p-6 space-y-8">
         {/* Budget Utilization Card */}
-        <Card className="bg-black text-white shadow-sm hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-4 bg-black text-white">
-            <CardTitle className="text-xl text-white">Budget Utilization</CardTitle>
+        <Card className={`shadow-sm hover:shadow-md transition-shadow ${theme === 'light' ? 'bg-gradient-to-br from-white to-blue-50 text-gray-900 border border-blue-200' : 'bg-black text-white'}`}>
+          <CardHeader className={`flex flex-row items-center justify-between pb-4 ${theme === 'light' ? 'bg-transparent text-gray-900' : 'bg-black text-white'}`}>
+            <CardTitle className={`text-xl ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Budget Utilization</CardTitle>
             <Dialog open={isBudgetDialogOpen} onOpenChange={setIsBudgetDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700 h-9">
@@ -265,13 +267,13 @@ export default function Expenses() {
               </DialogContent>
             </Dialog>
           </CardHeader>
-          <CardContent className="bg-black text-white">
+          <CardContent className={theme === 'light' ? 'bg-transparent text-gray-900' : 'bg-black text-white'}>
             <div className="space-y-8">
               {/* Overall Budget */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700">Overall Budget</span>
-                  <span className="text-sm font-medium text-gray-700">{budgetUtilization.toFixed(1)}%</span>
+                  <span className={`text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'}`}>Overall Budget</span>
+                  <span className={`text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'}`}>{budgetUtilization.toFixed(1)}%</span>
                 </div>
                 <Progress value={budgetUtilization} className="h-2" />
                 <div className="flex justify-between text-sm text-gray-500">
@@ -287,14 +289,14 @@ export default function Expenses() {
                     View Category Utilization
                   </Button>
                 ) : (
-                  <Card className="bg-black text-white shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between pb-4 bg-black text-white">
-                      <CardTitle className="text-xl text-white">Category-wise Utilization</CardTitle>
+                  <Card className={`shadow-sm ${theme === 'light' ? 'bg-gradient-to-br from-white to-indigo-50 text-gray-900 border border-indigo-200' : 'bg-black text-white'}`}>
+                    <CardHeader className={`flex flex-row items-center justify-between pb-4 ${theme === 'light' ? 'bg-transparent text-gray-900' : 'bg-black text-white'}`}>
+                      <CardTitle className={`text-xl ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Category-wise Utilization</CardTitle>
                       <Button variant="destructive" size="sm" onClick={() => setShowCategoryUtilization(false)} className="h-9">
                         Hide
                       </Button>
                     </CardHeader>
-                    <CardContent className="bg-black text-white">
+                    <CardContent className={theme === 'light' ? 'bg-transparent text-gray-900' : 'bg-black text-white'}>
                       <div className="max-w-xs mb-6">
                         <select
                           value={selectedCategory}
@@ -335,7 +337,7 @@ export default function Expenses() {
 
         {/* Add Expense Form */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold text-white mb-4">
+          <h2 className={`text-lg font-semibold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
             {editingExpense ? "Edit Expense" : "Add New Expense"}
           </h2>
           <div className="flex gap-4 mb-4">
@@ -381,22 +383,22 @@ export default function Expenses() {
 
         {/* Expenses Table */}
         <div>
-          <h2 className="text-lg font-semibold text-white mb-4">Expense List</h2>
+          <h2 className={`text-lg font-semibold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Expense List</h2>
           <div className="overflow-x-auto">
-            <table className="w-full border rounded-lg bg-black text-white">
-              <thead className="bg-black text-white">
+            <table className={`w-full border rounded-lg ${theme === 'light' ? 'bg-white text-gray-900 border-gray-200' : 'bg-black text-white'}`}>
+              <thead className={theme === 'light' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-gray-900' : 'bg-black text-white'}>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Description</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Actions</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>Date</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>Description</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>Category</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>Amount</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-black text-white">
+              <tbody className={theme === 'light' ? 'bg-white text-gray-900' : 'bg-black text-white'}>
                 {expenses.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-4 text-gray-400">No expenses recorded.</td>
+                    <td colSpan={5} className={`text-center py-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>No expenses recorded.</td>
                   </tr>
                 ) : (
                   expenses.map((exp: Expense) => (

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
 import Header from "@/components/layout/header";
+import { useTheme } from "@/contexts/ThemeContext";
 import { 
   Bot, 
   TrendingUp, 
@@ -192,6 +193,7 @@ const EmployeeTabs: React.FC<EmployeeTabsProps> = ({ activeTab, setActiveTab }) 
 };
 
 export default function StaffAI() {
+  const { theme } = useTheme();
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [aiAnalysisOpen, setAiAnalysisOpen] = useState(false);
   const [payrollGenerationOpen, setPayrollGenerationOpen] = useState(false);
@@ -1441,20 +1443,20 @@ export default function StaffAI() {
   });
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className={`min-h-screen ${theme === 'light' ? 'bg-gradient-to-br from-blue-50 to-indigo-100' : 'bg-black'}`}>
       <Header />
       <div className="max-w-[120rem] mx-auto">
         <EmployeeTabs activeTab={activeTab} setActiveTab={setActiveTab} />
         {activeTab === "overview" && (
-          <div className="min-h-screen h-screen bg-black font-sans overflow-hidden">
+          <div className={`min-h-screen h-screen font-sans overflow-hidden ${theme === 'light' ? 'bg-gradient-to-br from-blue-50 to-indigo-100' : 'bg-black'}`}>
             <div className="w-full px-8 pt-8 pb-4 flex flex-col gap-2">
               <div className="flex items-center gap-10 w-full">
                 <div className="relative flex-grow">
-                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white pointer-events-none" />
+                  <SearchIcon className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 pointer-events-none ${theme === 'light' ? 'text-gray-500' : 'text-white'}`} />
                   <input
                     type="text"
                     placeholder="Search contacts by name, email, or company..."
-                    className="pl-10 pr-4 py-2 w-full rounded-lg bg-[#18181b] text-white placeholder:text-white/70 focus:outline-none focus:ring-2 focus:ring-[#643ae5] border-none shadow"
+                    className={`pl-10 pr-4 py-2 w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-[#643ae5] border-none shadow ${theme === 'light' ? 'bg-white text-gray-900 placeholder:text-gray-500' : 'bg-[#18181b] text-white placeholder:text-white/70'}`}
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                   />

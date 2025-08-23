@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import Header from "@/components/layout/header";
+import { useTheme } from "@/contexts/ThemeContext";
 import { 
   CreditCard,
   TrendingUp,
@@ -174,6 +175,7 @@ interface EmiPlan {
 }
 
 export default function StudentFees() {
+  const { theme } = useTheme();
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [addMandateOpen, setAddMandateOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useHashState("overview");
@@ -1115,9 +1117,9 @@ export default function StudentFees() {
   
   return (
     <>
-      <Header className="py-4 bg-black" />
+      <Header className={`py-4 ${theme === 'light' ? 'bg-gradient-to-r from-blue-50 to-indigo-100' : 'bg-black'}`} />
       {/* Custom header row with search, filters, and pagination */}
-      <div className="flex items-center justify-between px-6 pt-2 pb-4 bg-black gap-4">
+      <div className={`flex items-center justify-between px-6 pt-2 pb-4 gap-4 ${theme === 'light' ? 'bg-gradient-to-r from-blue-50 to-indigo-100' : 'bg-black'}`}>
         {/* Search bar */}
         <div className="flex-1 max-w-xl">
           <div className="flex items-center bg-[#232328] rounded-lg px-4 py-2">
@@ -1132,14 +1134,14 @@ export default function StudentFees() {
           </div>
         </div>
         {/* All Classes dropdown */}
-        <select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="border border-[#23272f] bg-[#23242a] text-white rounded px-2 py-1 ml-4">
+        <select value={classFilter} onChange={e => setClassFilter(e.target.value)} className={`border rounded px-2 py-1 ml-4 ${theme === 'light' ? 'border-gray-300 bg-white text-gray-900' : 'border-[#23272f] bg-[#23242a] text-white'}`}>
           <option value="all">All Classes</option>
           {Array.from(new Set(displayStudents.map(s => s.class))).map(cls => (
             <option key={cls} value={cls}>{cls}</option>
           ))}
         </select>
         {/* All Statuses dropdown */}
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border border-[#23272f] bg-[#23242a] text-white rounded px-2 py-1 ml-2">
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={`border rounded px-2 py-1 ml-2 ${theme === 'light' ? 'border-gray-300 bg-white text-gray-900' : 'border-[#23272f] bg-[#23242a] text-white'}`}>
           <option value="all">All Statuses</option>
           <option value="E-Mandate Active">E-Mandate Active</option>
           <option value="No E-Mandate">No E-Mandate</option>
@@ -1186,31 +1188,31 @@ export default function StudentFees() {
           </button>
         </div>
       </div>
-      <div className="flex min-h-screen bg-black p-6">
+      <div className={`flex min-h-screen p-6 ${theme === 'light' ? 'bg-gradient-to-br from-blue-50 to-indigo-100' : 'bg-black'}`}>
         {/* Sidebar: Student List */}
-        <aside className="w-[320px] bg-[#23242a] rounded-2xl border border-[#23272f] shadow h-fit mr-6 flex flex-col">
-          <div className="px-6 pt-6 pb-2 text-base font-semibold text-white">
+        <aside className={`w-[320px] rounded-2xl shadow h-fit mr-6 flex flex-col ${theme === 'light' ? 'bg-gradient-to-br from-white to-blue-50 border border-blue-200' : 'bg-[#23242a] border border-[#23272f]'}`}>
+          <div className={`px-6 pt-6 pb-2 text-base font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
             {allStudents.length} contacts
           </div>
           {/* Remove old search, class, status, and pagination controls from sidebar */}
           <div className="flex-1 overflow-y-auto">
-            <ul className="divide-y divide-[#23272f]">
+            <ul className={`divide-y ${theme === 'light' ? 'divide-blue-200' : 'divide-[#23272f]'}`}>
               {paginatedStudents.map((student) => (
                 <li
                   key={student.id}
-                  className={`flex items-center gap-3 px-6 py-4 cursor-pointer transition rounded-xl ${selectedStudent?.id === student.id ? 'bg-[#23272f] border border-[#643ae5]' : 'hover:bg-[#23242a]'} text-white`}
+                  className={`flex items-center gap-3 px-6 py-4 cursor-pointer transition rounded-xl ${theme === 'light' ? 'text-gray-900' : 'text-white'} ${selectedStudent?.id === student.id ? (theme === 'light' ? 'bg-blue-100 border border-[#643ae5]' : 'bg-[#23272f] border border-[#643ae5]') : (theme === 'light' ? 'hover:bg-blue-50' : 'hover:bg-[#23242a]')}`}
                   onClick={() => setSelectedStudent(student as Student)}
                 >
                   <div className="relative">
-                    <div className="h-10 w-10 rounded-full flex items-center justify-center bg-[#62656e] text-white font-bold text-sm border-2 border-[#23272f]">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm border-2 ${theme === 'light' ? 'bg-blue-200 text-gray-900 border-blue-300' : 'bg-[#62656e] text-white border-[#23272f]'}`}>
                       {student.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
                     </div>
-                    <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#23272f] ${((student as any).status === 'active' || (student as any).status === 'enrolled') ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+                    <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 ${theme === 'light' ? 'border-blue-300' : 'border-[#23272f]'} ${((student as any).status === 'active' || (student as any).status === 'enrolled') ? 'bg-green-500' : 'bg-gray-500'}`}></span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-white truncate">{student.name}</div>
-                    <div className="text-xs text-[#b0b3b8] truncate">{student.class || 'No Class'}</div>
-                    <div className="text-xs text-[#62656e]">{student.email || 'No email'}</div>
+                    <div className={`font-medium truncate ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{student.name}</div>
+                    <div className={`text-xs truncate ${theme === 'light' ? 'text-gray-600' : 'text-[#b0b3b8]'}`}>{student.class || 'No Class'}</div>
+                    <div className={`text-xs ${theme === 'light' ? 'text-gray-500' : 'text-[#62656e]'}`}>{student.email || 'No email'}</div>
                   </div>
                 </li>
               ))}
@@ -1246,10 +1248,10 @@ export default function StudentFees() {
         {/* Details Panel */}
         <main className="flex-1">
           {selectedStudent ? (
-            <div className="bg-[#23242a] rounded-2xl shadow border border-[#23272f] p-8 min-h-[600px] text-white">
+            <div className={`rounded-2xl shadow p-8 min-h-[600px] ${theme === 'light' ? 'bg-gradient-to-br from-white to-blue-50 border border-blue-200 text-gray-900' : 'bg-[#23242a] border border-[#23272f] text-white'}`}>
               <div className="flex items-center gap-6 mb-6">
                 <div className="relative">
-                  <div className="h-16 w-16 rounded-full flex items-center justify-center bg-[#62656e] text-white font-bold text-2xl border-2 border-[#23272f]">
+                  <div className={`h-16 w-16 rounded-full flex items-center justify-center font-bold text-2xl border-2 ${theme === 'light' ? 'bg-blue-200 text-gray-900 border-blue-300' : 'bg-[#62656e] text-white border-[#23272f]'}`}>
                     {selectedStudent.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
                   </div>
                   {/* Floating edit icon */}
@@ -1269,8 +1271,8 @@ export default function StudentFees() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xl font-bold text-white">{selectedStudent.name}</span>
-                    <span className="text-sm text-[#b0b3b8] font-medium">{selectedStudent.class}</span>
+                    <span className={`text-2xl font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{selectedStudent.name}</span>
+                    <span className={`text-sm font-medium ${theme === 'light' ? 'text-gray-600' : 'text-[#b0b3b8]'}`}>{selectedStudent.class}</span>
                   </div>
                 </div>
               </div>

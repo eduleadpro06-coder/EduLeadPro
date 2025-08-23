@@ -28,6 +28,7 @@ import {
 import AddLeadModal from "@/components/leads/add-lead-modal";
 import LeadDetailModal from "@/components/leads/lead-detail-modal";
 import LeadStatusBadge from "@/components/leads/lead-status-badge";
+import { useTheme } from "@/contexts/ThemeContext";
 import CSVImport from "@/components/leads/csv-import";
 import CampaignManager from "@/components/campaigns/campaign-manager";
 import ERPConnector from "@/components/erp-integration/erp-connector";
@@ -47,6 +48,7 @@ const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 export default function LeadManagement() {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useHashState("leads");
 
   const handleTabChange = (value: string) => {
@@ -267,13 +269,13 @@ export default function LeadManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className={`min-h-screen ${theme === 'light' ? 'bg-gradient-to-br from-blue-50 to-indigo-100' : 'bg-black'}`}>
       <Header />
       {/* Add a wrapper for padding, similar to CardContent */}
       <div className="py-4">
         {/* Search and Filter Controls */}
-        <div className="flex flex-col md:flex-row items-center justify-between text-white">
-          <div className="flex gap-4 flex-1 text-white">
+        <div className={`flex flex-col md:flex-row items-center justify-between ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+          <div className={`flex gap-4 flex-1 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
             {/* Search Input */}
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -281,7 +283,7 @@ export default function LeadManagement() {
                 placeholder="Search leads by name, phone, or email..."
                 value={searchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                className="pl-10 text-white placeholder:text-white/70"
+                className={`pl-10 ${theme === 'light' ? 'text-gray-900 placeholder:text-gray-500 bg-white border-gray-300' : 'text-white placeholder:text-white/70 bg-transparent border-gray-700'}`}
               />
             </div>
             {/* Status Dropdown */}
@@ -318,26 +320,26 @@ export default function LeadManagement() {
               </Select>
             </div>
           </div>
-          <div className="flex items-center gap-2 ml-4 space-x-2 text-white">
+          <div className={`flex items-center gap-2 ml-4 space-x-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
             <Button 
               variant="outline" 
               onClick={() => setIsCSVImportOpen(true)}
-              className="flex items-center gap-2 text-white"
+              className={`flex items-center gap-2 ${theme === 'light' ? 'text-gray-900 border-gray-300 hover:bg-gray-100' : 'text-white'}`}
             >
               Import CSV
-              <Download size={16} className="text-white" />
+              <Download size={16} className={theme === 'light' ? 'text-gray-700' : 'text-white'} />
             </Button>
             <Button 
               variant="outline" 
               onClick={exportLeads}
-              className="flex items-center gap-2 text-white"
+              className={`flex items-center gap-2 ${theme === 'light' ? 'text-gray-900 border-gray-300 hover:bg-gray-100' : 'text-white'}`}
             >
               Export CSV
-              <Upload size={16} className="text-white" />
+              <Upload size={16} className={theme === 'light' ? 'text-gray-700' : 'text-white'} />
             </Button>
             {/* Pagination controls moved here for alignment */}
             {totalPages > 1 && (
-              <div className="ml-4 text-white">
+              <div className={`ml-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
                 <Pagination>
                   <PaginationContent>
                     <PaginationItem>
@@ -375,15 +377,15 @@ export default function LeadManagement() {
         {/* Leads Table */}
         <div className="border rounded-xl overflow-hidden shadow-lg mt-4">
           <div className="overflow-x-auto">
-            <table className="w-full glass-card rounded-lg border bg-card text-white shadow-lg">
-              <thead className="bg-background">
+            <table className={`w-full rounded-lg border shadow-lg ${theme === 'light' ? 'bg-white text-gray-900 border-gray-200' : 'glass-card bg-card text-white'}`}>
+              <thead className={theme === 'light' ? 'bg-gradient-to-r from-blue-50 to-indigo-50' : 'bg-background'}>
                 <tr>
                   <th
                     onClick={() => {
                       setSortKey("student");
                       setSortOrder(sortKey === "student" && sortOrder === "asc" ? "desc" : "asc");
                     }}
-                    className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider cursor-pointer"
+                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}
                   >
                     <span className="flex items-center gap-1">
                       Student Details
@@ -392,28 +394,28 @@ export default function LeadManagement() {
                       ) : null}
                     </span>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                     Contact Info
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                     Class/Stream
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                  <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                     Source
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                     Counselor
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                     Last Contacted
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                     AI Prediction
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>
                     Actions
                   </th>
                 </tr>

@@ -12,6 +12,7 @@ import { TrendingUp, TrendingDown, Users, DollarSign, UserCheck, BarChart2, PieC
 import { mockAnalyticsData, mockDashboardData } from "@/lib/mockData";
 import { AreaChart as RCAreaChart, BarChart as RCBarChart, Area, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Tooltip as RechartsBarTooltip, CartesianGrid, ResponsiveContainer, LabelList } from 'recharts';
 import Header from "@/components/layout/header";
+import { useTheme } from "@/contexts/ThemeContext";
 
 // Mock data for products and team
 const products = [
@@ -37,6 +38,7 @@ const websiteVisitors = {
 };
 
 export default function Dashboard() {
+  const { theme } = useTheme();
   // Date range for revenue chart
   const [dateRange, setDateRange] = useState("2024");
 
@@ -102,7 +104,7 @@ export default function Dashboard() {
   return (
     <>
       <Header />
-      <div className="min-h-screen w-full bg-black text-white px-4">
+      <div className={`min-h-screen w-full px-4 ${theme === 'light' ? 'bg-gradient-to-br from-blue-50 to-indigo-100 text-gray-900' : 'bg-black text-white'}`}>
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           {kpis.map((kpi, idx) => {
@@ -110,12 +112,12 @@ export default function Dashboard() {
             const isPositive = !kpi.change.startsWith("-");
             const TrendIcon = isPositive ? TrendingUp : TrendingDown;
             return (
-              <Card key={idx} className="bg-[#62656e] text-white border-none shadow-lg">
+              <Card key={idx} className={`border-none shadow-lg ${theme === 'light' ? 'bg-gradient-to-br from-white to-blue-50 text-gray-900 border border-blue-200' : 'bg-[#62656e] text-white'}`}>
                 <CardContent className="p-6 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-white">{kpi.title}</p>
-                      <p className="text-2xl font-bold mt-1 text-white">{kpi.value}</p>
+                      <p className={`text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}>{kpi.title}</p>
+                      <p className={`text-2xl font-bold mt-1 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{kpi.value}</p>
                       <div className={`flex items-center gap-1 text-sm ${isPositive ? 'text-green-400' : 'text-red-400'}`}> <TrendIcon className="h-3 w-3" /> {kpi.change} </div>
                     </div>
                     <Icon className={`h-8 w-8 ${kpi.color}`} />
@@ -129,9 +131,9 @@ export default function Dashboard() {
         {/* Main Grid - EduLeadPro Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-8">
           {/* Lead Management */}
-          <Card className="bg-[#23243a] rounded-2xl shadow-xl p-6 flex flex-col justify-between min-h-[340px]">
+          <Card className={`rounded-2xl shadow-xl p-6 flex flex-col justify-between min-h-[340px] ${theme === 'light' ? 'bg-gradient-to-br from-white to-blue-50 border border-blue-200' : 'bg-[#23243a] border-none'}`}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-2xl font-extrabold text-white mb-2">Lead Management</CardTitle>
+              <CardTitle className={`text-2xl font-extrabold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Lead Management</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center flex-1">
               <DonutChart
@@ -146,9 +148,9 @@ export default function Dashboard() {
           </Card>
 
           {/* Staff Management */}
-          <Card className="bg-[#23243a] rounded-2xl shadow-xl p-6 flex flex-col justify-between min-h-[340px]">
+          <Card className={`rounded-2xl shadow-xl p-6 flex flex-col justify-between min-h-[340px] ${theme === 'light' ? 'bg-gradient-to-br from-white to-indigo-50 border border-indigo-200' : 'bg-[#23243a] border-none'}`}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-2xl font-extrabold text-white mb-2">Staff Management</CardTitle>
+              <CardTitle className={`text-2xl font-extrabold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Staff Management</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center flex-1 w-full">
               <div className="w-full">
@@ -160,28 +162,28 @@ export default function Dashboard() {
                         <stop offset="95%" stopColor="#a78bfa" stopOpacity={0.2}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                    <XAxis dataKey="label" stroke="#fff" />
-                    <YAxis stroke="#fff" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#333'} />
+                    <XAxis dataKey="label" stroke={theme === 'light' ? '#374151' : '#fff'} />
+                    <YAxis stroke={theme === 'light' ? '#374151' : '#fff'} />
                     <RechartsBarTooltip
-                      contentStyle={{ background: "#18181b", borderRadius: 8, color: "#fff", border: "none" }}
-                      labelStyle={{ color: "#fff" }}
-                      cursor={{ fill: "#444", opacity: 0.1 }}
+                      contentStyle={{ background: theme === 'light' ? '#ffffff' : '#18181b', borderRadius: 8, color: theme === 'light' ? '#000' : '#fff', border: "none" }}
+                      labelStyle={{ color: theme === 'light' ? '#000' : '#fff' }}
+                      cursor={{ fill: theme === 'light' ? '#e5e7eb' : '#444', opacity: 0.1 }}
                     />
                     <Bar dataKey="value" fill="url(#staffBar)" radius={[8, 8, 0, 0]}>
-                      <LabelList dataKey="value" position="top" fill="#fff" fontSize={14} />
+                      <LabelList dataKey="value" position="top" fill={theme === 'light' ? '#374151' : '#fff'} fontSize={14} />
                     </Bar>
                   </RCBarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-4 text-lg text-gray-300">Attendance Rate: {analytics.staffAnalytics.attendanceRate}%</div>
+              <div className={`mt-4 text-lg ${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`}>Attendance Rate: {analytics.staffAnalytics.attendanceRate}%</div>
             </CardContent>
           </Card>
 
           {/* Student Fee */}
-          <Card className="bg-[#23243a] rounded-2xl shadow-xl p-6 flex flex-col justify-between min-h-[340px]">
+          <Card className={`rounded-2xl shadow-xl p-6 flex flex-col justify-between min-h-[340px] ${theme === 'light' ? 'bg-gradient-to-br from-white to-blue-50 border border-blue-200' : 'bg-[#23243a] border-none'}`}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-2xl font-extrabold text-white mb-2">Student Fee</CardTitle>
+              <CardTitle className={`text-2xl font-extrabold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Student Fee</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center flex-1">
               <DonutChart
@@ -189,7 +191,7 @@ export default function Dashboard() {
                 data={studentFeeDonutData}
                 colors={studentFeeColors}
               />
-              <div className="mt-4 text-lg text-gray-300 text-center w-full">
+              <div className={`mt-4 text-lg text-center w-full ${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`}>
                 Paid: ₹{totalPaid.toLocaleString()}<br />
                 Pending: ₹{totalPending.toLocaleString()}
               </div>
@@ -197,9 +199,9 @@ export default function Dashboard() {
           </Card>
 
           {/* Expenses */}
-          <Card className="bg-[#23243a] rounded-2xl shadow-xl p-6 flex flex-col justify-between min-h-[340px]">
+          <Card className={`rounded-2xl shadow-xl p-6 flex flex-col justify-between min-h-[340px] ${theme === 'light' ? 'bg-gradient-to-br from-white to-green-50 border border-green-200' : 'bg-[#23243a] border-none'}`}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-2xl font-extrabold text-white mb-2">Expenses</CardTitle>
+              <CardTitle className={`text-2xl font-extrabold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Expenses</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center flex-1">
               <DonutChart
@@ -214,16 +216,16 @@ export default function Dashboard() {
           </Card>
 
           {/* AI Forecasting */}
-          <Card className="bg-[#23243a] rounded-2xl shadow-xl p-6 flex flex-col justify-between min-h-[340px]">
+          <Card className={`rounded-2xl shadow-xl p-6 flex flex-col justify-between min-h-[340px] ${theme === 'light' ? 'bg-gradient-to-br from-white to-purple-50 border border-purple-200' : 'bg-[#23243a] border-none'}`}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-2xl font-extrabold text-white mb-2">AI Forecasting</CardTitle>
+              <CardTitle className={`text-2xl font-extrabold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>AI Forecasting</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col justify-center flex-1">
-              <div className="text-3xl font-extrabold text-white mb-2">
+              <div className={`text-3xl font-extrabold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
                 Predicted Enrollments: <span className="text-[#a78bfa]">{mockDashboardData.aiForecast.predictedEnrollments}</span>
               </div>
-              <div className="text-lg text-gray-300 mb-2">Confidence: {(mockDashboardData.aiForecast.confidence * 100).toFixed(0)}%</div>
-              <ul className="text-base text-gray-200 list-disc ml-5">
+              <div className={`text-lg mb-2 ${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`}>Confidence: {(mockDashboardData.aiForecast.confidence * 100).toFixed(0)}%</div>
+              <ul className={`text-base list-disc ml-5 ${theme === 'light' ? 'text-gray-700' : 'text-gray-200'}`}>
                 {mockDashboardData.aiForecast.insights.slice(0,2).map((insight, idx) => (
                   <li key={idx}>{insight.title}: {insight.description}</li>
                 ))}
@@ -232,9 +234,9 @@ export default function Dashboard() {
           </Card>
 
           {/* AI Marketing */}
-          <Card className="bg-[#23243a] rounded-2xl shadow-xl p-6 flex flex-col justify-between min-h-[340px]">
+          <Card className={`rounded-2xl shadow-xl p-6 flex flex-col justify-between min-h-[340px] ${theme === 'light' ? 'bg-gradient-to-br from-white to-orange-50 border border-orange-200' : 'bg-[#23243a] border-none'}`}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-2xl font-extrabold text-white mb-2">AI Marketing</CardTitle>
+              <CardTitle className={`text-2xl font-extrabold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>AI Marketing</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center flex-1 w-full">
               <div className="w-full">
@@ -250,10 +252,10 @@ export default function Dashboard() {
                         <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <XAxis dataKey="label" stroke="#fff" />
-                    <YAxis stroke="#fff" />
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                    <RechartsTooltip contentStyle={{ background: '#18181b', borderRadius: 8, color: '#fff', border: 'none' }} labelStyle={{ color: '#fff' }} />
+                    <XAxis dataKey="label" stroke={theme === 'light' ? '#374151' : '#fff'} />
+                    <YAxis stroke={theme === 'light' ? '#374151' : '#fff'} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#333'} />
+                    <RechartsTooltip contentStyle={{ background: theme === 'light' ? '#ffffff' : '#18181b', borderRadius: 8, color: theme === 'light' ? '#000' : '#fff', border: 'none' }} labelStyle={{ color: theme === 'light' ? '#000' : '#fff' }} />
                     <Area type="monotone" dataKey="leads" stroke="#38bdf8" fillOpacity={1} fill="url(#colorLeads)" name="Leads" />
                     <Area type="monotone" dataKey="conversions" stroke="#a855f7" fillOpacity={1} fill="url(#colorConversions)" name="Conversions" />
                   </RCAreaChart>

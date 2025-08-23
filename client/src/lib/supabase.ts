@@ -45,7 +45,7 @@ const getRedirectUrl = () => {
   }
   
   // Fallback for server-side rendering
-  return 'http://localhost:5000/auth/callback';
+  return 'http://localhost:3000/auth/callback';
 };
 
 // Create the Supabase client with actual values or fallbacks if missing

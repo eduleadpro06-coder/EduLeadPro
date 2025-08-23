@@ -20,7 +20,7 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
   const { user, signOut } = useAuth();
 
   return (
-    <header className={`bg-black shadow-sm px-6 py-4 ${className || ''}`}>
+    <header className={`shadow-sm px-6 py-4 ${theme === 'light' ? 'bg-gradient-to-r from-blue-50 to-indigo-100' : 'bg-black'} ${className || ''}`}>
       <div className="flex items-center justify-between pl-2">
         <div />
         <div className="flex items-center space-x-4">
@@ -53,8 +53,8 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
             </Button>
             
             {showProfileDropdown && (
-              <div className="absolute right-0 mt-2 w-56 bg-black border border-border rounded-lg shadow-lg z-50">
-                <div className="p-3 border-b border-border">
+              <div className={`absolute right-0 mt-2 w-56 border rounded-lg shadow-lg z-50 ${theme === 'light' ? 'bg-white border-gray-200' : 'bg-black border-border'}`}>
+                <div className={`p-3 border-b ${theme === 'light' ? 'border-gray-200' : 'border-border'}`}>
                   <div className="flex items-center space-x-3">
                     <Avatar className="w-10 h-10">
                       {user?.avatarUrl ? (

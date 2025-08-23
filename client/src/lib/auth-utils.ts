@@ -15,5 +15,5 @@ export const getAuthRedirectUrl = (path: string = '/auth/callback') => {
   }
   
   // Fallback for server-side rendering
-  return `http://localhost:5000${path}`;
+  return `http://localhost:3000${path}`;
 };
