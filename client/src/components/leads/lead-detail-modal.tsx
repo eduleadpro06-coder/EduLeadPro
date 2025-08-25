@@ -16,12 +16,12 @@ import {
   Calendar, 
   MessageSquare,
   FileText,
-  Brain,
+
   Save,
   Edit,
   Plus,
   Clock,
-  Target,
+
   Trash2
 } from "lucide-react";
 import { type LeadWithCounselor as BaseLeadWithCounselor, type User as UserType, type FollowUp } from "@shared/schema";
@@ -249,46 +249,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
     }
   });
 
-  const predictMutation = useMutation({
-    mutationFn: async () => {
-      try {
-        const response = await apiRequest("POST", `/leads/${lead?.id}/predict`);
-        
-        // Check content type to ensure we're receiving JSON
-        const contentType = response.headers.get("Content-Type");
-        if (contentType && contentType.includes("application/json")) {
-          return await response.json();
-        } else {
-          throw new Error("Received non-JSON response from server");
-        }
-      } catch (error: any) {
-        console.error("API request error:", error);
-        throw error;
-      }
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      toast({
-        title: "AI Prediction Generated",
-        description: `Admission likelihood: ${data.likelihood}% (Confidence: ${(data.confidence * 100).toFixed(0)}%)`,
-      });
-    },
-    onError: (error: any) => {
-      let errorMessage = "Unable to generate AI prediction at this time";
-      
-      if (error.errorData?.message) {
-        errorMessage = error.errorData.message;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      toast({
-        title: "Prediction Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    }
-  });
+
 
   const saveChanges = () => {
     if (!validateForm()) {
@@ -360,15 +321,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
               <Badge variant="status" className={getStatusColor(lead.status)}>
                 {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
               </Badge>
-              {lead.status === 'enrolled' ? (
-                <Badge variant="outline" className="italic text-gray-400">N/A</Badge>
-              ) : lead.admissionLikelihood ? (
-                <Badge variant="outline" className="text-blue-600">
-                  {Number(lead.admissionLikelihood).toFixed(0)}% likely
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="italic text-gray-400">Predicting...</Badge>
-              )}
+
             </div>
           </DialogTitle>
           <DialogDescription>
@@ -377,10 +330,10 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="followups">Follow-ups</TabsTrigger>
-            <TabsTrigger value="ai-insights">AI Insights</TabsTrigger>
+
           </TabsList>
 
           <TabsContent value="details" className="space-y-4">
@@ -789,15 +742,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
             <div className="h-[520px] flex flex-col gap-4">
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold text-lg">Follow-up History</h3>
-                <Button
-                  onClick={() => predictMutation.mutate()}
-                  disabled={predictMutation.isPending}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Brain size={16} className="mr-2" />
-                  {predictMutation.isPending ? "Generating..." : "AI Prediction"}
-                </Button>
+
               </div>
 
               <Card>
@@ -885,88 +830,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
             </div>
           </TabsContent>
 
-          <TabsContent value="ai-insights" className="space-y-4">
-            <div className="h-[520px] flex flex-col gap-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Target size={18} className="mr-2" />
-                      Admission Likelihood
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {lead.status === 'enrolled' ? (
-                      <div className="text-center">
-                        <div className="text-3xl font-bold text-gray-400 mb-2 italic">N/A</div>
-                        <p className="text-sm text-gray-600">Student already enrolled</p>
-                      </div>
-                    ) : lead.admissionLikelihood ? (
-                      <div className="text-center">
-                        <div className="text-3xl font-bold text-blue-600 mb-2">
-                          {Number(lead.admissionLikelihood).toFixed(0)}%
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          Based on current engagement and profile
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="text-center py-4">
-                        <p className="text-gray-600 mb-4">No prediction available</p>
-                        <Button
-                          onClick={() => predictMutation.mutate()}
-                          disabled={predictMutation.isPending}
-                        >
-                          <Brain size={16} className="mr-2" />
-                          Generate Prediction
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recommended Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {lead.status === "new" && (
-                        <div className="p-3 bg-blue-50 rounded-lg">
-                          <p className="text-sm font-medium text-blue-900">
-                            Initial Contact Required
-                          </p>
-                          <p className="text-xs text-blue-700">
-                            Schedule first call within 24 hours
-                          </p>
-                        </div>
-                      )}
-                      {lead.status === "interested" && (
-                        <div className="p-3 bg-green-50 rounded-lg">
-                          <p className="text-sm font-medium text-green-900">
-                            High Priority Lead
-                          </p>
-                          <p className="text-xs text-green-700">
-                            Schedule campus visit and send enrollment details
-                          </p>
-                        </div>
-                      )}
-                      {!lead.lastContactedAt && (
-                        <div className="p-3 bg-orange-50 rounded-lg">
-                          <p className="text-sm font-medium text-orange-900">
-                            No Contact History
-                          </p>
-                          <p className="text-xs text-orange-700">
-                            Immediate follow-up recommended
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>

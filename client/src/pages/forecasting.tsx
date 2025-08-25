@@ -11,14 +11,14 @@ export default function Forecasting() {
   const { data: leads = [] } = useLeads();
 
   const highProbabilityLeads = leads.filter(l => 
-    (l.admissionLikelihood && l.admissionLikelihood > 70) || 
-    l.status === "Interested" || 
-    l.status === "Hot"
+    l.status === "interested" || 
+    l.status === "hot" ||
+    l.status === "enrolled"
   );
 
   const atRiskLeads = leads.filter(l => 
-    l.status === "Cold" || 
-    (l.admissionLikelihood && l.admissionLikelihood < 30)
+    l.status === "cold" || 
+    l.status === "dropped"
   );
 
   if (isLoading) {

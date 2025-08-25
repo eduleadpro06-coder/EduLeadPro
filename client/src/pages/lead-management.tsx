@@ -23,8 +23,7 @@ import {
   //BookOpen, // for Class/Stream
   ChevronUp,
   ChevronDown,
-  GraduationCap,
-  Brain
+  GraduationCap
 } from "lucide-react";
 import AddLeadModal from "@/components/leads/add-lead-modal";
 import LeadDetailModal from "@/components/leads/lead-detail-modal";
@@ -68,24 +67,7 @@ export default function LeadManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // AI Prediction mutation
-  const predictAdmissionMutation = useMutation({
-    mutationFn: async (leadId: number) => {
-      const response = await apiRequest("POST", `/api/leads/${leadId}/predict`, {});
-      return response.json();
-    },
-    onSuccess: (data, leadId) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
-      toast({ 
-        title: "🎯 AI Prediction Complete", 
-        description: `Likelihood: ${data.likelihood}% | Confidence: ${(data.confidence * 100).toFixed(0)}% | Key factors: ${data.factors.slice(0, 2).join(', ')}`,
-        duration: 6000
-      });
-    },
-    onError: () => {
-      toast({ title: "Failed to predict admission likelihood", variant: "destructive" });
-    },
-  });
+
 
   const { data, isLoading } = useQuery<LeadWithCounselor[]>({
     queryKey: ["/api/leads"],
@@ -96,16 +78,7 @@ export default function LeadManagement() {
   });
   const [leadsState, setLeadsState] = useState<LeadWithCounselor[]>([]);
 
-  useEffect(() => {
-    if (data && Array.isArray(data)) {
-      data.forEach(lead => {
-        if (lead.status !== 'enrolled' && !lead.admissionLikelihood) {
-          predictAdmissionMutation.mutate(lead.id);
-        }
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+
 
   useEffect(() => {
     if (Array.isArray(data)) {
@@ -426,9 +399,7 @@ export default function LeadManagement() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                     Last Contacted
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                    AI Prediction
-                  </th>
+
                   <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                     Actions
                   </th>
@@ -437,13 +408,13 @@ export default function LeadManagement() {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-4 text-center text-white">
+                    <td colSpan={8} className="px-6 py-4 text-center text-white">
                       Loading leads...
                     </td>
                   </tr>
                 ) : filteredLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-4 text-center text-white">
+                    <td colSpan={8} className="px-6 py-4 text-center text-white">
                       No leads found matching your criteria
                     </td>
                   </tr>
@@ -488,28 +459,7 @@ export default function LeadManagement() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-white/70">
                         {formatDate(lead.lastContactedAt)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {lead.status === 'enrolled' ? (
-                          <span className="text-xs italic text-gray-400">N/A</span>
-                        ) : (
-                          <div className="flex flex-col space-y-2">
-                            {lead.admissionLikelihood ? (
-                              <div className="flex items-center">
-                                <Brain className="w-3 h-3 text-purple-500 mr-1" />
-                                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                                  parseFloat(lead.admissionLikelihood) >= 70 ? 'bg-green-100 text-green-700' :
-                                  parseFloat(lead.admissionLikelihood) >= 40 ? 'bg-yellow-100 text-yellow-700' :
-                                  'bg-red-100 text-red-700'
-                                }`}>
-                                  {parseFloat(lead.admissionLikelihood).toFixed(0)}% likely
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-gray-400">Predicting...</span>
-                            )}
-                          </div>
-                        )}
-                      </td>
+
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex space-x-2">
                           <Button

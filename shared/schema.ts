@@ -26,7 +26,7 @@ export const leads = pgTable("leads", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   lastContactedAt: timestamp("last_contacted_at"),
-  admissionLikelihood: decimal("admission_likelihood", { precision: 5, scale: 2 }), // AI prediction 0-100
+
   notes: text("notes"),
   parentName: text("parent_name"),
   parentPhone: text("parent_phone"),
@@ -282,34 +282,9 @@ export const recentlyDeletedEmployee = pgTable("recently_deleted_employee", {
   deleted_at: timestamp("deleted_at").notNull(),
 });
 
-// AI Analytics and Predictions Tables
-export const aiPredictions = pgTable("ai_predictions", {
-  id: serial("id").primaryKey(),
-  entityType: varchar("entity_type", { length: 50 }).notNull(), // student, lead, staff, course
-  entityId: integer("entity_id").notNull(),
-  predictionType: varchar("prediction_type", { length: 100 }).notNull(), // success_probability, dropout_risk, pricing, etc.
-  predictionValue: decimal("prediction_value", { precision: 10, scale: 4 }).notNull(),
-  confidence: decimal("confidence", { precision: 5, scale: 2 }).notNull(), // 0-100
-  metadata: text("metadata"), // JSON string for additional data
-  modelVersion: varchar("model_version", { length: 50 }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
 
-export const aiInterventions = pgTable("ai_interventions", {
-  id: serial("id").primaryKey(),
-  studentId: integer("student_id").references(() => students.id).notNull(),
-  predictionId: integer("prediction_id").references(() => aiPredictions.id),
-  interventionType: varchar("intervention_type", { length: 100 }).notNull(),
-  priority: varchar("priority", { length: 20 }).notNull(), // immediate, high, medium, low
-  description: text("description").notNull(),
-  recommendedActions: text("recommended_actions"), // JSON array
-  assignedTo: integer("assigned_to").references(() => users.id),
-  status: varchar("status", { length: 20 }).default("pending"), // pending, in_progress, completed, dismissed
-  effectivenessScore: decimal("effectiveness_score", { precision: 5, scale: 2 }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  completedAt: timestamp("completed_at"),
-});
+
+
 
 export const aiAnalytics = pgTable("ai_analytics", {
   id: serial("id").primaryKey(),
@@ -454,10 +429,7 @@ export const insertEmiPlanSchema = createInsertSchema(emiPlans).omit({ id: true,
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRecentlyDeletedEmployeeSchema = createInsertSchema(recentlyDeletedEmployee).omit({ id: true, created_at: true, updated_at: true });
 
-// AI-related insert schemas
-export const insertAIPredictionSchema = createInsertSchema(aiPredictions).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertAIInterventionSchema = createInsertSchema(aiInterventions).omit({ id: true, createdAt: true });
-export const insertAIAnalyticsSchema = createInsertSchema(aiAnalytics).omit({ id: true, createdAt: true });
+
 export const insertAIConversationSchema = createInsertSchema(aiConversations).omit({ id: true, startedAt: true });
 export const insertAIMessageSchema = createInsertSchema(aiMessages).omit({ id: true, createdAt: true });
 export const insertAIModelPerformanceSchema = createInsertSchema(aiModelPerformance).omit({ id: true, lastEvaluated: true });
@@ -485,10 +457,7 @@ export type EmiPlan = typeof emiPlans.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type RecentlyDeletedEmployee = typeof recentlyDeletedEmployee.$inferSelect;
 
-// AI-related types
-export type AIPrediction = typeof aiPredictions.$inferSelect;
-export type AIIntervention = typeof aiInterventions.$inferSelect;
-export type AIAnalytics = typeof aiAnalytics.$inferSelect;
+
 export type AIConversation = typeof aiConversations.$inferSelect;
 export type AIMessage = typeof aiMessages.$inferSelect;
 export type AIModelPerformance = typeof aiModelPerformance.$inferSelect;

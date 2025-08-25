@@ -1,11 +1,6 @@
 // Local AI implementation - no external dependencies required
 
-export interface AdmissionPrediction {
-  likelihood: number;
-  confidence: number;
-  factors: string[];
-  recommendations: string[];
-}
+
 
 export interface EnrollmentForecast {
   predictedEnrollments: number;
@@ -23,101 +18,7 @@ export interface MarketingRecommendation {
   expected_leads: number;
 }
 
-export async function predictAdmissionLikelihood(leadData: {
-  status: string;
-  source: string;
-  daysSinceCreation: number;
-  followUpCount: number;
-  lastContactDays?: number;
-  class: string;
-  hasParentInfo: boolean;
-}): Promise<AdmissionPrediction> {
-  // Rule-based AI prediction system
-  let likelihood = 50; // Base likelihood
-  let confidence = 0.7;
-  const factors: string[] = [];
-  const recommendations: string[] = [];
 
-  // Status impact
-  if (leadData.status === "hot") {
-    likelihood += 25;
-    factors.push("High interest level");
-  } else if (leadData.status === "warm") {
-    likelihood += 10;
-    factors.push("Moderate interest level");
-  } else if (leadData.status === "cold") {
-    likelihood -= 20;
-    factors.push("Low engagement");
-    recommendations.push("Re-engage with personalized communication");
-  }
-
-  // Source quality analysis
-  if (leadData.source === "referral") {
-    likelihood += 20;
-    factors.push("High-quality referral source");
-  } else if (leadData.source === "website") {
-    likelihood += 10;
-    factors.push("Direct website inquiry");
-  } else if (leadData.source === "social_media") {
-    likelihood += 5;
-    factors.push("Social media engagement");
-  }
-
-  // Timing factors
-  if (leadData.daysSinceCreation <= 3) {
-    likelihood += 15;
-    factors.push("Recent inquiry");
-  } else if (leadData.daysSinceCreation > 14) {
-    likelihood -= 10;
-    factors.push("Older lead requiring attention");
-    recommendations.push("Immediate follow-up required");
-  }
-
-  // Follow-up engagement
-  if (leadData.followUpCount >= 3) {
-    likelihood += 10;
-    factors.push("Good follow-up engagement");
-  } else if (leadData.followUpCount === 0) {
-    likelihood -= 15;
-    factors.push("No follow-up interactions");
-    recommendations.push("Schedule initial follow-up call");
-  }
-
-  // Contact recency
-  if (leadData.lastContactDays && leadData.lastContactDays <= 2) {
-    likelihood += 10;
-    factors.push("Recent contact");
-  } else if (leadData.lastContactDays && leadData.lastContactDays > 7) {
-    likelihood -= 10;
-    factors.push("Stale contact");
-    recommendations.push("Immediate re-engagement needed");
-  }
-
-  // Parent information
-  if (leadData.hasParentInfo) {
-    likelihood += 10;
-    factors.push("Complete parent information available");
-  } else {
-    likelihood -= 5;
-    factors.push("Missing parent information");
-    recommendations.push("Collect complete parent details");
-  }
-
-  // Ensure reasonable bounds
-  likelihood = Math.max(0, Math.min(100, likelihood));
-
-  // Add default recommendations if none exist
-  if (recommendations.length === 0) {
-    recommendations.push("Continue regular follow-up schedule");
-  }
-
-  return {
-    likelihood,
-    confidence,
-    factors,
-    recommendations
-  };
-}
 
 export async function forecastEnrollments(currentData: {
   totalLeads: number;

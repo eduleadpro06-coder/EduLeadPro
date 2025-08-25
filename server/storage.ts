@@ -262,7 +262,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: schema.leads.createdAt,
         updatedAt: schema.leads.updatedAt,
         lastContactedAt: schema.leads.lastContactedAt,
-        admissionLikelihood: schema.leads.admissionLikelihood,
+
         parentName: schema.leads.parentName,
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
@@ -306,7 +306,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: schema.leads.createdAt,
         updatedAt: schema.leads.updatedAt,
         lastContactedAt: schema.leads.lastContactedAt,
-        admissionLikelihood: schema.leads.admissionLikelihood,
+
         parentName: schema.leads.parentName,
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
@@ -355,7 +355,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: schema.leads.createdAt,
         updatedAt: schema.leads.updatedAt,
         lastContactedAt: schema.leads.lastContactedAt,
-        admissionLikelihood: schema.leads.admissionLikelihood,
+
         parentName: schema.leads.parentName,
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
@@ -398,7 +398,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: schema.leads.createdAt,
         updatedAt: schema.leads.updatedAt,
         lastContactedAt: schema.leads.lastContactedAt,
-        admissionLikelihood: schema.leads.admissionLikelihood,
+
         parentName: schema.leads.parentName,
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
@@ -441,7 +441,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: schema.leads.createdAt,
         updatedAt: schema.leads.updatedAt,
         lastContactedAt: schema.leads.lastContactedAt,
-        admissionLikelihood: schema.leads.admissionLikelihood,
+
         parentName: schema.leads.parentName,
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
@@ -568,7 +568,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: schema.leads.createdAt,
         updatedAt: schema.leads.updatedAt,
         lastContactedAt: schema.leads.lastContactedAt,
-        admissionLikelihood: schema.leads.admissionLikelihood,
+
         parentName: schema.leads.parentName,
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
@@ -1943,7 +1943,7 @@ export class DatabaseStorage implements IStorage {
         counselorId: deletedLead.counselor_id,
         assignedAt: deletedLead.assigned_at,
         lastContactedAt: deletedLead.last_contacted_at,
-        admissionLikelihood: deletedLead.admission_likelihood,
+
         notes: deletedLead.notes,
         parentName: deletedLead.parent_name,
         parentPhone: deletedLead.parent_phone,
@@ -2020,7 +2020,7 @@ export class DatabaseStorage implements IStorage {
         created_at: lead.createdAt,
         updated_at: lead.updatedAt,
         last_contacted_at: lead.lastContactedAt,
-        admission_likelihood: lead.admissionLikelihood,
+
         notes: lead.notes,
         parent_name: lead.parentName,
         parent_phone: lead.parentPhone,

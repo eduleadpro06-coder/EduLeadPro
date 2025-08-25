@@ -72,8 +72,7 @@ export async function importCSVLeads(csvData: CSVLeadData[]): Promise<void> {
         source: row["Source"],
         counselorId: null, // Will be assigned later
         assignedAt: null,
-        lastContactedAt: null,
-        admissionLikelihood: null,
+        lastContactedAt: new Date(), // Set to current date when importing
         notes: row["Notes"] || "",
         parentName: row["Enquirer Name"],
         parentPhone: row["Enquirer Mobile"],

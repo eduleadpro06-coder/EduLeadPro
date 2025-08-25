@@ -26,7 +26,6 @@ interface Stats {
 }
 
 interface Lead {
-  admissionLikelihood?: number | string;
   status?: string;
 }
 
@@ -91,14 +90,10 @@ export default function AIForecasting() {
   const confidencePercentage = (forecast.confidence || 0) * 100;
   const conversionRate = stats.totalLeads > 0 ? (stats.conversions / stats.totalLeads) * 100 : 0;
 
-  // Calculate lead distribution by likelihood
-  const leadsWithPredictions = leads.filter((lead) => lead.admissionLikelihood !== undefined && lead.admissionLikelihood !== null);
-  const highLikelihood = leadsWithPredictions.filter((lead) => Number(lead.admissionLikelihood) >= 70).length;
-  const mediumLikelihood = leadsWithPredictions.filter((lead) => {
-    const likelihood = Number(lead.admissionLikelihood);
-    return likelihood >= 40 && likelihood < 70;
-  }).length;
-  const lowLikelihood = leadsWithPredictions.filter((lead) => Number(lead.admissionLikelihood) < 40).length;
+  // Calculate lead distribution by status
+  const highLikelihood = leads.filter((lead) => lead.status === "hot" || lead.status === "interested" || lead.status === "enrolled").length;
+  const mediumLikelihood = leads.filter((lead) => lead.status === "warm" || lead.status === "contacted").length;
+  const lowLikelihood = leads.filter((lead) => lead.status === "cold" || lead.status === "new" || lead.status === "dropped").length;
 
   // Animation variants
   const cardVariants = {

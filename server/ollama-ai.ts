@@ -3,12 +3,7 @@ import { Ollama } from 'ollama';
 const ollama = new Ollama();
 
 
-export interface AdmissionPrediction {
-  likelihood: number;
-  confidence: number;
-  factors: string[];
-  recommendations: string[];
-}
+
 
 export interface EnrollmentForecast {
   predictedEnrollments: number;
@@ -70,87 +65,7 @@ async function initializeOllama() {
   }
 }
 
-export async function predictAdmissionLikelihood(leadData: {
-  status: string;
-  source: string;
-  daysSinceCreation: number;
-  followUpCount: number;
-  lastContactDays?: number;
-  class: string;
-  hasParentInfo: boolean;
-  name: string;
-  phone?: string;
-  email?: string;
-}): Promise<AdmissionPrediction> {
-  try {
-    const model = await initializeOllama();
-    
-    const prompt = `As an AI expert in educational admissions, analyze this lead data and predict admission likelihood:
 
-Lead Information:
-- Student Name: ${leadData.name}
-- Class/Grade: ${leadData.class}
-- Status: ${leadData.status}
-- Lead Source: ${leadData.source}
-- Days since inquiry: ${leadData.daysSinceCreation}
-- Follow-up interactions: ${leadData.followUpCount}
-- Last contact: ${leadData.lastContactDays || 'N/A'} days ago
-- Parent info available: ${leadData.hasParentInfo ? 'Yes' : 'No'}
-- Contact methods: ${leadData.phone ? 'Phone' : ''} ${leadData.email ? 'Email' : ''}
-
-Please provide analysis in this exact JSON format:
-{
-  "likelihood": [number 0-100],
-  "confidence": [number 0.0-1.0],
-  "factors": ["factor1", "factor2", "factor3"],
-  "recommendations": ["rec1", "rec2", "rec3"]
-}
-
-Consider factors like:
-- Lead freshness and engagement level
-- Quality of lead source
-- Parent involvement and information completeness
-- Response patterns and communication history
-- Grade-specific admission patterns`;
-
-    const response = await ollama.generate({
-      model,
-      prompt,
-      stream: false,
-      options: {
-        temperature: 0.3, // Lower temperature for more consistent results
-        top_p: 0.9
-      }
-    });
-
-    try {
-      const analysis = JSON.parse(response.response);
-      
-      // Validate the response structure
-      if (typeof analysis.likelihood !== 'number' || 
-          typeof analysis.confidence !== 'number' ||
-          !Array.isArray(analysis.factors) ||
-          !Array.isArray(analysis.recommendations)) {
-        throw new Error('Invalid response format');
-      }
-
-      return {
-        likelihood: Math.max(0, Math.min(100, analysis.likelihood)),
-        confidence: Math.max(0, Math.min(1, analysis.confidence)),
-        factors: analysis.factors.slice(0, 5), // Limit to 5 factors
-        recommendations: analysis.recommendations.slice(0, 4) // Limit to 4 recommendations
-      };
-    } catch (parseError) {
-      console.error('Failed to parse Ollama response:', parseError);
-      // Fallback to rule-based system
-      return fallbackAdmissionPrediction(leadData);
-    }
-
-  } catch (error) {
-    console.error('Ollama prediction failed:', error);
-    return fallbackAdmissionPrediction(leadData);
-  }
-}
 
 export async function forecastEnrollments(currentData: {
   totalLeads: number;
@@ -269,40 +184,7 @@ Focus on:
 }
 
 // Fallback functions (simplified versions of the original rule-based system)
-function fallbackAdmissionPrediction(leadData: any): AdmissionPrediction {
-  let likelihood = 50;
-  const factors = [];
-  const recommendations = [];
 
-  if (leadData.status === "hot") {
-    likelihood += 25;
-    factors.push("High interest level");
-  } else if (leadData.status === "warm") {
-    likelihood += 10;
-    factors.push("Moderate interest level");
-  }
-
-  if (leadData.source === "referral") {
-    likelihood += 20;
-    factors.push("Quality referral source");
-  }
-
-  if (leadData.daysSinceCreation <= 3) {
-    likelihood += 15;
-    factors.push("Recent inquiry");
-  }
-
-  if (leadData.followUpCount === 0) {
-    recommendations.push("Schedule initial follow-up");
-  }
-
-  return {
-    likelihood: Math.max(0, Math.min(100, likelihood)),
-    confidence: 0.7,
-    factors: factors.length > 0 ? factors : ["Standard assessment"],
-    recommendations: recommendations.length > 0 ? recommendations : ["Continue engagement"]
-  };
-}
 
 function fallbackEnrollmentForecast(currentData: any): EnrollmentForecast {
   const conversionRate = currentData.totalLeads > 0 ? currentData.conversions / currentData.totalLeads : 0.1;

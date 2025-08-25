@@ -5,7 +5,7 @@ import { insertLeadSchema, insertFollowUpSchema, Lead, InsertLead, InsertEmiPlan
 import { perplexityAI } from "./perplexity-ai.js";
 import PDFDocument from "pdfkit";
 import { db } from "./db.js";
-import { predictAdmissionLikelihood, forecastEnrollments, generateMarketingRecommendations } from "./ai.js";
+import { forecastEnrollments, generateMarketingRecommendations } from "./ai.js";
 import aiComprehensiveRouter from "./api/ai-comprehensive.js";
 import { sql } from "drizzle-orm";
 
@@ -349,6 +349,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertLeadSchema.parse(req.body);
       const forceCreate = req.query.force === "true";
+      
+      // Set lastContactedAt to current timestamp when creating a lead
+      validatedData.lastContactedAt = new Date();
       
       console.log("=== CREATE LEAD REQUEST ===");
       console.log("Phone:", validatedData.phone);
@@ -788,34 +791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Lead prediction endpoint
-  app.post("/api/leads/:id/predict", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const lead = await storage.getLead(parseInt(id));
-      
-      if (!lead) {
-        return res.status(404).json({ error: "Lead not found" });
-      }
 
-      const likelihood = Math.floor(Math.random() * 40) + 60;
-      const confidence = Math.random() * 0.3 + 0.7;
-      
-      await storage.updateLead(parseInt(id), { 
-        admissionLikelihood: likelihood.toString() 
-      });
-      
-      res.json({
-        likelihood,
-        confidence,
-        factors: ["Student engagement level", "Parent interest", "Academic background"],
-        recommendations: ["Schedule campus visit", "Send detailed course information"]
-      });
-    } catch (error) {
-      console.error("Lead prediction error:", error);
-      res.status(500).json({ error: "Failed to generate prediction" });
-    }
-  });
 
   // Get alerts
   app.get("/api/alerts", async (req, res) => {

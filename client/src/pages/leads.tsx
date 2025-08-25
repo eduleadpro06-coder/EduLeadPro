@@ -10,7 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Filter, Phone, Mail, Calendar, Brain } from "lucide-react";
+import { Plus, Search, Filter, Phone, Mail, Calendar } from "lucide-react";
 import type { Lead, LeadWithCounselor } from "@shared/schema";
 
 export default function Leads() {
@@ -44,34 +44,9 @@ export default function Leads() {
     },
   });
 
-  const predictAdmissionMutation = useMutation({
-    mutationFn: async (leadId: number) => {
-      const response = await apiRequest("POST", `/api/leads/${leadId}/predict`, {});
-      return response.json();
-    },
-    onSuccess: (data, leadId) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
-      toast({ 
-        title: "🎯 AI Prediction Complete", 
-        description: `Likelihood: ${data.likelihood}% | Confidence: ${(data.confidence * 100).toFixed(0)}% | Key factors: ${data.factors.slice(0, 2).join(', ')}`,
-        duration: 6000
-      });
-    },
-    onError: () => {
-      toast({ title: "Failed to predict admission likelihood", variant: "destructive" });
-    },
-  });
 
-  useEffect(() => {
-    if (leads && Array.isArray(leads)) {
-      leads.forEach(lead => {
-        if (lead.status !== 'enrolled' && !lead.admissionLikelihood) {
-          predictAdmissionMutation.mutate(lead.id);
-        }
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads]);
+
+
 
   // Filter leads based on search and filters
   const filteredLeads = leads.filter(lead => {
@@ -223,26 +198,7 @@ export default function Leads() {
                             )}
                           </div>
                           <p className="text-sm text-gray-500">{lead.class}</p>
-                          {lead.status === 'enrolled' ? (
-                            <span className="text-xs italic text-gray-400">N/A</span>
-                          ) : (
-                            <>
-                              {lead.admissionLikelihood ? (
-                                <div className="flex items-center mt-1">
-                                  <Brain className="w-3 h-3 text-purple-500 mr-1" />
-                                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                                    parseFloat(lead.admissionLikelihood) >= 70 ? 'bg-green-100 text-green-700' :
-                                    parseFloat(lead.admissionLikelihood) >= 40 ? 'bg-yellow-100 text-yellow-700' :
-                                    'bg-red-100 text-red-700'
-                                  }`}>
-                                    {parseFloat(lead.admissionLikelihood).toFixed(0)}% likely
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-gray-400">Predicting...</span>
-                              )}
-                            </>
-                          )}
+
                         </div>
                       </td>
                       <td className="py-4 px-6 align-top">
@@ -293,22 +249,7 @@ export default function Leads() {
                           {formatDate(lead.lastContactedAt)}
                         </div>
                       </td>
-                      <td className="py-4 px-6 align-top">
-                        {lead.status === 'enrolled' ? (
-                          <span className="text-xs italic text-gray-400">N/A</span>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => predictAdmissionMutation.mutate(lead.id)}
-                            disabled={predictAdmissionMutation.isPending}
-                            className="h-9"
-                          >
-                            <Brain className="w-3 h-3 mr-1" />
-                            {predictAdmissionMutation.isPending ? "Predicting..." : "AI Predict"}
-                          </Button>
-                        )}
-                      </td>
+
                     </tr>
                   ))}
                 </tbody>
