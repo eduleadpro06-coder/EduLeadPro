@@ -117,7 +117,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
       invalidateNotifications(queryClient);
       toast({
         title: "Lead created successfully",
-        description: "The new lead has been added to your pipeline.",
+        description: "The new lead has been added to your database.",
       });
       form.reset();
       onOpenChange(false);
