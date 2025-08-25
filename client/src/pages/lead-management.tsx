@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { 
   Users, 
   Plus, 
+  UserPlus,
   Search, 
   Filter, 
   MessageSquare,
@@ -172,6 +173,14 @@ export default function LeadManagement() {
     setIsDetailModalOpen(true);
   };
 
+  const handleLeadUpdated = (updatedLead: LeadWithCounselor) => {
+    setSelectedLead(updatedLead);
+    // Update the lead in the local state as well
+    setLeadsState(prev => prev.map(lead => 
+      lead.id === updatedLead.id ? updatedLead : lead
+    ));
+  };
+
   const handleDetailModalClose = (open: boolean) => {
     setIsDetailModalOpen(open);
     if (!open) {
@@ -319,6 +328,13 @@ export default function LeadManagement() {
             </div>
           </div>
           <div className="flex items-center gap-2 ml-4 space-x-2 text-white">
+            <Button 
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-2 bg-[#643ae5] hover:bg-[#643ae5]/90 text-white"
+            >
+              <UserPlus size={16} className="text-white" />
+              Add New Lead
+            </Button>
             <Button 
               variant="outline" 
               onClick={() => setIsCSVImportOpen(true)}
@@ -540,6 +556,7 @@ export default function LeadManagement() {
         open={isDetailModalOpen}
         onOpenChange={setIsDetailModalOpen}
         onLeadDeleted={() => selectedLead && handleLeadDeleted(selectedLead.id)}
+        onLeadUpdated={handleLeadUpdated}
       />
 
       <Dialog open={isCSVImportOpen} onOpenChange={setIsCSVImportOpen}>
@@ -587,15 +604,7 @@ export default function LeadManagement() {
         </DialogContent>
       </Dialog>
 
-      <div className="fixed bottom-6 right-6 z-50">
-        <Button
-          size="lg"
-          className="w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 bg-purple-600 hover:bg-purple-700 text-white font-bold flex items-center justify-center"
-          onClick={() => setIsAddModalOpen(true)}
-        >
-          <Plus className="w-6 h-6" />
-        </Button>
-      </div>
+
     </div>
   );
 }

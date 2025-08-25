@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +21,8 @@ interface AddLeadModalProps {
 export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [deletedLeadData, setDeletedLeadData] = useState<any>(null);
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
 
   const { data: counselors } = useQuery<User[]>({
     queryKey: ["/api/counselors"],
@@ -27,6 +30,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
 
   const form = useForm<InsertLead>({
     resolver: zodResolver(insertLeadSchema),
+    mode: "onChange", // Enable real-time validation
     defaultValues: {
       name: "",
       email: "",
@@ -43,11 +47,49 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
     },
   });
 
+  // Reset form when modal closes
+  useEffect(() => {
+    if (!open) {
+      form.reset();
+      setDeletedLeadData(null);
+      setShowRestoreDialog(false);
+    }
+  }, [open, form]);
+
+  // Handle restoring deleted lead
+  const restoreLeadMutation = useMutation({
+    mutationFn: async (leadId: number) => {
+      const response = await apiRequest("PATCH", `/leads/${leadId}/restore`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/leads"] });
+      toast({
+        title: "Lead Restored",
+        description: "The deleted lead has been successfully restored.",
+      });
+      form.reset();
+      setShowRestoreDialog(false);
+      setDeletedLeadData(null);
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Restore Failed",
+        description: "Failed to restore the deleted lead. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const createLeadMutation = useMutation({
-    mutationFn: async (data: InsertLead) => {
-      console.log("Attempting to create lead:", data);
+    mutationFn: async ({ data, forceCreate = false }: { data: InsertLead; forceCreate?: boolean }) => {
+      console.log("Attempting to create lead:", data, "Force create:", forceCreate);
       try {
-        const response = await apiRequest("POST", "/leads", data);
+        const url = forceCreate ? "/leads?force=true" : "/leads";
+        const response = await apiRequest("POST", url, data);
         console.log("Response status:", response.status);
         
         // Check content type to ensure we're receiving JSON
@@ -98,29 +140,32 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
         ));
       
       if (isDuplicateError) {
-        console.log("Duplicate detected on client side");
-        
-        // Extract duplicate information from the form data
-        const formData = form.getValues();
-        console.log("Form data for duplicate:", formData);
-        
-        // Create a more detailed error message
-        let errorDescription = "A lead with this contact information already exists in the system.";
-        
-        if (formData.phone && formData.email) {
-          errorDescription = `A lead with phone number "${formData.phone}" and email "${formData.email}" already exists in the system.`;
-        } else if (formData.phone) {
-          errorDescription = `A lead with phone number "${formData.phone}" already exists in the system.`;
-        } else if (formData.email) {
-          errorDescription = `A lead with email "${formData.email}" already exists in the system.`;
+        // Check if this is a deleted lead
+        if (error.errorData?.isDeletedLead) {
+          setDeletedLeadData(error.errorData.deletedLead);
+          setShowRestoreDialog(true);
+        } else {
+          // Handle normal duplicate (active lead)
+          const formData = form.getValues();
+          
+          // Create a more detailed error message
+          let errorDescription = "A lead with this contact information already exists in the system.";
+          
+          if (formData.phone && formData.email) {
+            errorDescription = `A lead with phone number "${formData.phone}" and email "${formData.email}" already exists in the system.`;
+          } else if (formData.phone) {
+            errorDescription = `A lead with phone number "${formData.phone}" already exists in the system.`;
+          } else if (formData.email) {
+            errorDescription = `A lead with email "${formData.email}" already exists in the system.`;
+          }
+          
+          // Show the server's error message to the user
+          toast({
+            title: "⚠️ Duplicate Lead Warning",
+            description: errorDescription,
+            variant: "destructive",
+          });
         }
-        
-        // Show the server's error message to the user
-        toast({
-          title: "⚠️ Duplicate Lead Warning",
-          description: errorDescription,
-          variant: "destructive",
-        });
         
         // DO NOT close the modal - let user modify the form and try again
         // DO NOT reset the form - let user see what they entered
@@ -145,7 +190,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
   });
 
   const onSubmit = (data: InsertLead) => {
-    createLeadMutation.mutate(data);
+    createLeadMutation.mutate({ data });
   };
 
   const classOptions = [
@@ -383,6 +428,55 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
           </form>
         </Form>
       </DialogContent>
+
+      {/* Restore Deleted Lead Dialog */}
+      <AlertDialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deleted Lead Found</AlertDialogTitle>
+            <AlertDialogDescription>
+              A deleted lead with the same contact information exists:
+              <br />
+              <strong>Name:</strong> {deletedLeadData?.name}
+              <br />
+              <strong>Phone:</strong> {deletedLeadData?.phone}
+              <br />
+              {deletedLeadData?.email && (
+                <>
+                  <strong>Email:</strong> {deletedLeadData.email}
+                  <br />
+                </>
+              )}
+              <br />
+              Would you like to restore this deleted lead instead of creating a new one?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                setShowRestoreDialog(false);
+                // Force create new lead despite deleted one existing
+                const formData = form.getValues();
+                createLeadMutation.mutate({ data: formData, forceCreate: true });
+              }}
+              disabled={createLeadMutation.isPending}
+            >
+              {createLeadMutation.isPending ? "Creating..." : "Create New Lead"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletedLeadData) {
+                  restoreLeadMutation.mutate(deletedLeadData.id);
+                }
+              }}
+              disabled={restoreLeadMutation.isPending}
+              className="bg-[#643ae5] hover:bg-[#643ae5]/90"
+            >
+              {restoreLeadMutation.isPending ? "Restoring..." : "Restore Lead"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

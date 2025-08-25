@@ -1914,16 +1914,86 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async restoreLead(id: number): Promise<Lead | undefined> {
-    // Restore a soft-deleted lead
-    return this.updateLead(id, { status: "new", deletedAt: null });
+  async restoreLead(originalLeadId: number): Promise<Lead | undefined> {
+    // Find the deleted lead in recentlyDeletedLeads table
+    const deletedLeadResult = await db
+      .select()
+      .from(schema.recentlyDeletedLeads)
+      .where(eq(schema.recentlyDeletedLeads.original_lead_id, originalLeadId))
+      .limit(1);
+    
+    if (deletedLeadResult.length === 0) {
+      console.log("No deleted lead found with original_lead_id:", originalLeadId);
+      return undefined;
+    }
+    
+    const deletedLead = deletedLeadResult[0];
+    console.log("Restoring deleted lead:", deletedLead);
+    
+    try {
+      // Insert the lead back into the main leads table
+      const restoredLeadData = {
+        name: deletedLead.name,
+        email: deletedLead.email,
+        phone: deletedLead.phone,
+        class: deletedLead.class,
+        stream: deletedLead.stream,
+        status: "new", // Reset status to new when restoring
+        source: deletedLead.source,
+        counselorId: deletedLead.counselor_id,
+        assignedAt: deletedLead.assigned_at,
+        lastContactedAt: deletedLead.last_contacted_at,
+        admissionLikelihood: deletedLead.admission_likelihood,
+        notes: deletedLead.notes,
+        parentName: deletedLead.parent_name,
+        parentPhone: deletedLead.parent_phone,
+        address: deletedLead.address,
+        interestedProgram: deletedLead.interested_program,
+      };
+      
+      const [restoredLead] = await db
+        .insert(schema.leads)
+        .values(restoredLeadData)
+        .returning();
+      
+      // Remove from recentlyDeletedLeads table
+      await db
+        .delete(schema.recentlyDeletedLeads)
+        .where(eq(schema.recentlyDeletedLeads.id, deletedLead.id));
+      
+      // Create notification
+      await this.notifyChange(
+        'lead',
+        'Lead Restored',
+        `Lead ${restoredLead.name} (${restoredLead.phone}) has been restored`,
+        'medium',
+        'lead_restored',
+        restoredLead.id.toString()
+      );
+      
+      console.log("Lead restored successfully:", restoredLead);
+      return restoredLead;
+      
+    } catch (error) {
+      console.error("Error restoring lead:", error);
+      throw error;
+    }
   }
 
   async deleteLead(id: number): Promise<void> {
+    console.log(`=== DELETING LEAD ${id} ===`);
+    
     // Fetch the lead
     const lead = await this.getLead(id);
-    if (!lead) return;
+    console.log("Found lead to delete:", lead ? `${lead.name} (${lead.phone})` : "No lead found");
+    
+    if (!lead) {
+      console.log("Lead not found, aborting deletion");
+      return;
+    }
+    
     try {
+      console.log("Step 1: Creating notification...");
       // Notify before actual deletion so details are still available
       await this.notifyChange(
         'lead',
@@ -1933,6 +2003,9 @@ export class DatabaseStorage implements IStorage {
         'lead_deleted',
         lead.id.toString()
       );
+      console.log("Notification created successfully");
+
+      console.log("Step 2: Preparing insert data for recently_deleted_leads...");
       const insertObj = {
         original_lead_id: lead.id,
         name: lead.name,
@@ -1955,12 +2028,19 @@ export class DatabaseStorage implements IStorage {
         interested_program: lead.interestedProgram,
         deleted_at: new Date(),
       };
-      console.log('Inserting into recently_deleted_leads:', insertObj);
+      
+      console.log('Step 3: Inserting into recently_deleted_leads...');
       await db.insert(schema.recentlyDeletedLeads).values(insertObj);
-      console.log('Insert successful');
-      await db.delete(schema.leads).where(eq(schema.leads.id, id));
+      console.log('Insert into recently_deleted_leads successful');
+      
+      console.log('Step 4: Deleting from main leads table...');
+      const deleteResult = await db.delete(schema.leads).where(eq(schema.leads.id, id));
+      console.log('Delete from main leads table successful, rows affected:', deleteResult.rowCount);
+      
+      console.log(`=== LEAD ${id} DELETION COMPLETED ===`);
     } catch (err) {
-      console.error('Error moving lead to recently_deleted_leads:', err);
+      console.error('Error during lead deletion process:', err);
+      console.error('Error details:', err instanceof Error ? err.message : String(err));
       throw err;
     }
   }

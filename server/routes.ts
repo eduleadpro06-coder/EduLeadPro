@@ -348,35 +348,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/leads", async (req, res) => {
     try {
       const validatedData = insertLeadSchema.parse(req.body);
+      const forceCreate = req.query.force === "true";
       
-      console.log("Checking for duplicates with:", {
-        phone: validatedData.phone,
-        email: validatedData.email
-      });
+      console.log("=== CREATE LEAD REQUEST ===");
+      console.log("Phone:", validatedData.phone);
+      console.log("Email:", validatedData.email);
+      console.log("Force create:", forceCreate);
       
-      // Check for duplicate leads by phone number - include deleted leads to prevent duplicates
-      const allLeads = await storage.getAllLeads(true); // Include deleted leads
-      console.log("Total leads in database (including deleted):", allLeads.length);
+      // First check only active leads for duplicates
+      const activeLeads = await storage.getAllLeads(false); // Exclude deleted leads
+      console.log("Active leads count:", activeLeads.length);
       
-      const existingLead = allLeads.find(lead => 
+      const existingActiveLead = activeLeads.find(lead => 
         lead.phone === validatedData.phone || 
         (validatedData.email && lead.email === validatedData.email)
       );
       
-      console.log("Existing lead found:", existingLead);
+      console.log("Existing active lead found:", !!existingActiveLead);
       
-      if (existingLead) {
-        console.log("Duplicate detected, returning 409");
+      if (existingActiveLead) {
+        console.log("Active duplicate detected, returning 409");
         return res.status(409).json({ 
           message: "A lead with this phone number or email already exists",
           existingLead: {
-            id: existingLead.id,
-            name: existingLead.name,
-            phone: existingLead.phone,
-            email: existingLead.email,
-            status: existingLead.status
+            id: existingActiveLead.id,
+            name: existingActiveLead.name,
+            phone: existingActiveLead.phone,
+            email: existingActiveLead.email,
+            status: existingActiveLead.status
           }
         });
+      }
+      
+      // Check if there's a deleted lead with the same contact info (only if not forcing creation)
+      if (!forceCreate) {
+        console.log("Checking for deleted leads...");
+        try {
+          // Check the recentlyDeletedLeads table directly
+          const { recentlyDeletedLeads } = await import("@shared/schema");
+          const { db } = await import("./db");
+          const { or, eq } = await import("drizzle-orm");
+          
+          let whereConditions = [eq(recentlyDeletedLeads.phone, validatedData.phone)];
+          if (validatedData.email) {
+            whereConditions.push(eq(recentlyDeletedLeads.email, validatedData.email));
+          }
+          
+          console.log("Querying recentlyDeletedLeads table...");
+          const deletedLeadResults = await db
+            .select()
+            .from(recentlyDeletedLeads)
+            .where(or(...whereConditions))
+            .limit(1);
+          
+          console.log("Deleted lead results:", deletedLeadResults.length);
+          
+          if (deletedLeadResults.length > 0) {
+            const deletedLead = deletedLeadResults[0];
+            console.log("Found deleted lead, returning restore option");
+            return res.status(409).json({ 
+              message: "A deleted lead with this contact information exists. Would you like to restore it instead?",
+              isDeletedLead: true,
+              deletedLead: {
+                id: deletedLead.original_lead_id || deletedLead.id,
+                name: deletedLead.name,
+                phone: deletedLead.phone,
+                email: deletedLead.email,
+                status: "deleted"
+              }
+            });
+          } else {
+            console.log("No deleted lead found");
+          }
+        } catch (deleteCheckError) {
+          console.error("Error checking deleted leads:", deleteCheckError);
+        }
+      } else {
+        console.log("Force create mode - skipping deleted lead check");
       }
       
       const lead = await storage.createLead(validatedData);
@@ -2174,7 +2222,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete a lead (move to recently_deleted_leads)
   app.delete("/api/leads/:id", async (req, res) => {
     try {
+      console.log("=== DELETE LEAD REQUEST ===");
+      console.log("Lead ID to delete:", req.params.id);
       await storage.deleteLead(Number(req.params.id));
+      console.log("Lead deletion completed successfully");
       res.status(204).send();
     } catch (error) {
       console.error("Failed to delete lead:", error);

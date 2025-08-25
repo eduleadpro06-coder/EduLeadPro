@@ -418,7 +418,20 @@ export const coursePricing = pgTable("course_pricing", {
 
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
-export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true });
+export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true })
+  .extend({
+    phone: z.string()
+      .min(1, { message: "Phone number is required" })
+      .regex(/^[\d\s\-\+\(\)]+$/, { message: "Phone number can only contain digits, spaces, hyphens, plus signs, and parentheses" })
+      .refine((val) => {
+        const digitsOnly = val.replace(/\D/g, '');
+        return digitsOnly.length === 10;
+      }, { message: "Phone number must contain exactly 10 digits" }),
+    email: z.string()
+      .email({ message: "Please enter a valid email address" })
+      .optional()
+      .or(z.literal("")),
+  });
 export const insertFollowUpSchema = createInsertSchema(followUps).omit({ id: true, createdAt: true });
 export const insertLeadSourceSchema = createInsertSchema(leadSources).omit({ id: true });
 export const insertStaffSchema = createInsertSchema(staff)

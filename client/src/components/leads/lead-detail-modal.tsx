@@ -38,6 +38,7 @@ interface LeadDetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onLeadDeleted?: () => void;
+  onLeadUpdated?: (updatedLead: LeadWithCounselorAndFollowUps) => void;
 }
 
 interface FollowUpForm {
@@ -46,10 +47,11 @@ interface FollowUpForm {
   outcome: string;
 }
 
-export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDeleted }: LeadDetailModalProps) {
+export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDeleted, onLeadUpdated }: LeadDetailModalProps) {
   const [activeTab, setActiveTab] = useHashState("details");
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<any>(lead || {});
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [followUpForm, setFollowUpForm] = useState<FollowUpForm>({
     scheduledAt: "",
     remarks: "",
@@ -57,6 +59,68 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Validation functions
+  const validatePhone = (phone: string): string | null => {
+    if (!phone || phone.trim() === "") {
+      return "Phone number is required";
+    }
+    
+    // Check if contains only allowed characters
+    if (!/^[\d\s\-\+\(\)]+$/.test(phone)) {
+      return "Phone number can only contain digits, spaces, hyphens, plus signs, and parentheses";
+    }
+    
+    // Count only digits
+    const digitsOnly = phone.replace(/\D/g, '');
+    if (digitsOnly.length !== 10) {
+      return "Phone number must contain exactly 10 digits";
+    }
+    
+    return null;
+  };
+
+  const validateEmail = (email: string): string | null => {
+    if (email && email.trim() !== "") {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return "Please enter a valid email address";
+      }
+    }
+    return null;
+  };
+
+  const validateForm = (): boolean => {
+    const errors: {[key: string]: string} = {};
+    
+    // Validate phone
+    const phoneError = validatePhone(editForm.phone);
+    if (phoneError) {
+      errors.phone = phoneError;
+    }
+    
+    // Validate email
+    const emailError = validateEmail(editForm.email);
+    if (emailError) {
+      errors.email = emailError;
+    }
+    
+    // Validate required fields
+    if (!editForm.name || editForm.name.trim() === "") {
+      errors.name = "Student name is required";
+    }
+    
+    if (!editForm.class || editForm.class.trim() === "") {
+      errors.class = "Class is required";
+    }
+
+    if (!editForm.source || editForm.source.trim() === "") {
+      errors.source = "Lead source is required";
+    }
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -66,6 +130,8 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
   useEffect(() => {
     if (!open) {
       setActiveTab("");
+      setValidationErrors({}); // Clear validation errors when modal closes
+      setIsEditing(false); // Reset editing state
     }
   }, [open, setActiveTab]);
 
@@ -102,9 +168,19 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (updatedLead) => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       setIsEditing(false);
+      setValidationErrors({}); // Clear validation errors on successful save
+      
+      // Update the edit form with the latest data
+      setEditForm(updatedLead);
+      
+      // Notify parent component to update the selected lead
+      if (onLeadUpdated) {
+        onLeadUpdated(updatedLead);
+      }
+      
       toast({
         title: "Lead Updated",
         description: "Lead information has been updated successfully",
@@ -215,6 +291,15 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
   });
 
   const saveChanges = () => {
+    if (!validateForm()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fix the errors before saving.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     updateLeadMutation.mutate(editForm);
   };
 
@@ -306,7 +391,15 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setIsEditing(!isEditing)}
+                    onClick={() => {
+                      if (isEditing) {
+                        // Clear validation errors when cancelling
+                        setValidationErrors({});
+                        // Reset form to original lead data
+                        setEditForm(lead);
+                      }
+                      setIsEditing(!isEditing);
+                    }}
                     className="text-white"
                   >
                     <Edit size={16} className="mr-2" />
@@ -376,10 +469,38 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                       Student Name
                     </label>
                     {isEditing ? (
-                      <Input
-                        value={editForm.name}
-                        onChange={(e) => setEditForm((prev: typeof editForm) => ({ ...prev, name: e.target.value }))}
-                      />
+                      <div>
+                        <Input
+                          value={editForm.name}
+                          onChange={(e) => {
+                            const newValue = e.target.value;
+                            setEditForm((prev: typeof editForm) => ({ ...prev, name: newValue }));
+                            
+                            // Real-time validation
+                            const errors = { ...validationErrors };
+                            if (!newValue || newValue.trim() === "") {
+                              errors.name = "Student name is required";
+                            } else {
+                              delete errors.name;
+                            }
+                            setValidationErrors(errors);
+                          }}
+                          onBlur={() => {
+                            // Validate on blur as well
+                            const errors = { ...validationErrors };
+                            if (!editForm.name || editForm.name.trim() === "") {
+                              errors.name = "Student name is required";
+                            } else {
+                              delete errors.name;
+                            }
+                            setValidationErrors(errors);
+                          }}
+                          className={validationErrors.name ? "border-red-500" : ""}
+                        />
+                        {validationErrors.name && (
+                          <p className="text-red-500 text-sm mt-1">{validationErrors.name}</p>
+                        )}
+                      </div>
                     ) : (
                       <div className="flex items-center gap-2">
                         <User size={16} className="text-gray-500" />
@@ -393,10 +514,40 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                       Phone Number
                     </label>
                     {isEditing ? (
-                      <Input
-                        value={editForm.phone}
-                        onChange={(e) => setEditForm((prev: typeof editForm) => ({ ...prev, phone: e.target.value }))}
-                      />
+                      <div>
+                        <Input
+                          value={editForm.phone}
+                          onChange={(e) => {
+                            const newValue = e.target.value;
+                            setEditForm((prev: typeof editForm) => ({ ...prev, phone: newValue }));
+                            
+                            // Real-time validation
+                            const errors = { ...validationErrors };
+                            const phoneError = validatePhone(newValue);
+                            if (phoneError) {
+                              errors.phone = phoneError;
+                            } else {
+                              delete errors.phone;
+                            }
+                            setValidationErrors(errors);
+                          }}
+                          onBlur={() => {
+                            // Validate on blur as well
+                            const errors = { ...validationErrors };
+                            const phoneError = validatePhone(editForm.phone);
+                            if (phoneError) {
+                              errors.phone = phoneError;
+                            } else {
+                              delete errors.phone;
+                            }
+                            setValidationErrors(errors);
+                          }}
+                          className={validationErrors.phone ? "border-red-500" : ""}
+                        />
+                        {validationErrors.phone && (
+                          <p className="text-red-500 text-sm mt-1">{validationErrors.phone}</p>
+                        )}
+                      </div>
                     ) : (
                       <div className="flex items-center gap-2">
                         <Phone size={16} className="text-gray-500" />
@@ -410,10 +561,40 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                       Email
                     </label>
                     {isEditing ? (
-                      <Input
-                        value={editForm.email || ""}
-                        onChange={(e) => setEditForm((prev: typeof editForm) => ({ ...prev, email: e.target.value }))}
-                      />
+                      <div>
+                        <Input
+                          value={editForm.email || ""}
+                          onChange={(e) => {
+                            const newValue = e.target.value;
+                            setEditForm((prev: typeof editForm) => ({ ...prev, email: newValue }));
+                            
+                            // Real-time validation
+                            const errors = { ...validationErrors };
+                            const emailError = validateEmail(newValue);
+                            if (emailError) {
+                              errors.email = emailError;
+                            } else {
+                              delete errors.email;
+                            }
+                            setValidationErrors(errors);
+                          }}
+                          onBlur={() => {
+                            // Validate on blur as well
+                            const errors = { ...validationErrors };
+                            const emailError = validateEmail(editForm.email || "");
+                            if (emailError) {
+                              errors.email = emailError;
+                            } else {
+                              delete errors.email;
+                            }
+                            setValidationErrors(errors);
+                          }}
+                          className={validationErrors.email ? "border-red-500" : ""}
+                        />
+                        {validationErrors.email && (
+                          <p className="text-red-500 text-sm mt-1">{validationErrors.email}</p>
+                        )}
+                      </div>
                     ) : (
                       <div className="flex items-center gap-2">
                         <Mail size={16} className="text-gray-500" />
@@ -465,35 +646,50 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                       Class & Stream
                     </label>
                     {isEditing ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        <Select
-                          value={editForm.class}
-                          onValueChange={(value) => setEditForm((prev: typeof editForm) => ({ ...prev, class: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Class 9">Class 9</SelectItem>
-                            <SelectItem value="Class 10">Class 10</SelectItem>
-                            <SelectItem value="Class 11">Class 11</SelectItem>
-                            <SelectItem value="Class 12">Class 12</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Select
-                          value={editForm.stream || ""}
-                          onValueChange={(value) => setEditForm((prev: typeof editForm) => ({ ...prev, stream: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Science">Science</SelectItem>
-                            <SelectItem value="Commerce">Commerce</SelectItem>
-                            <SelectItem value="Arts">Arts</SelectItem>
-                            <SelectItem value="N/A">N/A</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Select
+                            value={editForm.class}
+                            onValueChange={(value) => {
+                              setEditForm((prev: typeof editForm) => ({ ...prev, class: value }));
+                              // Real-time validation for class
+                              const errors = { ...validationErrors };
+                              if (!value || value.trim() === "") {
+                                errors.class = "Class is required";
+                              } else {
+                                delete errors.class;
+                              }
+                              setValidationErrors(errors);
+                            }}
+                          >
+                            <SelectTrigger className={validationErrors.class ? "border-red-500" : ""}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Class 9">Class 9</SelectItem>
+                              <SelectItem value="Class 10">Class 10</SelectItem>
+                              <SelectItem value="Class 11">Class 11</SelectItem>
+                              <SelectItem value="Class 12">Class 12</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={editForm.stream || ""}
+                            onValueChange={(value) => setEditForm((prev: typeof editForm) => ({ ...prev, stream: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Science">Science</SelectItem>
+                              <SelectItem value="Commerce">Commerce</SelectItem>
+                              <SelectItem value="Arts">Arts</SelectItem>
+                              <SelectItem value="N/A">N/A</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {validationErrors.class && (
+                          <p className="text-red-500 text-sm mt-1">{validationErrors.class}</p>
+                        )}
                       </div>
                     ) : (
                       <span>{lead.class} {lead.stream}</span>
