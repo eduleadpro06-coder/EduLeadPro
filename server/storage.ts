@@ -851,57 +851,92 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateStaff(id: number, updates: Partial<Staff>): Promise<Staff | undefined> {
-    // Map isActive to is_active for DB
-    if (Object.prototype.hasOwnProperty.call(updates, 'isActive')) {
-      (updates as any).is_active = (updates as any).isActive;
-      delete (updates as any).isActive;
-    }
-    const dateFields = ["dateOfJoining", "createdAt", "updatedAt"];
-    for (const field of dateFields) {
-      if (Object.prototype.hasOwnProperty.call(updates, field)) {
-        const val = (updates as any)[field];
-        if (field === "dateOfJoining" && val instanceof Date) {
-          (updates as any)[field] = val.toISOString().split('T')[0];
-        } else if ((field === "createdAt" || field === "updatedAt") && typeof val === "string" && !isNaN(Date.parse(val))) {
-          (updates as any)[field] = new Date(val);
+    try {
+      console.log("=== updateStaff DEBUG ===");
+      console.log("ID:", id);
+      console.log("Updates received:", updates);
+      console.log("isActive in updates:", 'isActive' in updates);
+      console.log("isActive value:", updates.isActive);
+      console.log("isActive type:", typeof updates.isActive);
+      
+      // First, let's get the current staff record to see what we're working with
+      const currentStaff = await this.getStaff(id);
+      console.log("Current staff record:", currentStaff);
+      
+      // Prepare the update object with explicit field mapping
+      const updateData: any = { ...updates };
+      
+      // Handle date fields
+      const dateFields = ["dateOfJoining", "createdAt", "updatedAt"];
+      for (const field of dateFields) {
+        if (Object.prototype.hasOwnProperty.call(updates, field)) {
+          const val = (updates as any)[field];
+          if (field === "dateOfJoining" && val instanceof Date) {
+            updateData[field] = val.toISOString().split('T')[0];
+          } else if ((field === "createdAt" || field === "updatedAt") && typeof val === "string" && !isNaN(Date.parse(val))) {
+            updateData[field] = new Date(val);
+          }
         }
       }
-    }
-    const result = await db.update(schema.staff).set({
-      ...updates,
-      updatedAt: new Date()
-    }).where(eq(schema.staff.id, id)).returning();
-    const updatedStaff = result[0];
-
-    // --- Update payroll if name or salary changed ---
-    if (updatedStaff && (updates.name || updates.salary)) {
-      const now = new Date();
-      const month = now.getMonth() + 1;
-      const year = now.getFullYear();
-      const payroll = await this.getPayrollByStaffMonthYear(id, month, year);
-      if (payroll) {
-        const basicSalary = updates.salary !== undefined ? Number(updates.salary) : Number(updatedStaff.salary);
-        const employeeName = updates.name !== undefined ? updates.name : updatedStaff.name;
-        const attendedDays = payroll.attendedDays || 30;
-        const netSalary = (basicSalary / 30) * attendedDays;
-        await this.updatePayroll(payroll.id, {
-          basicSalary,
-          employeeName,
-          netSalary
-        });
+      
+      console.log("After date processing, updateData:", updateData);
+      
+      // Special handling for isActive - this is our main fix
+      if ('isActive' in updates) {
+        const isActiveValue = Boolean(updates.isActive);
+        console.log("Converting isActive:", updates.isActive, "->", isActiveValue);
+        updateData.isActive = isActiveValue;
       }
+      
+      console.log("Final updateData before DB call:", updateData);
+      
+      const result = await db.update(schema.staff)
+        .set({
+          ...updateData,
+          updatedAt: new Date()
+        })
+        .where(eq(schema.staff.id, id))
+        .returning();
+        
+      const updatedStaff = result[0];
+      console.log("Database result:", updatedStaff);
+      console.log("=== updateStaff COMPLETE ===");
+
+      // --- Update payroll if name or salary changed ---
+      if (updatedStaff && (updates.name || updates.salary)) {
+        const now = new Date();
+        const month = now.getMonth() + 1;
+        const year = now.getFullYear();
+        const payroll = await this.getPayrollByStaffMonthYear(id, month, year);
+        if (payroll) {
+          const basicSalary = updates.salary !== undefined ? Number(updates.salary) : Number(updatedStaff.salary);
+          const employeeName = updates.name !== undefined ? updates.name : updatedStaff.name;
+          const attendedDays = payroll.attendedDays || 30;
+          const netSalary = (basicSalary / 30) * attendedDays;
+          await this.updatePayroll(payroll.id, {
+            basicSalary,
+            employeeName,
+            netSalary
+          });
+        }
+      }
+      
+      if (updatedStaff) {
+        await this.notifyChange(
+          'staff',
+          'Staff Updated',
+          `Staff ${updatedStaff.name} updated`,
+          'medium',
+          'view_staff',
+          updatedStaff.id.toString()
+        );
+      }
+      
+      return updatedStaff;
+    } catch (error) {
+      console.error("Error in updateStaff:", error);
+      throw error;
     }
-    if (updatedStaff) {
-      await this.notifyChange(
-        'staff',
-        'Staff Updated',
-        `Staff ${updatedStaff.name} updated`,
-        'medium',
-        'view_staff',
-        updatedStaff.id.toString()
-      );
-    }
-    return updatedStaff;
   }
 
   async deleteStaff(id: number): Promise<boolean> {

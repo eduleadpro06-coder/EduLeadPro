@@ -37,7 +37,7 @@ export const leads = pgTable("leads", {
 
 export const followUps = pgTable("follow_ups", {
   id: serial("id").primaryKey(),
-  leadId: integer("lead_id").references(() => leads.id).notNull(),
+  leadId: integer("lead_id").notNull(), // Removed foreign key reference to allow independent existence
   counselorId: integer("counselor_id").references(() => users.id).notNull(),
   scheduledAt: timestamp("scheduled_at").notNull(),
   completedAt: timestamp("completed_at"),

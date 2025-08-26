@@ -65,6 +65,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { insertStaffSchema, type InsertStaff } from "@shared/schema";
+import { z } from "zod";
 import { useHashState } from "@/hooks/use-hash-state";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
 import { Checkbox } from "@/components/ui/checkbox";
@@ -257,7 +258,12 @@ export default function StaffAI() {
   console.log('canManageStaff:', canManageStaff);
 
   // Fetch data
-  const { data: staff = [] } = useQuery({ queryKey: ["/api/staff"] });
+  const { data: staff = [] } = useQuery({ 
+    queryKey: ["/api/staff"],
+    onSuccess: (data) => {
+      console.log("Staff data fetched:", data);
+    }
+  });
   const displayStaff: Staff[] = (staff as Staff[]);
   const { data: attendance = [] } = useQuery({ queryKey: ["/api/attendance"] });
   const { data: payroll = [] } = useQuery({ queryKey: ["/api/payroll"] });
@@ -913,7 +919,13 @@ export default function StaffAI() {
 
   // Add Staff Modal logic
   const addStaffForm = useForm<InsertStaff>({
-    resolver: zodResolver(insertStaffSchema),
+    resolver: zodResolver(insertStaffSchema.extend({
+      email: z.string()
+        .email({ message: "Please enter a valid email address" })
+        .optional()
+        .or(z.literal("")),
+    })),
+    mode: "onChange", // Enable real-time validation
     defaultValues: {
       employeeId: '',
       name: '',
@@ -930,6 +942,34 @@ export default function StaffAI() {
       ifscCode: '',
       panNumber: '',
       isActive: true, // Add default value for isActive
+    },
+  });
+
+  // Edit Staff Modal logic (separate form to avoid conflicts)
+  const editStaffForm = useForm<InsertStaff>({
+    resolver: zodResolver(insertStaffSchema.extend({
+      email: z.string()
+        .email({ message: "Please enter a valid email address" })
+        .optional()
+        .or(z.literal("")),
+    })),
+    mode: "onChange", // Enable real-time validation
+    defaultValues: {
+      employeeId: '',
+      name: '',
+      email: '',
+      phone: '',
+      role: '',
+      department: '',
+      dateOfJoining: '',
+      salary: '',
+      address: '',
+      emergencyContact: '',
+      qualifications: '',
+      bankAccountNumber: '',
+      ifscCode: '',
+      panNumber: '',
+      isActive: true,
     },
   });
   const addStaffMutation = useMutation({
@@ -1078,8 +1118,15 @@ export default function StaffAI() {
   // Pagination and sorting state
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
+  const [maxVisiblePage, setMaxVisiblePage] = useState(2); // Controls how many pages are visible
   const [sortKey, setSortKey] = useState<'name' | 'role' | 'salary' | 'dateOfJoining'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Reset pagination when tab changes
+  useEffect(() => {
+    setPage(1);
+    setMaxVisiblePage(2);
+  }, [selectedTab]);
 
   // Sorting and pagination logic
   const sortedStaff = useMemo(() => {
@@ -1371,9 +1418,16 @@ export default function StaffAI() {
   const [isEditStaffOpen, setIsEditStaffOpen] = useState(false);
 
   // When opening the edit modal, set form values to selectedStaff
+  // Populate edit form when editing staff
   useEffect(() => {
     if (isEditStaffOpen && selectedStaff) {
-      addStaffForm.reset({
+      console.log("Populating edit form with selectedStaff:", selectedStaff);
+      console.log("selectedStaff.isActive:", selectedStaff.isActive, "Type:", typeof selectedStaff.isActive);
+      
+      const isActiveValue = Boolean(selectedStaff.isActive);
+      console.log("Converted isActive value:", isActiveValue);
+      
+      editStaffForm.reset({
         name: selectedStaff.name || '',
         phone: selectedStaff.phone || '',
         email: selectedStaff.email || '',
@@ -1387,11 +1441,13 @@ export default function StaffAI() {
         panNumber: selectedStaff.panNumber || '',
         role: selectedStaff.role || '',
         employeeId: selectedStaff.employeeId || '',
-        emergencyContact: '',
-        isActive: selectedStaff.isActive !== false, // Properly handle isActive field
+        emergencyContact: selectedStaff.emergencyContact || '',
+        isActive: isActiveValue, // Ensure proper boolean value
       });
+      
+      console.log("Form values after reset:", editStaffForm.getValues());
     }
-  }, [isEditStaffOpen, selectedStaff]);
+  }, [isEditStaffOpen, selectedStaff, editStaffForm]);
 
   // Add mutation for editing staff
   const editStaffMutation = useMutation({
@@ -1400,18 +1456,35 @@ export default function StaffAI() {
         ...data,
         salary: Number(data.salary),
         dateOfJoining: data.dateOfJoining ? new Date(data.dateOfJoining).toISOString().split('T')[0] : '',
+        isActive: Boolean(data.isActive), // Ensure proper boolean conversion
       };
-      const response = await apiRequest("PUT", `/api/staff/${data.id}`, payload);
-      return response.json();
+      console.log("Updating staff with payload:", payload);
+      const response = await apiRequest("PUT", `/staff/${data.id}`, payload);
+      const result = await response.json();
+      console.log("Server response:", result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (updatedStaff) => {
+      console.log("Staff updated successfully:", updatedStaff);
+      
+      // Force refetch staff data to ensure UI updates
       queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
       invalidateNotifications(queryClient);
+      
+      // Update the selected staff with the returned data
+      setSelectedStaff(updatedStaff);
+      
+      // Also refetch to be extra sure
+      queryClient.refetchQueries({ queryKey: ["/api/staff"] });
+      
+      // Close modal automatically after successful save
       setIsEditStaffOpen(false);
-      toast({ title: "Staff updated successfully" });
+      toast({ title: "Employee updated successfully", description: `${updatedStaff.name} has been updated. Status: ${updatedStaff.isActive ? 'Active' : 'Inactive'}` });
     },
     onError: (error: any) => {
-      toast({ title: "Error updating staff", description: error.message || "Something went wrong", variant: "destructive" });
+      console.error("Error updating staff:", error);
+      toast({ title: "Error updating employee", description: error.message || "Something went wrong", variant: "destructive" });
     },
   });
 
@@ -1424,7 +1497,7 @@ export default function StaffAI() {
   // Add after editStaffMutation
   const deleteStaffMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `/api/staff/${id}`);
+      const response = await apiRequest("DELETE", `/staff/${id}`);
       if (!response.ok) throw new Error("Failed to delete staff member");
       return response.json();
     },
@@ -1513,33 +1586,28 @@ export default function StaffAI() {
                   >
                     &lt;
                   </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p, idx, arr) => {
-                    // Show first, last, current, and neighbors; use ellipsis for gaps
-                    if (
-                      p === 1 ||
-                      p === totalPages ||
-                      Math.abs(p - page) <= 1
-                    ) {
-                      return (
-                        <button
-                          key={p}
-                          className={`px-3 py-1 rounded-full border text-sm font-medium mx-0.5 ${page === p ? 'bg-[#643ae5] text-white' : 'bg-[#62656e] text-white'} transition`}
-                          onClick={() => setPage(p)}
-                        >
-                          {p}
-                        </button>
-                      );
-                    } else if (
-                      (p === page - 2 && p > 1) ||
-                      (p === page + 2 && p < totalPages)
-                    ) {
-                      return <span key={p} className="px-2 text-white">...</span>;
-                    }
-                    return null;
-                  })}
+                  {Array.from({ length: Math.min(totalPages, maxVisiblePage) }, (_, i) => i + 1).map((p) => (
+                    <button
+                      key={p}
+                      className={`px-3 py-1 rounded-full border text-sm font-medium mx-0.5 ${page === p ? 'bg-[#643ae5] text-white' : 'bg-[#62656e] text-white'} transition`}
+                      onClick={() => setPage(p)}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                  {maxVisiblePage < totalPages && (
+                    <span className="px-2 text-white">...</span>
+                  )}
                   <button
                     className={`px-3 py-1 rounded-full border text-sm font-medium ${page === totalPages ? 'bg-[#643ae5] text-white' : 'bg-[#62656e] text-white'} transition`}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    onClick={() => {
+                      const nextPage = Math.min(totalPages, page + 1);
+                      setPage(nextPage);
+                      // Expand visible pages when user navigates beyond current maxVisiblePage
+                      if (nextPage > maxVisiblePage) {
+                        setMaxVisiblePage(nextPage);
+                      }
+                    }}
                     disabled={page === totalPages}
                     style={{ opacity: page === totalPages ? 0.5 : 1 }}
                   >
@@ -1581,26 +1649,40 @@ export default function StaffAI() {
               <main className="flex-1">
                 {selectedStaff ? (
                   <div className="w-full glass-card rounded-lg border bg-card text-card-foreground shadow-lg p-8" style={{minHeight: '600px'}}>
-                    <div className="flex items-center gap-6 mb-6">
+                    <div className="flex items-center gap-6 mb-6 relative">
                       <div className="relative">
                         <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
                           {selectedStaff.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
                         </div>
                         <span className="absolute bottom-1 right-1 block w-4 h-4 rounded-full border-2 border-[#62656e]" style={{background: selectedStaff.isActive !== false ? '#52C41A' : '#BFBFBF'}}></span>
-                        <button
-                          className="absolute top-0 right-0 bg-[#643ae5] rounded-full p-1 shadow hover:bg-[#7a7ca0]"
-                          style={{transform: 'translate(50%,-50%)'}}
-                          onClick={() => setIsEditStaffOpen(true)}
-                          title="Edit Contact"
-                        >
-                          <Pencil size={16} className="text-white" />
-                        </button>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xl font-bold">{selectedStaff.name}</span>
                           <span className="text-sm font-medium">{selectedStaff.role} • {selectedStaff.department}</span>
                         </div>
+                      </div>
+                      {/* Edit and Delete buttons */}
+                      <div className="absolute top-0 right-0 flex gap-2">
+                        <button
+                          className="bg-[#643ae5] hover:bg-[#7a7ca0] text-white px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition-colors"
+                          onClick={() => setIsEditStaffOpen(true)}
+                          title="Edit Employee"
+                        >
+                          <Pencil size={14} />
+                          Edit
+                        </button>
+                        <button
+                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition-colors"
+                          onClick={() => {
+                            setStaffToDelete(selectedStaff);
+                            setDeleteDialogOpen(true);
+                          }}
+                          title="Delete Employee"
+                        >
+                          <Trash2 size={14} />
+                          Delete
+                        </button>
                       </div>
                     </div>
                     {/* Tabs */}
@@ -2176,7 +2258,7 @@ export default function StaffAI() {
                   <FormField control={addStaffForm.control} name="phone" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Phone</FormLabel>
-                      <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. +91 12345 67890" /></FormControl>
+                      <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -2220,7 +2302,7 @@ export default function StaffAI() {
                   <FormField control={addStaffForm.control} name="email" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Email</FormLabel>
-                      <FormControl><Input {...field} type="email" value={field.value ?? ''} required placeholder="e.g. john.doe@example.com" /></FormControl>
+                      <FormControl><Input {...field} type="email" value={field.value ?? ''} placeholder="john.doe@example.com" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -2359,49 +2441,52 @@ export default function StaffAI() {
               <DialogTitle>Edit Employee</DialogTitle>
               <DialogDescription>Edit the details for this employee below</DialogDescription>
             </DialogHeader>
-            <Form {...addStaffForm}>
-              <form onSubmit={addStaffForm.handleSubmit((data) => {
+            <Form {...editStaffForm}>
+              <form onSubmit={editStaffForm.handleSubmit((data) => {
                 if (!selectedStaff) return;
                 const payload = { ...data, id: selectedStaff.id };
                 editStaffMutation.mutate(payload);
               })} className="space-y-6">
                 {/* Active/Inactive Toggle */}
-                <FormField control={addStaffForm.control} name="isActive" render={({ field }) => (
+                <FormField control={editStaffForm.control} name="isActive" render={({ field }) => (
                   <div className="flex items-center gap-4 mb-2">
                     <Label htmlFor="isActive-toggle" className="text-base font-medium">
-                      {field.value !== false ? "Active" : "Inactive"}
+                      {field.value ? "Active" : "Inactive"}
                     </Label>
                     <Switch
                       id="isActive-toggle"
-                      checked={field.value !== false}
-                      onCheckedChange={checked => field.onChange(checked)}
+                      checked={field.value || false}
+                      onCheckedChange={checked => {
+                        console.log("Toggle changed to:", checked);
+                        field.onChange(checked);
+                      }}
                     />
                   </div>
                 )} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <FormField control={addStaffForm.control} name="name" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="name" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
                         <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. John Doe" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="phone" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="phone" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Phone</FormLabel>
-                        <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. +91 12345 67890" /></FormControl>
+                        <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="role" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="role" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Role</FormLabel>
                         <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. Counselor" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="address" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="address" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Address</FormLabel>
                         <FormControl>
@@ -2415,14 +2500,14 @@ export default function StaffAI() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="salary" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="salary" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Salary (₹)</FormLabel>
                         <FormControl><Input {...field} type="number" value={field.value ?? ''} required min={0} placeholder="e.g. 50000" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="bankAccountNumber" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="bankAccountNumber" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Bank Account Number</FormLabel>
                         <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
@@ -2431,21 +2516,21 @@ export default function StaffAI() {
                     )} />
                   </div>
                   <div className="space-y-4">
-                    <FormField control={addStaffForm.control} name="email" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="email" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl><Input {...field} type="email" value={field.value ?? ''} required placeholder="e.g. john.doe@example.com" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="dateOfJoining" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="dateOfJoining" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Date of Joining</FormLabel>
                         <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="department" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="department" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Department</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined} value={field.value ?? undefined}>
@@ -2465,7 +2550,7 @@ export default function StaffAI() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="qualifications" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="qualifications" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Qualifications</FormLabel>
                         <FormControl>
@@ -2479,14 +2564,14 @@ export default function StaffAI() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="ifscCode" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="ifscCode" render={({ field }) => (
                       <FormItem>
                         <FormLabel>IFSC Code</FormLabel>
                         <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="panNumber" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="panNumber" render={({ field }) => (
                       <FormItem>
                         <FormLabel>PAN Number</FormLabel>
                         <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter PAN number" /></FormControl>

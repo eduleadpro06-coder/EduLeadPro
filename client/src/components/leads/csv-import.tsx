@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,6 @@ import {
   FileText, 
   CheckCircle, 
   AlertTriangle, 
-  X,
   Eye,
   Users,
   Copy,
@@ -102,7 +101,8 @@ export default function CSVImport({ onSuccess, onClose }: CSVImportProps) {
           parentPhone: lead.parentPhone || "",
           address: lead.address || "",
           notes: lead.notes || "",
-          lastContactedAt: lead.lastContactedAt
+          // Only include lastContactedAt if it has a valid value from CSV
+          ...(lead.lastContactedAt && typeof lead.lastContactedAt === 'string' && lead.lastContactedAt.trim() !== '' && { lastContactedAt: lead.lastContactedAt })
         }))
       });
       return response.json();
@@ -131,6 +131,7 @@ export default function CSVImport({ onSuccess, onClose }: CSVImportProps) {
       
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      
       setFile(null);
       setParsedData([]);
       setActiveTab("upload");
@@ -314,7 +315,7 @@ export default function CSVImport({ onSuccess, onClose }: CSVImportProps) {
           } else if (header.includes('address')) {
             row.address = value;
           } else if (header.includes('contact') || header.includes('last')) {
-            row.lastContactedAt = value;
+            row.lastContactedAt = value && value.trim() !== '' ? value : null;
           } else if (header.includes('note') || header.includes('remark')) {
             row.notes = value;
           }
@@ -323,6 +324,7 @@ export default function CSVImport({ onSuccess, onClose }: CSVImportProps) {
         // Set defaults
         row.source = row.source || 'csv_import';
         row.status = row.status || 'new';
+        // Don't set lastContactedAt here - let the server set current date
 
         const validation = validateLead(row);
         
@@ -423,26 +425,22 @@ export default function CSVImport({ onSuccess, onClose }: CSVImportProps) {
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader>
+    <div className="w-full">
+      <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
               <Upload className="h-5 w-5" />
               Import Leads from CSV
-            </CardTitle>
-            <CardDescription>
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
               Upload a CSV file to import multiple leads with their details
-            </CardDescription>
+            </p>
           </div>
-          {onClose && (
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          )}
+
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div>
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="upload">Upload File</TabsTrigger>
@@ -477,7 +475,8 @@ export default function CSVImport({ onSuccess, onClose }: CSVImportProps) {
                 <FileText className="h-4 w-4" />
                 <AlertDescription>
                   <strong>Required columns:</strong> name, phone, class<br/>
-                  <strong>Optional columns:</strong> email, stream, status, source, counselor, parentName, parentPhone, address, lastContactedAt, notes
+                  <strong>Optional columns:</strong> email, stream, status, source, counselor, parentName, parentPhone, address, lastContactedAt, notes<br/>
+                  <strong>Note:</strong> If lastContactedAt is not provided, it will be automatically set to the current date
                 </AlertDescription>
               </Alert>
 
@@ -729,7 +728,7 @@ export default function CSVImport({ onSuccess, onClose }: CSVImportProps) {
             </div>
           </TabsContent>
         </Tabs>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -142,7 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             parentPhone: row.parentPhone?.trim() || null,
             address: row.address?.trim() || null,
             notes: row.notes?.trim() || null,
-            lastContactedAt: row.lastContactedAt ? new Date(row.lastContactedAt) : null
+            lastContactedAt: (row.lastContactedAt && row.lastContactedAt.trim() !== '') ? new Date(row.lastContactedAt) : new Date()
           };
 
           // Check for duplicates before creating
@@ -1294,6 +1294,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const updates = { ...req.body };
+      
+      console.log("PUT /api/staff/:id - Received updates:", updates);
+      
       // Convert date fields to Date objects if they are valid strings
       const dateFields = ["dateOfJoining", "createdAt", "updatedAt"];
       for (const field of dateFields) {
@@ -1304,10 +1307,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
+      
+      // Explicitly handle boolean fields
+      if ('isActive' in updates) {
+        updates.isActive = Boolean(updates.isActive);
+        console.log("Converted isActive to boolean:", updates.isActive);
+      }
+      
+      console.log("Final updates being passed to storage:", updates);
+      
       const staff = await storage.updateStaff(parseInt(id), updates);
       if (!staff) {
         return res.status(404).json({ message: "Staff not found" });
       }
+      
+      console.log("Returning staff data:", staff);
       res.json(staff);
     } catch (error) {
       console.error("Update staff error:", error);

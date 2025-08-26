@@ -48,7 +48,11 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
 
   useEffect(() => {
     if (staff) {
-      setEditedStaff({ ...staff, salary: staff.salary });
+      setEditedStaff({ 
+        ...staff, 
+        salary: staff.salary,
+        isActive: staff.isActive ?? true // Default to true if undefined
+      });
     } else {
       setEditedStaff({});
     }
@@ -62,7 +66,7 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
   const updateStaffMutation = useMutation({
     mutationFn: async (updates: Partial<Staff>) => {
       if (!staff) throw new Error("No staff member selected");
-      const response = await apiRequest("PUT", `/api/staff/${staff.id}`, updates);
+      const response = await apiRequest("PUT", `/staff/${staff.id}`, updates);
       return response.json();
     },
     onSuccess: async (_, variables) => {
@@ -70,11 +74,12 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
       invalidateNotifications(queryClient);
       // Refetch the latest staff data and update the modal
       if (staff) {
-        const response = await apiRequest("GET", `/api/staff/${staff.id}`);
+        const response = await apiRequest("GET", `/staff/${staff.id}`);
         const updatedStaff = await response.json();
         setEditedStaff({ ...updatedStaff, salary: updatedStaff.salary });
       }
       setIsEditing(false);
+      onOpenChange(false); // Close the modal after successful save
       toast({ title: "Success", description: "Staff details updated successfully." });
       if(onStaffUpdated) onStaffUpdated();
     },
@@ -84,7 +89,12 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
   });
 
   const handleSave = () => {
-    let payload = { ...editedStaff, salary: Number(editedStaff.salary) };
+    let payload = { 
+      ...editedStaff, 
+      salary: Number(editedStaff.salary),
+      isActive: Boolean(editedStaff.isActive) // Explicitly convert to boolean
+    };
+    
     // Ensure dateOfJoining is always a string in 'YYYY-MM-DD' format
     if (payload.dateOfJoining && typeof payload.dateOfJoining !== 'string') {
       payload.dateOfJoining = (payload.dateOfJoining as Date).toISOString().split('T')[0];
@@ -95,13 +105,15 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
         payload.dateOfJoining = d.toISOString().split('T')[0];
       }
     }
+    
+    console.log("Sending staff update payload:", payload); // Debug log
     updateStaffMutation.mutate(payload);
   };
   
   const deleteStaffMutation = useMutation({
     mutationFn: async () => {
       if (!staff) throw new Error("No staff member selected");
-      const response = await apiRequest("DELETE", `/api/staff/${staff.id}`);
+      const response = await apiRequest("DELETE", `/staff/${staff.id}`);
       return response.json();
     },
     onSuccess: () => {
@@ -142,7 +154,7 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
           <DialogTitle className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {/* Status dot */}
-              <span className={`w-3 h-3 rounded-full border-2 border-white ${getStatusDotColor((isEditing ? editedStaff.isActive : staff.isActive) !== false)}`}></span>
+              <span className={`w-3 h-3 rounded-full border-2 border-white ${getStatusDotColor(Boolean(isEditing ? editedStaff.isActive : staff.isActive))}`}></span>
               <User size={24} />
               <div>
                 <h2 className="text-xl font-bold flex items-center gap-2">
@@ -150,10 +162,10 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
                   {/* Show Active/Inactive toggle in edit mode */}
                   {isEditing && (
                     <span className="flex items-center gap-2 ml-4">
-                      <Label htmlFor="active-toggle">{editedStaff.isActive !== false ? "Active" : "Inactive"}</Label>
+                      <Label htmlFor="active-toggle">{editedStaff.isActive ? "Active" : "Inactive"}</Label>
                       <Switch
                         id="active-toggle"
-                        checked={editedStaff.isActive !== false}
+                        checked={Boolean(editedStaff.isActive)}
                         onCheckedChange={(checked) => setEditedStaff(prev => ({ ...prev, isActive: checked }))}
                       />
                     </span>
@@ -163,7 +175,7 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
               </div>
             </div>
             <div className="flex items-center gap-2">
-                {getStatusPill((isEditing ? editedStaff.isActive : staff.isActive) !== false)}
+                {getStatusPill(Boolean(isEditing ? editedStaff.isActive : staff.isActive))}
             </div>
           </DialogTitle>
           <DialogDescription>

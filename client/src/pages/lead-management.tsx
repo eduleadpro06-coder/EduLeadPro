@@ -511,9 +511,6 @@ export default function LeadManagement() {
 
       <Dialog open={isCSVImportOpen} onOpenChange={setIsCSVImportOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Import Leads from CSV</DialogTitle>
-          </DialogHeader>
           <CSVImport 
             onSuccess={() => setIsCSVImportOpen(false)}
             onClose={() => setIsCSVImportOpen(false)}
