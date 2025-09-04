@@ -69,19 +69,28 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
       const response = await apiRequest("PUT", `/staff/${staff.id}`, updates);
       return response.json();
     },
-    onSuccess: async (_, variables) => {
+    onSuccess: async (updatedStaff, variables) => {
       await queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
       invalidateNotifications(queryClient);
-      // Refetch the latest staff data and update the modal
-      if (staff) {
-        const response = await apiRequest("GET", `/staff/${staff.id}`);
-        const updatedStaff = await response.json();
-        setEditedStaff({ ...updatedStaff, salary: updatedStaff.salary });
-      }
+      
       setIsEditing(false);
       onOpenChange(false); // Close the modal after successful save
-      toast({ title: "Success", description: "Staff details updated successfully." });
-      if(onStaffUpdated) onStaffUpdated();
+      
+      // If staff was made inactive, clear the selection to avoid showing moved contact
+      if (updatedStaff && updatedStaff.isActive === false && staff?.isActive !== false) {
+        // Staff was just made inactive - they'll be moved to the bottom
+        // Clear selection to avoid confusion
+        setTimeout(() => {
+          if (onStaffUpdated) onStaffUpdated();
+        }, 100);
+      } else {
+        if (onStaffUpdated) onStaffUpdated();
+      }
+      
+      toast({ 
+        title: "Success", 
+        description: `Staff details updated successfully.${updatedStaff?.isActive === false ? ' Employee has been deactivated.' : ''}` 
+      });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to update staff.", variant: "destructive" });

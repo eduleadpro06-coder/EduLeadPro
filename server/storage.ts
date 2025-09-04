@@ -921,15 +921,204 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      if (updatedStaff) {
+      if (updatedStaff && currentStaff) {
+        // Track specific field changes with detailed notifications
+        const changes: string[] = [];
+        
+        // Track name changes
+        if (updates.name && currentStaff.name !== updatedStaff.name) {
+          changes.push(`name from "${currentStaff.name}" to "${updatedStaff.name}"`);
         await this.notifyChange(
           'staff',
-          'Staff Updated',
-          `Staff ${updatedStaff.name} updated`,
+            'Employee Name Updated',
+            `Employee name changed from "${currentStaff.name}" to "${updatedStaff.name}"`,
           'medium',
-          'view_staff',
+            'staff_profile_change',
           updatedStaff.id.toString()
         );
+        }
+        
+        // Track email changes
+        if (updates.email && currentStaff.email !== updatedStaff.email) {
+          changes.push(`email from "${currentStaff.email || 'N/A'}" to "${updatedStaff.email || 'N/A'}"`);
+          await this.notifyChange(
+            'staff',
+            'Employee Email Updated',
+            `Email updated for ${updatedStaff.name} from "${currentStaff.email || 'N/A'}" to "${updatedStaff.email || 'N/A'}"`,
+            'medium',
+            'staff_profile_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        // Track phone changes
+        if (updates.phone && currentStaff.phone !== updatedStaff.phone) {
+          changes.push(`phone from "${currentStaff.phone}" to "${updatedStaff.phone}"`);
+          await this.notifyChange(
+            'staff',
+            'Employee Phone Updated',
+            `Phone updated for ${updatedStaff.name} from "${currentStaff.phone}" to "${updatedStaff.phone}"`,
+            'medium',
+            'staff_profile_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        // Track role changes
+        if (updates.role && currentStaff.role !== updatedStaff.role) {
+          changes.push(`role from "${currentStaff.role}" to "${updatedStaff.role}"`);
+          await this.notifyChange(
+            'staff',
+            'Employee Role Updated',
+            `Role updated for ${updatedStaff.name} from "${currentStaff.role}" to "${updatedStaff.role}"`,
+            'high',
+            'staff_role_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        // Track department changes
+        if (updates.department && currentStaff.department !== updatedStaff.department) {
+          changes.push(`department from "${currentStaff.department || 'N/A'}" to "${updatedStaff.department || 'N/A'}"`);
+          await this.notifyChange(
+            'staff',
+            'Employee Department Updated',
+            `Department updated for ${updatedStaff.name} from "${currentStaff.department || 'N/A'}" to "${updatedStaff.department || 'N/A'}"`,
+            'medium',
+            'staff_department_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        // Track address changes
+        if (updates.address && currentStaff.address !== updatedStaff.address) {
+          changes.push(`address updated`);
+          await this.notifyChange(
+            'staff',
+            'Employee Address Updated',
+            `Address updated for ${updatedStaff.name}`,
+            'low',
+            'staff_profile_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        // Track emergency contact changes
+        if (updates.emergencyContact && currentStaff.emergencyContact !== updatedStaff.emergencyContact) {
+          changes.push(`emergency contact from "${currentStaff.emergencyContact || 'N/A'}" to "${updatedStaff.emergencyContact || 'N/A'}"`);
+          await this.notifyChange(
+            'staff',
+            'Emergency Contact Updated',
+            `Emergency contact updated for ${updatedStaff.name} from "${currentStaff.emergencyContact || 'N/A'}" to "${updatedStaff.emergencyContact || 'N/A'}"`,
+            'medium',
+            'staff_profile_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        // Track qualifications changes
+        if (updates.qualifications && currentStaff.qualifications !== updatedStaff.qualifications) {
+          changes.push(`qualifications updated`);
+          await this.notifyChange(
+            'staff',
+            'Employee Qualifications Updated',
+            `Qualifications updated for ${updatedStaff.name}`,
+            'medium',
+            'staff_profile_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        // Track banking details changes
+        if (updates.bankAccountNumber && currentStaff.bankAccountNumber !== updatedStaff.bankAccountNumber) {
+          changes.push(`bank account number updated`);
+          await this.notifyChange(
+            'staff',
+            'Banking Details Updated',
+            `Bank account number updated for ${updatedStaff.name}`,
+            'medium',
+            'staff_banking_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        if (updates.ifscCode && currentStaff.ifscCode !== updatedStaff.ifscCode) {
+          changes.push(`IFSC code updated`);
+          await this.notifyChange(
+            'staff',
+            'Banking Details Updated',
+            `IFSC code updated for ${updatedStaff.name}`,
+            'medium',
+            'staff_banking_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        if (updates.panNumber && currentStaff.panNumber !== updatedStaff.panNumber) {
+          changes.push(`PAN number updated`);
+          await this.notifyChange(
+            'staff',
+            'PAN Number Updated',
+            `PAN number updated for ${updatedStaff.name}`,
+            'medium',
+            'staff_profile_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        // Track date of joining changes
+        if (updates.dateOfJoining && currentStaff.dateOfJoining !== updatedStaff.dateOfJoining) {
+          const oldDate = currentStaff.dateOfJoining ? new Date(currentStaff.dateOfJoining).toLocaleDateString() : 'N/A';
+          const newDate = updatedStaff.dateOfJoining ? new Date(updatedStaff.dateOfJoining).toLocaleDateString() : 'N/A';
+          changes.push(`date of joining from "${oldDate}" to "${newDate}"`);
+          await this.notifyChange(
+            'staff',
+            'Date of Joining Updated',
+            `Date of joining updated for ${updatedStaff.name} from "${oldDate}" to "${newDate}"`,
+            'medium',
+            'staff_profile_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        // Track salary changes (existing logic)
+        if (updates.salary && Number(currentStaff.salary) !== Number(updatedStaff.salary)) {
+          changes.push(`salary from ₹${Number(currentStaff.salary).toLocaleString()} to ₹${Number(updatedStaff.salary).toLocaleString()}`);
+          await this.notifyChange(
+            'staff',
+            'Employee Salary Updated',
+            `Salary updated for ${updatedStaff.name} from ₹${Number(currentStaff.salary).toLocaleString()} to ₹${Number(updatedStaff.salary).toLocaleString()}`,
+            'high',
+            'staff_salary_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        // Track status changes (existing logic)
+        if ('isActive' in updates && currentStaff.isActive !== updatedStaff.isActive) {
+          const statusAction = updatedStaff.isActive ? 'activated' : 'deactivated';
+          changes.push(`status ${statusAction}`);
+          await this.notifyChange(
+            'staff',
+            'Employee Status Changed',
+            `Employee ${updatedStaff.name} has been ${statusAction}`,
+            'high',
+            'staff_status_change',
+            updatedStaff.id.toString()
+          );
+        }
+        
+        // Create a comprehensive summary notification if multiple changes were made
+        if (changes.length > 1) {
+          await this.notifyChange(
+            'staff',
+            'Employee Profile Updated',
+            `${updatedStaff.name}'s profile was updated: ${changes.join(', ')}`,
+            'medium',
+            'staff_bulk_update',
+            updatedStaff.id.toString()
+          );
+        }
       }
       
       return updatedStaff;
@@ -981,6 +1170,130 @@ export class DatabaseStorage implements IStorage {
     } catch (err) {
       console.error('Error moving staff to recently_deleted_employee:', err);
       throw err;
+    }
+  }
+
+  async checkDuplicateStaff(phone: string, email?: string, employeeId?: string): Promise<Staff | null> {
+    // First check by phone number (required field)
+    if (phone) {
+      const phoneResult = await db
+        .select()
+        .from(schema.staff)
+        .where(eq(schema.staff.phone, phone))
+        .limit(1);
+      
+      if (phoneResult.length > 0) {
+        return phoneResult[0];
+      }
+    }
+    
+    // Check by employee ID if provided
+    if (employeeId) {
+      const employeeIdResult = await db
+        .select()
+        .from(schema.staff)
+        .where(eq(schema.staff.employeeId, employeeId))
+        .limit(1);
+      
+      if (employeeIdResult.length > 0) {
+        return employeeIdResult[0];
+      }
+    }
+    
+    // If email is provided, also check by email
+    if (email) {
+      const emailResult = await db
+        .select()
+        .from(schema.staff)
+        .where(eq(schema.staff.email, email))
+        .limit(1);
+      
+      if (emailResult.length > 0) {
+        return emailResult[0];
+      }
+    }
+    
+    return null;
+  }
+
+  async getStaffActivities(staffId: number): Promise<any[]> {
+    try {
+      console.log(`[ACTIVITY DEBUG] Fetching activities for staff ID: ${staffId}`);
+      
+      // Get notifications related to this staff member - simplified query
+      const staffNotifications = await db
+        .select()
+        .from(schema.notifications)
+        .where(eq(schema.notifications.actionId, staffId.toString()))
+        .orderBy(desc(schema.notifications.createdAt))
+        .limit(50);
+
+      console.log(`[ACTIVITY DEBUG] Found ${staffNotifications.length} notifications for staff ${staffId}`);
+      console.log(`[ACTIVITY DEBUG] Sample notification:`, staffNotifications[0]);
+
+      // Also get payroll records for this staff member
+      const payrollRecords = await db
+        .select({
+          id: schema.payroll.id,
+          month: schema.payroll.month,
+          year: schema.payroll.year,
+          status: schema.payroll.status,
+          netSalary: schema.payroll.netSalary,
+          createdAt: schema.payroll.createdAt,
+          updatedAt: schema.payroll.updatedAt,
+        })
+        .from(schema.payroll)
+        .where(eq(schema.payroll.staffId, staffId))
+        .orderBy(desc(schema.payroll.createdAt));
+
+      // Combine and format activities
+      const activities: any[] = [];
+
+      // Add notification-based activities
+      staffNotifications.forEach(notification => {
+        activities.push({
+          id: `notification_${notification.id}`,
+          type: 'notification',
+          title: notification.title,
+          message: notification.message,
+          priority: notification.priority || 'medium',
+          actionType: notification.actionType || 'view_staff',
+          timestamp: notification.createdAt,
+          metadata: notification.metadata ? (typeof notification.metadata === 'string' ? JSON.parse(notification.metadata) : notification.metadata) : null,
+        });
+      });
+
+      // Add payroll-based activities
+      payrollRecords.forEach(payroll => {
+        activities.push({
+          id: `payroll_${payroll.id}`,
+          type: 'payroll',
+          title: `Payroll ${payroll.status === 'processed' ? 'Processed' : 'Generated'}`,
+          message: `${payroll.month}/${payroll.year} - ₹${Number(payroll.netSalary).toLocaleString()} (${payroll.status})`,
+          priority: payroll.status === 'processed' ? 'high' : 'medium',
+          actionType: payroll.status === 'processed' ? 'payroll_processed' : 'payroll_generated',
+          timestamp: payroll.status === 'processed' ? payroll.updatedAt : payroll.createdAt,
+          metadata: {
+            payrollId: payroll.id,
+            month: payroll.month,
+            year: payroll.year,
+            netSalary: payroll.netSalary,
+            status: payroll.status,
+          },
+        });
+      });
+
+      // Sort all activities by timestamp (newest first)
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      console.log(`[ACTIVITY DEBUG] Returning ${activities.length} activities for staff ${staffId}`);
+      
+      // Return real activities data (latest 20 activities)
+      return activities.slice(0, 20);
+    } catch (error) {
+      console.error("Error fetching staff activities:", error);
+      console.error("Error details:", error);
+      return [];
     }
   }
 
@@ -1114,7 +1427,23 @@ export class DatabaseStorage implements IStorage {
       console.log('Storage createPayroll - Input data:', JSON.stringify(insertPayroll, null, 2));
       const result = await db.insert(schema.payroll).values(insertPayroll).returning();
       console.log('Storage createPayroll - Result:', JSON.stringify(result[0], null, 2));
-      return result[0];
+      
+      const payroll = result[0];
+      
+      // Get staff details for notification
+      const staff = await this.getStaff(payroll.staffId);
+      if (staff) {
+        await this.notifyChange(
+          'payroll',
+          'Payroll Generated',
+          `Payroll generated for ${staff.name} - Month: ${payroll.month}/${payroll.year}, Net Salary: ₹${Number(payroll.netSalary).toLocaleString()}`,
+          'medium',
+          'view_payroll',
+          payroll.id.toString()
+        );
+      }
+      
+      return payroll;
     } catch (error) {
       console.error("Error creating payroll:", error);
       throw error;
@@ -1122,11 +1451,46 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePayroll(id: number, updates: Partial<Payroll>): Promise<Payroll | undefined> {
+    // Get current payroll for comparison
+    const currentPayroll = await this.getPayroll(id);
+    
     const result = await db.update(schema.payroll).set({
       ...updates,
       updatedAt: new Date()
     }).where(eq(schema.payroll.id, id)).returning();
-    return result[0];
+    
+    const updatedPayroll = result[0];
+    
+    if (updatedPayroll && currentPayroll) {
+      const staff = await this.getStaff(updatedPayroll.staffId);
+      if (staff) {
+        // Log status changes
+        if (updates.status && currentPayroll.status !== updatedPayroll.status) {
+          await this.notifyChange(
+            'payroll',
+            'Payroll Status Updated',
+            `Payroll status changed for ${staff.name} from ${currentPayroll.status} to ${updatedPayroll.status} - Month: ${updatedPayroll.month}/${updatedPayroll.year}`,
+            updatedPayroll.status === 'processed' ? 'high' : 'medium',
+            'payroll_status_change',
+            updatedPayroll.id.toString()
+          );
+        }
+        
+        // Log salary changes
+        if (updates.netSalary && Number(currentPayroll.netSalary) !== Number(updatedPayroll.netSalary)) {
+          await this.notifyChange(
+            'payroll',
+            'Payroll Amount Updated',
+            `Net salary updated for ${staff.name} from ₹${Number(currentPayroll.netSalary).toLocaleString()} to ₹${Number(updatedPayroll.netSalary).toLocaleString()} - Month: ${updatedPayroll.month}/${updatedPayroll.year}`,
+            'medium',
+            'payroll_amount_change',
+            updatedPayroll.id.toString()
+          );
+        }
+      }
+    }
+    
+    return updatedPayroll;
   }
 
   async deletePayroll(id: number): Promise<boolean> {

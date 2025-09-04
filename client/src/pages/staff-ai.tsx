@@ -75,6 +75,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext } from "@/components/ui/pagination";
 import React from "react";
 import StaffDetailModal from "@/components/staff/StaffDetailModal";
+import StaffCSVImport from "@/components/staff/csv-import";
+import StaffActivityTab from "@/components/staff/staff-activity-tab";
 import { Textarea } from "@/components/ui/textarea";
 
 interface Staff {
@@ -93,6 +95,7 @@ interface Staff {
   bankAccountNumber?: string;
   ifscCode?: string;
   panNumber?: string;
+  emergencyContact?: string;
 }
 
 interface Attendance {
@@ -203,6 +206,7 @@ export default function StaffAI() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
+  const [isCSVImportOpen, setIsCSVImportOpen] = useState(false);
   const [roleFilter, setRoleFilter] = useState('all');
   const [editablePayrollData, setEditablePayrollData] = useState<{
     [key: number]: { attendedDays: number | ''; basicSalary: number | ''; netSalary: number }
@@ -259,10 +263,7 @@ export default function StaffAI() {
 
   // Fetch data
   const { data: staff = [] } = useQuery({ 
-    queryKey: ["/api/staff"],
-    onSuccess: (data) => {
-      console.log("Staff data fetched:", data);
-    }
+    queryKey: ["/api/staff"]
   });
   const displayStaff: Staff[] = (staff as Staff[]);
   const { data: attendance = [] } = useQuery({ queryKey: ["/api/attendance"] });
@@ -1441,7 +1442,7 @@ export default function StaffAI() {
         panNumber: selectedStaff.panNumber || '',
         role: selectedStaff.role || '',
         employeeId: selectedStaff.employeeId || '',
-        emergencyContact: selectedStaff.emergencyContact || '',
+        emergencyContact: (selectedStaff as any).emergencyContact || '',
         isActive: isActiveValue, // Ensure proper boolean value
       });
       
@@ -1472,15 +1473,23 @@ export default function StaffAI() {
       queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
       invalidateNotifications(queryClient);
       
-      // Update the selected staff with the returned data
-      setSelectedStaff(updatedStaff);
+      // If staff was made inactive, clear the selection since they'll move to bottom
+      if (updatedStaff.isActive === false && selectedStaff?.isActive !== false) {
+        setSelectedStaff(null);
+      } else {
+        // Update the selected staff with the returned data
+        setSelectedStaff(updatedStaff);
+      }
       
       // Also refetch to be extra sure
       queryClient.refetchQueries({ queryKey: ["/api/staff"] });
       
       // Close modal automatically after successful save
       setIsEditStaffOpen(false);
-      toast({ title: "Employee updated successfully", description: `${updatedStaff.name} has been updated. Status: ${updatedStaff.isActive ? 'Active' : 'Inactive'}` });
+      toast({ 
+        title: "Employee updated successfully", 
+        description: `${updatedStaff.name} has been updated. Status: ${updatedStaff.isActive ? 'Active' : 'Inactive'}${updatedStaff.isActive === false ? ' (moved to inactive section)' : ''}` 
+      });
     },
     onError: (error: any) => {
       console.error("Error updating staff:", error);
@@ -1491,8 +1500,60 @@ export default function StaffAI() {
   // Add this state near the top of your component
   const [showStatus, setShowStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
+  // Fix tab switching to deselect employee when switching tabs
+  useEffect(() => {
+    setSelectedStaff(null);
+  }, [showStatus, selectedTab]);
+
   // 1. Add state for delete dialog and staff to delete (near other state declarations)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  // Export functionality
+  const exportStaff = () => {
+    const staffToExport = displayStaff || [];
+    if (!staffToExport || staffToExport.length === 0) {
+      toast({ title: "No Data", description: "No staff data to export", variant: "destructive" });
+      return;
+    }
+
+    const csvHeaders = [
+      "Employee ID", "Name", "Email", "Phone", "Role", "Department", 
+      "Date of Joining", "Salary", "Active Status", "Address", "Emergency Contact",
+      "Qualifications", "Bank Account", "IFSC Code", "PAN Number"
+    ];
+
+    const csvData = staffToExport.map((member: any) => [
+      member.employeeId || "",
+      member.name,
+      member.email || "",
+      member.phone,
+      member.role,
+      member.department || "",
+      member.dateOfJoining ? new Date(member.dateOfJoining).toLocaleDateString() : "",
+      member.salary ? `₹${Number(member.salary).toLocaleString()}` : "",
+      member.isActive !== false ? "Active" : "Inactive",
+      member.address || "",
+      member.emergencyContact || "",
+      member.qualifications || "",
+      member.bankAccountNumber || "",
+      member.ifscCode || "",
+      member.panNumber || ""
+    ]);
+
+    const csvContent = [csvHeaders, ...csvData]
+      .map((row: any) => row.map((field: any) => `"${field}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `staff_export_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    toast({ title: "Export Successful", description: `Exported ${staffToExport.length} staff records` });
+  };
 
   // Add after editStaffMutation
   const deleteStaffMutation = useMutation({
@@ -1532,7 +1593,29 @@ export default function StaffAI() {
                     onChange={e => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                    <SelectTrigger className="w-40 bg-[#18181b] border-[#643ae5] text-white">
+                      <SelectValue placeholder="All Departments" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#18181b] border-[#643ae5] text-white">
+                      <SelectItem value="all">All Departments</SelectItem>
+                      {Array.from(new Set(displayStaff.map(s => s.department).filter(Boolean))).map(dept => (
+                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={roleFilter} onValueChange={setRoleFilter}>
+                    <SelectTrigger className="w-32 bg-[#18181b] border-[#643ae5] text-white">
+                      <SelectValue placeholder="All Roles" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#18181b] border-[#643ae5] text-white">
+                      <SelectItem value="all">All Roles</SelectItem>
+                      {Array.from(new Set(displayStaff.map(s => s.role).filter(Boolean))).map(role => (
+                        <SelectItem key={role} value={role}>{role}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button variant="outline"
                     className="rounded-lg border border-[#643ae5] bg-black text-white font-medium hover:bg-black hover:border-[#a084fa] flex items-center gap-2" onClick={() => setIsAddStaffOpen(true)}>
                     <UserPlus className="mr-2 h-4 w-4" /> Add New Employee
@@ -1540,14 +1623,16 @@ export default function StaffAI() {
                   <Button
                     variant="outline"
                     className="rounded-lg border border-[#643ae5] bg-black text-white font-medium hover:bg-black hover:border-[#a084fa] flex items-center gap-2"
+                    onClick={() => setIsCSVImportOpen(true)}
                   >
                     <Download className="mr-2 h-4 w-4 text-white" /> Import
                   </Button>
                   <Button
                     variant="outline"
                     className="rounded-lg border border-[#643ae5] bg-black text-white font-medium hover:bg-black hover:border-[#a084fa] flex items-center gap-2"
+                    onClick={exportStaff}
                   >
-                    <FilterIcon className="mr-2 h-4 w-4 text-white" /> Filter
+                    <Upload className="mr-2 h-4 w-4 text-white" /> Export
                   </Button>
                 </div>
               </div>
@@ -1713,7 +1798,7 @@ export default function StaffAI() {
                             <div className="mt-4 flex items-center gap-3">
                               <span className="font-medium">Status:</span>
                               <Badge
-                                variant="status"
+                                variant={selectedStaff.isActive !== false ? "default" : "secondary"}
                                 className={selectedStaff.isActive !== false ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
                               >
                                 {selectedStaff.isActive !== false ? "Active" : "Inactive"}
@@ -1760,6 +1845,7 @@ export default function StaffAI() {
                         </div>
                       </>
                     )}
+                    {contactTab === 'Activity' && selectedStaff && <StaffActivityTab staffId={selectedStaff.id} />}
                     {contactTab === 'Payroll' && selectedStaff && (
                       <div className="w-full glass-card rounded-lg border bg-card text-card-foreground shadow-lg p-6" style={{minHeight: '200px'}}>
                         <div className="font-semibold mb-2">Current Month Payroll</div>
@@ -1883,17 +1969,6 @@ export default function StaffAI() {
                               className="pl-10"
                             />
                           </div>
-                          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                            <SelectTrigger className="w-40">
-                              <SelectValue placeholder="All Departments" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Departments</SelectItem>
-                              {Array.from(new Set(filteredStaff.map(s => s.department).filter(Boolean))).map(dept => (
-                                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
                         </div>
                         <div className="flex gap-2 items-center">
                           <Button
@@ -2617,6 +2692,27 @@ export default function StaffAI() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* CSV Import Modal */}
+      {isCSVImportOpen && (
+        <Dialog open={isCSVImportOpen} onOpenChange={setIsCSVImportOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>Import Staff Data</DialogTitle>
+              <DialogDescription>
+                Import staff members from a CSV file
+              </DialogDescription>
+            </DialogHeader>
+            <StaffCSVImport
+              onSuccess={() => {
+                setIsCSVImportOpen(false);
+                queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+              }}
+              onClose={() => setIsCSVImportOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -95,4 +95,7 @@ export function invalidateNotifications(queryClient: QueryClient): void {
   // Invalidate all notification-related queries
   queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
   queryClient.invalidateQueries({ queryKey: ['notifications'] });
+  
+  // Also trigger a custom event to refresh notifications
+  window.dispatchEvent(new CustomEvent('refreshNotifications'));
 }

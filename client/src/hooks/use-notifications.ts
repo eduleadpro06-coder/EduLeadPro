@@ -122,6 +122,15 @@ export function useNotifications(userId: number = 1) {
   useEffect(() => {
     loadNotifications();
     loadStats();
+
+    // Listen for custom refresh events
+    const handleRefresh = () => {
+      loadNotifications();
+      loadStats();
+    };
+
+    window.addEventListener('refreshNotifications', handleRefresh);
+    return () => window.removeEventListener('refreshNotifications', handleRefresh);
   }, [loadNotifications, loadStats]);
 
   return {

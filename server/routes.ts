@@ -1356,6 +1356,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Staff CSV Import endpoint
+  app.post("/api/staff/import-csv", async (req, res) => {
+    try {
+      const { csvData } = req.body;
+      
+      if (!csvData || !Array.isArray(csvData)) {
+        return res.status(400).json({ message: "Invalid CSV data format" });
+      }
+
+      const results = {
+        staff: [],
+        duplicates: 0,
+        errors: 0,
+        duplicateDetails: []
+      };
+
+      for (const staffData of csvData) {
+        try {
+          // Check for duplicates before creating
+          const duplicate = await storage.checkDuplicateStaff(
+            staffData.phone, 
+            staffData.email, 
+            staffData.employeeId
+          );
+          
+          if (duplicate) {
+            results.duplicates++;
+            results.duplicateDetails.push({
+              csvData: staffData,
+              existingStaff: duplicate,
+              matchType: duplicate.phone === staffData.phone ? 'phone' : 
+                        duplicate.email === staffData.email ? 'email' : 'employeeId'
+            });
+            continue;
+          }
+
+          // Create new staff member
+          const newStaff = await storage.createStaff(staffData);
+          results.staff.push(newStaff);
+          
+        } catch (error) {
+          console.error("Error creating staff from CSV:", error);
+          results.errors++;
+        }
+      }
+
+      res.json(results);
+    } catch (error) {
+      console.error("Staff CSV import error:", error);
+      res.status(500).json({ message: "Failed to import staff CSV" });
+    }
+  });
+
+  // Check staff duplicate endpoint
+  app.post("/api/staff/check-duplicate", async (req, res) => {
+    try {
+      const { phone, email, employeeId } = req.body;
+      
+      const existingStaff = await storage.checkDuplicateStaff(phone, email, employeeId);
+      
+      if (existingStaff) {
+        res.json({
+          isDuplicate: true,
+          existingStaff,
+          matchType: existingStaff.phone === phone ? 'phone' : 
+                    existingStaff.email === email ? 'email' : 'employeeId'
+        });
+      } else {
+        res.json({ isDuplicate: false });
+      }
+    } catch (error) {
+      console.error("Check staff duplicate error:", error);
+      res.status(500).json({ message: "Failed to check duplicates" });
+    }
+  });
+
+  // Get staff activity logs endpoint
+  app.get("/api/staff/:id/activity", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const staffId = parseInt(id);
+      
+      if (isNaN(staffId)) {
+        return res.status(400).json({ message: "Invalid staff ID" });
+      }
+
+      const activities = await storage.getStaffActivities(staffId);
+      res.json(activities);
+    } catch (error) {
+      console.error("Get staff activity error:", error);
+      res.status(500).json({ message: "Failed to fetch staff activities" });
+    }
+  });
+
   app.get("/api/staff/departments", async (req, res) => {
     try {
       const staff = await storage.getAllStaff();
