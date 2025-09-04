@@ -10,6 +10,13 @@ import aiComprehensiveRouter from "./api/ai-comprehensive.js";
 import { sql } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  console.log("🚀 Starting route registration...");
+  
+  // Test route to verify routes are working
+  app.get("/api/test", (req, res) => {
+    res.json({ message: "Routes are working!", timestamp: new Date().toISOString() });
+  });
+  
   // Dashboard stats
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
@@ -862,12 +869,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/e-mandates/:id", async (req, res) => {
     try {
-      const mandate = await storage.getEMandate(parseInt(req.params.id));
-      if (!mandate) return res.status(404).json({ message: "Not found" });
-      await storage.deleteEMandate(mandate.id);
-      res.json({ message: "E-Mandate deleted successfully" });
+      const { id } = req.params;
+      console.log(`API: Attempting to delete E-Mandate with ID: ${id}`);
+      
+      const mandate = await storage.getEMandate(parseInt(id));
+      if (!mandate) {
+        console.log(`API: E-Mandate ${id} not found`);
+        return res.status(404).json({ message: "E-Mandate not found" });
+      }
+      
+      console.log(`API: Found mandate:`, JSON.stringify(mandate, null, 2));
+      
+      const result = await storage.deleteEMandate(mandate.id);
+      
+      if (result) {
+        console.log(`API: E-Mandate ${id} deleted successfully`);
+        res.json({ message: "E-Mandate deleted successfully" });
+      } else {
+        console.log(`API: Failed to delete E-Mandate ${id} - storage.deleteEMandate returned false`);
+        res.status(400).json({ message: "E-Mandate could not be deleted" });
+      }
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete E-Mandate" });
+      console.error("API: Delete E-Mandate DETAILED ERROR:", error);
+      console.error("API: Error stack:", error.stack);
+      console.error("API: Error message:", error.message);
+      res.status(500).json({ 
+        message: "Failed to delete E-Mandate",
+        error: error.message,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
     }
   });
 
@@ -1189,6 +1219,157 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "EMI plan deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete EMI plan" });
+    }
+  });
+
+  // Student Management Routes
+  app.get("/api/students", async (req, res) => {
+    try {
+      const { class: className } = req.query;
+      let students = await storage.getAllStudents();
+      
+      // Apply filters
+      if (className && className !== 'all') {
+        students = students.filter(s => s.class === className);
+      }
+      
+      res.json(students);
+    } catch (error) {
+      console.error("Get students error:", error);
+      res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+
+  app.get("/api/students/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const student = await storage.getStudent(parseInt(id));
+      
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      res.json(student);
+    } catch (error) {
+      console.error("Get student by ID error:", error);
+      res.status(500).json({ message: "Failed to fetch student" });
+    }
+  });
+
+  app.post("/api/students", async (req, res) => {
+    try {
+      const studentData = req.body;
+      const student = await storage.createStudent(studentData);
+      res.status(201).json(student);
+    } catch (error: any) {
+      console.error("Create student error:", error);
+      res.status(500).json({ message: error?.message || "Failed to create student" });
+    }
+  });
+
+  app.put("/api/students/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = { ...req.body };
+      
+      console.log("PUT /api/students/:id - Received updates:", updates);
+      
+      // Convert date fields to Date objects if they are valid strings
+      const dateFields = ["dateOfJoining", "createdAt", "updatedAt"];
+      for (const field of dateFields) {
+        if (field in updates) {
+          const val = updates[field];
+          if (typeof val === "string" && !isNaN(Date.parse(val))) {
+            updates[field] = new Date(val);
+          }
+        }
+      }
+      
+      console.log("Final updates being passed to storage:", updates);
+      
+      const student = await storage.updateStudent(parseInt(id), updates);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      console.log("Returning student data:", student);
+      res.json(student);
+    } catch (error) {
+      console.error("Update student error:", error);
+      res.status(500).json({ message: "Failed to update student" });
+    }
+  });
+
+  // Student route without /api prefix to match staff pattern  
+  app.put("/students/:id", async (req, res) => {
+    console.log("=== STUDENT ROUTE HIT ===", req.params, req.body);
+    
+    // Simple test response first
+    res.json({ 
+      message: "Student route working!",
+      id: req.params.id, 
+      updates: req.body 
+    });
+    return;
+    
+    try {
+      const { id } = req.params;
+      const updates = { ...req.body };
+      
+      console.log("PUT /students/:id - Received updates:", updates);
+      
+      // Convert date fields to Date objects if they are valid strings
+      const dateFields = ["dateOfJoining", "createdAt", "updatedAt"];
+      for (const field of dateFields) {
+        if (field in updates) {
+          const val = updates[field];
+          if (typeof val === "string" && !isNaN(Date.parse(val))) {
+            updates[field] = new Date(val);
+          }
+        }
+      }
+      
+      console.log("Final updates being passed to storage:", updates);
+      
+      const student = await storage.updateStudent(parseInt(id), updates);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      console.log("Returning student data:", student);
+      res.json(student);
+    } catch (error) {
+      console.error("Update student error:", error);
+      res.status(500).json({ message: "Failed to update student" });
+    }
+  });
+
+  app.delete("/api/students/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log(`API: Attempting to delete student with ID: ${id}`);
+      const result = await storage.deleteStudent(parseInt(id));
+      console.log(`API: Delete student result: ${result}`);
+      
+      if (result) {
+        console.log(`API: Student ${id} deleted successfully`);
+        res.json({ message: "Student deleted successfully" });
+      } else {
+        console.log(`API: Failed to delete student ${id}`);
+        res.status(400).json({ message: "Student could not be deleted. It may have related data that prevents deletion." });
+      }
+    } catch (error) {
+      console.error("API: Delete student error:", error);
+      
+      // Check if error is related to active EMI obligations
+      if (error.message && error.message.includes('active EMI')) {
+        res.status(400).json({ 
+          message: error.message,
+          code: 'ACTIVE_EMI_FOUND'
+        });
+      } else {
+        res.status(500).json({ message: "Failed to delete student" });
+      }
     }
   });
 

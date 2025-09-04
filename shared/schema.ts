@@ -332,6 +332,31 @@ export const aiModelPerformance = pgTable("ai_model_performance", {
   evaluationMetrics: text("evaluation_metrics"), // JSON object with detailed metrics
 });
 
+// AI Predictions Table
+export const aiPredictions = pgTable("ai_predictions", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").references(() => students.id).notNull(),
+  predictionType: varchar("prediction_type", { length: 100 }).notNull(), // success_probability, dropout_risk, etc.
+  prediction: text("prediction").notNull(), // JSON object with prediction details
+  confidence: decimal("confidence", { precision: 5, scale: 2 }), // 0-100
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// AI Interventions Table  
+export const aiInterventions = pgTable("ai_interventions", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").references(() => students.id).notNull(),
+  predictionId: integer("prediction_id").references(() => aiPredictions.id),
+  interventionType: varchar("intervention_type", { length: 100 }).notNull(), // academic_support, financial_aid, etc.
+  priority: varchar("priority", { length: 20 }).notNull(), // immediate, high, medium, low
+  description: text("description").notNull(),
+  recommendedActions: text("recommended_actions"), // JSON array of actions
+  status: varchar("status", { length: 20 }).default("pending"), // pending, in_progress, completed, cancelled
+  assignedTo: integer("assigned_to").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Academic Performance Tracking for Enhanced AI
 export const academicRecords = pgTable("academic_records", {
   id: serial("id").primaryKey(),
@@ -433,6 +458,8 @@ export const insertRecentlyDeletedEmployeeSchema = createInsertSchema(recentlyDe
 export const insertAIConversationSchema = createInsertSchema(aiConversations).omit({ id: true, startedAt: true });
 export const insertAIMessageSchema = createInsertSchema(aiMessages).omit({ id: true, createdAt: true });
 export const insertAIModelPerformanceSchema = createInsertSchema(aiModelPerformance).omit({ id: true, lastEvaluated: true });
+export const insertAIPredictionSchema = createInsertSchema(aiPredictions).omit({ id: true, createdAt: true });
+export const insertAIInterventionSchema = createInsertSchema(aiInterventions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertAcademicRecordSchema = createInsertSchema(academicRecords).omit({ id: true, createdAt: true });
 export const insertStudentEngagementSchema = createInsertSchema(studentEngagement).omit({ id: true, createdAt: true });
 export const insertCourseSchema = createInsertSchema(courses).omit({ id: true, createdAt: true, updatedAt: true });
@@ -461,6 +488,8 @@ export type RecentlyDeletedEmployee = typeof recentlyDeletedEmployee.$inferSelec
 export type AIConversation = typeof aiConversations.$inferSelect;
 export type AIMessage = typeof aiMessages.$inferSelect;
 export type AIModelPerformance = typeof aiModelPerformance.$inferSelect;
+export type AIPrediction = typeof aiPredictions.$inferSelect;
+export type AIIntervention = typeof aiInterventions.$inferSelect;
 export type AcademicRecord = typeof academicRecords.$inferSelect;
 export type StudentEngagement = typeof studentEngagement.$inferSelect;
 export type Course = typeof courses.$inferSelect;

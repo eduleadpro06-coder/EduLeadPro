@@ -142,6 +142,7 @@ export interface IStorage {
   getStudentsByClass(className: string): Promise<Student[]>;
   createStudent(student: InsertStudent): Promise<Student>;
   updateStudent(id: number, updates: Partial<Student>): Promise<Student | undefined>;
+  deleteStudent(id: number): Promise<boolean>;
   convertLeadToStudent(leadId: number, studentData: InsertStudent): Promise<Student>;
 
   // Fee Management
@@ -1837,6 +1838,168 @@ export class DatabaseStorage implements IStorage {
     return student;
   }
 
+  async deleteStudent(id: number): Promise<boolean> {
+    try {
+      console.log(`\n=== DETAILED STUDENT DELETION DEBUG FOR ID: ${id} ===`);
+      
+      // First, get student details for debugging
+      const student = await db.select().from(schema.students).where(eq(schema.students.id, id));
+      if (student.length === 0) {
+        console.log(`Student with ID ${id} not found`);
+        throw new Error(`Student with ID ${id} not found`);
+      }
+      console.log(`Found student: ${student[0].name} (${student[0].rollNumber})`);
+      
+      // Check all EMI schedules (both active and inactive) for debugging
+      console.log(`\n--- Checking ALL EMI schedules for student ${id} ---`);
+      const allEmiSchedules = await db
+        .select()
+        .from(schema.emiSchedule)
+        .where(eq(schema.emiSchedule.studentId, id));
+      
+      console.log(`Total EMI schedules found: ${allEmiSchedules.length}`);
+      allEmiSchedules.forEach(emi => {
+        console.log(`  - EMI ${emi.id}: Status="${emi.status}", Amount=${emi.amount}, Due=${emi.dueDate}`);
+      });
+      
+      // Check specifically for active EMI schedules
+      const activeEmiSchedules = allEmiSchedules.filter(emi => 
+        emi.status === 'pending' || emi.status === 'overdue'
+      );
+      
+      if (activeEmiSchedules.length > 0) {
+        console.log(`❌ BLOCKING: Found ${activeEmiSchedules.length} active EMI schedule(s):`);
+        activeEmiSchedules.forEach(emi => {
+          console.log(`  - Active EMI ${emi.id}: Status="${emi.status}"`);
+        });
+        throw new Error(`Cannot delete student: has ${activeEmiSchedules.length} active EMI payment(s) pending`);
+      }
+      console.log(`✅ No active EMI schedules found`);
+      
+      // Check all EMI plans (both active and inactive) for debugging
+      console.log(`\n--- Checking ALL EMI plans for student ${id} ---`);
+      const allEmiPlans = await db
+        .select()
+        .from(schema.emiPlans)
+        .where(eq(schema.emiPlans.studentId, id));
+      
+      console.log(`Total EMI plans found: ${allEmiPlans.length}`);
+      allEmiPlans.forEach(plan => {
+        console.log(`  - Plan ${plan.id}: Status="${plan.status}", Total=${plan.totalAmount}, Installments=${plan.numberOfInstallments}`);
+      });
+      
+      // Check specifically for active EMI plans
+      const activeEmiPlans = allEmiPlans.filter(plan => plan.status === 'active');
+      
+      if (activeEmiPlans.length > 0) {
+        console.log(`❌ BLOCKING: Found ${activeEmiPlans.length} active EMI plan(s):`);
+        activeEmiPlans.forEach(plan => {
+          console.log(`  - Active Plan ${plan.id}: Status="${plan.status}"`);
+        });
+        throw new Error(`Cannot delete student: has ${activeEmiPlans.length} active EMI plan(s)`);
+      }
+      console.log(`✅ No active EMI plans found`);
+      
+      // Check academic records
+      console.log(`\n--- Checking academic records for student ${id} ---`);
+      const academicRecords = await db
+        .select()
+        .from(schema.academicRecords)
+        .where(eq(schema.academicRecords.studentId, id));
+      console.log(`Found ${academicRecords.length} academic record(s)`);
+      
+      // Check student engagement records
+      console.log(`\n--- Checking student engagement records for student ${id} ---`);
+      const engagementRecords = await db
+        .select()
+        .from(schema.studentEngagement)
+        .where(eq(schema.studentEngagement.studentId, id));
+      console.log(`Found ${engagementRecords.length} engagement record(s)`);
+      
+      // Check fee payments (using leadId as studentId relationship)
+      console.log(`\n--- Checking fee payments for student ${id} ---`);
+      const feePayments = await db
+        .select()
+        .from(schema.feePayments)
+        .where(eq(schema.feePayments.leadId, id));
+      console.log(`Found ${feePayments.length} fee payment(s) linked via leadId`);
+      
+      // Note: AI interventions foreign key constraint has been removed
+      // Students can now be deleted without worrying about AI records
+      console.log(`\n--- AI interventions constraint removed ---`);
+      console.log(`Students can be deleted without clearing AI records first`);
+      
+      
+      console.log(`\n--- Starting deletion process for student ${id} ---`);
+      
+      // Delete all related records in correct order
+      if (allEmiSchedules.length > 0) {
+        console.log(`Deleting ${allEmiSchedules.length} EMI schedule(s)...`);
+        await db.delete(schema.emiSchedule).where(eq(schema.emiSchedule.studentId, id));
+        console.log(`✅ EMI schedules deleted`);
+      }
+      
+      if (allEmiPlans.length > 0) {
+        console.log(`Deleting ${allEmiPlans.length} EMI plan(s)...`);
+        await db.delete(schema.emiPlans).where(eq(schema.emiPlans.studentId, id));
+        console.log(`✅ EMI plans deleted`);
+      }
+      
+      if (academicRecords.length > 0) {
+        console.log(`Deleting ${academicRecords.length} academic record(s)...`);
+        await db.delete(schema.academicRecords).where(eq(schema.academicRecords.studentId, id));
+        console.log(`✅ Academic records deleted`);
+      }
+      
+      if (engagementRecords.length > 0) {
+        console.log(`Deleting ${engagementRecords.length} engagement record(s)...`);
+        await db.delete(schema.studentEngagement).where(eq(schema.studentEngagement.studentId, id));
+        console.log(`✅ Student engagement records deleted`);
+      }
+      
+      if (feePayments.length > 0) {
+        console.log(`Deleting ${feePayments.length} fee payment(s)...`);
+        await db.delete(schema.feePayments).where(eq(schema.feePayments.leadId, id));
+        console.log(`✅ Fee payments deleted`);
+      }
+      
+      // AI interventions no longer block student deletion (constraint removed)
+      console.log(`✅ AI interventions constraint removed - no cleanup needed`);
+      
+      
+      // Now delete the student record
+      console.log(`\n--- Deleting student record ${id} ---`);
+      const result = await db.delete(schema.students).where(eq(schema.students.id, id));
+      console.log(`Delete operation completed, checking result...`);
+      
+      // Verify deletion
+      const remainingStudent = await db.select().from(schema.students).where(eq(schema.students.id, id));
+      
+      if (remainingStudent.length === 0) {
+        console.log(`✅ SUCCESS: Student ${id} (${student[0].name}) deleted successfully!`);
+        await this.notifyChange(
+          'student',
+          'Student Deleted',
+          `Student ${student[0].name} deleted successfully`,
+          'high',
+          'view_student',
+          id.toString()
+        );
+        console.log(`=== END DELETION DEBUG ===\n`);
+        return true;
+      } else {
+        console.log(`❌ FAILED: Student ${id} still exists after deletion attempt`);
+        console.log(`Remaining student:`, remainingStudent[0]);
+        console.log(`=== END DELETION DEBUG ===\n`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`❌ ERROR during student deletion:`, error);
+      console.log(`=== END DELETION DEBUG ===\n`);
+      return false;
+    }
+  }
+
   async convertLeadToStudent(leadId: number, studentData: InsertStudent): Promise<Student> {
     const student = await this.createStudent(studentData);
     await this.updateLead(leadId, { status: "enrolled" });
@@ -1940,8 +2103,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteEMandate(id: number): Promise<boolean> {
-    const result = await db.delete(schema.eMandates).where(eq(schema.eMandates.id, id));
-    return true;
+    try {
+      console.log(`🔥 deleteEMandate called with id: ${id}`);
+      
+      // Follow the same simple pattern as other working delete functions
+      const mandate = await this.getEMandate(id);
+      console.log(`🔍 getEMandate result:`, mandate ? JSON.stringify(mandate, null, 2) : 'Not found');
+      if (!mandate) {
+        console.log(`❌ Mandate ${id} not found, returning false`);
+        return false;
+      }
+      
+      console.log(`🗑️ About to execute delete for mandate ${id}...`);
+      const result = await db.delete(schema.eMandates).where(eq(schema.eMandates.id, id));
+      console.log(`✅ Delete executed, result:`, result);
+      return true;
+    } catch (error: any) {
+      console.error(`💥 deleteEMandate error for id ${id}:`, error?.message);
+      console.error(`💥 Full error:`, error);
+      return false;
+    }
   }
 
   async getEmiSchedule(id: number): Promise<EmiSchedule | undefined> {

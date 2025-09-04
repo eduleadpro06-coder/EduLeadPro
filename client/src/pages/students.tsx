@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,20 +6,44 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, CreditCard, Receipt, AlertCircle, CheckCircle, Clock, Filter, Download, User, Phone, Mail, Trash2 } from "lucide-react";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, CreditCard, Receipt, AlertCircle, CheckCircle, Clock, Filter, Download, User, Phone, Mail, Trash2, Edit } from "lucide-react";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
 import { format } from "date-fns";
-import type { Student, FeeStructure, FeePayment } from '@/types';
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import type { Student, FeeStructure, FeePayment, InsertStudent } from '../../../shared/schema';
+
+// Student form schema
+const studentSchema = z.object({
+  rollNumber: z.string().min(1, "Roll number is required"),
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  phone: z.string().min(10, "Phone number must be at least 10 digits"),
+  class: z.string().min(1, "Class is required"),
+  stream: z.string().min(1, "Stream is required"),
+  parentName: z.string().min(1, "Parent name is required"),
+  parentPhone: z.string().min(10, "Parent phone must be at least 10 digits"),
+  address: z.string().optional(),
+  dateOfBirth: z.string().optional(),
+  admissionDate: z.string().min(1, "Admission date is required"),
+  status: z.string().default("active"),
+});
 
 export default function Students() {
   const [addStudentOpen, setAddStudentOpen] = useState(false);
   const [addFeePaymentOpen, setAddFeePaymentOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [editStudentOpen, setEditStudentOpen] = useState(false);
+  const [deleteStudentOpen, setDeleteStudentOpen] = useState(false);
   const [filterClass, setFilterClass] = useState<string>("all");
   const [filterFeeStatus, setFilterFeeStatus] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -84,11 +108,110 @@ export default function Students() {
     },
   });
 
+  // Edit Student Form
+  const editStudentForm = useForm<z.infer<typeof studentSchema>>({
+    resolver: zodResolver(studentSchema),
+    defaultValues: {
+      rollNumber: '',
+      name: '',
+      email: '',
+      phone: '',
+      class: '',
+      stream: '',
+      parentName: '',
+      parentPhone: '',
+      address: '',
+      dateOfBirth: '',
+      admissionDate: '',
+      status: 'active',
+    },
+  });
+
+  // Populate edit form when editing student
+  useEffect(() => {
+    if (editStudentOpen && selectedStudent) {
+      console.log("Populating edit form with selectedStudent:", selectedStudent);
+      editStudentForm.reset({
+        rollNumber: selectedStudent.rollNumber || '',
+        name: selectedStudent.name || '',
+        email: selectedStudent.email || '',
+        phone: selectedStudent.phone || '',
+        class: selectedStudent.class || '',
+        stream: selectedStudent.stream || '',
+        parentName: selectedStudent.parentName || '',
+        parentPhone: selectedStudent.parentPhone || '',
+        address: selectedStudent.address || '',
+        dateOfBirth: selectedStudent.dateOfBirth ? selectedStudent.dateOfBirth.split('T')[0] : '',
+        admissionDate: selectedStudent.admissionDate ? selectedStudent.admissionDate.split('T')[0] : '',
+        status: selectedStudent.status || 'active',
+      });
+    }
+  }, [editStudentOpen, selectedStudent, editStudentForm]);
+
+  // Edit student mutation
+  const editStudentMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof studentSchema> & { id: number }) => {
+      const payload = {
+        ...data,
+        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth).toISOString().split('T')[0] : null,
+        admissionDate: data.admissionDate ? new Date(data.admissionDate).toISOString().split('T')[0] : null,
+      };
+      console.log("Updating student with payload:", payload);
+      const response = await apiRequest(`/api/students/${data.id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+      return response;
+    },
+    onSuccess: (updatedStudent) => {
+      console.log("Student updated successfully:", updatedStudent);
+      queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+      invalidateNotifications(queryClient);
+      setSelectedStudent(updatedStudent);
+      setEditStudentOpen(false);
+      toast({
+        title: "Student updated successfully",
+        description: `${updatedStudent.name} has been updated.`
+      });
+    },
+    onError: (error: any) => {
+      console.error("Error updating student:", error);
+      toast({ 
+        title: "Error updating student", 
+        description: error.message || "Something went wrong", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Delete student mutation
+  const deleteStudentMutation = useMutation({
+    mutationFn: async (studentId: number) => {
+      await apiRequest(`/api/students/${studentId}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+      setSelectedStudent(null);
+      setDeleteStudentOpen(false);
+      toast({
+        title: "Student deleted successfully",
+        description: "The student has been removed from the system."
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error deleting student", 
+        description: error.message || "Failed to delete student", 
+        variant: "destructive" 
+      });
+    },
+  });
+
   const handleAddStudent = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const data = {
-      studentId: formData.get("studentId"),
+      rollNumber: formData.get("rollNumber") || formData.get("studentId"), // Support both field names
       name: formData.get("name"),
       email: formData.get("email"),
       phone: formData.get("phone"),
@@ -142,6 +265,9 @@ export default function Students() {
   const filteredStudents = students.filter((student: Student) => 
     (filterClass === "all" || student.class === filterClass)
   );
+
+  // Debug logging - remove in production
+  console.log("Students count:", students.length);
 
   const getStudentFeeStructure = (studentId: number) => {
     return feeStructures.filter((fee: FeeStructure) => fee.studentId === studentId);
@@ -346,7 +472,7 @@ export default function Students() {
                       <div>
                         <CardTitle className="text-lg text-white">{student.name}</CardTitle>
                         <CardDescription className="text-sm text-white">
-                          {student.studentId} • {student.class} {student.stream}
+                          {student.rollNumber} • {student.class} {student.stream}
                         </CardDescription>
                       </div>
                       {hasOverdue && (
@@ -380,6 +506,30 @@ export default function Students() {
                       </div>
                     </div>
                     <div className="flex gap-2 mt-4">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="bg-black text-white border-white"
+                        onClick={() => {
+                          setSelectedStudent(student);
+                          setEditStudentOpen(true);
+                        }}
+                      >
+                        <Edit className="mr-1 h-3 w-3 text-white" />
+                        Edit
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="bg-black text-white border-white hover:bg-red-600 hover:border-red-600"
+                        onClick={() => {
+                          setSelectedStudent(student);
+                          setDeleteStudentOpen(true);
+                        }}
+                      >
+                        <Trash2 className="mr-1 h-3 w-3 text-white" />
+                        Delete
+                      </Button>
                       <Button 
                         size="sm" 
                         variant="outline"
@@ -556,6 +706,195 @@ export default function Students() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Student Dialog */}
+      {selectedStudent && (
+        <Dialog open={editStudentOpen} onOpenChange={setEditStudentOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Student</DialogTitle>
+              <DialogDescription>Edit the details for this student below</DialogDescription>
+            </DialogHeader>
+            <Form {...editStudentForm}>
+              <form onSubmit={editStudentForm.handleSubmit((data) => {
+                if (!selectedStudent) return;
+                const payload = { ...data, id: selectedStudent.id };
+                editStudentMutation.mutate(payload);
+              })} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <FormField control={editStudentForm.control} name="rollNumber" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Roll Number</FormLabel>
+                        <FormControl><Input {...field} required placeholder="e.g. 2024001" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    
+                    <FormField control={editStudentForm.control} name="name" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl><Input {...field} required placeholder="e.g. John Doe" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    
+                    <FormField control={editStudentForm.control} name="email" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl><Input {...field} type="email" placeholder="e.g. john.doe@example.com" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    
+                    <FormField control={editStudentForm.control} name="phone" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone</FormLabel>
+                        <FormControl><Input {...field} required placeholder="1234567890" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    
+                    <FormField control={editStudentForm.control} name="class" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Class</FormLabel>
+                        <FormControl><Input {...field} required placeholder="e.g. 10" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    
+                    <FormField control={editStudentForm.control} name="stream" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Stream</FormLabel>
+                        <FormControl><Input {...field} required placeholder="e.g. Science" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <FormField control={editStudentForm.control} name="parentName" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Parent Name</FormLabel>
+                        <FormControl><Input {...field} required placeholder="e.g. Jane Doe" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    
+                    <FormField control={editStudentForm.control} name="parentPhone" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Parent Phone</FormLabel>
+                        <FormControl><Input {...field} required placeholder="1234567890" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    
+                    <FormField control={editStudentForm.control} name="address" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Address</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            {...field} 
+                            placeholder="Enter student address"
+                            rows={3}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    
+                    <FormField control={editStudentForm.control} name="dateOfBirth" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date of Birth</FormLabel>
+                        <FormControl><Input {...field} type="date" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    
+                    <FormField control={editStudentForm.control} name="admissionDate" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Admission Date</FormLabel>
+                        <FormControl><Input {...field} type="date" required /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    
+                    <FormField control={editStudentForm.control} name="status" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="graduated">Graduated</SelectItem>
+                            <SelectItem value="dropped_out">Dropped Out</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => {
+                      setEditStudentOpen(false);
+                      setSelectedStudent(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={editStudentMutation.isPending}
+                    className="bg-[#643ae5] hover:bg-[#5832c4] text-white"
+                  >
+                    {editStudentMutation.isPending ? "Updating..." : "Update Student"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Delete Student AlertDialog */}
+      {selectedStudent && (
+        <AlertDialog open={deleteStudentOpen} onOpenChange={setDeleteStudentOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Student</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete <strong>{selectedStudent.name}</strong>? This action cannot be undone and will permanently remove the student from the system.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel 
+                onClick={() => {
+                  setDeleteStudentOpen(false);
+                  setSelectedStudent(null);
+                }}
+              >
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => selectedStudent && deleteStudentMutation.mutate(selectedStudent.id)}
+                disabled={deleteStudentMutation.isPending}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deleteStudentMutation.isPending ? "Deleting..." : "Delete Student"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

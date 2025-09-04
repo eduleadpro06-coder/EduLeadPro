@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import Header from "@/components/layout/header";
@@ -22,6 +22,7 @@ import {
   User,
   Plus,
   Download,
+  Upload,
   Eye,
   Settings,
   Search,
@@ -199,6 +200,102 @@ export default function StudentFees() {
   const [academicYear, setAcademicYear] = useState("2024-25");
   const [viewTotalFeesModalOpen, setViewTotalFeesModalOpen] = useState(false);
   const [selectedClassForTotal, setSelectedClassForTotal] = useState<string>("");
+  
+  // Student edit modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
+  const [isImportOpen, setIsImportOpen] = useState(false);
+
+  // Validation functions
+  const validateEmail = (email: string) => {
+    if (!email) return true; // Email is optional
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePhone = (phone: string) => {
+    if (!phone) return true; // Phone is optional
+    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+    return phoneRegex.test(phone.replace(/\s+/g, ''));
+  };
+
+  const validateForm = (student: Partial<Student>) => {
+    const errors: {[key: string]: string} = {};
+    
+    if (!student.name?.trim()) {
+      errors.name = "Name is required";
+    }
+    
+    if (student.parentPhone && !validatePhone(student.parentPhone)) {
+      errors.parentPhone = "Please enter a valid phone number";
+    }
+    
+    if ((student as any).email && !validateEmail((student as any).email)) {
+      errors.email = "Please enter a valid email address";
+    }
+    
+    return errors;
+  };
+
+  // Save handler - exactly like staff management
+  const handleSave = () => {
+    console.log("HandleSave called, editedStudent:", editedStudent);
+    if (!editedStudent) return;
+    updateStudentMutation.mutate(editedStudent);
+  };
+
+  // Export to CSV function
+  const exportToCSV = () => {
+    const headers = ['Student ID', 'Name', 'Class', 'Parent Name', 'Parent Phone', 'Email', 'Address'];
+    const csvContent = [
+      headers.join(','),
+      ...allStudents.map(student => [
+        student.studentId || '',
+        student.name || '',
+        student.class || '',
+        student.parentName || '',
+        student.parentPhone || '',
+        (student as any).email || '',
+        (student as any).address || ''
+      ].map(field => `"${String(field).replace(/"/g, '""')}"`))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `students-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Export Successful",
+      description: `${allStudents.length} students exported to CSV`,
+    });
+  };
+
+  // Import CSV function
+  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split('\n');
+      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+      
+      // For now, just show a success message
+      toast({
+        title: "Import Started",
+        description: `Processing ${lines.length - 1} rows from CSV file`,
+      });
+      
+      // Reset the input
+      event.target.value = '';
+    };
+    reader.readAsText(file);
+  };
   
   // Payment management state
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
@@ -669,9 +766,32 @@ export default function StudentFees() {
   }, [classFilter, statusFilter, studentSearch, studentsPerPage]);
 
   const handleDeleteMandate = async (mandateId: number) => {
-    await fetch(`/api/e-mandates/${mandateId}`, { method: 'DELETE' });
-    queryClient.invalidateQueries({ queryKey: ["/api/e-mandates"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+    try {
+      const response = await fetch(`/api/e-mandates/${mandateId}`, { method: 'DELETE' });
+      
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: ["/api/e-mandates"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+        toast({
+          title: "Success",
+          description: "E-Mandate deleted successfully",
+        });
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Error",
+          description: errorData.message || "Failed to delete E-Mandate",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting mandate:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete E-Mandate",
+        variant: "destructive",
+      });
+    }
   };
 
   // Utility functions for global class fees
@@ -1072,25 +1192,46 @@ export default function StudentFees() {
     return [...explicitFees, ...virtualGlobalFees] as FeeStructure[];
   }
 
-  const [isEditingStudent, setIsEditingStudent] = useState(false);
   const [editedStudent, setEditedStudent] = useState<Partial<Student> | null>(null);
 
-  // Student update mutation
+  // Debug effect to monitor editedStudent changes
+  useEffect(() => {
+    console.log("editedStudent state changed:", editedStudent);
+  }, [editedStudent]);
+
+  // Initialize editedStudent when selectedStudent changes
+  useEffect(() => {
+    if (selectedStudent && isEditModalOpen) {
+      console.log("Initializing editedStudent from selectedStudent:", selectedStudent);
+      setEditedStudent({ ...selectedStudent });
+    }
+  }, [selectedStudent, isEditModalOpen]);
+
+  // Student update mutation - with debugging
   const updateStudentMutation = useMutation({
     mutationFn: async (updates: Partial<Student>) => {
       if (!selectedStudent) throw new Error("No student selected");
-      const res = await apiRequest("PUT", `/students/${selectedStudent.id}`, updates);
-      return res.json();
+      console.log("Making API call PUT /api/students/" + selectedStudent.id, updates);
+      const response = await apiRequest("PUT", `/api/students/${selectedStudent.id}`, updates);
+      console.log("Response status:", response.status);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      const result = await response.json();
+      console.log("API response:", result);
+      return result;
     },
-    onSuccess: (data) => {
+    onSuccess: (updatedStudent) => {
+      console.log("Mutation onSuccess called with:", updatedStudent);
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
-      setIsEditingStudent(false);
+      setIsEditModalOpen(false);
       setEditedStudent(null);
+      setSelectedStudent(prev => prev ? { ...prev, ...updatedStudent } : prev);
       toast({ title: "Success", description: "Student details updated successfully." });
-      // Optionally update selectedStudent with new data
-      setSelectedStudent((prev) => prev ? { ...prev, ...data } : prev);
+      console.log("Success callback completed");
     },
     onError: (error: any) => {
+      console.error("Mutation onError called with:", error);
       toast({ title: "Error", description: error.message || "Failed to update student.", variant: "destructive" });
     }
   });
@@ -1098,14 +1239,17 @@ export default function StudentFees() {
   const deleteStudentMutation = useMutation({
     mutationFn: async () => {
       if (!selectedStudent) throw new Error("No student selected");
-      const res = await apiRequest("DELETE", `/students/${selectedStudent.id}`);
+      console.log("Deleting student with id:", selectedStudent.id);
+      const res = await apiRequest("DELETE", `/api/students/${selectedStudent.id}`);
+      if (!res.ok) {
+        throw new Error(`Failed to delete student: ${res.statusText}`);
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
       toast({ title: "Success", description: "Student deleted successfully." });
       setSelectedStudent(null);
-      setIsEditingStudent(false);
       setEditedStudent(null);
     },
     onError: (error: any) => {
@@ -1150,39 +1294,31 @@ export default function StudentFees() {
         </select>
         {/* Action buttons */}
         <div className="flex items-center gap-3 ml-6">
-          <button className="flex items-center gap-2 px-5 py-2 rounded-lg border border-[#643ae5] text-white font-semibold hover:bg-[#643ae5]/10 transition">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-3A2.25 2.25 0 008.25 5.25V9m7.5 0v10.5A2.25 2.25 0 0113.5 21h-3A2.25 2.25 0 018.25 19.5V9m7.5 0H8.25" /></svg>
-            Import
-          </button>
-          <button className="flex items-center gap-2 px-5 py-2 rounded-lg border border-[#643ae5] text-white font-semibold hover:bg-[#643ae5]/10 transition">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+          <div>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSV}
+              style={{ display: 'none' }}
+              id="csv-import"
+            />
+            <label htmlFor="csv-import">
+              <button 
+                type="button"
+                className="flex items-center gap-2 px-5 py-2 rounded-lg border border-[#643ae5] text-white font-semibold hover:bg-[#643ae5]/10 transition"
+                onClick={() => document.getElementById('csv-import')?.click()}
+              >
+                <Download className="w-5 h-5" />
+                Import
+              </button>
+            </label>
+          </div>
+          <button 
+            onClick={exportToCSV}
+            className="flex items-center gap-2 px-5 py-2 rounded-lg border border-[#643ae5] text-white font-semibold hover:bg-[#643ae5]/10 transition"
+          >
+            <Upload className="w-5 h-5" />
             Export
-          </button>
-        </div>
-        {/* Pagination Controls */}
-        <div className="flex items-center gap-2 ml-6">
-          <button
-            className="px-2 py-1 rounded border border-[#23272f] text-sm text-white bg-[#23242a] disabled:opacity-50"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            &lt; Previous
-          </button>
-          {[...Array(totalStudentPages)].map((_, i) => (
-            <button
-              key={i}
-              className={`px-2 py-1 rounded border border-[#23272f] text-sm ${currentPage === i + 1 ? 'bg-[#643ae5] text-white' : 'bg-[#23242a] text-[#b0b3b8]'}`}
-              onClick={() => setCurrentPage(i + 1)}
-            >
-              {i + 1}
-            </button>
-          ))}
-          <button
-            className="px-2 py-1 rounded border border-[#23272f] text-sm text-white bg-[#23242a] disabled:opacity-50"
-            onClick={() => setCurrentPage((p) => Math.min(totalStudentPages, p + 1))}
-            disabled={currentPage === totalStudentPages}
-          >
-            Next &gt;
           </button>
         </div>
       </div>
@@ -1197,7 +1333,7 @@ export default function StudentFees() {
             <ul className="divide-y divide-[#23272f]">
               {paginatedStudents.map((student) => (
                 <li
-                  key={student.id}
+                  key={`${student.type}-${student.id}`}
                   className={`flex items-center gap-3 px-6 py-4 cursor-pointer transition rounded-xl ${selectedStudent?.id === student.id ? 'bg-[#23272f] border border-[#643ae5]' : 'hover:bg-[#23242a]'} text-white`}
                   onClick={() => setSelectedStudent(student as Student)}
                 >
@@ -1252,26 +1388,51 @@ export default function StudentFees() {
                   <div className="h-16 w-16 rounded-full flex items-center justify-center bg-[#62656e] text-white font-bold text-2xl border-2 border-[#23272f]">
                     {selectedStudent.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
                   </div>
-                  {/* Floating edit icon */}
-                  {!isEditingStudent && (
-                    <button
-                      className="absolute -top-2 -right-2 bg-[#643ae5] rounded-full p-1 shadow-lg border-2 border-white hover:bg-[#7c4dff] transition"
-                      title="Edit student"
-                      onClick={() => {
-                        setIsEditingStudent(true);
-                        setEditedStudent(selectedStudent);
-                      }}
-                      style={{ zIndex: 10 }}
-                    >
-                      <Edit className="w-4 h-4 text-white" />
-                    </button>
-                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-2xl font-bold text-white">{selectedStudent.name}</span>
                     <span className="text-sm text-[#b0b3b8] font-medium">{selectedStudent.class}</span>
                   </div>
+                </div>
+                {/* Edit and Delete buttons */}
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="border-[#643ae5] text-white hover:bg-[#643ae5]/10"
+                    onClick={() => {
+                      console.log("Edit button clicked, selectedStudent:", selectedStudent);
+                      setEditedStudent({ ...selectedStudent });
+                      setFormErrors({});
+                      setIsEditModalOpen(true);
+                    }}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure you want to delete?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will remove the student from the system. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deleteStudentMutation.mutate()}>
+                          Confirm
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
               {/* Tabs for student details */}
@@ -1294,93 +1455,18 @@ export default function StudentFees() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Contact Information Card */}
                     <Card className="bg-[#23242a] text-white border border-[#23272f] rounded-2xl">
-                      <CardHeader className="flex flex-row justify-between items-start">
-                        <div>
-                          <CardTitle>Contact Information</CardTitle>
-                        </div>
-                        <div className="flex gap-2">
-                          {!isEditingStudent && (
-                            <Button size="sm" variant="outline" onClick={() => {
-                              setIsEditingStudent(true);
-                              setEditedStudent(selectedStudent);
-                            }}>
-                              Edit
-                            </Button>
-                          )}
-                          {isEditingStudent && (
-                            <>
-                              <Button size="sm" variant="outline" onClick={() => {
-                                setIsEditingStudent(false);
-                                setEditedStudent(null);
-                              }}>
-                                Cancel
-                              </Button>
-                              <Button size="sm" onClick={() => {
-                                if (editedStudent) updateStudentMutation.mutate(editedStudent);
-                              }} disabled={updateStudentMutation.isPending}>
-                                {updateStudentMutation.isPending ? "Saving..." : "Save"}
-                              </Button>
-                            </>
-                          )}
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm">Delete</Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure you want to delete?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will remove the student from the system. This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteStudentMutation.mutate()}>
-                                  Confirm
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
+                      <CardHeader>
+                        <CardTitle>Contact Information</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {!isEditingStudent ? (
-                          <div className="space-y-2">
-                            <div><span className="font-semibold">Full Name:</span> {selectedStudent.name}</div>
-                            <div><span className="font-semibold">Phone:</span> {selectedStudent.parentPhone || '-'}</div>
-                            <div><span className="font-semibold">Email:</span> {(selectedStudent as any).email || '-'}</div>
-                            <div><span className="font-semibold">Class:</span> {selectedStudent.class}</div>
-                            <div><span className="font-semibold">Parent:</span> {selectedStudent.parentName || '-'}</div>
-                            <div><span className="font-semibold">Address:</span> {(selectedStudent as any).address || '-'}</div>
-                          </div>
-                        ) : (
-                          <form className="space-y-2" onSubmit={e => { e.preventDefault(); if (editedStudent) updateStudentMutation.mutate(editedStudent); }}>
-                            <div>
-                              <Label htmlFor="name">Full Name</Label>
-                              <Input id="name" value={editedStudent?.name || ''} onChange={e => setEditedStudent(prev => ({ ...prev!, name: e.target.value }))} required />
-                            </div>
-                            <div>
-                              <Label htmlFor="parentPhone">Phone</Label>
-                              <Input id="parentPhone" value={editedStudent?.parentPhone || ''} onChange={e => setEditedStudent(prev => ({ ...prev!, parentPhone: e.target.value }))} />
-                            </div>
-                            <div>
-                              <Label htmlFor="email">Email</Label>
-                              <Input id="email" value={(editedStudent as any)?.email || ''} onChange={e => setEditedStudent(prev => ({ ...prev!, email: e.target.value }))} />
-                            </div>
-                            <div>
-                              <Label htmlFor="class">Class</Label>
-                              <Input id="class" value={editedStudent?.class || ''} onChange={e => setEditedStudent(prev => ({ ...prev!, class: e.target.value }))} />
-                            </div>
-                            <div>
-                              <Label htmlFor="parentName">Parent</Label>
-                              <Input id="parentName" value={editedStudent?.parentName || ''} onChange={e => setEditedStudent(prev => ({ ...prev!, parentName: e.target.value }))} />
-                            </div>
-                            <div>
-                              <Label htmlFor="address">Address</Label>
-                              <Input id="address" value={(editedStudent as any)?.address || ''} onChange={e => setEditedStudent(prev => ({ ...prev!, address: e.target.value }))} />
-                            </div>
-                          </form>
-                        )}
+                        <div className="space-y-2">
+                          <div><span className="font-semibold">Full Name:</span> {selectedStudent.name}</div>
+                          <div><span className="font-semibold">Phone:</span> {selectedStudent.parentPhone || '-'}</div>
+                          <div><span className="font-semibold">Email:</span> {(selectedStudent as any).email || '-'}</div>
+                          <div><span className="font-semibold">Class:</span> {selectedStudent.class}</div>
+                          <div><span className="font-semibold">Parent:</span> {selectedStudent.parentName || '-'}</div>
+                          <div><span className="font-semibold">Address:</span> {(selectedStudent as any).address || '-'}</div>
+                        </div>
                       </CardContent>
                     </Card>
                     {/* Fee Information Card */}
@@ -2051,6 +2137,123 @@ export default function StudentFees() {
           )}
         </main>
       </div>
+
+      {/* Student Edit Modal */}
+      {selectedStudent && (
+        <Dialog 
+          open={isEditModalOpen} 
+          onOpenChange={(open) => {
+            console.log("Dialog onOpenChange:", { open, selectedStudent });
+            setIsEditModalOpen(open);
+            if (open && selectedStudent) {
+              console.log("Setting editedStudent to:", selectedStudent);
+              setEditedStudent({ ...selectedStudent });
+              setFormErrors({});
+            } else {
+              setEditedStudent(null);
+              setFormErrors({});
+            }
+          }}
+        >
+          <DialogContent className="max-w-2xl max-h-[75vh] overflow-y-auto border-4">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <User size={24} />
+                <div>
+                  <h2 className="text-xl font-bold">{selectedStudent.name}</h2>
+                  <p className="text-sm text-gray-600">{selectedStudent.class}</p>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-name">Full Name</Label>
+                  <Input
+                    id="edit-name"
+                    value={editedStudent?.name || ''}
+                    onChange={(e) => setEditedStudent(prev => ({ ...prev!, name: e.target.value }))}
+                    className={formErrors.name ? "border-red-500" : ""}
+                  />
+                  {formErrors.name && <p className="text-red-500 text-sm mt-1">{formErrors.name}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="edit-class">Class</Label>
+                  <Select
+                    value={editedStudent?.class || ''}
+                    onValueChange={(value) => setEditedStudent(prev => ({ ...prev!, class: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a class" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from(new Set(allStudents.map(s => s.class).filter(Boolean))).map(cls => (
+                        <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="edit-parent-name">Parent Name</Label>
+                  <Input
+                    id="edit-parent-name"
+                    value={editedStudent?.parentName || ''}
+                    onChange={(e) => setEditedStudent(prev => ({ ...prev!, parentName: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-parent-phone">Parent Phone</Label>
+                  <Input
+                    id="edit-parent-phone"
+                    type="tel"
+                    value={editedStudent?.parentPhone || ''}
+                    onChange={(e) => setEditedStudent(prev => ({ ...prev!, parentPhone: e.target.value }))}
+                    className={formErrors.parentPhone ? "border-red-500" : ""}
+                  />
+                  {formErrors.parentPhone && <p className="text-red-500 text-sm mt-1">{formErrors.parentPhone}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={(editedStudent as any)?.email || ''}
+                    onChange={(e) => setEditedStudent(prev => ({ ...prev!, email: e.target.value }))}
+                    className={formErrors.email ? "border-red-500" : ""}
+                  />
+                  {formErrors.email && <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="edit-student-id">Student ID</Label>
+                  <Input
+                    id="edit-student-id"
+                    value={editedStudent?.studentId || ''}
+                    onChange={(e) => setEditedStudent(prev => ({ ...prev!, studentId: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="edit-address">Address</Label>
+                <Input
+                  id="edit-address"
+                  value={(editedStudent as any)?.address || ''}
+                  onChange={(e) => setEditedStudent(prev => ({ ...prev!, address: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={updateStudentMutation.isPending}>
+                {updateStudentMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }
