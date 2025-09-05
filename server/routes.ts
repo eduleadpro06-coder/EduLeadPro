@@ -1348,6 +1348,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       console.log(`API: Attempting to delete student with ID: ${id}`);
+      
+      
       const result = await storage.deleteStudent(parseInt(id));
       console.log(`API: Delete student result: ${result}`);
       
@@ -1360,14 +1362,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("API: Delete student error:", error);
+      console.error("API: Error type:", typeof error);
+      console.error("API: Error code:", error.code);
+      console.error("API: Error details:", error.details);
+      console.error("API: Error keys:", Object.keys(error));
       
-      // Check if error is related to active EMI obligations
-      if (error.message && error.message.includes('active EMI')) {
+      // Check if error is related to active financial obligations
+      if (error.code === 'ACTIVE_FINANCIAL_OBLIGATIONS') {
+        console.log("API: 🎯 Detected ACTIVE_FINANCIAL_OBLIGATIONS error, sending structured response");
+        const response = { 
+          message: error.message,
+          code: 'ACTIVE_FINANCIAL_OBLIGATIONS',
+          details: error.details || {},
+          cannotDelete: true
+        };
+        console.log("API: 📤 Sending response:", JSON.stringify(response, null, 2));
+        res.status(400).json(response);
+      } else if (error.message && error.message.includes('active EMI')) {
+        console.log("API: 🎯 Detected legacy EMI error format");
+        // Fallback for old error format
         res.status(400).json({ 
           message: error.message,
-          code: 'ACTIVE_EMI_FOUND'
+          code: 'ACTIVE_EMI_FOUND',
+          cannotDelete: true
         });
       } else {
+        console.log("API: ❌ Unhandled error, sending generic 500 response");
         res.status(500).json({ message: "Failed to delete student" });
       }
     }

@@ -1866,15 +1866,14 @@ export class DatabaseStorage implements IStorage {
       const activeEmiSchedules = allEmiSchedules.filter(emi => 
         emi.status === 'pending' || emi.status === 'overdue'
       );
-      
-      if (activeEmiSchedules.length > 0) {
-        console.log(`❌ BLOCKING: Found ${activeEmiSchedules.length} active EMI schedule(s):`);
-        activeEmiSchedules.forEach(emi => {
-          console.log(`  - Active EMI ${emi.id}: Status="${emi.status}"`);
-        });
-        throw new Error(`Cannot delete student: has ${activeEmiSchedules.length} active EMI payment(s) pending`);
-      }
-      console.log(`✅ No active EMI schedules found`);
+      console.log(`🎯 ACTIVE EMI SCHEDULES FILTER:`);
+      console.log(`  - Total schedules: ${allEmiSchedules.length}`);
+      console.log(`  - Filtered to active: ${activeEmiSchedules.length}`);
+      console.log(`  - Filter criteria: status === 'pending' OR status === 'overdue'`);
+      allEmiSchedules.forEach(emi => {
+        const isActive = emi.status === 'pending' || emi.status === 'overdue';
+        console.log(`    * Schedule ${emi.id}: status="${emi.status}" → ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
+      });
       
       // Check all EMI plans (both active and inactive) for debugging
       console.log(`\n--- Checking ALL EMI plans for student ${id} ---`);
@@ -1890,15 +1889,161 @@ export class DatabaseStorage implements IStorage {
       
       // Check specifically for active EMI plans
       const activeEmiPlans = allEmiPlans.filter(plan => plan.status === 'active');
+      console.log(`🎯 ACTIVE EMI PLANS FILTER:`);
+      console.log(`  - Total plans: ${allEmiPlans.length}`);
+      console.log(`  - Filtered to active: ${activeEmiPlans.length}`);
+      console.log(`  - Filter criteria: status === 'active'`);
+      allEmiPlans.forEach(plan => {
+        const isActive = plan.status === 'active';
+        console.log(`    * Plan ${plan.id}: status="${plan.status}" → ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
+      });
       
-      if (activeEmiPlans.length > 0) {
-        console.log(`❌ BLOCKING: Found ${activeEmiPlans.length} active EMI plan(s):`);
-        activeEmiPlans.forEach(plan => {
-          console.log(`  - Active Plan ${plan.id}: Status="${plan.status}"`);
+      // Check for pending regular fee payments
+      console.log(`\n--- Checking pending fee payments for student ${id} ---`);
+      const pendingFeePayments = await db
+        .select()
+        .from(schema.feePayments)
+        .where(
+          and(
+            eq(schema.feePayments.leadId, id),
+            eq(schema.feePayments.status, 'pending')
+          )
+        );
+      
+      console.log(`Found ${pendingFeePayments.length} pending fee payment(s)`);
+      pendingFeePayments.forEach(payment => {
+        console.log(`  - Payment ${payment.id}: ₹${payment.amount} (${payment.paymentMode}) - ${payment.status}`);
+      });
+      
+      console.log(`🎯 FEE PAYMENTS QUERY DEBUG:`);
+      console.log(`  - Query: SELECT * FROM fee_payments WHERE lead_id = ${id} AND status = 'pending'`);
+      console.log(`  - Total pending payments found: ${pendingFeePayments.length}`);
+      
+      // Check for active mandates
+      console.log(`\n--- Checking active mandates for student ${id} ---`);
+      const activeMandates = await db
+        .select()
+        .from(schema.eMandates)
+        .where(
+          and(
+            eq(schema.eMandates.leadId, id),
+            eq(schema.eMandates.status, 'active')
+          )
+        );
+      
+      console.log(`Found ${activeMandates.length} active mandate(s)`);
+      activeMandates.forEach(mandate => {
+        console.log(`  - Mandate ${mandate.id}: ${mandate.mandateId} - Max Amount: ₹${mandate.maxAmount} (${mandate.status})`);
+      });
+      
+      console.log(`🎯 E-MANDATES QUERY DEBUG:`);
+      console.log(`  - Query: SELECT * FROM e_mandates WHERE lead_id = ${id} AND status = 'active'`);
+      console.log(`  - Total active mandates found: ${activeMandates.length}`);
+      
+      // If there are blocking records, prepare detailed information
+      console.log(`\n🔍 FINANCIAL OBLIGATION SUMMARY:`);
+      console.log(`  - Active EMI Schedules: ${activeEmiSchedules.length}`);
+      console.log(`  - Active EMI Plans: ${activeEmiPlans.length}`);
+      console.log(`  - Pending Fee Payments: ${pendingFeePayments.length}`);
+      console.log(`  - Active Mandates: ${activeMandates.length}`);
+      
+      const hasBlockingRecords = activeEmiSchedules.length > 0 || activeEmiPlans.length > 0 || pendingFeePayments.length > 0 || activeMandates.length > 0;
+      console.log(`  - TOTAL BLOCKING RECORDS: ${hasBlockingRecords ? 'YES' : 'NO'}`);
+      
+      if (hasBlockingRecords) {
+        console.log(`❌ BLOCKING: Student deletion prevented by active financial records`);
+        console.log(`🎯 ABOUT TO THROW ACTIVE_FINANCIAL_OBLIGATIONS ERROR`);
+        
+        const blockingReasons = [];
+        const blockingDetails = {
+          activePayments: [],
+          activePlans: [],
+          pendingFeePayments: [],
+          activeMandates: [],
+          totalOutstanding: 0
+        };
+        
+        if (activeEmiSchedules.length > 0) {
+          console.log(`  - ${activeEmiSchedules.length} active EMI payment(s):`);
+          activeEmiSchedules.forEach(emi => {
+            console.log(`    EMI ${emi.id}: ₹${emi.amount} due ${emi.dueDate} (${emi.status})`);
+            blockingDetails.activePayments.push({
+              id: emi.id,
+              amount: parseFloat(emi.amount),
+              dueDate: emi.dueDate,
+              status: emi.status,
+              installmentNumber: emi.installmentNumber
+            });
+            blockingDetails.totalOutstanding += parseFloat(emi.amount);
+          });
+          blockingReasons.push(`${activeEmiSchedules.length} pending EMI payment${activeEmiSchedules.length > 1 ? 's' : ''}`);
+        }
+        
+        if (activeEmiPlans.length > 0) {
+          console.log(`  - ${activeEmiPlans.length} active EMI plan(s):`);
+          activeEmiPlans.forEach(plan => {
+            console.log(`    Plan ${plan.id}: ₹${plan.totalAmount} (${plan.numberOfInstallments} installments)`);
+            blockingDetails.activePlans.push({
+              id: plan.id,
+              totalAmount: parseFloat(plan.totalAmount),
+              installmentAmount: parseFloat(plan.installmentAmount),
+              numberOfInstallments: plan.numberOfInstallments,
+              startDate: plan.startDate,
+              endDate: plan.endDate
+            });
+          });
+          blockingReasons.push(`${activeEmiPlans.length} active EMI plan${activeEmiPlans.length > 1 ? 's' : ''}`);
+        }
+        
+        if (pendingFeePayments.length > 0) {
+          console.log(`  - ${pendingFeePayments.length} pending fee payment(s):`);
+          pendingFeePayments.forEach(payment => {
+            console.log(`    Payment ${payment.id}: ₹${payment.amount} (${payment.paymentMode})`);
+            blockingDetails.pendingFeePayments.push({
+              id: payment.id,
+              amount: parseFloat(payment.amount),
+              paymentMode: payment.paymentMode,
+              paymentDate: payment.paymentDate,
+              receiptNumber: payment.receiptNumber,
+              installmentNumber: payment.installmentNumber
+            });
+            blockingDetails.totalOutstanding += parseFloat(payment.amount);
+          });
+          blockingReasons.push(`${pendingFeePayments.length} pending fee payment${pendingFeePayments.length > 1 ? 's' : ''}`);
+        }
+        
+        if (activeMandates.length > 0) {
+          console.log(`  - ${activeMandates.length} active mandate(s):`);
+          activeMandates.forEach(mandate => {
+            console.log(`    Mandate ${mandate.id}: ${mandate.mandateId} (Max: ₹${mandate.maxAmount})`);
+            blockingDetails.activeMandates.push({
+              id: mandate.id,
+              mandateId: mandate.mandateId,
+              maxAmount: parseFloat(mandate.maxAmount),
+              bankAccount: mandate.bankAccount,
+              bankName: mandate.bankName,
+              startDate: mandate.startDate,
+              endDate: mandate.endDate
+            });
+          });
+          blockingReasons.push(`${activeMandates.length} active mandate${activeMandates.length > 1 ? 's' : ''}`);
+        }
+        
+        const errorMessage = `Cannot delete student: ${blockingReasons.join(' and ')}`;
+        const error: any = new Error(errorMessage);
+        error.code = 'ACTIVE_FINANCIAL_OBLIGATIONS';
+        error.details = blockingDetails;
+        console.log(`🎯 THROWING ERROR:`, {
+          message: errorMessage,
+          code: error.code,
+          detailsKeys: Object.keys(blockingDetails),
+          hasDetails: !!blockingDetails
         });
-        throw new Error(`Cannot delete student: has ${activeEmiPlans.length} active EMI plan(s)`);
+        throw error;
       }
-      console.log(`✅ No active EMI plans found`);
+      
+      console.log(`✅ No active EMI schedules or plans found - proceeding with deletion`);
+      console.log(`🎯 CONTINUING TO DELETION LOGIC (no financial blocking records found)`);
       
       // Check academic records
       console.log(`\n--- Checking academic records for student ${id} ---`);
@@ -1996,6 +2141,14 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`❌ ERROR during student deletion:`, error);
       console.log(`=== END DELETION DEBUG ===\n`);
+      
+      // Re-throw financial obligation errors so they can be handled properly by the API
+      if (error.code === 'ACTIVE_FINANCIAL_OBLIGATIONS') {
+        console.log(`🎯 RE-THROWING FINANCIAL OBLIGATIONS ERROR to API route`);
+        throw error;
+      }
+      
+      // Only return false for unexpected errors
       return false;
     }
   }
@@ -2113,6 +2266,12 @@ export class DatabaseStorage implements IStorage {
         console.log(`❌ Mandate ${id} not found, returning false`);
         return false;
       }
+      
+      // First, delete all EMI schedule records that reference this mandate
+      console.log(`🧹 Deleting EMI schedule records for mandate ${id}...`);
+      const emiScheduleDeleteResult = await db.delete(schema.emiSchedule)
+        .where(eq(schema.emiSchedule.eMandateId, id));
+      console.log(`🧹 EMI schedule delete result:`, emiScheduleDeleteResult);
       
       console.log(`🗑️ About to execute delete for mandate ${id}...`);
       const result = await db.delete(schema.eMandates).where(eq(schema.eMandates.id, id));

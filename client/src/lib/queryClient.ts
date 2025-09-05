@@ -30,29 +30,53 @@ export async function apiRequest(
   });
 
   if (!res.ok) {
-    // Clone the response before reading it to avoid "body stream already read" error
-    const clonedRes = res.clone();
+    console.log("🔍 Response not ok, status:", res.status);
+    
+    // Try to get JSON response first
+    let errorData: any = null;
+    let responseText = '';
+    
     try {
-      const errorData = await clonedRes.json();
-      const error = new Error(errorData.message || `${res.status}: ${res.statusText}`);
-      (error as any).errorData = errorData;
-      (error as any).status = res.status;
-      throw error;
-    } catch (parseError) {
-      // If JSON parsing fails, try to read as text
+      const responseClone = res.clone();
+      errorData = await responseClone.json();
+      console.log("✅ Successfully parsed JSON error data:", errorData);
+    } catch (jsonError) {
+      console.log("❌ Failed to parse JSON, trying text...");
       try {
-        const clonedRes2 = res.clone();
-        const text = await clonedRes2.text() || res.statusText;
-        const error = new Error(`${res.status}: ${text}`);
-        (error as any).status = res.status;
-        throw error;
+        responseText = await res.text();
+        console.log("📄 Got text response:", responseText);
       } catch (textError) {
-        // If all else fails, create a generic error
-        const error = new Error(`${res.status}: ${res.statusText}`);
-        (error as any).status = res.status;
-        throw error;
+        console.log("❌ Failed to get text response too");
+        responseText = res.statusText;
       }
     }
+    
+    // Create the error object
+    let error: any;
+    if (errorData) {
+      // We have JSON error data
+      error = new Error(errorData.message || `${res.status}: ${res.statusText}`);
+      error.errorData = errorData;
+      error.code = errorData.code;
+      error.details = errorData.details;
+      error.cannotDelete = errorData.cannotDelete;
+      error.status = res.status;
+      
+      console.log("✅ Created error with JSON data:", {
+        message: error.message,
+        code: error.code,
+        details: !!error.details,
+        status: error.status
+      });
+    } else {
+      // Fallback to text error
+      error = new Error(`${res.status}: ${responseText}`);
+      error.status = res.status;
+      
+      console.log("⚠️ Created fallback error:", error.message);
+    }
+    
+    throw error;
   }
 
   return res;

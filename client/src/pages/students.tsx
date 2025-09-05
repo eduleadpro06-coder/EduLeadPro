@@ -13,7 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, CreditCard, Receipt, AlertCircle, CheckCircle, Clock, Filter, Download, User, Phone, Mail, Trash2, Edit } from "lucide-react";
-import { apiRequest, invalidateNotifications } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
+import { invalidateNotifications } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
 import { format } from "date-fns";
@@ -44,6 +45,8 @@ export default function Students() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [editStudentOpen, setEditStudentOpen] = useState(false);
   const [deleteStudentOpen, setDeleteStudentOpen] = useState(false);
+  const [financialBlockingOpen, setFinancialBlockingOpen] = useState(false);
+  const [financialBlockingDetails, setFinancialBlockingDetails] = useState<any>(null);
   const [filterClass, setFilterClass] = useState<string>("all");
   const [filterFeeStatus, setFilterFeeStatus] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -187,7 +190,8 @@ export default function Students() {
   // Delete student mutation
   const deleteStudentMutation = useMutation({
     mutationFn: async (studentId: number) => {
-      await apiRequest(`/api/students/${studentId}`, { method: "DELETE" });
+      console.log(`🔥 Deleting student with ID: ${studentId}`);
+      await apiRequest("DELETE", `/api/students/${studentId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
@@ -199,11 +203,48 @@ export default function Students() {
       });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Error deleting student", 
-        description: error.message || "Failed to delete student", 
-        variant: "destructive" 
-      });
+      console.log("=== DELETE STUDENT ERROR DEBUG ===");
+      console.log("Full error object:", error);
+      console.log("Error message:", error.message);
+      console.log("Error errorData:", error.errorData);
+      console.log("All error keys:", Object.keys(error));
+      if (error.errorData) {
+        console.log("ErrorData keys:", Object.keys(error.errorData));
+        console.log("ErrorData code:", error.errorData.code);
+        console.log("ErrorData details:", error.errorData.details);
+        console.log("ErrorData message:", error.errorData.message);
+        console.log("ErrorData cannotDelete:", error.errorData.cannotDelete);
+      }
+      console.log("=== END DEBUG ===");
+      
+      // Check if this is a financial obligations error (check both direct properties and errorData)
+      const errorData = error.errorData || {};
+      const code = error.code || errorData.code;
+      const details = error.details || errorData.details;
+      
+      console.log("🎯 UI: Checking error condition - Code:", code, "Has details:", !!details);
+      console.log("🎯 UI: Code comparison:", code, "===", "'ACTIVE_FINANCIAL_OBLIGATIONS'", "->", code === 'ACTIVE_FINANCIAL_OBLIGATIONS');
+      
+      if (code === 'ACTIVE_FINANCIAL_OBLIGATIONS' && details) {
+        console.log("🎯 UI: ✅ FINANCIAL OBLIGATIONS ERROR DETECTED - Setting modal state");
+        console.log("🎯 UI: Details object:", JSON.stringify(details, null, 2));
+        console.log("🎯 SHOWING FINANCIAL BLOCKING DIALOG");
+        console.log("Details structure:", details);
+        setFinancialBlockingDetails({
+          student: selectedStudent,
+          ...details
+        });
+        setFinancialBlockingOpen(true);
+        setDeleteStudentOpen(false);
+      } else {
+        console.log("❌ SHOWING REGULAR ERROR TOAST");
+        console.log("Code:", code, "Details:", details);
+        toast({ 
+          title: "Error deleting student", 
+          description: error.message || "Failed to delete student", 
+          variant: "destructive" 
+        });
+      }
     },
   });
 
@@ -530,6 +571,7 @@ export default function Students() {
                         <Trash2 className="mr-1 h-3 w-3 text-white" />
                         Delete
                       </Button>
+                      
                       <Button 
                         size="sm" 
                         variant="outline"
@@ -895,6 +937,180 @@ export default function Students() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* Financial Blocking Dialog */}
+      <AlertDialog open={financialBlockingOpen} onOpenChange={setFinancialBlockingOpen}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              Cannot Delete Student
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                {financialBlockingDetails && (
+                  <>
+                    <p className="text-sm text-gray-600">
+                      <strong>{financialBlockingDetails.student?.name}</strong> cannot be deleted because they have active financial obligations that must be resolved first.
+                    </p>
+                    
+                    {/* Outstanding EMI Payments */}
+                    {financialBlockingDetails.activePayments?.length > 0 && (
+                      <div className="bg-red-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-red-900 mb-3">
+                          📋 Pending EMI Payments ({financialBlockingDetails.activePayments.length})
+                        </h4>
+                        <div className="space-y-2">
+                          {financialBlockingDetails.activePayments.map((payment: any, index: number) => (
+                            <div key={payment.id} className="flex justify-between items-center bg-white p-3 rounded border-l-4 border-red-400">
+                              <div>
+                                <p className="font-medium">Installment #{payment.installmentNumber}</p>
+                                <p className="text-sm text-gray-600">Due: {new Date(payment.dueDate).toLocaleDateString()}</p>
+                                <p className="text-sm">
+                                  <span className={`px-2 py-1 rounded-full text-xs ${
+                                    payment.status === 'overdue' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {payment.status}
+                                  </span>
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold text-lg">₹{payment.amount.toLocaleString()}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Active EMI Plans */}
+                    {financialBlockingDetails.activePlans?.length > 0 && (
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-blue-900 mb-3">
+                          📅 Active EMI Plans ({financialBlockingDetails.activePlans.length})
+                        </h4>
+                        <div className="space-y-2">
+                          {financialBlockingDetails.activePlans.map((plan: any) => (
+                            <div key={plan.id} className="bg-white p-3 rounded border-l-4 border-blue-400">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="font-medium">EMI Plan #{plan.id}</p>
+                                  <p className="text-sm text-gray-600">
+                                    {plan.numberOfInstallments} installments of ₹{plan.installmentAmount.toLocaleString()} each
+                                  </p>
+                                  <p className="text-sm text-gray-600">
+                                    Period: {new Date(plan.startDate).toLocaleDateString()} to {new Date(plan.endDate).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold">₹{plan.totalAmount.toLocaleString()}</p>
+                                  <p className="text-sm text-gray-600">Total Amount</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pending Fee Payments */}
+                    {financialBlockingDetails.pendingFeePayments?.length > 0 && (
+                      <div className="bg-yellow-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-yellow-900 mb-3">
+                          💳 Pending Fee Payments ({financialBlockingDetails.pendingFeePayments.length})
+                        </h4>
+                        <div className="space-y-2">
+                          {financialBlockingDetails.pendingFeePayments.map((payment: any) => (
+                            <div key={payment.id} className="bg-white p-3 rounded border-l-4 border-yellow-400">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="font-medium">Payment #{payment.id}</p>
+                                  <p className="text-sm text-gray-600">Mode: {payment.paymentMode}</p>
+                                  {payment.receiptNumber && (
+                                    <p className="text-sm text-gray-600">Receipt: {payment.receiptNumber}</p>
+                                  )}
+                                  {payment.installmentNumber && (
+                                    <p className="text-sm text-gray-600">Installment: #{payment.installmentNumber}</p>
+                                  )}
+                                  <p className="text-sm text-gray-600">Due: {new Date(payment.paymentDate).toLocaleDateString()}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold text-lg">₹{payment.amount.toLocaleString()}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Active Mandates */}
+                    {financialBlockingDetails.activeMandates?.length > 0 && (
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-green-900 mb-3">
+                          🏦 Active Mandates ({financialBlockingDetails.activeMandates.length})
+                        </h4>
+                        <div className="space-y-2">
+                          {financialBlockingDetails.activeMandates.map((mandate: any) => (
+                            <div key={mandate.id} className="bg-white p-3 rounded border-l-4 border-green-400">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="font-medium">Mandate: {mandate.mandateId}</p>
+                                  <p className="text-sm text-gray-600">{mandate.bankName}</p>
+                                  <p className="text-sm text-gray-600">Account: {mandate.bankAccount}</p>
+                                  <p className="text-sm text-gray-600">
+                                    Valid: {new Date(mandate.startDate).toLocaleDateString()} to {mandate.endDate ? new Date(mandate.endDate).toLocaleDateString() : 'Ongoing'}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold">₹{mandate.maxAmount.toLocaleString()}</p>
+                                  <p className="text-sm text-gray-600">Max Amount</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Total Outstanding */}
+                    {financialBlockingDetails.totalOutstanding > 0 && (
+                      <div className="bg-orange-50 p-4 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-orange-900">Total Outstanding Amount:</span>
+                          <span className="text-xl font-bold text-orange-900">₹{financialBlockingDetails.totalOutstanding.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-blue-900 mb-2">💡 What you can do:</h4>
+                      <ul className="text-sm text-blue-800 space-y-1">
+                        <li>• Clear all pending fee payments before attempting to delete</li>
+                        <li>• Complete or cancel active EMI plans</li>
+                        <li>• Mark outstanding EMI installments as paid</li>
+                        <li>• Deactivate or cancel active bank mandates</li>
+                        <li>• Process all pending transactions</li>
+                        <li>• Contact the finance team for assistance</li>
+                      </ul>
+                    </div>
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setFinancialBlockingOpen(false);
+              setFinancialBlockingDetails(null);
+            }}>
+              Got it
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
