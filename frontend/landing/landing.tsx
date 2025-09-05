@@ -32,10 +32,6 @@ import {
   MessageSquarePlus
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
-import FeatureSteps from "@/shared/components/ui/feature-steps";
-import Earth from "@/shared/components/ui/globe";
-// Remove the AnimatedInsights import
-// import AnimatedInsights from "../components/dashboard/animated-insights";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { useState as useState3 } from "react";
 import HeroSection from "./hero-section";

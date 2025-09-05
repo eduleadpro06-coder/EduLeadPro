@@ -45,14 +45,14 @@ export default function Reports() {
 
   // Calculate report metrics
   const calculateMetrics = () => {
-    if (!leads) return null;
+    if (!leads || !Array.isArray(leads)) return null;
 
     const totalLeads = leads.length;
     const conversions = leads.filter(lead => lead.status === "enrolled").length;
     const conversionRate = totalLeads > 0 ? (conversions / totalLeads) * 100 : 0;
     
-    // Counselor performance
-    const counselorStats = counselors?.map(counselor => {
+    // Counselor performance  
+    const counselorStats = Array.isArray(counselors) ? counselors.map((counselor: any) => {
       const counselorLeads = leads.filter(lead => lead.counselorId === counselor.id);
       const counselorConversions = counselorLeads.filter(lead => lead.status === "enrolled").length;
       const counselorConversionRate = counselorLeads.length > 0 ? 
@@ -64,7 +64,7 @@ export default function Reports() {
         conversions: counselorConversions,
         conversionRate: counselorConversionRate
       };
-    }) || [];
+    }) : [];
 
     // Status distribution
     const statusDistribution = {
@@ -76,12 +76,12 @@ export default function Reports() {
     };
 
     // Source performance
-    const sourceStats = leadSources?.map(source => ({
+    const sourceStats = Array.isArray(leadSources) ? leadSources.map((source: any) => ({
       ...source,
       conversionRate: source.totalLeads > 0 ? (source.conversions / source.totalLeads) * 100 : 0,
       costPerLead: source.totalLeads > 0 && source.cost ? 
         (Number(source.cost) / source.totalLeads) : 0
-    })) || [];
+    })) : [];
 
     return {
       totalLeads,
@@ -326,7 +326,7 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {metrics.sourceStats.map((source, index) => (
+                {metrics.sourceStats.map((source: any, index: number) => (
                   <div key={source.source} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
                       <div className="font-medium text-gray-900 capitalize">
@@ -363,10 +363,10 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {metrics.counselorStats.map((counselor) => (
+                {metrics.counselorStats.map((counselor: any) => (
                   <div key={counselor.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
-                      <div className="font-medium text-gray-900">{counselor.name}</div>
+                      <div className="font-medium text-gray-900">{counselor.username}</div>
                       <div className="text-sm text-gray-600">
                         {counselor.totalLeads} leads assigned
                       </div>
@@ -402,8 +402,8 @@ export default function Reports() {
           </CardHeader>
           <CardContent>
             <div className="relative h-64 bg-gradient-to-t from-blue-50 to-transparent rounded-lg flex items-end justify-between p-4">
-              {enrollmentTrend?.map((data, index) => {
-                const maxEnrollments = Math.max(...(enrollmentTrend?.map(t => t.enrollments) || [1]));
+              {Array.isArray(enrollmentTrend) ? enrollmentTrend.map((data: any, index: number) => {
+                const maxEnrollments = Math.max(...(Array.isArray(enrollmentTrend) ? enrollmentTrend.map((t: any) => t.enrollments) : [1]));
                 const height = (data.enrollments / maxEnrollments) * 200;
                 
                 return (
@@ -416,7 +416,7 @@ export default function Reports() {
                     <span className="text-xs font-medium text-gray-900">{data.enrollments}</span>
                   </div>
                 );
-              })}
+              }) : []}
             </div>
             <div className="mt-4 text-sm text-gray-600 text-center">
               Monthly enrollment numbers over the past 6 months
@@ -467,7 +467,7 @@ export default function Reports() {
                   <div className="flex items-start space-x-2">
                     <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
                     <p className="text-sm text-gray-600">
-                      Analyze and improve {metrics.sourceStats.filter(s => s.conversionRate < 10).length} underperforming sources
+                      Analyze and improve {metrics.sourceStats.filter((s: any) => s.conversionRate < 10).length} underperforming sources
                     </p>
                   </div>
                   <div className="flex items-start space-x-2">

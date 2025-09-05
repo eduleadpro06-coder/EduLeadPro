@@ -1,5 +1,5 @@
-import { storage } from "./storage";
-import { insertLeadSourceSchema } from "../shared/schema";
+import { storage } from "../storage.js";
+import { insertLeadSourceSchema } from "../shared/schema.js";
 
 interface CSVLeadData {
   "Student Name": string;

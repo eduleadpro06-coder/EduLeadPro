@@ -3,11 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Calendar } from "lucide-react";
 
 export function EnrollmentChart() {
-  const { data: monthlyEnrollments = [] } = useQuery({
+  const { data: monthlyEnrollments = [] } = useQuery<any[]>({
     queryKey: ['/api/analytics/monthly-enrollments'],
   });
 
-  const maxEnrollments = Math.max(...monthlyEnrollments.map(m => m.enrollments), 1);
+  const maxEnrollments = Math.max(...monthlyEnrollments.map((m: any) => m.enrollments), 1);
 
   return (
     <Card>
@@ -24,7 +24,7 @@ export function EnrollmentChart() {
           </div>
         ) : (
           <div className="relative h-64 bg-gradient-to-t from-primary/10 to-transparent rounded-lg flex items-end justify-between p-4">
-            {monthlyEnrollments.map((data, index) => {
+            {monthlyEnrollments.map((data: any, index: number) => {
               const height = (data.enrollments / maxEnrollments) * 200;
               const isProjected = index >= monthlyEnrollments.length - 1;
               

@@ -344,7 +344,7 @@ export default function AIForecasting() {
                 ))}
               </div>
               <div className="mt-8 flex justify-end">
-                <Button variant="purple" size="lg" className="px-8 py-3 font-semibold shadow-xl">
+                <Button variant="default" size="lg" className="px-8 py-3 font-semibold shadow-xl bg-[#643ae5] hover:bg-[#643ae5]/90">
                   Download Full Report
                 </Button>
               </div>

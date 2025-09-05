@@ -15,7 +15,7 @@ import {
   AlertTriangle,
   Users
 } from "lucide-react";
-import { useToast } from "@/shared/components/ui/use-toast";
+import { useToast } from "@/shared/hooks/use-toast";
 import { apiRequest } from "@/shared/lib/queryClient";
 
 interface CSVImportProps {

@@ -1,6 +1,6 @@
 // Predictive Staff Management & Optimization System
 import { eq, sql, desc, and, gte, lt, count, avg } from "drizzle-orm";
-import { db } from "./lib/db.js";
+import { db } from "../db.js";
 import { staff, students, leads } from "../shared/schema.js";
 
 // Staff Management Interfaces
@@ -247,7 +247,7 @@ async function calculateWorkloadMetrics(staffId: number): Promise<WorkloadMetric
     const studentCount = await db
       .select({ count: count(students.id) })
       .from(students)
-      .where(eq(students.isActive, true));
+      .where(sql`${students.status} = 'active'`);
 
     // Get assigned leads (simulated)
     const leadCount = await db
@@ -472,7 +472,7 @@ export async function generateHiringPredictions(): Promise<HiringPrediction[]> {
     const currentStudents = await db
       .select({ count: count(students.id) })
       .from(students)
-      .where(eq(students.isActive, true));
+      .where(sql`${students.status} = 'active'`);
 
     const currentStaff = await db
       .select({ count: count(staff.id) })
@@ -918,10 +918,10 @@ async function analyzeWorkloadDistribution(): Promise<WorkloadDistributionAnalys
     let totalOverloaded = 0;
     let totalUnderutilized = 0;
 
-    for (const [deptName, data] of departmentStats) {
-      const avgWorkload = data.workloads.reduce((sum, w) => sum + w.hoursPerWeek, 0) / data.workloads.length;
-      const workloadVariance = calculateVariance(data.workloads.map(w => w.hoursPerWeek));
-      const efficiencyScore = data.workloads.reduce((sum, w) => sum + (w.hoursPerWeek > 50 ? 60 : 80), 0) / data.workloads.length;
+    for (const [deptName, data] of Array.from(departmentStats.entries())) {
+      const avgWorkload = data.workloads.reduce((sum: number, w: WorkloadMetrics) => sum + w.hoursPerWeek, 0) / data.workloads.length;
+      const workloadVariance = calculateVariance(data.workloads.map((w: WorkloadMetrics) => w.hoursPerWeek));
+      const efficiencyScore = data.workloads.reduce((sum: number, w: WorkloadMetrics) => sum + (w.hoursPerWeek > 50 ? 60 : 80), 0) / data.workloads.length;
 
       departments.push({
         department: deptName,
@@ -932,8 +932,8 @@ async function analyzeWorkloadDistribution(): Promise<WorkloadDistributionAnalys
       });
 
       // Count overloaded and underutilized staff
-      totalOverloaded += data.workloads.filter(w => w.hoursPerWeek > 45).length;
-      totalUnderutilized += data.workloads.filter(w => w.hoursPerWeek < 35).length;
+      totalOverloaded += data.workloads.filter((w: WorkloadMetrics) => w.hoursPerWeek > 45).length;
+      totalUnderutilized += data.workloads.filter((w: WorkloadMetrics) => w.hoursPerWeek < 35).length;
     }
 
     const optimalDistributionScore = Math.max(0, 100 - (totalOverloaded + totalUnderutilized) * 10);

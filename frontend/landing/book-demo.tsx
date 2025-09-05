@@ -7,7 +7,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { Calendar, Clock, Users } from "lucide-react";
 import { motion, animate, useMotionValue, useMotionTemplate } from "framer-motion";
-import { useToast } from "@/shared/components/ui/use-toast";
+import { useToast } from "@/shared/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/components/ui/card";
 
 const BookDemoPage = () => {

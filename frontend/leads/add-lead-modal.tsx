@@ -11,7 +11,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
 import { Button } from "@/shared/components/ui/button";
 import { insertLeadSchema, type InsertLead, type User } from "@shared/schema";
 import { apiRequest, invalidateNotifications } from "@/shared/lib/utils";
-import { useToast } from "@/shared/components/ui/use-toast";
+import { useToast } from "@/shared/hooks/use-toast";
 
 interface AddLeadModalProps {
   open: boolean;
@@ -348,7 +348,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
                       <SelectContent>
                         {counselors?.map((counselor) => (
                           <SelectItem key={counselor.id} value={counselor.id.toString()}>
-                            {counselor.name}
+                            {counselor.username}
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -64,32 +64,35 @@ export default function EMandate() {
   });
 
   // Fetch students data
-  const { data: students = [] } = useQuery({
+  const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students"],
   });
 
   // Fetch e-mandates
-  const { data: eMandates = [], isLoading: eMandatesLoading } = useQuery({
+  const { data: eMandates = [], isLoading: eMandatesLoading } = useQuery<EMandate[]>({
     queryKey: ["/api/e-mandates"],
   });
 
   // Fetch EMI schedules
-  const { data: emiSchedules = [] } = useQuery({
+  const { data: emiSchedules = [] } = useQuery<EmiSchedule[]>({
     queryKey: ["/api/emi-schedules"],
   });
 
   // Fetch upcoming EMIs
-  const { data: upcomingEmis = [] } = useQuery({
+  const { data: upcomingEmis = [] } = useQuery<EmiSchedule[]>({
     queryKey: ["/api/upcoming-emis"],
   });
 
   // Add e-mandate mutation
   const addEMandateMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("/api/e-mandates", {
+      const response = await fetch("/api/e-mandates", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      if (!response.ok) throw new Error("Failed to create e-mandate");
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/e-mandates"] });
@@ -105,10 +108,13 @@ export default function EMandate() {
   // Update EMI status mutation
   const updateEmiStatusMutation = useMutation({
     mutationFn: async ({ emiId, status, transactionId, failureReason }: any) => {
-      return await apiRequest(`/api/emi-schedules/${emiId}`, {
+      const response = await fetch(`/api/emi-schedules/${emiId}`, {
         method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, transactionId, failureReason }),
       });
+      if (!response.ok) throw new Error("Failed to update EMI status");
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/emi-schedules"] });
@@ -273,7 +279,7 @@ export default function EMandate() {
                   value={selectedStudent?.id.toString() || ""}
                   onValueChange={(value) => {
                     const student = students.find((s: Student) => s.id === parseInt(value));
-                    setSelectedStudent(student);
+                    setSelectedStudent(student || null);
                   }}
                   required
                 >
@@ -375,7 +381,7 @@ export default function EMandate() {
                           {mandate.mandateId}
                         </CardDescription>
                       </div>
-                      <Badge variant="status" className={getStatusColor(mandate.status)}>
+                      <Badge variant="default" className={getStatusColor(mandate.status)}>
                         {mandate.status}
                       </Badge>
                     </div>
@@ -456,7 +462,7 @@ export default function EMandate() {
                         <TableCell className="font-semibold">₹{parseFloat(emi.emiAmount).toLocaleString()}</TableCell>
                         <TableCell>{format(new Date(emi.scheduledDate), "MMM dd, yyyy")}</TableCell>
                         <TableCell>
-                          <Badge variant="status" className={getStatusColor(emi.status)}>
+                          <Badge variant="default" className={getStatusColor(emi.status)}>
                             {emi.status}
                           </Badge>
                         </TableCell>
@@ -598,7 +604,7 @@ export default function EMandate() {
                         <TableCell>{format(new Date(emi.scheduledDate), "MMM dd, yyyy")}</TableCell>
                         <TableCell>{mandate?.bankName}</TableCell>
                         <TableCell>
-                          <Badge variant="status" className={getStatusColor(emi.status)}>
+                          <Badge variant="default" className={getStatusColor(emi.status)}>
                             {emi.status}
                           </Badge>
                         </TableCell>

@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Badge } from "@/shared/components/ui/badge";
-import LeadStatusBadge from "@/components/leads/lead-status-badge";
+import LeadStatusBadge from "@/leads/lead-status-badge";
 import { type LeadWithCounselor } from "@shared/schema";
 
 export default function RecentLeadsTable() {
@@ -139,7 +139,7 @@ export default function RecentLeadsTable() {
                     {lead.source.replace('_', ' ')}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">
-                    {lead.counselor?.name || "-"}
+                    {lead.counselor?.username || "-"}
                   </td>
                   <td className="px-6 py-4 text-sm">
                     {lead.lastContactedAt ? (

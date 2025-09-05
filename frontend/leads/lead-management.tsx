@@ -201,7 +201,7 @@ export default function LeadManagement() {
       lead.stream || "",
       lead.status,
       lead.source,
-      lead.counselor?.name || "",
+      lead.counselor?.username || "",
       lead.parentName || "",
       lead.parentPhone || "",
       lead.address || "",
@@ -446,7 +446,7 @@ export default function LeadManagement() {
                         {lead.class} {lead.stream}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <Badge variant="status" className={getStatusColor(lead.status)}>
+                        <Badge variant="default" className={getStatusColor(lead.status)}>
                           {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
                         </Badge>
                       </td>
@@ -454,7 +454,7 @@ export default function LeadManagement() {
                         {lead.source.charAt(0).toUpperCase() + lead.source.slice(1).replace('_', ' ')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                        {lead.counselor?.name || "Unassigned"}
+                        {lead.counselor?.username || "Unassigned"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-white/70">
                         {formatDate(lead.lastContactedAt)}

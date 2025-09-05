@@ -19,7 +19,7 @@ import {
   Copy,
   UserCheck
 } from "lucide-react";
-import { useToast } from "@/shared/components/ui/use-toast";
+import { useToast } from "@/shared/hooks/use-toast";
 import { apiRequest } from "@/shared/lib/queryClient";
 import { type User } from "@shared/schema";
 

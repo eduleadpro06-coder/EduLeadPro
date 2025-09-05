@@ -43,7 +43,9 @@ export const followUps = pgTable("follow_ups", {
   completedAt: timestamp("completed_at"),
   remarks: text("remarks"),
   outcome: text("outcome"), // interested, not_interested, needs_more_info, enrolled, etc.
+  status: varchar("status", { length: 20 }).default("scheduled"), // scheduled, completed, cancelled
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const leadSources = pgTable("lead_sources", {
@@ -52,6 +54,8 @@ export const leadSources = pgTable("lead_sources", {
   cost: decimal("cost", { precision: 10, scale: 2 }),
   conversions: integer("conversions").default(0),
   totalLeads: integer("total_leads").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Staff Management
@@ -86,6 +90,7 @@ export const attendance = pgTable("attendance", {
   status: varchar("status", { length: 20 }).default("present"), // present, absent, half-day, late
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const payroll = pgTable("payroll", {
@@ -102,6 +107,7 @@ export const payroll = pgTable("payroll", {
   paymentDate: date("payment_date"),
   status: varchar("status", { length: 20 }).default("pending"), // pending, paid, cancelled
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const expenses = pgTable("expenses", {
@@ -110,10 +116,12 @@ export const expenses = pgTable("expenses", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   category: varchar("category", { length: 100 }).notNull(),
   date: date("date").notNull(),
+  submittedBy: integer("submitted_by").references(() => users.id),
   approvedBy: integer("approved_by").references(() => users.id),
   receiptUrl: varchar("receipt_url", { length: 500 }),
   status: varchar("status", { length: 20 }).default("pending"), // pending, approved, rejected
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Student Management
@@ -163,6 +171,7 @@ export const globalClassFees = pgTable("global_class_fees", {
 export const feePayments = pgTable("fee_payments", {
   id: serial("id").primaryKey(),
   leadId: integer("lead_id").references(() => leads.id).notNull(),
+  studentId: integer("student_id").references(() => students.id),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
   paymentDate: date("payment_date").notNull(),
@@ -178,6 +187,7 @@ export const feePayments = pgTable("fee_payments", {
 export const eMandates = pgTable("e_mandates", {
   id: serial("id").primaryKey(),
   leadId: integer("lead_id").references(() => leads.id).notNull(),
+  studentId: integer("student_id").references(() => students.id),
   mandateId: varchar("mandate_id", { length: 100 }).unique().notNull(),
   bankAccount: varchar("bank_account", { length: 50 }).notNull(),
   ifscCode: varchar("ifsc_code", { length: 11 }).notNull(),
@@ -432,8 +442,8 @@ export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, creat
       .optional()
       .or(z.literal("")),
   });
-export const insertFollowUpSchema = createInsertSchema(followUps).omit({ id: true, createdAt: true });
-export const insertLeadSourceSchema = createInsertSchema(leadSources).omit({ id: true });
+export const insertFollowUpSchema = createInsertSchema(followUps).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertLeadSourceSchema = createInsertSchema(leadSources).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertStaffSchema = createInsertSchema(staff)
   .omit({ id: true, createdAt: true, updatedAt: true })
   .extend({
@@ -441,9 +451,9 @@ export const insertStaffSchema = createInsertSchema(staff)
       .max(10, { message: "Phone number must be exactly 10 digits" })
       .regex(/^\d{10}$/, { message: "Ph number must contain only 10 digits (0-9)" })
   });
-export const insertAttendanceSchema = createInsertSchema(attendance).omit({ id: true, createdAt: true });
-export const insertPayrollSchema = createInsertSchema(payroll).omit({ id: true, createdAt: true });
-export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
+export const insertAttendanceSchema = createInsertSchema(attendance).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPayrollSchema = createInsertSchema(payroll).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertStudentSchema = createInsertSchema(students).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertFeeStructureSchema = createInsertSchema(feeStructure).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertGlobalClassFeeSchema = createInsertSchema(globalClassFees).omit({ id: true, createdAt: true, updatedAt: true });
@@ -454,7 +464,7 @@ export const insertEmiPlanSchema = createInsertSchema(emiPlans).omit({ id: true,
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRecentlyDeletedEmployeeSchema = createInsertSchema(recentlyDeletedEmployee).omit({ id: true, created_at: true, updated_at: true });
 
-
+export const insertAIAnalyticsSchema = createInsertSchema(aiAnalytics).omit({ id: true, createdAt: true });
 export const insertAIConversationSchema = createInsertSchema(aiConversations).omit({ id: true, startedAt: true });
 export const insertAIMessageSchema = createInsertSchema(aiMessages).omit({ id: true, createdAt: true });
 export const insertAIModelPerformanceSchema = createInsertSchema(aiModelPerformance).omit({ id: true, lastEvaluated: true });
@@ -544,4 +554,5 @@ export type StudentWithFees = Student & {
 
 export type ExpenseWithApprover = Expense & {
   approver?: User;
+  submittedBy?: User;
 };

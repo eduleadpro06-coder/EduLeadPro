@@ -1,6 +1,6 @@
 // Intelligent Student Success Prediction Engine
 import { eq, sql, desc, and, gte, lt } from "drizzle-orm";
-import { db } from "./lib/db.js";
+import { db } from "../db.js";
 import { students, feePayments, leads } from "../shared/schema.js";
 
 // Student Success Prediction Interfaces
@@ -404,7 +404,7 @@ export async function generateEarlyWarningAlerts(): Promise<EarlyWarningAlert[]>
     const activeStudents = await db
       .select()
       .from(students)
-      .where(eq(students.isActive, true));
+      .where(sql`${students.status} = 'active'`);
 
     for (const student of activeStudents) {
       const riskProfile = await predictStudentSuccess(student.id);
@@ -456,13 +456,14 @@ export async function generateEarlyWarningAlerts(): Promise<EarlyWarningAlert[]>
 // Bulk prediction for dashboard
 export async function bulkStudentSuccessPrediction(limit: number = 50): Promise<StudentRiskProfile[]> {
   try {
-    const students = await db
+    const studentsList = await db
       .select()
-      .from(db.select().from(students).where(eq(students.isActive, true)))
+      .from(students)
+      .where(sql`${students.status} = 'active'`)
       .limit(limit);
 
     const predictions = await Promise.all(
-      students.map(student => predictStudentSuccess(student.id))
+      studentsList.map(student => predictStudentSuccess(student.id))
     );
 
     return predictions.sort((a, b) => a.successProbability - b.successProbability);

@@ -1,22 +1,39 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
-import { EnrollmentChart } from "@/components/charts/enrollment-chart";
-import { useForecast } from "@/shared/hooks/use-forecasting";
-import { useLeads } from "@/shared/hooks/use-leads";
+import { EnrollmentChart } from "@/shared/components/charts/enrollment-chart";
+import { useQuery } from "@tanstack/react-query";
 import { Brain, TrendingUp, Calendar, Users, Target, AlertCircle } from "lucide-react";
+import { type LeadWithCounselor } from "@shared/schema";
 
 export default function Forecasting() {
-  const { data: forecast, isLoading, refetch } = useForecast();
-  const { data: leads = [] } = useLeads();
+  const { data: forecast, isLoading, refetch } = useQuery({
+    queryKey: ["/api/ai/forecast"],
+    queryFn: async () => {
+      const response = await fetch("/api/ai/forecast");
+      if (!response.ok) throw new Error("Failed to fetch forecast data");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  
+  const { data: leads = [] } = useQuery<LeadWithCounselor[]>({
+    queryKey: ["/api/leads"],
+    queryFn: async () => {
+      const response = await fetch("/api/leads");
+      if (!response.ok) throw new Error("Failed to fetch leads");
+      return response.json();
+    },
+    staleTime: 2 * 60 * 1000,
+  });
 
-  const highProbabilityLeads = leads.filter(l => 
+  const highProbabilityLeads = leads.filter((l: any) => 
     l.status === "interested" || 
     l.status === "hot" ||
     l.status === "enrolled"
   );
 
-  const atRiskLeads = leads.filter(l => 
+  const atRiskLeads = leads.filter((l: any) => 
     l.status === "cold" || 
     l.status === "dropped"
   );
@@ -129,7 +146,7 @@ export default function Forecasting() {
                 <div>
                   <h4 className="font-medium text-gray-900 mb-3">Key Trends Identified</h4>
                   <ul className="space-y-2">
-                    {forecast.trends.map((trend, index) => (
+                    {forecast.trends.map((trend: any, index: number) => (
                       <li key={index} className="flex items-start space-x-2">
                         <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
                         <p className="text-sm text-gray-700">{trend}</p>

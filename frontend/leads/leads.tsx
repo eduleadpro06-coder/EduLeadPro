@@ -226,7 +226,7 @@ export default function Leads() {
                           }
                         >
                           <SelectTrigger className="w-32 h-9">
-                            <Badge variant="status" className={`${getStatusColor(lead.status)} cursor-pointer`}>
+                            <Badge variant="default" className={`${getStatusColor(lead.status)} cursor-pointer`}>
                               {lead.status}
                             </Badge>
                           </SelectTrigger>
@@ -241,7 +241,7 @@ export default function Leads() {
                       </td>
                       <td className="py-4 px-4 text-gray-600">{lead.source}</td>
                       <td className="py-4 px-4">
-                        <p className="text-gray-900">{lead.counselor?.name || "Unassigned"}</p>
+                        <p className="text-gray-900">{lead.counselor?.username || "Unassigned"}</p>
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center text-sm text-gray-600">

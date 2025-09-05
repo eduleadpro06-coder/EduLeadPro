@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, invalidateNotifications } from "@/shared/lib/utils";
-import { useToast } from "@/shared/components/ui/use-toast";
+import { useToast } from "@/shared/hooks/use-toast";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
@@ -253,7 +253,7 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
                   <SelectContent>
                     {counselors.map((counselor) => (
                       <SelectItem key={counselor.id} value={counselor.id.toString()}>
-                        {counselor.name}
+                        {counselor.username}
                       </SelectItem>
                     ))}
                   </SelectContent>

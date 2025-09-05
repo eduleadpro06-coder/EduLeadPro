@@ -481,7 +481,7 @@ export default function CampaignManager() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="status" className={getStatusColor(campaign.status)}>
+                      <Badge variant="default" className={getStatusColor(campaign.status)}>
                         {campaign.status}
                       </Badge>
                       {campaign.status === "draft" && (

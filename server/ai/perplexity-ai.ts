@@ -51,7 +51,7 @@ class PerplexityAI {
   private baseUrl: string = 'https://api.perplexity.ai/chat/completions';
 
   constructor() {
-    this.apiKey = process.env.PERPLEXITY_API_KEY;
+    this.apiKey = process.env.PERPLEXITY_API_KEY || '';
     if (!this.apiKey) {
       throw new Error('PERPLEXITY_API_KEY environment variable is not set');
     }
@@ -574,7 +574,7 @@ export async function analyzeFeeOptimization(studentData: {
     
     Respond with actionable, practical recommendations for educational fee management.`;
 
-    const response = await perplexityAI.callPerplexityAPI({
+    const response = await perplexityAI.query({
       model: 'llama-3.1-sonar-small-128k-online',
       messages: [
         {
@@ -646,7 +646,7 @@ export async function analyzeStaffPerformance(staffData: {
     
     Focus on actionable insights for educational staff development.`;
 
-    const response = await perplexityAI.callPerplexityAPI({
+    const response = await perplexityAI.query({
       model: 'llama-3.1-sonar-small-128k-online',
       messages: [
         {

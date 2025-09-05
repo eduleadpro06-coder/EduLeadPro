@@ -43,21 +43,20 @@ router.get("/student-success-analytics", async (req, res) => {
 
         // Store prediction in database
         const [prediction] = await db.insert(schema.aiPredictions).values({
-          entityType: 'student',
-          entityId: studentData.student.id,
+          studentId: studentData.student.id,
           predictionType: 'success_probability',
-          predictionValue: aiAnalysis.successProbability.toString(),
-          confidence: aiAnalysis.confidence.toString(),
-          metadata: JSON.stringify({
+          prediction: JSON.stringify({
+            successProbability: aiAnalysis.successProbability,
             riskFactors: aiAnalysis.riskFactors,
             recommendations: aiAnalysis.recommendations,
             academicData: {
               avgMarks: studentData.academicAvg,
               attendance: studentData.attendanceAvg,
               engagement: studentData.engagementAvg
-            }
+            },
+            modelVersion: 'perplexity-v2.1'
           }),
-          modelVersion: 'perplexity-v2.1'
+          confidence: aiAnalysis.confidence.toString()
         }).returning();
 
         predictions.push({
@@ -282,13 +281,14 @@ router.post("/virtual-counselor", async (req, res) => {
     });
 
     // Update conversation
-    if (conversation[0]) {
+    const currentConversation = conversation[0];
+    if (currentConversation) {
       await db.update(schema.aiConversations)
         .set({
-          messageCount: conversation[0].messageCount + 2,
+          messageCount: (currentConversation.messageCount || 0) + 2,
           escalated: aiResponse.escalationNeeded
         })
-        .where(eq(schema.aiConversations.id, conversation[0].id));
+        .where(eq(schema.aiConversations.id, currentConversation.id));
     }
 
     res.json({
@@ -301,7 +301,7 @@ router.post("/virtual-counselor", async (req, res) => {
         suggestedActions: aiResponse.suggestedActions
       },
       conversationMetrics: {
-        messageCount: conversation[0].messageCount + 2,
+        messageCount: currentConversation ? (currentConversation.messageCount || 0) + 2 : 2,
         responseTime,
         sessionId
       }
@@ -543,7 +543,7 @@ router.get("/ai-model-performance", async (req, res) => {
       recentActivity: {
         totalPredictions: recentPredictions.length,
         predictionsByType,
-        avgConfidence: Math.round(recentPredictions.reduce((sum, p) => sum + parseFloat(p.confidence), 0) / recentPredictions.length)
+        avgConfidence: Math.round(recentPredictions.reduce((sum, p) => sum + (p.confidence ? parseFloat(p.confidence.toString()) : 0), 0) / recentPredictions.length)
       },
       systemHealth: {
         status: 'operational',

@@ -1,6 +1,6 @@
 // AI-Powered Dynamic Pricing & Revenue Optimization
 import { eq, sql, desc, and, gte, lt, avg, count } from "drizzle-orm";
-import { db } from "./lib/db.js";
+import { db } from "../db.js";
 import { students, feePayments, leads, staff } from "../shared/schema.js";
 
 // Dynamic Pricing Interfaces
@@ -120,15 +120,16 @@ async function analyzeCoursePerformance() {
   try {
     const courses = await db
       .select({
-        courseId: students.course,
-        courseName: students.course,
+        courseId: students.class,
+        courseName: students.class,
         studentCount: count(students.id),
-        averageFee: avg(sql`CAST(${students.feeAmount} AS DECIMAL)`),
-        enrollmentTrend: sql<number>`COUNT(CASE WHEN ${students.enrollmentDate} >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END)`
+        averageFee: avg(sql`CAST(${feePayments.amount} AS DECIMAL)`),
+        enrollmentTrend: sql<number>`COUNT(CASE WHEN ${students.admissionDate} >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END)`
       })
       .from(students)
-      .where(eq(students.isActive, true))
-      .groupBy(students.course);
+      .leftJoin(feePayments, sql`${feePayments.studentId} = ${students.id}`)
+      .where(sql`${students.status} = 'active'`)
+      .groupBy(students.class);
 
     return courses.map(course => ({
       courseId: course.courseId || 'unknown',
@@ -162,7 +163,7 @@ async function analyzeCapacityUtilization() {
     const totalStudents = await db
       .select({ count: count(students.id) })
       .from(students)
-      .where(eq(students.isActive, true));
+      .where(sql`${students.status} = 'active'`);
 
     const totalStaff = await db
       .select({ count: count(staff.id) })
@@ -320,15 +321,15 @@ function calculatePricingConfidence(course: any, market: any): number {
 // Generate scholarship recommendations
 export async function generateScholarshipRecommendations(): Promise<ScholarshipRecommendation[]> {
   try {
-    const students = await db
+    const studentsList = await db
       .select()
       .from(students)
-      .where(eq(students.isActive, true))
+      .where(sql`${students.status} = 'active'`)
       .limit(50);
 
     const recommendations: ScholarshipRecommendation[] = [];
 
-    for (const student of students) {
+    for (const student of studentsList) {
       const recommendation = await analyzeScholarshipEligibility(student);
       if (recommendation.eligibilityScore >= 60) {
         recommendations.push(recommendation);
@@ -395,8 +396,8 @@ async function analyzeScholarshipEligibility(student: any): Promise<ScholarshipR
     scholarshipType = 'special_category';
   }
 
-  // Calculate recommended amount
-  const baseAmount = parseFloat(student.feeAmount) || 80000;
+  // Calculate recommended amount (fallback to default since students table doesn't have feeAmount)
+  const baseAmount = 80000; // Default amount since feeAmount is not available in students table
   let scholarshipPercentage = Math.min(50, eligibilityScore * 0.5); // Max 50%
   
   if (scholarshipType === 'hybrid') {
@@ -470,7 +471,7 @@ export async function generateOptimalPaymentPlan(studentId: number): Promise<Opt
     }
 
     const studentData = student[0];
-    const totalAmount = parseFloat(studentData.feeAmount) || 80000;
+    const totalAmount = 80000; // Default since feeAmount is not available in students table
     
     // Analyze family financial capacity
     const familyCapacityScore = await analyzeFamilyCapacity(studentData);

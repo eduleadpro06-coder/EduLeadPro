@@ -401,7 +401,7 @@ export default function Students() {
 
         <Dialog open={addStudentOpen} onOpenChange={setAddStudentOpen}>
           <DialogTrigger asChild>
-            <Button variant="purple">
+            <Button variant="default" className="bg-[#643ae5] hover:bg-[#643ae5]/90">
               <Plus className="mr-2 h-4 w-4" />
               Add Student
             </Button>

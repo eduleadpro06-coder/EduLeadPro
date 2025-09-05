@@ -17,7 +17,7 @@ export default function LeadStatusBadge({ status }: LeadStatusBadgeProps) {
   };
 
   return (
-    <Badge variant="status" className={getStatusColor(status)}>
+    <Badge variant="default" className={getStatusColor(status)}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );

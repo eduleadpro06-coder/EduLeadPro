@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { type LeadWithCounselor as BaseLeadWithCounselor, type User as UserType, type FollowUp } from "@shared/schema";
 import { apiRequest, invalidateNotifications } from "@/shared/lib/utils";
-import { useToast } from "@/shared/components/ui/use-toast";
+import { useToast } from "@/shared/hooks/use-toast";
 import { useHashState } from "@/shared/hooks/use-hash-state";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/shared/components/ui/alert-dialog";
 
@@ -318,7 +318,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="status" className={getStatusColor(lead.status)}>
+              <Badge variant="default" className={getStatusColor(lead.status)}>
                 {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
               </Badge>
 
@@ -670,7 +670,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Badge variant="status" className={getStatusColor(lead.status)}>
+                      <Badge variant="default" className={getStatusColor(lead.status)}>
                         {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
                       </Badge>
                     )}
@@ -691,13 +691,13 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                         <SelectContent>
                           {counselors?.map((counselor) => (
                             <SelectItem key={counselor.id} value={counselor.id.toString()}>
-                              {counselor.name}
+                              {counselor.username}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     ) : (
-                      <span>{lead.counselor?.name || "Unassigned"}</span>
+                      <span>{lead.counselor?.username || "Unassigned"}</span>
                     )}
                   </div>
 

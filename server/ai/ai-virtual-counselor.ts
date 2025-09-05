@@ -1,6 +1,6 @@
 // Intelligent Virtual Counselor & 24/7 Support System
 import { eq, sql, desc, and, gte, lt } from "drizzle-orm";
-import { db } from "./lib/db.js";
+import { db } from "../db.js";
 import { students, leads, staff } from "../shared/schema.js";
 
 // Virtual Counselor Interfaces

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+// @ts-ignore - cobe module types not available
 import createGlobe from 'cobe';
-import { cn } from '../../client/src/lib/utils';
+import { cn } from '@/shared/lib/utils';
 
 interface EarthProps {
   className?: string;

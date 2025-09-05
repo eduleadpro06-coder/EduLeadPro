@@ -9,9 +9,14 @@ import { analyzeStaffPerformance, type StaffPerformanceInsights } from "./perple
 // Define types for AI analysis results
 export interface AdvancedLeadScore {
   score: number;
+  overallScore: number;
+  urgencyLevel: string;
+  conversionProbability: number;
+  nextBestAction: { action: string; priority: string };
   factors: { factor: string; impact: number; weight: number }[];
   confidence: number;
   recommendations: string[];
+  recommendedActions: string[];
 }
 
 export interface SmartCommunicationPlan {
@@ -35,8 +40,28 @@ export interface FinancialAnalytics {
 export async function calculateAdvancedLeadScore(leadData: any): Promise<AdvancedLeadScore> {
   // Basic lead scoring implementation
   const baseScore = Math.random() * 40 + 60; // 60-100 range
+  const score = Math.round(baseScore);
+  const conversionProb = Math.random() * 0.4 + 0.4; // 0.4-0.8 range
+  const urgencyLevels = ["low", "medium", "high", "critical"];
+  const urgencyLevel = urgencyLevels[Math.floor(Math.random() * urgencyLevels.length)];
+  
+  const recommendedActions = [
+    "Follow up within 24 hours",
+    "Schedule a campus visit",
+    "Provide detailed program information",
+    "Connect with parent/guardian",
+    "Send course curriculum details"
+  ];
+
   return {
-    score: Math.round(baseScore),
+    score,
+    overallScore: score,
+    urgencyLevel,
+    conversionProbability: conversionProb,
+    nextBestAction: { 
+      action: recommendedActions[Math.floor(Math.random() * recommendedActions.length)], 
+      priority: urgencyLevel 
+    },
     factors: [
       { factor: "Contact Frequency", impact: 0.8, weight: 0.3 },
       { factor: "Engagement Level", impact: 0.6, weight: 0.2 },
@@ -47,7 +72,8 @@ export async function calculateAdvancedLeadScore(leadData: any): Promise<Advance
       "Follow up within 24 hours",
       "Schedule a campus visit",
       "Provide detailed program information"
-    ]
+    ],
+    recommendedActions
   };
 }
 
@@ -138,7 +164,7 @@ router.get("/lead-score/:leadId", async (req: Request, res: Response) => {
       lastContactDays,
       hasParentInfo: !!(lead.parentName && lead.parentPhone),
       interestedProgram: lead.interestedProgram || undefined,
-      admissionLikelihood: lead.admissionLikelihood ? parseFloat(lead.admissionLikelihood) : undefined
+      admissionLikelihood: undefined // Property not available in current schema
     };
     
     const leadScore = await calculateAdvancedLeadScore(enhancedLeadData);
@@ -248,7 +274,10 @@ router.get("/staff-performance/:staffId", async (req: Request, res: Response) =>
       { type: "lead_follow_up", timestamp: new Date().toISOString(), outcome: "not_interested", score: 70 }
     ];
     
-    const staffPerformance = await analyzeStaffPerformance(staffData[0], performanceMetrics);
+    const staffPerformance = await analyzeStaffPerformance({
+      ...staffData[0],
+      performanceData: performanceMetrics
+    });
     
     res.json(staffPerformance);
   } catch (error) {
@@ -262,14 +291,17 @@ router.get("/bulk-lead-scores", async (req: Request, res: Response) => {
   try {
     const { limit = 50, status, source } = req.query;
     
-    let queryBuilder = db.select().from(leads);
+    let queryBuilder;
     
-    if (status && typeof status === 'string') {
-      queryBuilder = queryBuilder.where(eq(leads.status, status));
-    }
-    
-    if (source && typeof source === 'string') {
-      queryBuilder = queryBuilder.where(eq(leads.source, source));
+    if (status && source && typeof status === 'string' && typeof source === 'string') {
+      const { and } = await import("drizzle-orm");
+      queryBuilder = db.select().from(leads).where(and(eq(leads.status, status), eq(leads.source, source)));
+    } else if (status && typeof status === 'string') {
+      queryBuilder = db.select().from(leads).where(eq(leads.status, status));
+    } else if (source && typeof source === 'string') {
+      queryBuilder = db.select().from(leads).where(eq(leads.source, source));
+    } else {
+      queryBuilder = db.select().from(leads);
     }
     
     const leadsData = await queryBuilder
@@ -300,7 +332,7 @@ router.get("/bulk-lead-scores", async (req: Request, res: Response) => {
           lastContactDays,
           hasParentInfo: !!(lead.parentName && lead.parentPhone),
           interestedProgram: lead.interestedProgram || undefined,
-          admissionLikelihood: lead.admissionLikelihood ? parseFloat(lead.admissionLikelihood) : undefined
+          admissionLikelihood: undefined // Property not available in current schema
         };
         
         const score = await calculateAdvancedLeadScore(enhancedLeadData);

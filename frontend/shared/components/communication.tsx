@@ -52,31 +52,34 @@ export default function Communication() {
   });
 
   // Fetch communication logs
-  const { data: communicationLogs = [] } = useQuery({
+  const { data: communicationLogs = [] } = useQuery<CommunicationLog[]>({
     queryKey: ["/api/communications"],
   });
 
   // Fetch templates
-  const { data: templates = [] } = useQuery({
+  const { data: templates = [] } = useQuery<CommunicationTemplate[]>({
     queryKey: ["/api/communication-templates"],
   });
 
   // Fetch students and parents for recipient selection
-  const { data: students = [] } = useQuery({
+  const { data: students = [] } = useQuery<any[]>({
     queryKey: ["/api/students"],
   });
 
-  const { data: staff = [] } = useQuery({
+  const { data: staff = [] } = useQuery<any[]>({
     queryKey: ["/api/staff"],
   });
 
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("/api/communications/send", {
+      const response = await fetch("/api/communications/send", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      if (!response.ok) throw new Error("Failed to send message");
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/communications"] });
@@ -92,10 +95,13 @@ export default function Communication() {
   // Create template mutation
   const createTemplateMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("/api/communication-templates", {
+      const response = await fetch("/api/communication-templates", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      if (!response.ok) throw new Error("Failed to create template");
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/communication-templates"] });
@@ -454,7 +460,7 @@ export default function Communication() {
                         {log.subject || log.message}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="status" className={getStatusColor(log.status)}>
+                        <Badge variant="default" className={getStatusColor(log.status)}>
                           {log.status}
                         </Badge>
                       </TableCell>

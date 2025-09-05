@@ -1,6 +1,6 @@
 // Automated Content Generation & Curriculum Intelligence System
 import { eq, sql, desc, and, gte, lt } from "drizzle-orm";
-import { db } from "./lib/db.js";
+import { db } from "../db.js";
 import { students, staff } from "../shared/schema.js";
 
 // Content Generation Interfaces
