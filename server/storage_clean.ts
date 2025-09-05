@@ -1427,13 +1427,14 @@ async function initializeBasicData() {
     });
 
     // Import real CSV data
-    const { importCSVLeads, realLeadsData } = await import("./csv-import");
+    const { importCSVLeads, realLeadsData } = await import("./leads/csv-import");
     await importCSVLeads(realLeadsData);
 
     console.log("Admin user and CSV leads data imported successfully!");
   } catch (error) {
     console.log("Basic data already exists or error occurred:", error);
   }
+}
 
 export const storage = new DatabaseStorage();
 

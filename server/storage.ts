@@ -1,6 +1,6 @@
 import { eq, and, gte, lte, sql, desc, or, isNull, not } from "drizzle-orm";
 import { db } from "./db.js";
-import * as schema from "../shared/schema.js";
+import * as schema from "./shared/schema.js";
 import type {
   User, InsertUser, Lead, InsertLead, FollowUp, InsertFollowUp,
   LeadSource, InsertLeadSource, Staff, InsertStaff, Attendance, InsertAttendance,

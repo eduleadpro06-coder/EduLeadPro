@@ -1,11 +1,11 @@
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { registerRoutes } from "./routes.js";
+import { setupVite, serveStatic, log } from "./vite.js";
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
-import logger from './config/logger';
-import { StructuredLogger, LogCategory } from './utils/structuredLogger';
+import logger from './shared/config/logger.js';
+import { StructuredLogger, LogCategory } from './shared/utils/structuredLogger.js';
 
 const app = express();
 
@@ -84,15 +84,17 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Serve the app on port 5000 for Replit compatibility
+  // Serve the app on port 3000 
   // this serves both the API and the client.
-  const port = Number(process.env.PORT) || 5000;
+  const port = Number(process.env.PORT) || 3000;
   server.listen(port, '0.0.0.0', () => {
     logger.info('Server started successfully');
     StructuredLogger.info(
       LogCategory.SYSTEM,
-      `Server is running on port ${process.env.PORT || 3000}`,
+      `Server is running on port ${port}`,
       { environment: process.env.NODE_ENV }
     );
+    log(`🚀 Server running on http://localhost:${port}`);
+    log(`📱 Frontend and API both accessible at http://localhost:${port}`);
   });
 })();

@@ -1,12 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
-import { insertLeadSchema, insertFollowUpSchema, Lead, InsertLead, InsertEmiPlan } from "../shared/schema.js";
-import { perplexityAI } from "./perplexity-ai.js";
+import { insertLeadSchema, insertFollowUpSchema, Lead, InsertLead, InsertEmiPlan } from "./shared/schema.js";
+import { perplexityAI } from "./ai/perplexity-ai.js";
 import PDFDocument from "pdfkit";
 import { db } from "./db.js";
-import { forecastEnrollments, generateMarketingRecommendations } from "./ai.js";
-import aiComprehensiveRouter from "./api/ai-comprehensive.js";
+import { forecastEnrollments, generateMarketingRecommendations } from "./ai/ai.js";
+import aiComprehensiveRouter from "./ai/ai-comprehensive.js";
 import { sql } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -628,7 +628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI: Fee optimization
   app.post("/api/ai/fee-optimization", async (req, res) => {
     try {
-      const { analyzeFeeOptimization } = await import("./perplexity-ai.js");
+      const { analyzeFeeOptimization } = await import("./ai/perplexity-ai.js");
       const optimization = await analyzeFeeOptimization(req.body);
       res.json(optimization);
     } catch (error) {
@@ -640,7 +640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI: Staff performance analysis
   app.post("/api/ai/staff-performance", async (req, res) => {
     try {
-      const { analyzeStaffPerformance } = await import("./perplexity-ai.js");
+      const { analyzeStaffPerformance } = await import("./ai/perplexity-ai.js");
       const analysis = await analyzeStaffPerformance(req.body);
       res.json(analysis);
     } catch (error) {
@@ -2651,7 +2651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // AI Enhanced routes
   try {
-    const aiEnhancedRoutes = (await import("./api/ai-enhanced.js")).default;
+    const aiEnhancedRoutes = (await import("./ai/ai-enhanced.js")).default;
     app.use("/api/ai", aiEnhancedRoutes);
   } catch (error) {
     console.error("Failed to load AI enhanced routes:", error);
@@ -2659,7 +2659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Comprehensive AI routes
   try {
-    const aiComprehensiveRoutes = (await import("./api/ai-comprehensive.js")).default;
+    const aiComprehensiveRoutes = (await import("./ai/ai-comprehensive.js")).default;
     app.use("/api/ai-comprehensive", aiComprehensiveRoutes);
   } catch (error) {
     console.error("Failed to load comprehensive AI routes:", error);
