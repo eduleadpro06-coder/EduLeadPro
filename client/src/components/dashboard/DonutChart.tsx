@@ -10,7 +10,7 @@ interface DonutChartProps {
 const DonutChart: React.FC<DonutChartProps> = ({ title, data, colors }) => {
   return (
     <div className="flex flex-col items-center w-full h-full">
-      <h3 className="mb-4 text-lg font-semibold text-white">{title}</h3>
+      <h3 className="mb-4 text-lg font-semibold text-gray-800">{title}</h3>
       <div className="w-48 h-48">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -29,9 +29,9 @@ const DonutChart: React.FC<DonutChartProps> = ({ title, data, colors }) => {
                 <Cell key={`cell-${idx}`} fill={colors[idx % colors.length]} />
               ))}
             </Pie>
-            <Tooltip 
-              contentStyle={{ background: '#18181b', borderRadius: 8, color: '#fff', border: 'none' }}
-              itemStyle={{ color: '#fff' }}
+            <Tooltip
+              contentStyle={{ background: '#ffffff', borderRadius: 8, color: '#374151', border: '1px solid #e5e7eb' }}
+              itemStyle={{ color: '#374151' }}
             />
           </PieChart>
         </ResponsiveContainer>
@@ -41,7 +41,7 @@ const DonutChart: React.FC<DonutChartProps> = ({ title, data, colors }) => {
         {data.map((entry, idx) => (
           <div key={idx} className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full" style={{ background: colors[idx % colors.length] }}></span>
-            <span className="text-sm text-white">{entry.label}</span>
+            <span className="text-sm text-gray-700">{entry.label}</span>
           </div>
         ))}
       </div>

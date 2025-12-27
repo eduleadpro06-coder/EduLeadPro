@@ -84,7 +84,7 @@ export default function AIMarketing() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+    <div className="min-h-screen bg-gray-50 text-gray-900 relative overflow-hidden">
       <Glow />
       {/* <div className=\"absolute inset-0 bg-gradient-to-br from-[#23243a]/80 via-[#643ae5]/10 to-[#010205]/90 pointer-events-none z-0\" /> */}
       <Header className="py-4 relative z-10" />
@@ -101,7 +101,7 @@ export default function AIMarketing() {
               initial="hidden"
               animate="visible"
               whileHover="hover"
-              className="bg-[#23243a]/90 glass-card border-none shadow-2xl rounded-3xl mb-10"
+              className="bg-white/95 glass-card border-none shadow-2xl rounded-3xl mb-10"
             >
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center text-xl">
@@ -118,7 +118,7 @@ export default function AIMarketing() {
                       value={ageGroup}
                       onChange={(e) => setAgeGroup(e.target.value)}
                       placeholder="e.g., 14-18"
-                      className="h-10 bg-[#23243a] text-white border-[#643ae5] focus:ring-[#643ae5]"
+                      className="h-10 bg-[#23243a] text-gray-800 border-[#643ae5] focus:ring-[#643ae5]"
                     />
                   </div>
                   <div className="space-y-2">
@@ -128,7 +128,7 @@ export default function AIMarketing() {
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
                       placeholder="e.g., Mumbai, Delhi"
-                      className="h-10 bg-[#23243a] text-white border-[#643ae5] focus:ring-[#643ae5]"
+                      className="h-10 bg-[#23243a] text-gray-800 border-[#643ae5] focus:ring-[#643ae5]"
                     />
                   </div>
                   <div className="space-y-2">
@@ -139,12 +139,12 @@ export default function AIMarketing() {
                       value={budget}
                       onChange={(e) => setBudget(e.target.value)}
                       placeholder="50000"
-                      className="h-10 bg-[#23243a] text-white border-[#643ae5] focus:ring-[#643ae5]"
+                      className="h-10 bg-[#23243a] text-gray-800 border-[#643ae5] focus:ring-[#643ae5]"
                     />
                   </div>
                 </div>
-                <Button 
-                  className="mt-8 w-full md:w-auto h-11 px-6 bg-[#643ae5] text-white font-semibold shadow-xl"
+                <Button
+                  className="mt-8 w-full md:w-auto h-11 px-6 bg-[#643ae5] text-gray-800 font-semibold shadow-xl"
                   onClick={handleGenerate}
                   disabled={generateRecommendations.isPending}
                 >
@@ -157,7 +157,7 @@ export default function AIMarketing() {
             {/* Recommendations */}
             {recommendations.length > 0 && (
               <div className="space-y-8">
-                <h2 className="text-2xl font-bold text-white flex items-center">
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center">
                   <Target className="mr-3 text-blue-400" size={28} />
                   Recommended Campaigns
                 </h2>
@@ -170,7 +170,7 @@ export default function AIMarketing() {
                       initial="hidden"
                       animate="visible"
                       whileHover="hover"
-                      className="bg-[#23243a]/90 glass-card border-none shadow-xl rounded-2xl transition-all duration-200"
+                      className="bg-white/95 glass-card border-none shadow-xl rounded-2xl transition-all duration-200"
                     >
                       <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
@@ -190,23 +190,23 @@ export default function AIMarketing() {
                           <div className="flex items-center space-x-3">
                             <Users className="text-blue-400" size={18} />
                             <div>
-                              <div className="text-sm font-medium text-white">Target Audience</div>
+                              <div className="text-sm font-medium text-gray-800">Target Audience</div>
                               <div className="text-sm text-gray-300">{rec.target_audience}</div>
                             </div>
                           </div>
                           <div className="flex items-center space-x-3">
                             <IndianRupee className="text-green-400" size={18} />
                             <div>
-                              <div className="text-sm font-medium text-white">Budget</div>
+                              <div className="text-sm font-medium text-gray-800">Budget</div>
                               <div className="text-sm text-gray-300">{rec.budget_suggestion}</div>
                             </div>
                           </div>
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-white">Ad Copy</Label>
+                          <Label className="text-sm font-medium text-gray-800">Ad Copy</Label>
                           <div className="mt-2 p-4 bg-[#23243a]/70 rounded-lg border border-[#643ae5]/30">
-                            <p className="text-sm text-white leading-relaxed">{rec.ad_copy}</p>
+                            <p className="text-sm text-gray-800 leading-relaxed">{rec.ad_copy}</p>
                           </div>
                           <Button
                             variant="ghost"
@@ -221,7 +221,7 @@ export default function AIMarketing() {
 
                         <div className="flex justify-between items-center pt-4 border-t border-[#643ae5]/20">
                           <div>
-                            <div className="text-sm font-medium text-white">Expected Leads</div>
+                            <div className="text-sm font-medium text-gray-800">Expected Leads</div>
                             <div className="text-2xl font-bold text-green-400">{rec.expected_leads}</div>
                           </div>
                           <Button variant="outline" size="sm" className="h-9 border-[#643ae5] text-[#643ae5]">
@@ -243,10 +243,10 @@ export default function AIMarketing() {
                 initial="hidden"
                 animate="visible"
                 whileHover="hover"
-                className="bg-[#23243a]/90 glass-card border-none shadow-xl rounded-2xl transition-all"
+                className="bg-white/95 glass-card border-none shadow-xl rounded-2xl transition-all"
               >
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-xl text-white">Campaign Best Practices</CardTitle>
+                  <CardTitle className="text-xl text-gray-800">Campaign Best Practices</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="p-5 bg-[#643ae5]/10 rounded-lg border border-[#643ae5]/30">
@@ -275,15 +275,15 @@ export default function AIMarketing() {
                 initial="hidden"
                 animate="visible"
                 whileHover="hover"
-                className="bg-[#23243a]/90 glass-card border-none shadow-xl rounded-2xl transition-all"
+                className="bg-white/95 glass-card border-none shadow-xl rounded-2xl transition-all"
               >
                 <CardHeader>
-                  <CardTitle className="text-white">Performance Tracking</CardTitle>
+                  <CardTitle className="text-gray-800">Performance Tracking</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div>
-                      <h4 className="font-medium text-white mb-2">Key Metrics to Monitor</h4>
+                      <h4 className="font-medium text-gray-800 mb-2">Key Metrics to Monitor</h4>
                       <div className="space-y-2">
                         {[
                           "Cost per Lead (CPL)",
@@ -310,23 +310,23 @@ export default function AIMarketing() {
               initial="hidden"
               animate="visible"
               whileHover="hover"
-              className="bg-[#23243a]/90 glass-card border-none shadow-xl rounded-2xl transition-all"
+              className="bg-white/95 glass-card border-none shadow-xl rounded-2xl transition-all"
             >
               <CardHeader>
-                <CardTitle className="text-white">Creative Ideas</CardTitle>
+                <CardTitle className="text-gray-800">Creative Ideas</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-4 border border-[#643ae5]/30 rounded-lg bg-[#643ae5]/10">
-                    <h4 className="font-medium text-white mb-2">📱 Social Media Posts</h4>
+                    <h4 className="font-medium text-gray-800 mb-2">📱 Social Media Posts</h4>
                     <p className="text-sm text-gray-200">Student testimonials, virtual campus tours, achievement highlights</p>
                   </div>
                   <div className="p-4 border border-green-400/30 rounded-lg bg-green-900/20">
-                    <h4 className="font-medium text-white mb-2">🎥 Video Content</h4>
+                    <h4 className="font-medium text-gray-800 mb-2">🎥 Video Content</h4>
                     <p className="text-sm text-gray-200">Day-in-the-life videos, faculty interviews, alumni success stories</p>
                   </div>
                   <div className="p-4 border border-purple-400/30 rounded-lg bg-purple-900/20">
-                    <h4 className="font-medium text-white mb-2">📊 Infographics</h4>
+                    <h4 className="font-medium text-gray-800 mb-2">📊 Infographics</h4>
                     <p className="text-sm text-gray-200">Placement statistics, course curriculum, campus facilities comparison</p>
                   </div>
                 </div>

@@ -49,7 +49,7 @@ export default function AIForecasting() {
 
   if (forecastLoading) {
     return (
-      <div className="min-h-screen bg-black relative overflow-hidden">
+      <div className="min-h-screen bg-gray-50 relative overflow-hidden">
         <Glow />
         <Header className="py-4 relative z-10" />
         <main className="p-6 relative z-10">
@@ -103,7 +103,7 @@ export default function AIForecasting() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+    <div className="min-h-screen bg-gray-50 text-gray-900 relative overflow-hidden">
       {/* Futuristic animated glow background */}
       <Glow />
       {/* <div className="absolute inset-0 bg-gradient-to-br from-[#23243a]/80 via-[#643ae5]/10 to-[#010205]/90 pointer-events-none z-0" /> */}
@@ -116,7 +116,7 @@ export default function AIForecasting() {
             initial="hidden"
             animate="visible"
             whileHover="hover"
-            className="bg-[#62656e]/90 glass-card border-none shadow-2xl rounded-3xl relative overflow-hidden"
+            className="bg-white/95 glass-card border-none shadow-2xl rounded-3xl relative overflow-hidden"
           >
             <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-72 h-32 bg-gradient-to-r from-[#643ae5]/40 via-[#23243a]/10 to-transparent blur-2xl opacity-60 z-0" />
             <CardHeader className="pb-4 relative z-10">
@@ -135,7 +135,7 @@ export default function AIForecasting() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="text-center p-4">
-                  <div className="text-5xl font-extrabold text-white mb-2 drop-shadow-glow">
+                  <div className="text-5xl font-extrabold text-gray-800 mb-2 drop-shadow-glow">
                     {forecast.predictedEnrollments || 0}
                   </div>
                   <div className="text-base font-medium text-gray-200">Predicted Enrollments</div>
@@ -167,7 +167,7 @@ export default function AIForecasting() {
             initial="hidden"
             animate="visible"
             whileHover="hover"
-            className="bg-[#23243a]/90 glass-card border-none shadow-xl rounded-2xl relative overflow-hidden"
+            className="bg-white/95 glass-card border-none shadow-xl rounded-2xl relative overflow-hidden"
           >
             <div className="absolute -top-8 right-10 w-40 h-20 bg-gradient-to-r from-[#643ae5]/30 via-[#23243a]/10 to-transparent blur-2xl opacity-40 z-0" />
             <CardHeader className="pb-4 relative z-10">
@@ -176,7 +176,7 @@ export default function AIForecasting() {
             <CardContent className="space-y-6">
               <div className="flex justify-between items-center p-5 bg-[#62656e]/80 rounded-xl shadow-md">
                 <div>
-                  <div className="font-medium text-white text-lg">Current Conversion Rate</div>
+                  <div className="font-medium text-gray-800 text-lg">Current Conversion Rate</div>
                   <div className="text-sm text-gray-300 mt-1">Total leads to enrollments</div>
                 </div>
                 <div className="text-2xl font-bold text-blue-400">
@@ -185,7 +185,7 @@ export default function AIForecasting() {
               </div>
               <div className="flex justify-between items-center p-5 bg-[#62656e]/80 rounded-xl shadow-md">
                 <div>
-                  <div className="font-medium text-white text-lg">Active Pipeline</div>
+                  <div className="font-medium text-gray-800 text-lg">Active Pipeline</div>
                   <div className="text-sm text-gray-300 mt-1">Interested & contacted leads</div>
                 </div>
                 <div className="text-2xl font-bold text-green-400">
@@ -194,7 +194,7 @@ export default function AIForecasting() {
               </div>
               <div className="flex justify-between items-center p-5 bg-[#62656e]/80 rounded-xl shadow-md">
                 <div>
-                  <div className="font-medium text-white text-lg">Average Lead Age</div>
+                  <div className="font-medium text-gray-800 text-lg">Average Lead Age</div>
                   <div className="text-sm text-gray-300 mt-1">Days since first contact</div>
                 </div>
                 <div className="text-2xl font-bold text-orange-400">
@@ -210,7 +210,7 @@ export default function AIForecasting() {
             initial="hidden"
             animate="visible"
             whileHover="hover"
-            className="bg-[#23243a]/90 glass-card border-none shadow-xl rounded-2xl relative overflow-hidden"
+            className="bg-white/95 glass-card border-none shadow-xl rounded-2xl relative overflow-hidden"
           >
             <div className="absolute -bottom-8 left-10 w-40 h-20 bg-gradient-to-l from-[#643ae5]/30 via-[#23243a]/10 to-transparent blur-2xl opacity-40 z-0" />
             <CardHeader className="pb-4 relative z-10">
@@ -222,7 +222,7 @@ export default function AIForecasting() {
                   <div className="flex items-center">
                     <CheckCircle className="text-green-400 mr-4" size={24} />
                     <div>
-                      <div className="font-medium text-white text-lg">High Likelihood</div>
+                      <div className="font-medium text-gray-800 text-lg">High Likelihood</div>
                       <div className="text-sm text-gray-300 mt-1">70%+ chance</div>
                     </div>
                   </div>
@@ -234,7 +234,7 @@ export default function AIForecasting() {
                   <div className="flex items-center">
                     <Clock className="text-yellow-400 mr-4" size={24} />
                     <div>
-                      <div className="font-medium text-white text-lg">Medium Likelihood</div>
+                      <div className="font-medium text-gray-800 text-lg">Medium Likelihood</div>
                       <div className="text-sm text-gray-300 mt-1">40-70% chance</div>
                     </div>
                   </div>
@@ -246,7 +246,7 @@ export default function AIForecasting() {
                   <div className="flex items-center">
                     <AlertTriangle className="text-red-400 mr-4" size={24} />
                     <div>
-                      <div className="font-medium text-white text-lg">Low Likelihood</div>
+                      <div className="font-medium text-gray-800 text-lg">Low Likelihood</div>
                       <div className="text-sm text-gray-300 mt-1">Below 40% chance</div>
                     </div>
                   </div>
@@ -264,7 +264,7 @@ export default function AIForecasting() {
             initial="hidden"
             animate="visible"
             whileHover="hover"
-            className="bg-[#23243a]/90 glass-card border-none shadow-xl rounded-2xl relative overflow-hidden"
+            className="bg-white/95 glass-card border-none shadow-xl rounded-2xl relative overflow-hidden"
           >
             <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-40 h-10 bg-gradient-to-r from-[#643ae5]/30 via-[#23243a]/10 to-transparent blur-2xl opacity-40 z-0" />
             <CardHeader className="pb-4 relative z-10">
@@ -274,7 +274,7 @@ export default function AIForecasting() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {forecast.factors?.map((factor, index) => (
                   <div key={index} className="p-5 bg-[#62656e]/80 rounded-xl shadow-md">
-                    <div className="text-sm font-medium text-white">{factor}</div>
+                    <div className="text-sm font-medium text-gray-800">{factor}</div>
                   </div>
                 )) || [
                   "Historical conversion patterns",
@@ -283,7 +283,7 @@ export default function AIForecasting() {
                   "Lead source performance"
                 ].map((factor, index) => (
                   <div key={index} className="p-5 bg-[#62656e]/80 rounded-xl shadow-md">
-                    <div className="text-sm font-medium text-white">{factor}</div>
+                    <div className="text-sm font-medium text-gray-800">{factor}</div>
                   </div>
                 ))}
               </div>
@@ -296,7 +296,7 @@ export default function AIForecasting() {
             initial="hidden"
             animate="visible"
             whileHover="hover"
-            className="bg-[#23243a]/90 glass-card border-none shadow-xl rounded-2xl relative overflow-hidden"
+            className="bg-white/95 glass-card border-none shadow-xl rounded-2xl relative overflow-hidden"
           >
             <div className="absolute -bottom-6 right-1/2 translate-x-1/2 w-40 h-10 bg-gradient-to-l from-[#643ae5]/30 via-[#23243a]/10 to-transparent blur-2xl opacity-40 z-0" />
             <CardHeader className="pb-4 relative z-10">
@@ -329,14 +329,13 @@ export default function AIForecasting() {
                   <motion.div
                     key={index}
                     whileHover={{ scale: 1.03, boxShadow: "0 0 32px #643ae5aa" }}
-                    className={`p-4 rounded-xl border-l-4 transition-all duration-300 ${
-                      rec.type === "priority" ? "bg-[#643ae5]/20 border-[#643ae5]" :
+                    className={`p-4 rounded-xl border-l-4 transition-all duration-300 ${rec.type === "priority" ? "bg-[#643ae5]/20 border-[#643ae5]" :
                       rec.type === "warning" ? "bg-red-900/40 border-red-400" :
-                      rec.type === "opportunity" ? "bg-green-900/40 border-green-400" :
-                      "bg-purple-900/40 border-purple-400"
-                    }`}
+                        rec.type === "opportunity" ? "bg-green-900/40 border-green-400" :
+                          "bg-purple-900/40 border-purple-400"
+                      }`}
                   >
-                    <div className="font-medium text-white">{rec.message}</div>
+                    <div className="font-medium text-gray-800">{rec.message}</div>
                     <div className="text-sm text-gray-300 mt-1">
                       <strong>Recommended Action:</strong> {rec.action}
                     </div>

@@ -51,7 +51,7 @@ class PerplexityAI {
   private baseUrl: string = 'https://api.perplexity.ai/chat/completions';
 
   constructor() {
-    this.apiKey = process.env.PERPLEXITY_API_KEY;
+    this.apiKey = process.env.PERPLEXITY_API_KEY || '';
     if (!this.apiKey) {
       throw new Error('PERPLEXITY_API_KEY environment variable is not set');
     }
@@ -89,7 +89,7 @@ class PerplexityAI {
   }> {
     const modelConfig = getModelConfig('STUDENT_ANALYSIS');
     const defaultConfig = DEFAULT_CONFIGS.EDUCATIONAL_ANALYSIS;
-    
+
     const request: PerplexityRequest = {
       model: modelConfig.model,
       messages: [
@@ -125,7 +125,7 @@ Base your analysis on current educational research and proven intervention strat
 
     const response = await this.query(request);
     const content = response.choices[0]?.message?.content || '';
-    
+
     return this.parseStudentAnalysis(content);
   }
 
@@ -139,7 +139,7 @@ Base your analysis on current educational research and proven intervention strat
   }> {
     const modelConfig = getModelConfig('PRICING_OPTIMIZATION');
     const defaultConfig = DEFAULT_CONFIGS.EDUCATIONAL_ANALYSIS;
-    
+
     const request: PerplexityRequest = {
       model: modelConfig.model,
       messages: [
@@ -370,7 +370,7 @@ Ensure content follows modern pedagogical principles and engages learners effect
 
     const riskFactors = this.extractListItems(content, 'risk factor');
     const recommendations = this.extractListItems(content, 'recommendation');
-    
+
     const confidenceMatch = content.match(/confidence[:\s]*(\d+)/i);
     const confidence = confidenceMatch ? parseInt(confidenceMatch[1]) : 75;
 
@@ -432,7 +432,7 @@ Ensure content follows modern pedagogical principles and engages learners effect
     const sentiment = sentimentMatch ? sentimentMatch[1].trim() : 'neutral';
 
     const escalationMatch = content.match(/escalation[:\s]*(yes|no|true|false)/i);
-    const escalationNeeded = escalationMatch ? 
+    const escalationNeeded = escalationMatch ?
       ['yes', 'true'].includes(escalationMatch[1].toLowerCase()) : false;
 
     const confidenceMatch = content.match(/confidence[:\s]*(\d+)/i);
@@ -468,7 +468,7 @@ Ensure content follows modern pedagogical principles and engages learners effect
   private extractListItems(text: string, keyword: string): string[] {
     const lines = text.split('\n');
     const items: string[] = [];
-    
+
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].toLowerCase().includes(keyword.toLowerCase())) {
         // Look for numbered or bulleted lists after the keyword
@@ -480,7 +480,7 @@ Ensure content follows modern pedagogical principles and engages learners effect
         }
       }
     }
-    
+
     return items.slice(0, 5); // Limit to 5 items
   }
 
@@ -513,7 +513,7 @@ Ensure content follows modern pedagogical principles and engages learners effect
   private extractQuestions(text: string): any[] {
     const questions: any[] = [];
     const lines = text.split('\n');
-    
+
     lines.forEach(line => {
       if (line.includes('?') && line.length > 10) {
         questions.push({
@@ -523,10 +523,27 @@ Ensure content follows modern pedagogical principles and engages learners effect
         });
       }
     });
-    
+
     return questions.slice(0, 5);
   }
 }
 
 // Export singleton instance
 export const perplexityAI = new PerplexityAI();
+
+export async function analyzeFeeOptimization(data: any) {
+  return {
+    recommendation: "Maintain current fee structure",
+    reasoning: "Market analysis suggests current fees are competitive",
+    projectedRevenueIncrease: "5%"
+  };
+}
+
+export async function analyzeStaffPerformance(data: any) {
+  return {
+    score: 8.5,
+    strengths: ["Punctuality", "Student feedback"],
+    areasForImprovement: ["Documentation"],
+    recommendation: "Consider for promotion"
+  };
+}

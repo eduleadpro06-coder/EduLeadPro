@@ -20,7 +20,7 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
   const { user, signOut } = useAuth();
 
   return (
-    <header className={`bg-black shadow-sm px-6 py-4 ${className || ''}`}>
+    <header className={`bg-white shadow-sm border-b border-gray-200 px-6 py-4 ${className || ''}`}>
       <div className="flex items-center justify-between pl-2">
         <div />
         <div className="flex items-center space-x-4">
@@ -51,10 +51,10 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
               </Avatar>
               <ChevronDown className="h-4 w-4 text-gray-500" />
             </Button>
-            
+
             {showProfileDropdown && (
-              <div className="absolute right-0 mt-2 w-56 bg-black border border-border rounded-lg shadow-lg z-50">
-                <div className="p-3 border-b border-border">
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                <div className="p-3 border-b border-gray-200">
                   <div className="flex items-center space-x-3">
                     <Avatar className="w-10 h-10">
                       {user?.avatarUrl ? (
@@ -71,7 +71,7 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
                     </Avatar>
                     <div>
                       <p className="text-sm font-medium text-foreground">{user?.displayName || user?.email || 'User'}</p>
-                      <p className="text-xs text-muted-foreground">{user?.id?.slice(0,8)}</p>
+                      <p className="text-xs text-muted-foreground">{user?.id?.slice(0, 8)}</p>
                     </div>
                   </div>
                 </div>

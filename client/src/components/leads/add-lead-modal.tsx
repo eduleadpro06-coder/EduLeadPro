@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { insertLeadSchema, type InsertLead, type User } from "@shared/schema";
+import { insertLeadSchema, type InsertLead, type User, type GlobalClassFee } from "@shared/schema";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -91,11 +91,11 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
         const url = forceCreate ? "/leads?force=true" : "/leads";
         const response = await apiRequest("POST", url, data);
         console.log("Response status:", response.status);
-        
+
         // Check content type to ensure we're receiving JSON
         const contentType = response.headers.get("Content-Type");
         console.log("Response Content-Type:", contentType);
-        
+
         if (contentType && contentType.includes("application/json")) {
           return await response.json();
         } else {
@@ -128,17 +128,17 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
       console.log("Error status:", error.status);
       console.log("Error data:", error.errorData);
       console.log("Full error object:", error);
-      
+
       // Handle duplicate lead error specifically
       // Check for 409 status or error message containing duplicate indicators
-      const isDuplicateError = error.status === 409 || 
+      const isDuplicateError = error.status === 409 ||
         (error.message && (
-          error.message.includes("already exists") || 
+          error.message.includes("already exists") ||
           error.message.includes("409") ||
           error.message.includes("phone number or email") ||
           error.message.includes("duplicate")
         ));
-      
+
       if (isDuplicateError) {
         // Check if this is a deleted lead
         if (error.errorData?.isDeletedLead) {
@@ -147,10 +147,10 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
         } else {
           // Handle normal duplicate (active lead)
           const formData = form.getValues();
-          
+
           // Create a more detailed error message
           let errorDescription = "A lead with this contact information already exists in the system.";
-          
+
           if (formData.phone && formData.email) {
             errorDescription = `A lead with phone number "${formData.phone}" and email "${formData.email}" already exists in the system.`;
           } else if (formData.phone) {
@@ -158,7 +158,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
           } else if (formData.email) {
             errorDescription = `A lead with email "${formData.email}" already exists in the system.`;
           }
-          
+
           // Show the server's error message to the user
           toast({
             title: "⚠️ Duplicate Lead Warning",
@@ -166,24 +166,24 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
             variant: "destructive",
           });
         }
-        
+
         // DO NOT close the modal - let user modify the form and try again
         // DO NOT reset the form - let user see what they entered
       } else {
         let errorMessage = "Something went wrong while creating the lead";
-        
+
         if (error.errorData?.message) {
           errorMessage = error.errorData.message;
         } else if (error.message) {
           errorMessage = error.message;
         }
-        
+
         toast({
           title: "Error creating lead",
           description: errorMessage,
           variant: "destructive",
         });
-        
+
         // For other errors, also keep the modal open
       }
     },
@@ -193,9 +193,13 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
     createLeadMutation.mutate({ data });
   };
 
-  const classOptions = [
-    "Class 9", "Class 10", "Class 11", "Class 12", "Class 8", "Class 7"
-  ];
+  const { data: globalFees } = useQuery<GlobalClassFee[]>({
+    queryKey: ["/api/global-class-fees"],
+  });
+
+  const classOptions = globalFees
+    ? Array.from(new Set(globalFees.filter(f => f.isActive).map(f => f.className))).sort()
+    : [];
 
   const streamOptions = [
     "Science", "Commerce", "Arts", "N/A"
@@ -452,7 +456,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel 
+            <AlertDialogCancel
               onClick={() => {
                 setShowRestoreDialog(false);
                 // Force create new lead despite deleted one existing

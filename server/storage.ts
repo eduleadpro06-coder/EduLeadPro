@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, sql, desc, or, isNull, not } from "drizzle-orm";
+import { eq, and, gte, lte, lt, sql, desc, or, isNull, isNotNull, not, asc } from "drizzle-orm";
 import { db } from "./db.js";
 import * as schema from "../shared/schema.js";
 import type {
@@ -8,7 +8,8 @@ import type {
   FeeStructure, InsertFeeStructure, FeePayment, InsertFeePayment,
   EMandate, InsertEMandate, EmiSchedule, InsertEmiSchedule,
   GlobalClassFee, InsertGlobalClassFee, EmiPlan, InsertEmiPlan,
-  Notification, InsertNotification
+  Notification, InsertNotification, MessageTemplate, InsertMessageTemplate,
+  CommunicationLog, InsertCommunicationLog
 } from "../shared/schema.js";
 
 // Type definitions for complex queries
@@ -145,13 +146,17 @@ export interface IStorage {
   deleteStudent(id: number): Promise<boolean>;
   convertLeadToStudent(leadId: number, studentData: InsertStudent): Promise<Student>;
 
+  // Communication Logs
+  createCommunicationLog(log: InsertCommunicationLog): Promise<CommunicationLog>;
+  getCommunicationLogs(limit?: number): Promise<CommunicationLog[]>;
+
   // Fee Management
   getFeeStructure(id: number): Promise<FeeStructure | undefined>;
   getAllFeeStructures(): Promise<FeeStructure[]>;
   getFeeStructureByStudent(studentId: number): Promise<FeeStructure[]>;
   createFeeStructure(feeStructure: InsertFeeStructure): Promise<FeeStructure>;
   updateFeeStructure(id: number, updates: Partial<FeeStructure>): Promise<FeeStructure | undefined>;
-  
+
   // Global Class Fee Management
   getGlobalClassFee(id: number): Promise<GlobalClassFee | undefined>;
   getAllGlobalClassFees(): Promise<GlobalClassFee[]>;
@@ -159,12 +164,13 @@ export interface IStorage {
   createGlobalClassFee(globalClassFee: InsertGlobalClassFee): Promise<GlobalClassFee>;
   updateGlobalClassFee(id: number, updates: Partial<GlobalClassFee>): Promise<GlobalClassFee | undefined>;
   deleteGlobalClassFee(id: number): Promise<boolean>;
-  
+
   getFeePayment(id: number): Promise<FeePayment | undefined>;
   getAllFeePayments(): Promise<FeePayment[]>;
   getFeePaymentsByStudent(studentId: number): Promise<FeePayment[]>;
   createFeePayment(feePayment: InsertFeePayment): Promise<FeePayment>;
-  
+  updateFeePayment(id: number, updates: Partial<FeePayment>): Promise<FeePayment | undefined>;
+
   getFeeStats(): Promise<{
     totalPending: number;
     totalPaid: number;
@@ -179,13 +185,13 @@ export interface IStorage {
   createEMandate(eMandate: InsertEMandate): Promise<EMandate>;
   updateEMandate(id: number, updates: Partial<EMandate>): Promise<EMandate | undefined>;
   deleteEMandate(id: number): Promise<boolean>;
-  
+
   getEmiSchedule(id: number): Promise<EmiSchedule | undefined>;
   getEmiScheduleByMandate(eMandateId: number): Promise<EmiSchedule[]>;
   createEmiSchedule(emiSchedule: InsertEmiSchedule): Promise<EmiSchedule>;
   updateEmiSchedule(id: number, updates: Partial<EmiSchedule>): Promise<EmiSchedule | undefined>;
   getUpcomingEmis(): Promise<EmiSchedule[]>;
-  
+
   // EMI Plan operations
   getEmiPlan(id: number): Promise<EmiPlan | undefined>;
   getEmiPlansByStudent(studentId: number): Promise<EmiPlan[]>;
@@ -193,7 +199,7 @@ export interface IStorage {
   createEmiPlan(emiPlan: InsertEmiPlan): Promise<EmiPlan>;
   updateEmiPlan(id: number, updates: Partial<EmiPlan>): Promise<EmiPlan | undefined>;
   deleteEmiPlan(id: number): Promise<boolean>;
-  
+
   // EMI Payment tracking operations
   getPendingEmisForPlan(emiPlanId: number): Promise<any[]>;
   getEmiPaymentProgress(emiPlanId: number): Promise<any>;
@@ -219,6 +225,13 @@ export interface IStorage {
     byType: Array<{ type: string; count: number }>;
   }>;
 
+  // Message Templates
+  getMessageTemplate(id: number): Promise<MessageTemplate | undefined>;
+  getAllMessageTemplates(category?: string): Promise<MessageTemplate[]>;
+  createMessageTemplate(template: InsertMessageTemplate): Promise<MessageTemplate>;
+  updateMessageTemplate(id: number, updates: Partial<MessageTemplate>): Promise<MessageTemplate | undefined>;
+  deleteMessageTemplate(id: number): Promise<boolean>;
+
   // New method
   generateMonthlyPayrollForAllStaff(month: number, year: number): Promise<{ created: number; skipped: number; errors: any[] }>;
 }
@@ -241,7 +254,64 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllCounselors(): Promise<User[]> {
-    return await db.select().from(schema.users).where(eq(schema.users.role, "counselor"));
+    try {
+      // Sync Staff -> Users (role=Counselor) to ensure they appear in the dropdown
+      const potentialCounselors = await db.select().from(schema.staff)
+        .where(or(
+          eq(schema.staff.role, "Counselor"),
+          eq(schema.staff.role, "counselor"),
+          eq(schema.staff.role, "COUNSELOR")
+        ));
+
+      console.log(`[Auto-Sync] Found ${potentialCounselors.length} potential counselors in staff table`);
+
+      for (const staffMember of potentialCounselors) {
+        if (!staffMember.email) {
+          console.log(`[Auto-Sync] Skipping staff ${staffMember.name} (no email)`);
+          continue;
+        }
+
+        const existingUsers = await db.select().from(schema.users)
+          .where(eq(schema.users.email, staffMember.email));
+
+        if (existingUsers.length === 0) {
+          console.log(`[Auto-Sync] Creating user for staff: ${staffMember.name} (${staffMember.email})`);
+          try {
+            await this.createUser({
+              username: staffMember.email,
+              password: "password123",
+              role: "counselor",
+              email: staffMember.email,
+              name: staffMember.name
+            } as InsertUser);
+          } catch (err) {
+            console.error(`[Auto-Sync] Failed to create user for ${staffMember.email}:`, err);
+          }
+        } else {
+          const user = existingUsers[0];
+          // Ensure role is counselor if they are in the staff table as such
+          if (user.role !== "counselor") {
+            console.log(`[Auto-Sync] Updating role to counselor for ${user.username}`);
+            await db.update(schema.users).set({ role: "counselor" }).where(eq(schema.users.id, user.id));
+          }
+          // Update name if missing
+          if (!user.name && staffMember.name) {
+            console.log(`[Auto-Sync] Updating name for ${user.username} to ${staffMember.name}`);
+            await db.update(schema.users).set({ name: staffMember.name }).where(eq(schema.users.id, user.id));
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error in counselor sync:", error);
+    }
+
+    // Return users, aliasing username as name if name is missing (for frontend)
+    const users = await db.select().from(schema.users).where(eq(schema.users.role, "counselor"));
+    console.log(`[Auto-Sync] Returning ${users.length} counselors from users table`);
+    return users.map(u => ({
+      ...u,
+      name: u.name || u.username
+    }));
   }
 
   // Lead operations with counselor details
@@ -257,6 +327,7 @@ export class DatabaseStorage implements IStorage {
         source: schema.leads.source,
         status: schema.leads.status,
         interestedProgram: schema.leads.interestedProgram,
+        admissionLikelihood: schema.leads.admissionLikelihood,
         notes: schema.leads.notes,
         counselorId: schema.leads.counselorId,
         assignedAt: schema.leads.assignedAt,
@@ -267,8 +338,10 @@ export class DatabaseStorage implements IStorage {
         parentName: schema.leads.parentName,
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
+        deletedAt: schema.leads.deletedAt,
         counselor: {
           id: schema.users.id,
+          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           password: schema.users.password,
@@ -280,16 +353,16 @@ export class DatabaseStorage implements IStorage {
       .from(schema.leads)
       .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id))
       .where(eq(schema.leads.id, id));
-    
-    return result[0] ? {
+
+    return (result[0] ? {
       ...result[0],
       counselor: result[0].counselor || undefined
-    } : undefined;
+    } : undefined) as LeadWithCounselor | undefined;
   }
 
   async getAllLeads(includeDeleted = false): Promise<LeadWithCounselor[]> {
     const now = new Date();
-    const ninetyDaysAgo = new Date(now.getTime() - 90*24*60*60*1000);
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     let query = db
       .select({
         id: schema.leads.id,
@@ -300,6 +373,7 @@ export class DatabaseStorage implements IStorage {
         stream: schema.leads.stream,
         source: schema.leads.source,
         status: schema.leads.status,
+        admissionLikelihood: schema.leads.admissionLikelihood,
         interestedProgram: schema.leads.interestedProgram,
         notes: schema.leads.notes,
         counselorId: schema.leads.counselorId,
@@ -314,6 +388,7 @@ export class DatabaseStorage implements IStorage {
         deletedAt: schema.leads.deletedAt,
         counselor: {
           id: schema.users.id,
+          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           password: schema.users.password,
@@ -323,14 +398,21 @@ export class DatabaseStorage implements IStorage {
         }
       })
       .from(schema.leads)
-      .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id))
-      .orderBy(desc(schema.leads.createdAt));
+      .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id));
+
     if (!includeDeleted) {
-      query = query.where(or(
-        isNull(schema.leads.deletedAt),
-        gte(schema.leads.deletedAt, ninetyDaysAgo)
-      )).where(not(eq(schema.leads.status, "deleted")));
+      query = (query as any).where(and(
+        or(
+          isNull(schema.leads.deletedAt),
+          gte(schema.leads.deletedAt, ninetyDaysAgo)
+        ),
+        not(eq(schema.leads.status, "deleted"))
+      ));
     }
+
+    // Apply order by at the end
+    query = (query as any).orderBy(desc(schema.leads.createdAt));
+
     const result = await query;
     return result.map((item: any) => ({
       ...item,
@@ -357,11 +439,11 @@ export class DatabaseStorage implements IStorage {
         updatedAt: schema.leads.updatedAt,
         lastContactedAt: schema.leads.lastContactedAt,
 
-        parentName: schema.leads.parentName,
-        parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
+        deletedAt: schema.leads.deletedAt,
         counselor: {
           id: schema.users.id,
+          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           password: schema.users.password,
@@ -374,7 +456,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id))
       .where(eq(schema.leads.status, status))
       .orderBy(desc(schema.leads.createdAt));
-    
+
     return result.map((item: any) => ({
       ...item,
       counselor: item.counselor || undefined
@@ -403,8 +485,10 @@ export class DatabaseStorage implements IStorage {
         parentName: schema.leads.parentName,
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
+        deletedAt: schema.leads.deletedAt,
         counselor: {
           id: schema.users.id,
+          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           password: schema.users.password,
@@ -417,7 +501,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id))
       .where(eq(schema.leads.counselorId, counselorId))
       .orderBy(desc(schema.leads.createdAt));
-    
+
     return result.map((item: any) => ({
       ...item,
       counselor: item.counselor || undefined
@@ -446,8 +530,10 @@ export class DatabaseStorage implements IStorage {
         parentName: schema.leads.parentName,
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
+        deletedAt: schema.leads.deletedAt,
         counselor: {
           id: schema.users.id,
+          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           password: schema.users.password,
@@ -463,7 +549,7 @@ export class DatabaseStorage implements IStorage {
         lte(schema.leads.createdAt, endDate)
       ))
       .orderBy(desc(schema.leads.createdAt));
-    
+
     return result.map((item: any) => ({
       ...item,
       counselor: item.counselor || undefined
@@ -491,13 +577,13 @@ export class DatabaseStorage implements IStorage {
       .from(schema.leads)
       .where(eq(schema.leads.phone, phone))
       .limit(1);
-    
+
     if (phoneResult.length > 0) {
       // If found by phone, get the full lead with counselor details
       const lead = await this.getLead(phoneResult[0].id);
       return lead || null;
     }
-    
+
     // If email is provided, also check by email
     if (email) {
       const emailResult = await db
@@ -505,13 +591,13 @@ export class DatabaseStorage implements IStorage {
         .from(schema.leads)
         .where(eq(schema.leads.email, email))
         .limit(1);
-      
+
       if (emailResult.length > 0) {
         const lead = await this.getLead(emailResult[0].id);
         return lead || null;
       }
     }
-    
+
     return null;
   }
 
@@ -573,8 +659,10 @@ export class DatabaseStorage implements IStorage {
         parentName: schema.leads.parentName,
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
+        deletedAt: schema.leads.deletedAt,
         counselor: {
           id: schema.users.id,
+          name: schema.users.name,
           username: schema.users.username,
           email: schema.users.email,
           password: schema.users.password,
@@ -587,7 +675,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id))
       .where(eq(schema.leads.status, "interested"))
       .orderBy(desc(schema.leads.createdAt));
-    
+
     return result.map((item: any) => ({
       ...item,
       counselor: item.counselor || undefined
@@ -618,19 +706,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateFollowUp(id: number, updates: Partial<FollowUp>): Promise<FollowUp | undefined> {
-    const result = await db.update(schema.followUps).set({
-      ...updates,
-      updatedAt: new Date()
-    }).where(eq(schema.followUps.id, id)).returning();
-    return result[0];
+    console.log("updateFollowUp - Received updates:", JSON.stringify(updates, null, 2));
+
+    // Convert ISO string dates to Date objects
+    const processedUpdates: any = { ...updates };
+    if (typeof processedUpdates.completedAt === 'string') {
+      processedUpdates.completedAt = new Date(processedUpdates.completedAt);
+    }
+    if (typeof processedUpdates.scheduledAt === 'string') {
+      processedUpdates.scheduledAt = new Date(processedUpdates.scheduledAt);
+    }
+
+    console.log("updateFollowUp - Processed updates:", JSON.stringify(processedUpdates, null, 2));
+
+    try {
+      const result = await db.update(schema.followUps)
+        .set(processedUpdates)
+        .where(eq(schema.followUps.id, id))
+        .returning();
+
+      console.log("updateFollowUp - Database result:", JSON.stringify(result[0], null, 2));
+      return result[0];
+    } catch (error) {
+      console.error("updateFollowUp - Database error:", error);
+      throw error;
+    }
   }
 
   async getOverdueFollowUps(): Promise<FollowUp[]> {
     const now = new Date();
     return await db.select().from(schema.followUps)
       .where(and(
-        eq(schema.followUps.status, "scheduled"),
-        sql`${schema.followUps.scheduledAt} < ${now}`
+        isNull(schema.followUps.completedAt),
+        lt(schema.followUps.scheduledAt, now)
       ));
   }
 
@@ -646,8 +754,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateLeadSource(id: number, updates: Partial<LeadSource>): Promise<LeadSource | undefined> {
     const result = await db.update(schema.leadSources).set({
-      ...updates,
-      updatedAt: new Date()
+      ...updates
     }).where(eq(schema.leadSources.id, id)).returning();
     return result[0];
   }
@@ -662,7 +769,7 @@ export class DatabaseStorage implements IStorage {
     const totalLeads = await db.select({ count: sql<number>`count(*)` }).from(schema.leads);
     const hotLeads = await db.select({ count: sql<number>`count(*)` }).from(schema.leads).where(eq(schema.leads.status, "hot"));
     const conversions = await db.select({ count: sql<number>`count(*)` }).from(schema.leads).where(eq(schema.leads.status, "enrolled"));
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const newLeadsToday = await db.select({ count: sql<number>`count(*)` }).from(schema.leads)
@@ -686,19 +793,19 @@ export class DatabaseStorage implements IStorage {
     const totalEnrollments = await db.select({ count: sql<number>`count(*)` })
       .from(schema.leads)
       .where(eq(schema.leads.status, "enrolled"));
-    
+
     // Get active enrollments (leads with status "enrolled")
     const activeEnrollments = await db.select({ count: sql<number>`count(*)` })
       .from(schema.leads)
       .where(eq(schema.leads.status, "enrolled"));
-    
+
     // Get new enrollments this month
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
     const monthStart = new Date(currentYear, currentMonth, 1);
     const monthEnd = new Date(currentYear, currentMonth + 1, 0);
-    
+
     const newEnrollmentsThisMonth = await db.select({ count: sql<number>`count(*)` })
       .from(schema.leads)
       .where(
@@ -708,11 +815,11 @@ export class DatabaseStorage implements IStorage {
           lte(schema.leads.createdAt, monthEnd)
         )
       );
-    
+
     // Get previous month enrollments for trend calculation
     const prevMonthStart = new Date(currentYear, currentMonth - 1, 1);
     const prevMonthEnd = new Date(currentYear, currentMonth, 0);
-    
+
     const prevMonthEnrollments = await db.select({ count: sql<number>`count(*)` })
       .from(schema.leads)
       .where(
@@ -722,12 +829,12 @@ export class DatabaseStorage implements IStorage {
           lte(schema.leads.createdAt, prevMonthEnd)
         )
       );
-    
+
     // Calculate trend percentage
     const currentCount = newEnrollmentsThisMonth[0]?.count || 0;
     const prevCount = prevMonthEnrollments[0]?.count || 0;
     const enrollmentTrend = prevCount > 0 ? ((currentCount - prevCount) / prevCount) * 100 : 0;
-    
+
     return {
       totalEnrollments: totalEnrollments[0]?.count || 0,
       activeEnrollments: activeEnrollments[0]?.count || 0,
@@ -749,7 +856,7 @@ export class DatabaseStorage implements IStorage {
       const totalLeads = await db.select({ count: sql<number>`count(*)` })
         .from(schema.leads)
         .where(eq(schema.leads.source, source.name));
-      
+
       const conversions = await db.select({ count: sql<number>`count(*)` })
         .from(schema.leads)
         .where(and(
@@ -759,7 +866,7 @@ export class DatabaseStorage implements IStorage {
 
       const total = totalLeads[0].count;
       const converted = conversions[0].count;
-      
+
       performance.push({
         source: source.name,
         totalLeads: total,
@@ -835,11 +942,11 @@ export class DatabaseStorage implements IStorage {
           staffId: staff.id,
           month,
           year,
-          basicSalary,
-          allowances,
-          deductions,
-          overtime,
-          netSalary,
+          basicSalary: String(basicSalary),
+          allowances: String(allowances),
+          deductions: String(deductions),
+          overtime: String(overtime),
+          netSalary: String(netSalary),
           attendedDays,
           status: 'pending',
         });
@@ -859,14 +966,14 @@ export class DatabaseStorage implements IStorage {
       console.log("isActive in updates:", 'isActive' in updates);
       console.log("isActive value:", updates.isActive);
       console.log("isActive type:", typeof updates.isActive);
-      
+
       // First, let's get the current staff record to see what we're working with
       const currentStaff = await this.getStaff(id);
       console.log("Current staff record:", currentStaff);
-      
+
       // Prepare the update object with explicit field mapping
       const updateData: any = { ...updates };
-      
+
       // Handle date fields
       const dateFields = ["dateOfJoining", "createdAt", "updatedAt"];
       for (const field of dateFields) {
@@ -879,18 +986,18 @@ export class DatabaseStorage implements IStorage {
           }
         }
       }
-      
+
       console.log("After date processing, updateData:", updateData);
-      
+
       // Special handling for isActive - this is our main fix
       if ('isActive' in updates) {
         const isActiveValue = Boolean(updates.isActive);
         console.log("Converting isActive:", updates.isActive, "->", isActiveValue);
         updateData.isActive = isActiveValue;
       }
-      
+
       console.log("Final updateData before DB call:", updateData);
-      
+
       const result = await db.update(schema.staff)
         .set({
           ...updateData,
@@ -898,7 +1005,7 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(schema.staff.id, id))
         .returning();
-        
+
       const updatedStaff = result[0];
       console.log("Database result:", updatedStaff);
       console.log("=== updateStaff COMPLETE ===");
@@ -915,30 +1022,29 @@ export class DatabaseStorage implements IStorage {
           const attendedDays = payroll.attendedDays || 30;
           const netSalary = (basicSalary / 30) * attendedDays;
           await this.updatePayroll(payroll.id, {
-            basicSalary,
-            employeeName,
-            netSalary
+            basicSalary: String(basicSalary),
+            netSalary: String(netSalary)
           });
         }
       }
-      
+
       if (updatedStaff && currentStaff) {
         // Track specific field changes with detailed notifications
         const changes: string[] = [];
-        
+
         // Track name changes
         if (updates.name && currentStaff.name !== updatedStaff.name) {
           changes.push(`name from "${currentStaff.name}" to "${updatedStaff.name}"`);
-        await this.notifyChange(
-          'staff',
+          await this.notifyChange(
+            'staff',
             'Employee Name Updated',
             `Employee name changed from "${currentStaff.name}" to "${updatedStaff.name}"`,
-          'medium',
+            'medium',
             'staff_profile_change',
-          updatedStaff.id.toString()
-        );
+            updatedStaff.id.toString()
+          );
         }
-        
+
         // Track email changes
         if (updates.email && currentStaff.email !== updatedStaff.email) {
           changes.push(`email from "${currentStaff.email || 'N/A'}" to "${updatedStaff.email || 'N/A'}"`);
@@ -951,7 +1057,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         // Track phone changes
         if (updates.phone && currentStaff.phone !== updatedStaff.phone) {
           changes.push(`phone from "${currentStaff.phone}" to "${updatedStaff.phone}"`);
@@ -964,7 +1070,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         // Track role changes
         if (updates.role && currentStaff.role !== updatedStaff.role) {
           changes.push(`role from "${currentStaff.role}" to "${updatedStaff.role}"`);
@@ -977,7 +1083,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         // Track department changes
         if (updates.department && currentStaff.department !== updatedStaff.department) {
           changes.push(`department from "${currentStaff.department || 'N/A'}" to "${updatedStaff.department || 'N/A'}"`);
@@ -990,7 +1096,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         // Track address changes
         if (updates.address && currentStaff.address !== updatedStaff.address) {
           changes.push(`address updated`);
@@ -1003,7 +1109,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         // Track emergency contact changes
         if (updates.emergencyContact && currentStaff.emergencyContact !== updatedStaff.emergencyContact) {
           changes.push(`emergency contact from "${currentStaff.emergencyContact || 'N/A'}" to "${updatedStaff.emergencyContact || 'N/A'}"`);
@@ -1016,7 +1122,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         // Track qualifications changes
         if (updates.qualifications && currentStaff.qualifications !== updatedStaff.qualifications) {
           changes.push(`qualifications updated`);
@@ -1029,7 +1135,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         // Track banking details changes
         if (updates.bankAccountNumber && currentStaff.bankAccountNumber !== updatedStaff.bankAccountNumber) {
           changes.push(`bank account number updated`);
@@ -1042,7 +1148,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         if (updates.ifscCode && currentStaff.ifscCode !== updatedStaff.ifscCode) {
           changes.push(`IFSC code updated`);
           await this.notifyChange(
@@ -1054,7 +1160,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         if (updates.panNumber && currentStaff.panNumber !== updatedStaff.panNumber) {
           changes.push(`PAN number updated`);
           await this.notifyChange(
@@ -1066,7 +1172,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         // Track date of joining changes
         if (updates.dateOfJoining && currentStaff.dateOfJoining !== updatedStaff.dateOfJoining) {
           const oldDate = currentStaff.dateOfJoining ? new Date(currentStaff.dateOfJoining).toLocaleDateString() : 'N/A';
@@ -1081,7 +1187,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         // Track salary changes (existing logic)
         if (updates.salary && Number(currentStaff.salary) !== Number(updatedStaff.salary)) {
           changes.push(`salary from ₹${Number(currentStaff.salary).toLocaleString()} to ₹${Number(updatedStaff.salary).toLocaleString()}`);
@@ -1094,7 +1200,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         // Track status changes (existing logic)
         if ('isActive' in updates && currentStaff.isActive !== updatedStaff.isActive) {
           const statusAction = updatedStaff.isActive ? 'activated' : 'deactivated';
@@ -1108,7 +1214,7 @@ export class DatabaseStorage implements IStorage {
             updatedStaff.id.toString()
           );
         }
-        
+
         // Create a comprehensive summary notification if multiple changes were made
         if (changes.length > 1) {
           await this.notifyChange(
@@ -1121,7 +1227,7 @@ export class DatabaseStorage implements IStorage {
           );
         }
       }
-      
+
       return updatedStaff;
     } catch (error) {
       console.error("Error in updateStaff:", error);
@@ -1182,12 +1288,12 @@ export class DatabaseStorage implements IStorage {
         .from(schema.staff)
         .where(eq(schema.staff.phone, phone))
         .limit(1);
-      
+
       if (phoneResult.length > 0) {
         return phoneResult[0];
       }
     }
-    
+
     // Check by employee ID if provided
     if (employeeId) {
       const employeeIdResult = await db
@@ -1195,12 +1301,12 @@ export class DatabaseStorage implements IStorage {
         .from(schema.staff)
         .where(eq(schema.staff.employeeId, employeeId))
         .limit(1);
-      
+
       if (employeeIdResult.length > 0) {
         return employeeIdResult[0];
       }
     }
-    
+
     // If email is provided, also check by email
     if (email) {
       const emailResult = await db
@@ -1208,19 +1314,19 @@ export class DatabaseStorage implements IStorage {
         .from(schema.staff)
         .where(eq(schema.staff.email, email))
         .limit(1);
-      
+
       if (emailResult.length > 0) {
         return emailResult[0];
       }
     }
-    
+
     return null;
   }
 
   async getStaffActivities(staffId: number): Promise<any[]> {
     try {
       console.log(`[ACTIVITY DEBUG] Fetching activities for staff ID: ${staffId}`);
-      
+
       // Get notifications related to this staff member - simplified query
       const staffNotifications = await db
         .select()
@@ -1240,8 +1346,8 @@ export class DatabaseStorage implements IStorage {
           year: schema.payroll.year,
           status: schema.payroll.status,
           netSalary: schema.payroll.netSalary,
+          paymentDate: schema.payroll.paymentDate,
           createdAt: schema.payroll.createdAt,
-          updatedAt: schema.payroll.updatedAt,
         })
         .from(schema.payroll)
         .where(eq(schema.payroll.staffId, staffId))
@@ -1273,7 +1379,7 @@ export class DatabaseStorage implements IStorage {
           message: `${payroll.month}/${payroll.year} - ₹${Number(payroll.netSalary).toLocaleString()} (${payroll.status})`,
           priority: payroll.status === 'processed' ? 'high' : 'medium',
           actionType: payroll.status === 'processed' ? 'payroll_processed' : 'payroll_generated',
-          timestamp: payroll.status === 'processed' ? payroll.updatedAt : payroll.createdAt,
+          timestamp: payroll.status === 'processed' && payroll.paymentDate ? new Date(payroll.paymentDate) : payroll.createdAt,
           metadata: {
             payrollId: payroll.id,
             month: payroll.month,
@@ -1288,7 +1394,7 @@ export class DatabaseStorage implements IStorage {
       activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
       console.log(`[ACTIVITY DEBUG] Returning ${activities.length} activities for staff ${staffId}`);
-      
+
       // Return real activities data (latest 20 activities)
       return activities.slice(0, 20);
     } catch (error) {
@@ -1305,8 +1411,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAttendanceByStaff(staffId: number, month?: number, year?: number): Promise<Attendance[]> {
-    let query = db.select().from(schema.attendance).where(eq(schema.attendance.staffId, staffId));
-    
+    let query: any = db.select().from(schema.attendance).where(eq(schema.attendance.staffId, staffId));
+
     if (month && year) {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
@@ -1316,7 +1422,7 @@ export class DatabaseStorage implements IStorage {
         lte(schema.attendance.date, endDate.toISOString().split('T')[0])
       )) as any;
     }
-    
+
     return await query;
   }
 
@@ -1327,8 +1433,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateAttendance(id: number, updates: Partial<Attendance>): Promise<Attendance | undefined> {
     const result = await db.update(schema.attendance).set({
-      ...updates,
-      updatedAt: new Date()
+      ...updates
     }).where(eq(schema.attendance.id, id)).returning();
     return result[0];
   }
@@ -1340,7 +1445,7 @@ export class DatabaseStorage implements IStorage {
   }> {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
-    
+
     const stats = await db
       .select({
         totalPresent: sql<number>`count(*) filter (where status = 'present')`,
@@ -1428,9 +1533,9 @@ export class DatabaseStorage implements IStorage {
       console.log('Storage createPayroll - Input data:', JSON.stringify(insertPayroll, null, 2));
       const result = await db.insert(schema.payroll).values(insertPayroll).returning();
       console.log('Storage createPayroll - Result:', JSON.stringify(result[0], null, 2));
-      
+
       const payroll = result[0];
-      
+
       // Get staff details for notification
       const staff = await this.getStaff(payroll.staffId);
       if (staff) {
@@ -1443,7 +1548,7 @@ export class DatabaseStorage implements IStorage {
           payroll.id.toString()
         );
       }
-      
+
       return payroll;
     } catch (error) {
       console.error("Error creating payroll:", error);
@@ -1454,14 +1559,13 @@ export class DatabaseStorage implements IStorage {
   async updatePayroll(id: number, updates: Partial<Payroll>): Promise<Payroll | undefined> {
     // Get current payroll for comparison
     const currentPayroll = await this.getPayroll(id);
-    
+
     const result = await db.update(schema.payroll).set({
-      ...updates,
-      updatedAt: new Date()
+      ...updates
     }).where(eq(schema.payroll.id, id)).returning();
-    
+
     const updatedPayroll = result[0];
-    
+
     if (updatedPayroll && currentPayroll) {
       const staff = await this.getStaff(updatedPayroll.staffId);
       if (staff) {
@@ -1476,7 +1580,7 @@ export class DatabaseStorage implements IStorage {
             updatedPayroll.id.toString()
           );
         }
-        
+
         // Log salary changes
         if (updates.netSalary && Number(currentPayroll.netSalary) !== Number(updatedPayroll.netSalary)) {
           await this.notifyChange(
@@ -1490,7 +1594,7 @@ export class DatabaseStorage implements IStorage {
         }
       }
     }
-    
+
     return updatedPayroll;
   }
 
@@ -1534,9 +1638,9 @@ export class DatabaseStorage implements IStorage {
       }
       const result = await db.select().from(schema.payroll)
         .where(and(
-          eq(schema.payroll.staffId, staffId),
           eq(schema.payroll.month, month),
-          eq(schema.payroll.year, year)
+          eq(schema.payroll.year, year),
+          eq(schema.payroll.staffId, staffId)
         ));
       return result[0];
     } catch (error) {
@@ -1544,6 +1648,9 @@ export class DatabaseStorage implements IStorage {
       return undefined;
     }
   }
+
+
+
 
   // Expense operations
   async getExpense(id: number): Promise<ExpenseWithApprover | undefined> {
@@ -1560,20 +1667,45 @@ export class DatabaseStorage implements IStorage {
         approvedBy: schema.expenses.approvedBy,
         createdAt: schema.expenses.createdAt,
         updatedAt: schema.expenses.updatedAt,
-        approver: {
-          id: schema.users.id,
-          username: schema.users.username,
-          email: schema.users.email,
-          role: schema.users.role,
-          createdAt: schema.users.createdAt,
-          updatedAt: schema.users.updatedAt
-        }
+        approverId: schema.users.id,
+        approverName: schema.users.name,
+        approverEmail: schema.users.email,
+        approverUsername: schema.users.username,
+        approverPassword: schema.users.password,
+        approverRole: schema.users.role,
+        approverCreatedAt: schema.users.createdAt,
+        approverUpdatedAt: schema.users.updatedAt
       })
       .from(schema.expenses)
       .leftJoin(schema.users, eq(schema.expenses.approvedBy, schema.users.id))
       .where(eq(schema.expenses.id, id));
-    
-    return result[0];
+
+    if (!result[0]) return undefined;
+
+    const row = result[0];
+    return {
+      id: row.id,
+      description: row.description,
+      amount: row.amount,
+      category: row.category,
+      date: row.date,
+      status: row.status,
+      receiptUrl: row.receiptUrl,
+      submittedBy: row.submittedBy,
+      approvedBy: row.approvedBy,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      approver: row.approverId ? {
+        id: row.approverId,
+        name: row.approverName,
+        email: row.approverEmail,
+        username: row.approverUsername!,
+        password: row.approverPassword!,
+        role: row.approverRole!,
+        createdAt: row.approverCreatedAt!,
+        updatedAt: row.approverUpdatedAt!
+      } : undefined
+    };
   }
 
   async getAllExpenses(): Promise<ExpenseWithApprover[]> {
@@ -1590,19 +1722,41 @@ export class DatabaseStorage implements IStorage {
         approvedBy: schema.expenses.approvedBy,
         createdAt: schema.expenses.createdAt,
         updatedAt: schema.expenses.updatedAt,
-        approver: {
-          id: schema.users.id,
-          username: schema.users.username,
-          email: schema.users.email,
-          role: schema.users.role,
-          createdAt: schema.users.createdAt,
-          updatedAt: schema.users.updatedAt
-        }
+        approverId: schema.users.id,
+        approverName: schema.users.name,
+        approverEmail: schema.users.email,
+        approverUsername: schema.users.username,
+        approverPassword: schema.users.password,
+        approverRole: schema.users.role,
+        approverCreatedAt: schema.users.createdAt,
+        approverUpdatedAt: schema.users.updatedAt
       })
       .from(schema.expenses)
       .leftJoin(schema.users, eq(schema.expenses.approvedBy, schema.users.id));
-    
-    return result;
+
+    return result.map(row => ({
+      id: row.id,
+      description: row.description,
+      amount: row.amount,
+      category: row.category,
+      date: row.date,
+      status: row.status,
+      receiptUrl: row.receiptUrl,
+      submittedBy: row.submittedBy,
+      approvedBy: row.approvedBy,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      approver: row.approverId ? {
+        id: row.approverId,
+        name: row.approverName,
+        email: row.approverEmail,
+        username: row.approverUsername!,
+        password: row.approverPassword!,
+        role: row.approverRole!,
+        createdAt: row.approverCreatedAt!,
+        updatedAt: row.approverUpdatedAt!
+      } : undefined
+    }));
   }
 
   async getExpensesByCategory(category: string): Promise<ExpenseWithApprover[]> {
@@ -1619,20 +1773,42 @@ export class DatabaseStorage implements IStorage {
         approvedBy: schema.expenses.approvedBy,
         createdAt: schema.expenses.createdAt,
         updatedAt: schema.expenses.updatedAt,
-        approver: {
-          id: schema.users.id,
-          username: schema.users.username,
-          email: schema.users.email,
-          role: schema.users.role,
-          createdAt: schema.users.createdAt,
-          updatedAt: schema.users.updatedAt
-        }
+        approverId: schema.users.id,
+        approverName: schema.users.name,
+        approverEmail: schema.users.email,
+        approverUsername: schema.users.username,
+        approverPassword: schema.users.password,
+        approverRole: schema.users.role,
+        approverCreatedAt: schema.users.createdAt,
+        approverUpdatedAt: schema.users.updatedAt
       })
       .from(schema.expenses)
       .leftJoin(schema.users, eq(schema.expenses.approvedBy, schema.users.id))
       .where(eq(schema.expenses.category, category));
-    
-    return result;
+
+    return result.map(row => ({
+      id: row.id,
+      description: row.description,
+      amount: row.amount,
+      category: row.category,
+      date: row.date,
+      status: row.status,
+      receiptUrl: row.receiptUrl,
+      submittedBy: row.submittedBy,
+      approvedBy: row.approvedBy,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      approver: row.approverId ? {
+        id: row.approverId,
+        name: row.approverName,
+        email: row.approverEmail,
+        username: row.approverUsername!,
+        password: row.approverPassword!,
+        role: row.approverRole!,
+        createdAt: row.approverCreatedAt!,
+        updatedAt: row.approverUpdatedAt!
+      } : undefined
+    }));
   }
 
   async getExpensesByDateRange(startDate: string, endDate: string): Promise<ExpenseWithApprover[]> {
@@ -1649,14 +1825,14 @@ export class DatabaseStorage implements IStorage {
         approvedBy: schema.expenses.approvedBy,
         createdAt: schema.expenses.createdAt,
         updatedAt: schema.expenses.updatedAt,
-        approver: {
-          id: schema.users.id,
-          username: schema.users.username,
-          email: schema.users.email,
-          role: schema.users.role,
-          createdAt: schema.users.createdAt,
-          updatedAt: schema.users.updatedAt
-        }
+        approverId: schema.users.id,
+        approverName: schema.users.name,
+        approverEmail: schema.users.email,
+        approverUsername: schema.users.username,
+        approverPassword: schema.users.password,
+        approverRole: schema.users.role,
+        approverCreatedAt: schema.users.createdAt,
+        approverUpdatedAt: schema.users.updatedAt
       })
       .from(schema.expenses)
       .leftJoin(schema.users, eq(schema.expenses.approvedBy, schema.users.id))
@@ -1664,8 +1840,30 @@ export class DatabaseStorage implements IStorage {
         gte(schema.expenses.date, startDate),
         lte(schema.expenses.date, endDate)
       ));
-    
-    return result;
+
+    return result.map(row => ({
+      id: row.id,
+      description: row.description,
+      amount: row.amount,
+      category: row.category,
+      date: row.date,
+      status: row.status,
+      receiptUrl: row.receiptUrl,
+      submittedBy: row.submittedBy,
+      approvedBy: row.approvedBy,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      approver: row.approverId ? {
+        id: row.approverId,
+        name: row.approverName,
+        email: row.approverEmail,
+        username: row.approverUsername!,
+        password: row.approverPassword!,
+        role: row.approverRole!,
+        createdAt: row.approverCreatedAt!,
+        updatedAt: row.approverUpdatedAt!
+      } : undefined
+    }));
   }
 
   async createExpense(insertExpense: InsertExpense): Promise<Expense> {
@@ -1708,7 +1906,7 @@ export class DatabaseStorage implements IStorage {
   }> {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
-    
+
     const total = await db
       .select({
         total: sql<number>`sum(CAST(amount AS DECIMAL))`
@@ -1756,9 +1954,9 @@ export class DatabaseStorage implements IStorage {
   async deleteExpense(id: number): Promise<boolean> {
     const expense = await this.getExpense(id);
     if (!expense) return false;
-    
+
     await db.delete(schema.expenses).where(eq(schema.expenses.id, id));
-    
+
     await this.notifyChange(
       'expense',
       'Expense Deleted',
@@ -1767,7 +1965,7 @@ export class DatabaseStorage implements IStorage {
       'view_expense',
       id.toString()
     );
-    
+
     return true;
   }
 
@@ -1777,8 +1975,8 @@ export class DatabaseStorage implements IStorage {
     if (!student[0]) return undefined;
 
     const feeStructure = await db.select().from(schema.feeStructure);
-    const payments = await db.select().from(schema.feePayments).where(eq(schema.feePayments.studentId, id));
-    const eMandate = await db.select().from(schema.eMandates).where(eq(schema.eMandates.studentId, id));
+    const payments = await db.select().from(schema.feePayments).where(eq(schema.feePayments.leadId, id));
+    const eMandate = await db.select().from(schema.eMandates).where(eq(schema.eMandates.leadId, id));
     const emiSchedule = await db.select().from(schema.emiSchedule).where(eq(schema.emiSchedule.studentId, id));
 
     return {
@@ -1841,7 +2039,7 @@ export class DatabaseStorage implements IStorage {
   async deleteStudent(id: number): Promise<boolean> {
     try {
       console.log(`\n=== DETAILED STUDENT DELETION DEBUG FOR ID: ${id} ===`);
-      
+
       // First, get student details for debugging
       const student = await db.select().from(schema.students).where(eq(schema.students.id, id));
       if (student.length === 0) {
@@ -1849,21 +2047,21 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Student with ID ${id} not found`);
       }
       console.log(`Found student: ${student[0].name} (${student[0].rollNumber})`);
-      
+
       // Check all EMI schedules (both active and inactive) for debugging
       console.log(`\n--- Checking ALL EMI schedules for student ${id} ---`);
       const allEmiSchedules = await db
         .select()
         .from(schema.emiSchedule)
         .where(eq(schema.emiSchedule.studentId, id));
-      
+
       console.log(`Total EMI schedules found: ${allEmiSchedules.length}`);
       allEmiSchedules.forEach(emi => {
         console.log(`  - EMI ${emi.id}: Status="${emi.status}", Amount=${emi.amount}, Due=${emi.dueDate}`);
       });
-      
+
       // Check specifically for active EMI schedules
-      const activeEmiSchedules = allEmiSchedules.filter(emi => 
+      const activeEmiSchedules = allEmiSchedules.filter(emi =>
         emi.status === 'pending' || emi.status === 'overdue'
       );
       console.log(`🎯 ACTIVE EMI SCHEDULES FILTER:`);
@@ -1874,19 +2072,19 @@ export class DatabaseStorage implements IStorage {
         const isActive = emi.status === 'pending' || emi.status === 'overdue';
         console.log(`    * Schedule ${emi.id}: status="${emi.status}" → ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
       });
-      
+
       // Check all EMI plans (both active and inactive) for debugging
       console.log(`\n--- Checking ALL EMI plans for student ${id} ---`);
       const allEmiPlans = await db
         .select()
         .from(schema.emiPlans)
         .where(eq(schema.emiPlans.studentId, id));
-      
+
       console.log(`Total EMI plans found: ${allEmiPlans.length}`);
       allEmiPlans.forEach(plan => {
         console.log(`  - Plan ${plan.id}: Status="${plan.status}", Total=${plan.totalAmount}, Installments=${plan.numberOfInstallments}`);
       });
-      
+
       // Check specifically for active EMI plans
       const activeEmiPlans = allEmiPlans.filter(plan => plan.status === 'active');
       console.log(`🎯 ACTIVE EMI PLANS FILTER:`);
@@ -1897,7 +2095,7 @@ export class DatabaseStorage implements IStorage {
         const isActive = plan.status === 'active';
         console.log(`    * Plan ${plan.id}: status="${plan.status}" → ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
       });
-      
+
       // Check for pending regular fee payments
       console.log(`\n--- Checking pending fee payments for student ${id} ---`);
       const pendingFeePayments = await db
@@ -1909,16 +2107,16 @@ export class DatabaseStorage implements IStorage {
             eq(schema.feePayments.status, 'pending')
           )
         );
-      
+
       console.log(`Found ${pendingFeePayments.length} pending fee payment(s)`);
       pendingFeePayments.forEach(payment => {
         console.log(`  - Payment ${payment.id}: ₹${payment.amount} (${payment.paymentMode}) - ${payment.status}`);
       });
-      
+
       console.log(`🎯 FEE PAYMENTS QUERY DEBUG:`);
       console.log(`  - Query: SELECT * FROM fee_payments WHERE lead_id = ${id} AND status = 'pending'`);
       console.log(`  - Total pending payments found: ${pendingFeePayments.length}`);
-      
+
       // Check for active mandates
       console.log(`\n--- Checking active mandates for student ${id} ---`);
       const activeMandates = await db
@@ -1930,39 +2128,39 @@ export class DatabaseStorage implements IStorage {
             eq(schema.eMandates.status, 'active')
           )
         );
-      
+
       console.log(`Found ${activeMandates.length} active mandate(s)`);
       activeMandates.forEach(mandate => {
         console.log(`  - Mandate ${mandate.id}: ${mandate.mandateId} - Max Amount: ₹${mandate.maxAmount} (${mandate.status})`);
       });
-      
+
       console.log(`🎯 E-MANDATES QUERY DEBUG:`);
       console.log(`  - Query: SELECT * FROM e_mandates WHERE lead_id = ${id} AND status = 'active'`);
       console.log(`  - Total active mandates found: ${activeMandates.length}`);
-      
+
       // If there are blocking records, prepare detailed information
       console.log(`\n🔍 FINANCIAL OBLIGATION SUMMARY:`);
       console.log(`  - Active EMI Schedules: ${activeEmiSchedules.length}`);
       console.log(`  - Active EMI Plans: ${activeEmiPlans.length}`);
       console.log(`  - Pending Fee Payments: ${pendingFeePayments.length}`);
       console.log(`  - Active Mandates: ${activeMandates.length}`);
-      
+
       const hasBlockingRecords = activeEmiSchedules.length > 0 || activeEmiPlans.length > 0 || pendingFeePayments.length > 0 || activeMandates.length > 0;
       console.log(`  - TOTAL BLOCKING RECORDS: ${hasBlockingRecords ? 'YES' : 'NO'}`);
-      
+
       if (hasBlockingRecords) {
         console.log(`❌ BLOCKING: Student deletion prevented by active financial records`);
         console.log(`🎯 ABOUT TO THROW ACTIVE_FINANCIAL_OBLIGATIONS ERROR`);
-        
+
         const blockingReasons = [];
         const blockingDetails = {
-          activePayments: [],
-          activePlans: [],
-          pendingFeePayments: [],
-          activeMandates: [],
+          activePayments: [] as any[],
+          activePlans: [] as any[],
+          pendingFeePayments: [] as any[],
+          activeMandates: [] as any[],
           totalOutstanding: 0
         };
-        
+
         if (activeEmiSchedules.length > 0) {
           console.log(`  - ${activeEmiSchedules.length} active EMI payment(s):`);
           activeEmiSchedules.forEach(emi => {
@@ -1978,7 +2176,7 @@ export class DatabaseStorage implements IStorage {
           });
           blockingReasons.push(`${activeEmiSchedules.length} pending EMI payment${activeEmiSchedules.length > 1 ? 's' : ''}`);
         }
-        
+
         if (activeEmiPlans.length > 0) {
           console.log(`  - ${activeEmiPlans.length} active EMI plan(s):`);
           activeEmiPlans.forEach(plan => {
@@ -1994,7 +2192,7 @@ export class DatabaseStorage implements IStorage {
           });
           blockingReasons.push(`${activeEmiPlans.length} active EMI plan${activeEmiPlans.length > 1 ? 's' : ''}`);
         }
-        
+
         if (pendingFeePayments.length > 0) {
           console.log(`  - ${pendingFeePayments.length} pending fee payment(s):`);
           pendingFeePayments.forEach(payment => {
@@ -2011,7 +2209,7 @@ export class DatabaseStorage implements IStorage {
           });
           blockingReasons.push(`${pendingFeePayments.length} pending fee payment${pendingFeePayments.length > 1 ? 's' : ''}`);
         }
-        
+
         if (activeMandates.length > 0) {
           console.log(`  - ${activeMandates.length} active mandate(s):`);
           activeMandates.forEach(mandate => {
@@ -2028,7 +2226,7 @@ export class DatabaseStorage implements IStorage {
           });
           blockingReasons.push(`${activeMandates.length} active mandate${activeMandates.length > 1 ? 's' : ''}`);
         }
-        
+
         const errorMessage = `Cannot delete student: ${blockingReasons.join(' and ')}`;
         const error: any = new Error(errorMessage);
         error.code = 'ACTIVE_FINANCIAL_OBLIGATIONS';
@@ -2041,10 +2239,10 @@ export class DatabaseStorage implements IStorage {
         });
         throw error;
       }
-      
+
       console.log(`✅ No active EMI schedules or plans found - proceeding with deletion`);
       console.log(`🎯 CONTINUING TO DELETION LOGIC (no financial blocking records found)`);
-      
+
       // Check academic records
       console.log(`\n--- Checking academic records for student ${id} ---`);
       const academicRecords = await db
@@ -2052,7 +2250,7 @@ export class DatabaseStorage implements IStorage {
         .from(schema.academicRecords)
         .where(eq(schema.academicRecords.studentId, id));
       console.log(`Found ${academicRecords.length} academic record(s)`);
-      
+
       // Check student engagement records
       console.log(`\n--- Checking student engagement records for student ${id} ---`);
       const engagementRecords = await db
@@ -2060,7 +2258,7 @@ export class DatabaseStorage implements IStorage {
         .from(schema.studentEngagement)
         .where(eq(schema.studentEngagement.studentId, id));
       console.log(`Found ${engagementRecords.length} engagement record(s)`);
-      
+
       // Check fee payments (using leadId as studentId relationship)
       console.log(`\n--- Checking fee payments for student ${id} ---`);
       const feePayments = await db
@@ -2068,58 +2266,58 @@ export class DatabaseStorage implements IStorage {
         .from(schema.feePayments)
         .where(eq(schema.feePayments.leadId, id));
       console.log(`Found ${feePayments.length} fee payment(s) linked via leadId`);
-      
+
       // Note: AI interventions foreign key constraint has been removed
       // Students can now be deleted without worrying about AI records
       console.log(`\n--- AI interventions constraint removed ---`);
       console.log(`Students can be deleted without clearing AI records first`);
-      
-      
+
+
       console.log(`\n--- Starting deletion process for student ${id} ---`);
-      
+
       // Delete all related records in correct order
       if (allEmiSchedules.length > 0) {
         console.log(`Deleting ${allEmiSchedules.length} EMI schedule(s)...`);
         await db.delete(schema.emiSchedule).where(eq(schema.emiSchedule.studentId, id));
         console.log(`✅ EMI schedules deleted`);
       }
-      
+
       if (allEmiPlans.length > 0) {
         console.log(`Deleting ${allEmiPlans.length} EMI plan(s)...`);
         await db.delete(schema.emiPlans).where(eq(schema.emiPlans.studentId, id));
         console.log(`✅ EMI plans deleted`);
       }
-      
+
       if (academicRecords.length > 0) {
         console.log(`Deleting ${academicRecords.length} academic record(s)...`);
         await db.delete(schema.academicRecords).where(eq(schema.academicRecords.studentId, id));
         console.log(`✅ Academic records deleted`);
       }
-      
+
       if (engagementRecords.length > 0) {
         console.log(`Deleting ${engagementRecords.length} engagement record(s)...`);
         await db.delete(schema.studentEngagement).where(eq(schema.studentEngagement.studentId, id));
         console.log(`✅ Student engagement records deleted`);
       }
-      
+
       if (feePayments.length > 0) {
         console.log(`Deleting ${feePayments.length} fee payment(s)...`);
         await db.delete(schema.feePayments).where(eq(schema.feePayments.leadId, id));
         console.log(`✅ Fee payments deleted`);
       }
-      
+
       // AI interventions no longer block student deletion (constraint removed)
       console.log(`✅ AI interventions constraint removed - no cleanup needed`);
-      
-      
+
+
       // Now delete the student record
       console.log(`\n--- Deleting student record ${id} ---`);
       const result = await db.delete(schema.students).where(eq(schema.students.id, id));
       console.log(`Delete operation completed, checking result...`);
-      
+
       // Verify deletion
       const remainingStudent = await db.select().from(schema.students).where(eq(schema.students.id, id));
-      
+
       if (remainingStudent.length === 0) {
         console.log(`✅ SUCCESS: Student ${id} (${student[0].name}) deleted successfully!`);
         await this.notifyChange(
@@ -2141,13 +2339,13 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`❌ ERROR during student deletion:`, error);
       console.log(`=== END DELETION DEBUG ===\n`);
-      
+
       // Re-throw financial obligation errors so they can be handled properly by the API
-      if (error.code === 'ACTIVE_FINANCIAL_OBLIGATIONS') {
+      if ((error as any).code === 'ACTIVE_FINANCIAL_OBLIGATIONS') {
         console.log(`🎯 RE-THROWING FINANCIAL OBLIGATIONS ERROR to API route`);
         throw error;
       }
-      
+
       // Only return false for unexpected errors
       return false;
     }
@@ -2213,6 +2411,14 @@ export class DatabaseStorage implements IStorage {
     return payment;
   }
 
+  async updateFeePayment(id: number, updates: Partial<FeePayment>): Promise<FeePayment | undefined> {
+    const result = await db.update(schema.feePayments).set({
+      ...updates,
+      updatedAt: new Date()
+    }).where(eq(schema.feePayments.id, id)).returning();
+    return result[0];
+  }
+
   async getFeeStats(): Promise<{
     totalPending: number;
     totalPaid: number;
@@ -2234,7 +2440,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEMandateByStudent(studentId: number): Promise<EMandate | undefined> {
-    const result = await db.select().from(schema.eMandates).where(eq(schema.eMandates.studentId, studentId));
+    const result = await db.select().from(schema.eMandates).where(eq(schema.eMandates.leadId, studentId));
     return result[0];
   }
 
@@ -2258,7 +2464,7 @@ export class DatabaseStorage implements IStorage {
   async deleteEMandate(id: number): Promise<boolean> {
     try {
       console.log(`🔥 deleteEMandate called with id: ${id}`);
-      
+
       // Follow the same simple pattern as other working delete functions
       const mandate = await this.getEMandate(id);
       console.log(`🔍 getEMandate result:`, mandate ? JSON.stringify(mandate, null, 2) : 'Not found');
@@ -2266,13 +2472,13 @@ export class DatabaseStorage implements IStorage {
         console.log(`❌ Mandate ${id} not found, returning false`);
         return false;
       }
-      
+
       // First, delete all EMI schedule records that reference this mandate
       console.log(`🧹 Deleting EMI schedule records for mandate ${id}...`);
       const emiScheduleDeleteResult = await db.delete(schema.emiSchedule)
         .where(eq(schema.emiSchedule.eMandateId, id));
       console.log(`🧹 EMI schedule delete result:`, emiScheduleDeleteResult);
-      
+
       console.log(`🗑️ About to execute delete for mandate ${id}...`);
       const result = await db.delete(schema.eMandates).where(eq(schema.eMandates.id, id));
       console.log(`✅ Delete executed, result:`, result);
@@ -2309,7 +2515,7 @@ export class DatabaseStorage implements IStorage {
   async getUpcomingEmis(): Promise<EmiSchedule[]> {
     const sevenDaysFromNow = new Date();
     sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-    
+
     return await db.select().from(schema.emiSchedule)
       .where(and(
         eq(schema.emiSchedule.status, "scheduled"),
@@ -2361,6 +2567,50 @@ export class DatabaseStorage implements IStorage {
 
   async getAllEmiPlans(): Promise<EmiPlan[]> {
     return await db.select().from(schema.emiPlans);
+  }
+
+  async getEmiPlanById(id: number) {
+    const result = await db.select().from(schema.emiPlans)
+      .where(eq(schema.emiPlans.id, id));
+    return result[0];
+  }
+
+  async getActiveEmiPlans(studentId: number) {
+    return await db.select().from(schema.emiPlans)
+      .where(and(
+        eq(schema.emiPlans.studentId, studentId),
+        eq(schema.emiPlans.status, 'active')
+      ));
+  }
+
+  async getEmiPlanByStudentId(studentId: number) {
+    const result = await db.select().from(schema.emiPlans)
+      .where(and(
+        eq(schema.emiPlans.studentId, studentId),
+        eq(schema.emiPlans.status, 'active')
+      ))
+      .orderBy(desc(schema.emiPlans.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async getEmiPlanPayments(planId: number) {
+    const plan = await this.getEmiPlanById(planId);
+    if (!plan) return [];
+
+    return await db.select().from(schema.feePayments)
+      .where(and(
+        eq(schema.feePayments.leadId, plan.studentId),
+        isNotNull(schema.feePayments.installmentNumber)
+      ))
+      .orderBy(schema.feePayments.installmentNumber);
+  }
+
+  async getCompletedInstallments(planId: number): Promise<number> {
+    const payments = await this.getEmiPlanPayments(planId);
+    if (!payments) return 0;
+    const uniqueInstallments = new Set(payments.map(p => p.installmentNumber));
+    return uniqueInstallments.size;
   }
 
   async createEmiPlan(insertEmiPlan: InsertEmiPlan): Promise<EmiPlan> {
@@ -2426,12 +2676,12 @@ export class DatabaseStorage implements IStorage {
       const paidInstallments = new Set(payments.map(p => p.installmentNumber));
       const pendingEmis = [];
 
-      for (let i = 1; i <= emiPlan.emiPeriod; i++) {
+      for (let i = 1; i <= emiPlan.numberOfInstallments; i++) {
         if (!paidInstallments.has(i)) {
           pendingEmis.push({
             installmentNumber: i,
-            amount: emiPlan.emiAmount,
-            dueDate: this.calculateEmiDueDate(emiPlan.startDate, i, emiPlan.frequency),
+            amount: emiPlan.installmentAmount,
+            dueDate: this.calculateEmiDueDate(emiPlan.startDate, i, 'monthly'),
             status: 'pending'
           });
         }
@@ -2451,16 +2701,26 @@ export class DatabaseStorage implements IStorage {
         throw new Error("EMI plan not found");
       }
 
-      // Get all payments for this EMI plan
+      // Get all payments for this EMI plan (excluding down payment which has installmentNumber: 0)
       const payments = await db.select().from(schema.feePayments)
         .where(eq(schema.feePayments.leadId, emiPlan.studentId))
         .orderBy(schema.feePayments.installmentNumber);
 
-      const totalPaid = payments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+      // Filter out down payments (installmentNumber: 0) when calculating EMI progress
+      const emiPayments = payments.filter(p => p.installmentNumber && p.installmentNumber > 0);
+
+      const totalPaid = emiPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
       const totalAmount = parseFloat(emiPlan.totalAmount);
-      const paidInstallments = payments.length;
-      const totalInstallments = emiPlan.emiPeriod;
+      const paidInstallments = emiPayments.length;
+      const totalInstallments = emiPlan.numberOfInstallments;
       const nextInstallment = paidInstallments + 1;
+
+      const isCompleted = paidInstallments >= totalInstallments;
+
+      // Auto-update status if completed but not marked as such
+      if (isCompleted && emiPlan.status !== 'completed') {
+        await this.updateEmiPlan(emiPlanId, { status: 'completed' });
+      }
 
       return {
         emiPlanId,
@@ -2471,8 +2731,8 @@ export class DatabaseStorage implements IStorage {
         totalInstallments,
         nextInstallment: nextInstallment <= totalInstallments ? nextInstallment : null,
         completionPercentage: (paidInstallments / totalInstallments) * 100,
-        isCompleted: paidInstallments >= totalInstallments,
-        payments: payments.map(p => ({
+        isCompleted,
+        payments: emiPayments.map(p => ({
           installmentNumber: p.installmentNumber,
           amount: p.amount,
           paymentDate: p.paymentDate,
@@ -2498,7 +2758,7 @@ export class DatabaseStorage implements IStorage {
   private calculateEmiDueDate(startDate: string, installmentNumber: number, frequency: string): string {
     const start = new Date(startDate);
     let dueDate = new Date(start);
-    
+
     switch (frequency) {
       case 'monthly':
         dueDate.setMonth(start.getMonth() + installmentNumber - 1);
@@ -2512,7 +2772,7 @@ export class DatabaseStorage implements IStorage {
       default:
         dueDate.setMonth(start.getMonth() + installmentNumber - 1);
     }
-    
+
     return dueDate.toISOString().split('T')[0];
   }
 
@@ -2531,7 +2791,7 @@ export class DatabaseStorage implements IStorage {
   async getNotificationsByUser(userId: number, limit?: number): Promise<Notification[]> {
     let query = db.select().from(schema.notifications).where(eq(schema.notifications.userId, userId)).orderBy(desc(schema.notifications.createdAt));
     if (limit) {
-      query = query.limit(limit);
+      query = (query as any).limit(limit);
     }
     return await query;
   }
@@ -2551,7 +2811,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.notifications.type, type))
       .orderBy(desc(schema.notifications.createdAt));
     if (limit) {
-      query = query.limit(limit);
+      query = (query as any).limit(limit);
     }
     return await query;
   }
@@ -2605,13 +2865,13 @@ export class DatabaseStorage implements IStorage {
       const [countResult] = await db.select({ count: sql<number>`count(*)` })
         .from(schema.notifications)
         .where(eq(schema.notifications.userId, userId));
-      
+
       const count = Number(countResult.count);
-      
+
       // Then perform the delete operation
       await db.delete(schema.notifications)
         .where(eq(schema.notifications.userId, userId));
-      
+
       return count;
     } catch (error) {
       console.error("Error in deleteAllNotifications:", error);
@@ -2627,17 +2887,17 @@ export class DatabaseStorage implements IStorage {
     const [totalResult] = await db.select({ count: sql<number>`count(*)` })
       .from(schema.notifications)
       .where(eq(schema.notifications.userId, userId));
-    
+
     const [unreadResult] = await db.select({ count: sql<number>`count(*)` })
       .from(schema.notifications)
       .where(and(
         eq(schema.notifications.userId, userId),
         eq(schema.notifications.read, false)
       ));
-    
-    const notificationsByType = await db.select({ 
-      type: schema.notifications.type, 
-      count: sql<number>`count(*)` 
+
+    const notificationsByType = await db.select({
+      type: schema.notifications.type,
+      count: sql<number>`count(*)`
     })
       .from(schema.notifications)
       .where(eq(schema.notifications.userId, userId))
@@ -2660,15 +2920,15 @@ export class DatabaseStorage implements IStorage {
       .from(schema.recentlyDeletedLeads)
       .where(eq(schema.recentlyDeletedLeads.original_lead_id, originalLeadId))
       .limit(1);
-    
+
     if (deletedLeadResult.length === 0) {
       console.log("No deleted lead found with original_lead_id:", originalLeadId);
       return undefined;
     }
-    
+
     const deletedLead = deletedLeadResult[0];
     console.log("Restoring deleted lead:", deletedLead);
-    
+
     try {
       // Insert the lead back into the main leads table
       const restoredLeadData = {
@@ -2689,17 +2949,17 @@ export class DatabaseStorage implements IStorage {
         address: deletedLead.address,
         interestedProgram: deletedLead.interested_program,
       };
-      
+
       const [restoredLead] = await db
         .insert(schema.leads)
         .values(restoredLeadData)
         .returning();
-      
+
       // Remove from recentlyDeletedLeads table
       await db
         .delete(schema.recentlyDeletedLeads)
         .where(eq(schema.recentlyDeletedLeads.id, deletedLead.id));
-      
+
       // Create notification
       await this.notifyChange(
         'lead',
@@ -2709,10 +2969,10 @@ export class DatabaseStorage implements IStorage {
         'lead_restored',
         restoredLead.id.toString()
       );
-      
+
       console.log("Lead restored successfully:", restoredLead);
       return restoredLead;
-      
+
     } catch (error) {
       console.error("Error restoring lead:", error);
       throw error;
@@ -2721,16 +2981,16 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLead(id: number): Promise<void> {
     console.log(`=== DELETING LEAD ${id} ===`);
-    
+
     // Fetch the lead
     const lead = await this.getLead(id);
     console.log("Found lead to delete:", lead ? `${lead.name} (${lead.phone})` : "No lead found");
-    
+
     if (!lead) {
       console.log("Lead not found, aborting deletion");
       return;
     }
-    
+
     try {
       console.log("Step 1: Creating notification...");
       // Notify before actual deletion so details are still available
@@ -2767,15 +3027,15 @@ export class DatabaseStorage implements IStorage {
         interested_program: lead.interestedProgram,
         deleted_at: new Date(),
       };
-      
+
       console.log('Step 3: Inserting into recently_deleted_leads...');
       await db.insert(schema.recentlyDeletedLeads).values(insertObj);
       console.log('Insert into recently_deleted_leads successful');
-      
+
       console.log('Step 4: Deleting from main leads table...');
       const deleteResult = await db.delete(schema.leads).where(eq(schema.leads.id, id));
-      console.log('Delete from main leads table successful, rows affected:', deleteResult.rowCount);
-      
+      console.log('Delete from main leads table successful, rows affected:', (deleteResult as any).rowCount);
+
       console.log(`=== LEAD ${id} DELETION COMPLETED ===`);
     } catch (err) {
       console.error('Error during lead deletion process:', err);
@@ -2815,11 +3075,11 @@ export class DatabaseStorage implements IStorage {
           staffId: staff.id,
           month,
           year,
-          basicSalary,
-          allowances,
-          deductions,
-          overtime,
-          netSalary,
+          basicSalary: String(basicSalary),
+          allowances: String(allowances),
+          deductions: String(deductions),
+          overtime: String(overtime),
+          netSalary: String(netSalary),
           attendedDays,
           status: 'pending',
         });
@@ -2830,6 +3090,8 @@ export class DatabaseStorage implements IStorage {
     }
     return { created, skipped, errors };
   }
+
+
 
   /**
    * Helper to create system-generated notifications.
@@ -2857,6 +3119,64 @@ export class DatabaseStorage implements IStorage {
     } catch (err) {
       console.error('Failed to create notification', err);
     }
+  }
+  // Message Templates
+  async getAllMessageTemplates(category?: string): Promise<schema.MessageTemplate[]> {
+    if (category) {
+      return await db.select().from(schema.messageTemplates)
+        .where(and(
+          eq(schema.messageTemplates.category, category),
+          eq(schema.messageTemplates.isActive, true)
+        ))
+        .orderBy(schema.messageTemplates.displayName);
+    }
+    return await db.select().from(schema.messageTemplates)
+      .where(eq(schema.messageTemplates.isActive, true))
+      .orderBy(schema.messageTemplates.displayName);
+  }
+
+  async getMessageTemplate(id: number): Promise<schema.MessageTemplate | undefined> {
+    const result = await db.select().from(schema.messageTemplates)
+      .where(eq(schema.messageTemplates.id, id));
+    return result[0];
+  }
+
+  async createMessageTemplate(template: schema.InsertMessageTemplate): Promise<schema.MessageTemplate> {
+    const result = await db.insert(schema.messageTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async updateMessageTemplate(id: number, updates: Partial<schema.MessageTemplate>): Promise<schema.MessageTemplate | undefined> {
+    const result = await db.update(schema.messageTemplates)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.messageTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteMessageTemplate(id: number): Promise<boolean> {
+    // Check if it's a default template
+    const template = await this.getMessageTemplate(id);
+    if (template?.isDefault) {
+      throw new Error("Cannot delete default templates");
+    }
+    await db.delete(schema.messageTemplates).where(eq(schema.messageTemplates.id, id));
+    return true;
+  }
+
+  // Communication Logs Implementation
+  async createCommunicationLog(log: schema.InsertCommunicationLog): Promise<schema.CommunicationLog> {
+    const result = await db.insert(schema.communicationLogs).values(log).returning();
+    return result[0];
+  }
+
+  async getCommunicationLogs(limit: number = 50): Promise<schema.CommunicationLog[]> {
+    return await db.select().from(schema.communicationLogs)
+      .orderBy(desc(schema.communicationLogs.sentAt))
+      .limit(limit);
   }
 }
 
@@ -2892,6 +3212,9 @@ async function initializeBasicData() {
 }
 
 export const storage = new DatabaseStorage();
+
+// Daycare Storage - Standalone module for daycare management
+export { daycareStorage } from "./daycareStorage.js";
 
 // Only seed when explicitly enabled in non-production environments
 const shouldSeed = process.env.NODE_ENV !== 'production' && process.env.SEED_ON_START === 'true';

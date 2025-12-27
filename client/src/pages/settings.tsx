@@ -15,8 +15,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { CreditCard, Building} from "lucide-react";
+import { CreditCard, Building, MessageSquare } from "lucide-react";
 import React from "react"; // Added for useEffect
+import MessageTemplatesManager from "@/components/settings/message-templates-manager";
 
 // Define GlobalClassFee interface if not already imported
 interface GlobalClassFee {
@@ -204,7 +205,7 @@ export default function Settings() {
   const handleSaveSystem = () => {
     // Save custom institute name to localStorage
     localStorage.setItem("customInstituteName", systemSettings.customInstituteName);
-    
+
     toast({
       title: "System settings updated",
       description: "System configuration has been saved successfully.",
@@ -212,12 +213,12 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <main className="p-6">
         <Tabs value={selectedTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="profile" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               Profile
@@ -241,6 +242,10 @@ export default function Settings() {
             <TabsTrigger value="global-fees" className="flex items-center gap-2">
               <Calculator className="h-4 w-4" />
               Global Fees
+            </TabsTrigger>
+            <TabsTrigger value="templates" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Templates
             </TabsTrigger>
           </TabsList>
 
@@ -480,7 +485,7 @@ export default function Settings() {
                           <SelectValue placeholder="Select payment day" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({length: 28}, (_, i) => (
+                          {Array.from({ length: 28 }, (_, i) => (
                             <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
                           ))}
                         </SelectContent>
@@ -488,9 +493,9 @@ export default function Settings() {
                     </div>
                     <div className="space-y-2">
                       <Label>Working Days per Month</Label>
-                      <Input 
-                        type="number" 
-                        defaultValue="30" 
+                      <Input
+                        type="number"
+                        defaultValue="30"
                         placeholder="Enter working days"
                         min="1"
                         max="31"
@@ -521,9 +526,9 @@ export default function Settings() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>HRA Percentage</Label>
-                      <Input 
-                        type="number" 
-                        defaultValue="0" 
+                      <Input
+                        type="number"
+                        defaultValue="0"
                         placeholder="Enter HRA percentage"
                         min="0"
                         max="100"
@@ -531,9 +536,9 @@ export default function Settings() {
                     </div>
                     <div className="space-y-2">
                       <Label>PF Percentage</Label>
-                      <Input 
-                        type="number" 
-                        defaultValue="0" 
+                      <Input
+                        type="number"
+                        defaultValue="0"
                         placeholder="Enter PF percentage"
                         min="0"
                         max="100"
@@ -541,18 +546,18 @@ export default function Settings() {
                     </div>
                     <div className="space-y-2">
                       <Label>Transport Allowance</Label>
-                      <Input 
-                        type="number" 
-                        defaultValue="0" 
+                      <Input
+                        type="number"
+                        defaultValue="0"
                         placeholder="Enter transport allowance"
                         min="0"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Medical Allowance</Label>
-                      <Input 
-                        type="number" 
-                        defaultValue="0" 
+                      <Input
+                        type="number"
+                        defaultValue="0"
                         placeholder="Enter medical allowance"
                         min="0"
                       />
@@ -585,7 +590,7 @@ export default function Settings() {
                   <Input id="confirm-password" type="password" />
                 </div>
                 <Button>Change Password</Button>
-                
+
                 <div className="pt-4 border-t">
                   <h3 className="text-lg font-medium mb-2">Session Management</h3>
                   <p className="text-sm text-muted-foreground mb-4">
@@ -607,7 +612,7 @@ export default function Settings() {
                       Set and manage fee structures for different classes that can be used for calculations and automatically assigned to students
                     </CardDescription>
                   </div>
-                  <Button 
+                  <Button
                     onClick={() => {
                       setEditingGlobalFee(null);
                       setGlobalFeeModalOpen(true);
@@ -621,8 +626,8 @@ export default function Settings() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
-                    <select 
-                      value={academicYear} 
+                    <select
+                      value={academicYear}
                       onChange={(e) => setAcademicYear(e.target.value)}
                       className="border rounded px-3 py-2 text-sm"
                     >
@@ -630,8 +635,8 @@ export default function Settings() {
                       <option value="2025-26">2025-26</option>
                       <option value="2026-27">2026-27</option>
                     </select>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => setAcademicYear("2024-25")}
                     >
@@ -661,7 +666,7 @@ export default function Settings() {
                             <TableCell className="capitalize">{fee.frequency}</TableCell>
                             <TableCell>{fee.academicYear}</TableCell>
                             <TableCell>
-                              <Badge 
+                              <Badge
                                 variant={fee.isActive ? "default" : "secondary"}
                                 className={fee.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
                               >
@@ -724,6 +729,10 @@ export default function Settings() {
                           <SelectValue placeholder="Select class" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="Playgroup">Playgroup</SelectItem>
+                          <SelectItem value="Nursery">Nursery</SelectItem>
+                          <SelectItem value="Junior KG">Junior KG</SelectItem>
+                          <SelectItem value="Senior KG">Senior KG</SelectItem>
                           <SelectItem value="Class 1">Class 1</SelectItem>
                           <SelectItem value="Class 2">Class 2</SelectItem>
                           <SelectItem value="Class 3">Class 3</SelectItem>
@@ -762,11 +771,11 @@ export default function Settings() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="amount">Amount (₹)</Label>
-                      <Input 
-                        id="amount" 
-                        name="amount" 
-                        type="number" 
-                        required 
+                      <Input
+                        id="amount"
+                        name="amount"
+                        type="number"
+                        required
                         placeholder="Enter amount"
                         value={feeForm.amount}
                         onChange={e => setFeeForm(f => ({ ...f, amount: e.target.value }))}
@@ -816,9 +825,9 @@ export default function Settings() {
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="description">Description (Optional)</Label>
-                    <Input 
-                      id="description" 
-                      name="description" 
+                    <Input
+                      id="description"
+                      name="description"
                       placeholder="Enter description"
                       value={feeForm.description}
                       onChange={e => setFeeForm(f => ({ ...f, description: e.target.value }))}
@@ -832,8 +841,8 @@ export default function Settings() {
                       Cancel
                     </Button>
                     <Button type="submit" disabled={globalClassFeeMutation.isPending}>
-                      {globalClassFeeMutation.isPending 
-                        ? (editingGlobalFee ? "Updating..." : "Creating...") 
+                      {globalClassFeeMutation.isPending
+                        ? (editingGlobalFee ? "Updating..." : "Creating...")
                         : (editingGlobalFee ? "Update Fee" : "Create Fee")
                       }
                     </Button>
@@ -877,6 +886,10 @@ export default function Settings() {
                 </div>
               </DialogContent>
             </Dialog>
+          </TabsContent>
+
+          <TabsContent value="templates">
+            <MessageTemplatesManager />
           </TabsContent>
         </Tabs>
       </main>

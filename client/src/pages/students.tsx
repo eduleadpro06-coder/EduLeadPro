@@ -21,7 +21,7 @@ import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Student, FeeStructure, FeePayment, InsertStudent } from '../../../shared/schema';
+import type { Student, FeeStructure, FeePayment, InsertStudent, GlobalClassFee } from '../../../shared/schema';
 
 // Student form schema
 const studentSchema = z.object({
@@ -72,6 +72,14 @@ export default function Students() {
   const { data: feeStats } = useQuery({
     queryKey: ["/api/fee-stats"],
   });
+
+  const { data: globalFees } = useQuery<GlobalClassFee[]>({
+    queryKey: ["/api/global-class-fees"],
+  });
+
+  const classOptions = globalFees
+    ? Array.from(new Set(globalFees.filter(f => f.isActive).map(f => f.className))).sort()
+    : [];
 
   // Add student mutation
   const addStudentMutation = useMutation({
@@ -179,10 +187,10 @@ export default function Students() {
     },
     onError: (error: any) => {
       console.error("Error updating student:", error);
-      toast({ 
-        title: "Error updating student", 
-        description: error.message || "Something went wrong", 
-        variant: "destructive" 
+      toast({
+        title: "Error updating student",
+        description: error.message || "Something went wrong",
+        variant: "destructive"
       });
     },
   });
@@ -216,15 +224,15 @@ export default function Students() {
         console.log("ErrorData cannotDelete:", error.errorData.cannotDelete);
       }
       console.log("=== END DEBUG ===");
-      
+
       // Check if this is a financial obligations error (check both direct properties and errorData)
       const errorData = error.errorData || {};
       const code = error.code || errorData.code;
       const details = error.details || errorData.details;
-      
+
       console.log("🎯 UI: Checking error condition - Code:", code, "Has details:", !!details);
       console.log("🎯 UI: Code comparison:", code, "===", "'ACTIVE_FINANCIAL_OBLIGATIONS'", "->", code === 'ACTIVE_FINANCIAL_OBLIGATIONS');
-      
+
       if (code === 'ACTIVE_FINANCIAL_OBLIGATIONS' && details) {
         console.log("🎯 UI: ✅ FINANCIAL OBLIGATIONS ERROR DETECTED - Setting modal state");
         console.log("🎯 UI: Details object:", JSON.stringify(details, null, 2));
@@ -239,10 +247,10 @@ export default function Students() {
       } else {
         console.log("❌ SHOWING REGULAR ERROR TOAST");
         console.log("Code:", code, "Details:", details);
-        toast({ 
-          title: "Error deleting student", 
-          description: error.message || "Failed to delete student", 
-          variant: "destructive" 
+        toast({
+          title: "Error deleting student",
+          description: error.message || "Failed to delete student",
+          variant: "destructive"
         });
       }
     },
@@ -303,7 +311,7 @@ export default function Students() {
     return colors[method] || "bg-gray-100 text-gray-800";
   };
 
-  const filteredStudents = students.filter((student: Student) => 
+  const filteredStudents = students.filter((student: Student) =>
     (filterClass === "all" || student.class === filterClass)
   );
 
@@ -321,63 +329,63 @@ export default function Students() {
   const calculateOutstanding = (student: Student) => {
     const fees = getStudentFeeStructure(student.id);
     const payments = getStudentFeePayments(student.id);
-    
+
     const totalFees = fees.reduce((sum: number, fee: FeeStructure) => sum + parseFloat(fee.amount), 0);
     const totalPaid = payments.reduce((sum: number, payment: FeePayment) => sum + parseFloat(payment.amount), 0);
-    
+
     return Math.max(0, totalFees - totalPaid);
   };
 
   const getOverdueFees = (studentId: number) => {
     const fees = getStudentFeeStructure(studentId);
     const today = new Date();
-    
-    return fees.filter(fee => 
+
+    return fees.filter(fee =>
       fee.status === "pending" && new Date(fee.dueDate) < today
     );
   };
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-gray-50">
       <Header />
 
       {/* Fee Statistics Cards */}
       {feeStats && (
         <div className="grid gap-4 md:grid-cols-4">
-          <Card className="bg-black text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-black text-white">
-              <CardTitle className="text-sm font-medium text-white">Total Pending</CardTitle>
+          <Card className="bg-white text-gray-900">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-white text-gray-900">
+              <CardTitle className="text-sm font-medium text-gray-800">Total Pending</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="bg-black text-white">
-              <div className="text-2xl font-bold text-white">₹{feeStats.totalPending?.toLocaleString()}</div>
+            <CardContent className="bg-white text-gray-900">
+              <div className="text-2xl font-bold text-gray-800">₹{feeStats.totalPending?.toLocaleString()}</div>
             </CardContent>
           </Card>
-          <Card className="bg-black text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-black text-white">
-              <CardTitle className="text-sm font-medium text-white">Total Paid</CardTitle>
+          <Card className="bg-white text-gray-900">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-white text-gray-900">
+              <CardTitle className="text-sm font-medium text-gray-800">Total Paid</CardTitle>
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="bg-black text-white">
-              <div className="text-2xl font-bold text-white">₹{feeStats.totalPaid?.toLocaleString()}</div>
+            <CardContent className="bg-white text-gray-900">
+              <div className="text-2xl font-bold text-gray-800">₹{feeStats.totalPaid?.toLocaleString()}</div>
             </CardContent>
           </Card>
-          <Card className="bg-black text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-black text-white">
-              <CardTitle className="text-sm font-medium text-white">Overdue</CardTitle>
+          <Card className="bg-white text-gray-900">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-white text-gray-900">
+              <CardTitle className="text-sm font-medium text-gray-800">Overdue</CardTitle>
               <AlertCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="bg-black text-white">
-              <div className="text-2xl font-bold text-white">₹{feeStats.totalOverdue?.toLocaleString()}</div>
+            <CardContent className="bg-white text-gray-900">
+              <div className="text-2xl font-bold text-gray-800">₹{feeStats.totalOverdue?.toLocaleString()}</div>
             </CardContent>
           </Card>
-          <Card className="bg-black text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-black text-white">
-              <CardTitle className="text-sm font-medium text-white">Collection Rate</CardTitle>
+          <Card className="bg-white text-gray-900">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-white text-gray-900">
+              <CardTitle className="text-sm font-medium text-gray-800">Collection Rate</CardTitle>
               <Receipt className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="bg-black text-white">
-              <div className="text-2xl font-bold text-white">{feeStats.collectionRate?.toFixed(1)}%</div>
+            <CardContent className="bg-white text-gray-900">
+              <div className="text-2xl font-bold text-gray-800">{feeStats.collectionRate?.toFixed(1)}%</div>
             </CardContent>
           </Card>
         </div>
@@ -386,15 +394,16 @@ export default function Students() {
       <div className="flex justify-between items-center">
         <div className="flex gap-4">
           <Select value={filterClass} onValueChange={setFilterClass}>
-            <SelectTrigger className="w-48 bg-black text-white border-white">
+            <SelectTrigger className="w-48 bg-white text-gray-900 border-white">
               <SelectValue placeholder="Filter by class" />
             </SelectTrigger>
-            <SelectContent className="bg-black text-white">
+            <SelectContent className="bg-white text-gray-900">
               <SelectItem value="all">All Classes</SelectItem>
-              <SelectItem value="Class 9">Class 9</SelectItem>
-              <SelectItem value="Class 10">Class 10</SelectItem>
-              <SelectItem value="Class 11">Class 11</SelectItem>
-              <SelectItem value="Class 12">Class 12</SelectItem>
+              {classOptions.map((cls) => (
+                <SelectItem key={cls} value={cls}>
+                  {cls}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -406,7 +415,7 @@ export default function Students() {
               Add Student
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl bg-black text-white">
+          <DialogContent className="max-w-2xl bg-white text-gray-900">
             <DialogHeader>
               <DialogTitle>Add New Student</DialogTitle>
               <DialogDescription>
@@ -417,49 +426,50 @@ export default function Students() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="studentId">Student ID</Label>
-                  <Input id="studentId" name="studentId" required className="bg-black text-white border-white" />
+                  <Input id="studentId" name="studentId" required className="bg-white text-gray-900 border-white" />
                 </div>
                 <div>
                   <Label htmlFor="name">Full Name</Label>
-                  <Input id="name" name="name" required className="bg-black text-white border-white" />
+                  <Input id="name" name="name" required className="bg-white text-gray-900 border-white" />
                 </div>
                 <div>
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" className="bg-black text-white border-white" />
+                  <Input id="email" name="email" type="email" className="bg-white text-gray-900 border-white" />
                 </div>
                 <div>
                   <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" name="phone" required className="bg-black text-white border-white" />
+                  <Input id="phone" name="phone" required className="bg-white text-gray-900 border-white" />
                 </div>
                 <div>
                   <Label htmlFor="parentName">Parent Name</Label>
-                  <Input id="parentName" name="parentName" className="bg-black text-white border-white" />
+                  <Input id="parentName" name="parentName" className="bg-white text-gray-900 border-white" />
                 </div>
                 <div>
                   <Label htmlFor="parentPhone">Parent Phone</Label>
-                  <Input id="parentPhone" name="parentPhone" className="bg-black text-white border-white" />
+                  <Input id="parentPhone" name="parentPhone" className="bg-white text-gray-900 border-white" />
                 </div>
                 <div>
                   <Label htmlFor="class">Class</Label>
-                  <Select name="class" required className="bg-black text-white border-white">
+                  <Select name="class" required className="bg-white text-gray-900 border-white">
                     <SelectTrigger>
                       <SelectValue placeholder="Select class" />
                     </SelectTrigger>
-                    <SelectContent className="bg-black text-white">
-                      <SelectItem value="Class 9">Class 9</SelectItem>
-                      <SelectItem value="Class 10">Class 10</SelectItem>
-                      <SelectItem value="Class 11">Class 11</SelectItem>
-                      <SelectItem value="Class 12">Class 12</SelectItem>
+                    <SelectContent className="bg-white text-gray-900">
+                      {classOptions.map((cls) => (
+                        <SelectItem key={cls} value={cls}>
+                          {cls}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label htmlFor="stream">Stream</Label>
-                  <Select name="stream" className="bg-black text-white border-white">
+                  <Select name="stream" className="bg-white text-gray-900 border-white">
                     <SelectTrigger>
                       <SelectValue placeholder="Select stream" />
                     </SelectTrigger>
-                    <SelectContent className="bg-black text-white">
+                    <SelectContent className="bg-white text-gray-900">
                       <SelectItem value="Science">Science</SelectItem>
                       <SelectItem value="Commerce">Commerce</SelectItem>
                       <SelectItem value="Arts">Arts</SelectItem>
@@ -468,22 +478,22 @@ export default function Students() {
                 </div>
                 <div>
                   <Label htmlFor="admissionDate">Admission Date</Label>
-                  <Input id="admissionDate" name="admissionDate" type="date" required className="bg-black text-white border-white" />
+                  <Input id="admissionDate" name="admissionDate" type="date" required className="bg-white text-gray-900 border-white" />
                 </div>
                 <div>
                   <Label htmlFor="totalFees">Total Annual Fees</Label>
-                  <Input id="totalFees" name="totalFees" type="number" required className="bg-black text-white border-white" />
+                  <Input id="totalFees" name="totalFees" type="number" required className="bg-white text-gray-900 border-white" />
                 </div>
               </div>
               <div>
                 <Label htmlFor="address">Address</Label>
-                <Input id="address" name="address" className="bg-black text-white border-white" />
+                <Input id="address" name="address" className="bg-white text-gray-900 border-white" />
               </div>
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" className="bg-black text-white border-white" onClick={() => setAddStudentOpen(false)}>
+                <Button type="button" variant="outline" className="bg-white text-gray-900 border-white" onClick={() => setAddStudentOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={addStudentMutation.isPending} className="bg-black text-white border-white">
+                <Button type="submit" disabled={addStudentMutation.isPending} className="bg-white text-gray-900 border-white">
                   {addStudentMutation.isPending ? "Adding..." : "Add Student"}
                 </Button>
               </div>
@@ -493,10 +503,10 @@ export default function Students() {
       </div>
 
       <Tabs defaultValue="students" className="space-y-4">
-        <TabsList className="bg-black text-white">
-          <TabsTrigger value="students" className="bg-black text-white">Students</TabsTrigger>
-          <TabsTrigger value="fee-tracking" className="bg-black text-white">Fee Tracking</TabsTrigger>
-          <TabsTrigger value="payments" className="bg-black text-white">Payment History</TabsTrigger>
+        <TabsList className="bg-white text-gray-900">
+          <TabsTrigger value="students" className="bg-white text-gray-900">Students</TabsTrigger>
+          <TabsTrigger value="fee-tracking" className="bg-white text-gray-900">Fee Tracking</TabsTrigger>
+          <TabsTrigger value="payments" className="bg-white text-gray-900">Payment History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="students" className="space-y-4">
@@ -505,14 +515,14 @@ export default function Students() {
               const outstanding = calculateOutstanding(student);
               const overdueFees = getOverdueFees(student.id);
               const hasOverdue = overdueFees.length > 0;
-              
+
               return (
-                <Card key={student.id} className={`bg-black text-white ${hasOverdue ? "border-red-200" : ""}`}>
-                  <CardHeader className="pb-2 bg-black text-white">
+                <Card key={student.id} className={`bg-white text-gray-900 ${hasOverdue ? "border-red-200" : ""}`}>
+                  <CardHeader className="pb-2 bg-white text-gray-900">
                     <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle className="text-lg text-white">{student.name}</CardTitle>
-                        <CardDescription className="text-sm text-white">
+                        <CardTitle className="text-lg text-gray-800">{student.name}</CardTitle>
+                        <CardDescription className="text-sm text-gray-800">
                           {student.rollNumber} • {student.class} {student.stream}
                         </CardDescription>
                       </div>
@@ -523,65 +533,65 @@ export default function Students() {
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent className="bg-black text-white">
-                    <div className="space-y-2 text-sm text-white">
+                  <CardContent className="bg-white text-gray-900">
+                    <div className="space-y-2 text-sm text-gray-800">
                       <div className="flex items-center gap-2">
-                        <Phone className="h-3 w-3 text-white" />
+                        <Phone className="h-3 w-3 text-gray-800" />
                         {student.phone}
                       </div>
                       {student.email && (
                         <div className="flex items-center gap-2">
-                          <Mail className="h-3 w-3 text-white" />
+                          <Mail className="h-3 w-3 text-gray-800" />
                           {student.email}
                         </div>
                       )}
                       {student.parentName && (
                         <div className="flex items-center gap-2">
-                          <User className="h-3 w-3 text-white" />
+                          <User className="h-3 w-3 text-gray-800" />
                           {student.parentName} • {student.parentPhone}
                         </div>
                       )}
                       <div className="pt-2 border-t border-gray-700">
-                        <div className="text-muted-foreground text-white">Outstanding: </div>
+                        <div className="text-muted-foreground text-gray-800">Outstanding: </div>
                         <div className={`font-semibold ${outstanding > 0 ? 'text-red-400' : 'text-green-400'}`}>₹{outstanding.toLocaleString()}</div>
                       </div>
                     </div>
                     <div className="flex gap-2 mt-4">
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         variant="outline"
-                        className="bg-black text-white border-white"
+                        className="bg-white text-gray-900 border-white"
                         onClick={() => {
                           setSelectedStudent(student);
                           setEditStudentOpen(true);
                         }}
                       >
-                        <Edit className="mr-1 h-3 w-3 text-white" />
+                        <Edit className="mr-1 h-3 w-3 text-gray-800" />
                         Edit
                       </Button>
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         variant="outline"
-                        className="bg-black text-white border-white hover:bg-red-600 hover:border-red-600"
+                        className="bg-white text-gray-900 border-white hover:bg-red-600 hover:border-red-600"
                         onClick={() => {
                           setSelectedStudent(student);
                           setDeleteStudentOpen(true);
                         }}
                       >
-                        <Trash2 className="mr-1 h-3 w-3 text-white" />
+                        <Trash2 className="mr-1 h-3 w-3 text-gray-800" />
                         Delete
                       </Button>
-                      
-                      <Button 
-                        size="sm" 
+
+                      <Button
+                        size="sm"
                         variant="outline"
-                        className="bg-black text-white border-white"
+                        className="bg-white text-gray-900 border-white"
                         onClick={() => {
                           setSelectedStudent(student);
                           setAddFeePaymentOpen(true);
                         }}
                       >
-                        <CreditCard className="mr-1 h-3 w-3 text-white" />
+                        <CreditCard className="mr-1 h-3 w-3 text-gray-800" />
                         Record Payment
                       </Button>
                     </div>
@@ -593,28 +603,28 @@ export default function Students() {
         </TabsContent>
 
         <TabsContent value="fee-tracking" className="space-y-4">
-          <Card className="bg-black text-white">
-            <Table className="bg-black text-white">
-              <TableHeader className="bg-black text-white">
-                <TableRow className="bg-black text-white">
-                  <TableHead className="text-white">Student</TableHead>
-                  <TableHead className="text-white">Fee Type</TableHead>
-                  <TableHead className="text-white">Amount</TableHead>
-                  <TableHead className="text-white">Due Date</TableHead>
-                  <TableHead className="text-white">Status</TableHead>
-                  <TableHead className="text-white">Installment</TableHead>
+          <Card className="bg-white text-gray-900">
+            <Table className="bg-white text-gray-900">
+              <TableHeader className="bg-white text-gray-900">
+                <TableRow className="bg-white text-gray-900">
+                  <TableHead className="text-gray-800">Student</TableHead>
+                  <TableHead className="text-gray-800">Fee Type</TableHead>
+                  <TableHead className="text-gray-800">Amount</TableHead>
+                  <TableHead className="text-gray-800">Due Date</TableHead>
+                  <TableHead className="text-gray-800">Status</TableHead>
+                  <TableHead className="text-gray-800">Installment</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className="bg-black text-white">
+              <TableBody className="bg-white text-gray-900">
                 {feeStructures.map((fee: FeeStructure) => {
                   const student = students.find((s: Student) => s.id === fee.studentId);
                   const isOverdue = fee.status === "pending" && new Date(fee.dueDate) < new Date();
-                  
+
                   return (
                     <TableRow key={fee.id} className={isOverdue ? "bg-red-50" : ""}>
                       <TableCell>{student?.name}</TableCell>
                       <TableCell>{fee.feeType}</TableCell>
-                      <TableCell className="text-white">₹{parseFloat(fee.amount).toLocaleString()}</TableCell>
+                      <TableCell className="text-gray-800">₹{parseFloat(fee.amount).toLocaleString()}</TableCell>
                       <TableCell>{format(new Date(fee.dueDate), "MMM dd, yyyy")}</TableCell>
                       <TableCell>
                         <Badge className={getFeeStatusColor(isOverdue ? "overdue" : fee.status)}>
@@ -634,34 +644,34 @@ export default function Students() {
 
         <TabsContent value="payments" className="space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium text-white">Recent Payments</h3>
-            <Button variant="outline" className="bg-black text-white border-white">
+            <h3 className="text-lg font-medium text-gray-800">Recent Payments</h3>
+            <Button variant="outline" className="bg-white text-gray-900 border-white">
               <Download className="mr-2 h-4 w-4" />
               Export
             </Button>
           </div>
-          
-          <Card className="bg-black text-white">
-            <Table className="bg-black text-white">
-              <TableHeader className="bg-black text-white">
-                <TableRow className="bg-black text-white">
-                  <TableHead className="text-white">Student</TableHead>
-                  <TableHead className="text-white">Amount</TableHead>
-                  <TableHead className="text-white">Discount</TableHead>
-                  <TableHead className="text-white">Payment Date</TableHead>
-                  <TableHead className="text-white">Method</TableHead>
-                  <TableHead className="text-white">Receipt</TableHead>
-                  <TableHead className="text-white">Transaction ID</TableHead>
+
+          <Card className="bg-white text-gray-900">
+            <Table className="bg-white text-gray-900">
+              <TableHeader className="bg-white text-gray-900">
+                <TableRow className="bg-white text-gray-900">
+                  <TableHead className="text-gray-800">Student</TableHead>
+                  <TableHead className="text-gray-800">Amount</TableHead>
+                  <TableHead className="text-gray-800">Discount</TableHead>
+                  <TableHead className="text-gray-800">Payment Date</TableHead>
+                  <TableHead className="text-gray-800">Method</TableHead>
+                  <TableHead className="text-gray-800">Receipt</TableHead>
+                  <TableHead className="text-gray-800">Transaction ID</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className="bg-black text-white">
+              <TableBody className="bg-white text-gray-900">
                 {feePayments.map((payment: FeePayment) => {
                   const student = students.find((s: Student) => s.id === payment.studentId);
-                  
+
                   return (
                     <TableRow key={payment.id}>
                       <TableCell>{student?.name}</TableCell>
-                      <TableCell className="font-semibold text-white">₹{parseFloat(payment.amount).toLocaleString()}</TableCell>
+                      <TableCell className="font-semibold text-gray-800">₹{parseFloat(payment.amount).toLocaleString()}</TableCell>
                       <TableCell className="text-green-600">
                         {parseFloat(payment.discount) > 0 ? `-₹${parseFloat(payment.discount).toLocaleString()}` : '-'}
                       </TableCell>
@@ -686,7 +696,7 @@ export default function Students() {
 
       {/* Fee Payment Dialog */}
       <Dialog open={addFeePaymentOpen} onOpenChange={setAddFeePaymentOpen}>
-        <DialogContent className="bg-black text-white">
+        <DialogContent className="bg-white text-gray-900">
           <DialogHeader>
             <DialogTitle>Record Fee Payment</DialogTitle>
             <DialogDescription>
@@ -696,19 +706,19 @@ export default function Students() {
           <form onSubmit={handleAddFeePayment} className="space-y-4">
             <div>
               <Label htmlFor="amount">Amount</Label>
-              <Input id="amount" name="amount" type="number" step="0.01" required className="bg-black text-white border-white" />
+              <Input id="amount" name="amount" type="number" step="0.01" required className="bg-white text-gray-900 border-white" />
             </div>
             <div>
               <Label htmlFor="paymentDate">Payment Date</Label>
-              <Input id="paymentDate" name="paymentDate" type="date" required className="bg-black text-white border-white" />
+              <Input id="paymentDate" name="paymentDate" type="date" required className="bg-black text-gray-800 border-white" />
             </div>
             <div>
               <Label htmlFor="paymentMethod">Payment Method</Label>
-              <Select name="paymentMethod" required className="bg-black text-white border-white">
+              <Select name="paymentMethod" required className="bg-black text-gray-800 border-white">
                 <SelectTrigger>
                   <SelectValue placeholder="Select payment method" />
                 </SelectTrigger>
-                <SelectContent className="bg-black text-white">
+                <SelectContent className="bg-black text-gray-800">
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="card">Card</SelectItem>
                   <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
@@ -719,21 +729,21 @@ export default function Students() {
             </div>
             <div>
               <Label htmlFor="receiptNumber">Receipt Number</Label>
-              <Input id="receiptNumber" name="receiptNumber" required className="bg-black text-white border-white" />
+              <Input id="receiptNumber" name="receiptNumber" required className="bg-black text-gray-800 border-white" />
             </div>
             <div>
               <Label htmlFor="transactionId">Transaction ID (Optional)</Label>
-              <Input id="transactionId" name="transactionId" className="bg-black text-white border-white" />
+              <Input id="transactionId" name="transactionId" className="bg-black text-gray-800 border-white" />
             </div>
             <div>
               <Label htmlFor="notes">Notes (Optional)</Label>
-              <Input id="notes" name="notes" className="bg-black text-white border-white" />
+              <Input id="notes" name="notes" className="bg-black text-gray-800 border-white" />
             </div>
             <div className="flex justify-end gap-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="bg-black text-white border-white"
+              <Button
+                type="button"
+                variant="outline"
+                className="bg-black text-gray-800 border-white"
                 onClick={() => {
                   setAddFeePaymentOpen(false);
                   setSelectedStudent(null);
@@ -741,7 +751,7 @@ export default function Students() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={addFeePaymentMutation.isPending} className="bg-black text-white border-white">
+              <Button type="submit" disabled={addFeePaymentMutation.isPending} className="bg-black text-gray-800 border-white">
                 {addFeePaymentMutation.isPending ? "Recording..." : "Record Payment"}
               </Button>
             </div>
@@ -772,7 +782,7 @@ export default function Students() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    
+
                     <FormField control={editStudentForm.control} name="name" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
@@ -780,7 +790,7 @@ export default function Students() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    
+
                     <FormField control={editStudentForm.control} name="email" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Email</FormLabel>
@@ -788,7 +798,7 @@ export default function Students() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    
+
                     <FormField control={editStudentForm.control} name="phone" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Phone</FormLabel>
@@ -796,15 +806,28 @@ export default function Students() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    
+
                     <FormField control={editStudentForm.control} name="class" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Class</FormLabel>
-                        <FormControl><Input {...field} required placeholder="e.g. 10" /></FormControl>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select class" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {classOptions.map((cls) => (
+                              <SelectItem key={cls} value={cls}>
+                                {cls}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    
+
                     <FormField control={editStudentForm.control} name="stream" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Stream</FormLabel>
@@ -813,7 +836,7 @@ export default function Students() {
                       </FormItem>
                     )} />
                   </div>
-                  
+
                   <div className="space-y-4">
                     <FormField control={editStudentForm.control} name="parentName" render={({ field }) => (
                       <FormItem>
@@ -822,7 +845,7 @@ export default function Students() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    
+
                     <FormField control={editStudentForm.control} name="parentPhone" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Parent Phone</FormLabel>
@@ -830,13 +853,13 @@ export default function Students() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    
+
                     <FormField control={editStudentForm.control} name="address" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Address</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            {...field} 
+                          <Textarea
+                            {...field}
                             placeholder="Enter student address"
                             rows={3}
                           />
@@ -844,7 +867,7 @@ export default function Students() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    
+
                     <FormField control={editStudentForm.control} name="dateOfBirth" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Date of Birth</FormLabel>
@@ -852,7 +875,7 @@ export default function Students() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    
+
                     <FormField control={editStudentForm.control} name="admissionDate" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Admission Date</FormLabel>
@@ -860,7 +883,7 @@ export default function Students() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    
+
                     <FormField control={editStudentForm.control} name="status" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Status</FormLabel>
@@ -881,10 +904,10 @@ export default function Students() {
                     )} />
                   </div>
                 </div>
-                
+
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     variant="outline"
                     onClick={() => {
                       setEditStudentOpen(false);
@@ -893,8 +916,8 @@ export default function Students() {
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={editStudentMutation.isPending}
                     className="bg-[#643ae5] hover:bg-[#5832c4] text-white"
                   >
@@ -918,7 +941,7 @@ export default function Students() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel 
+              <AlertDialogCancel
                 onClick={() => {
                   setDeleteStudentOpen(false);
                   setSelectedStudent(null);
@@ -926,7 +949,7 @@ export default function Students() {
               >
                 Cancel
               </AlertDialogCancel>
-              <AlertDialogAction 
+              <AlertDialogAction
                 onClick={() => selectedStudent && deleteStudentMutation.mutate(selectedStudent.id)}
                 disabled={deleteStudentMutation.isPending}
                 className="bg-red-600 hover:bg-red-700 text-white"
@@ -955,7 +978,7 @@ export default function Students() {
                     <p className="text-sm text-gray-600">
                       <strong>{financialBlockingDetails.student?.name}</strong> cannot be deleted because they have active financial obligations that must be resolved first.
                     </p>
-                    
+
                     {/* Outstanding EMI Payments */}
                     {financialBlockingDetails.activePayments?.length > 0 && (
                       <div className="bg-red-50 p-4 rounded-lg">
@@ -969,9 +992,8 @@ export default function Students() {
                                 <p className="font-medium">Installment #{payment.installmentNumber}</p>
                                 <p className="text-sm text-gray-600">Due: {new Date(payment.dueDate).toLocaleDateString()}</p>
                                 <p className="text-sm">
-                                  <span className={`px-2 py-1 rounded-full text-xs ${
-                                    payment.status === 'overdue' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                                  }`}>
+                                  <span className={`px-2 py-1 rounded-full text-xs ${payment.status === 'overdue' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
                                     {payment.status}
                                   </span>
                                 </p>

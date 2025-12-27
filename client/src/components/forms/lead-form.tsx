@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { insertLeadSchema } from "@shared/schema";
-import type { InsertLead, User } from "@shared/schema";
+import type { InsertLead, User, GlobalClassFee } from "@shared/schema";
 
 interface LeadFormProps {
   onSuccess?: () => void;
@@ -23,6 +23,14 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
   const { data: counselors = [] } = useQuery<User[]>({
     queryKey: ['/api/counselors'],
   });
+
+  const { data: globalFees } = useQuery<GlobalClassFee[]>({
+    queryKey: ["/api/global-class-fees"],
+  });
+
+  const classOptions = globalFees
+    ? Array.from(new Set(globalFees.filter(f => f.isActive).map(f => f.className))).sort()
+    : [];
 
   const form = useForm<InsertLead>({
     resolver: zodResolver(insertLeadSchema),
@@ -43,7 +51,7 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
     mutationFn: async (data: InsertLead) => {
       try {
         const response = await apiRequest("POST", "/leads", data);
-        
+
         // Check content type to ensure we're receiving JSON
         const contentType = response.headers.get("Content-Type");
         if (contentType && contentType.includes("application/json")) {
@@ -67,17 +75,17 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
     },
     onError: (error: any) => {
       let errorMessage = "Failed to create lead";
-      
+
       if (error.errorData?.message) {
         errorMessage = error.errorData.message;
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
-      toast({ 
-        title: "Error", 
+
+      toast({
+        title: "Error",
         description: errorMessage,
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -159,24 +167,11 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="Pre-K">Pre-K</SelectItem>
-                    <SelectItem value="Kindergarten">Kindergarten</SelectItem>
-                    <SelectItem value="Class 1">Class 1</SelectItem>
-                    <SelectItem value="Class 2">Class 2</SelectItem>
-                    <SelectItem value="Class 3">Class 3</SelectItem>
-                    <SelectItem value="Class 4">Class 4</SelectItem>
-                    <SelectItem value="Class 5">Class 5</SelectItem>
-                    <SelectItem value="Class 6">Class 6</SelectItem>
-                    <SelectItem value="Class 7">Class 7</SelectItem>
-                    <SelectItem value="Class 8">Class 8</SelectItem>
-                    <SelectItem value="Class 9">Class 9</SelectItem>
-                    <SelectItem value="Class 10">Class 10</SelectItem>
-                    <SelectItem value="Class 11 - Science">Class 11 - Science</SelectItem>
-                    <SelectItem value="Class 11 - Commerce">Class 11 - Commerce</SelectItem>
-                    <SelectItem value="Class 11 - Arts">Class 11 - Arts</SelectItem>
-                    <SelectItem value="Class 12 - Science">Class 12 - Science</SelectItem>
-                    <SelectItem value="Class 12 - Commerce">Class 12 - Commerce</SelectItem>
-                    <SelectItem value="Class 12 - Arts">Class 12 - Arts</SelectItem>
+                    {classOptions.map((cls) => (
+                      <SelectItem key={cls} value={cls}>
+                        {cls}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -271,8 +266,8 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
             <FormItem>
               <FormLabel>Initial Remarks</FormLabel>
               <FormControl>
-                <Textarea 
-                  {...field} 
+                <Textarea
+                  {...field}
                   placeholder="Add any initial notes about this lead..."
                   rows={3}
                   value={field.value || ""}

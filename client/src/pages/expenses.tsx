@@ -172,14 +172,14 @@ export default function Expenses() {
   };
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-gray-50">
       <Header />
 
       <main className="p-6 space-y-8">
         {/* Budget Utilization Card */}
-        <Card className="bg-black text-white shadow-sm hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-4 bg-black text-white">
-            <CardTitle className="text-xl text-white">Budget Utilization</CardTitle>
+        <Card className="bg-white text-gray-800 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-4 bg-white text-gray-800">
+            <CardTitle className="text-xl text-gray-800">Budget Utilization</CardTitle>
             <Dialog open={isBudgetDialogOpen} onOpenChange={setIsBudgetDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700 h-9">
@@ -265,7 +265,7 @@ export default function Expenses() {
               </DialogContent>
             </Dialog>
           </CardHeader>
-          <CardContent className="bg-black text-white">
+          <CardContent className="bg-white text-gray-800">
             <div className="space-y-8">
               {/* Overall Budget */}
               <div className="space-y-4">
@@ -287,14 +287,14 @@ export default function Expenses() {
                     View Category Utilization
                   </Button>
                 ) : (
-                  <Card className="bg-black text-white shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between pb-4 bg-black text-white">
-                      <CardTitle className="text-xl text-white">Category-wise Utilization</CardTitle>
+                  <Card className="bg-white text-gray-800 shadow-sm">
+                    <CardHeader className="flex flex-row items-center justify-between pb-4 bg-white text-gray-800">
+                      <CardTitle className="text-xl text-gray-800">Category-wise Utilization</CardTitle>
                       <Button variant="destructive" size="sm" onClick={() => setShowCategoryUtilization(false)} className="h-9">
                         Hide
                       </Button>
                     </CardHeader>
-                    <CardContent className="bg-black text-white">
+                    <CardContent className="bg-white text-gray-800">
                       <div className="max-w-xs mb-6">
                         <select
                           value={selectedCategory}
@@ -335,7 +335,7 @@ export default function Expenses() {
 
         {/* Add Expense Form */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold text-white mb-4">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">
             {editingExpense ? "Edit Expense" : "Add New Expense"}
           </h2>
           <div className="flex gap-4 mb-4">
@@ -381,19 +381,19 @@ export default function Expenses() {
 
         {/* Expenses Table */}
         <div>
-          <h2 className="text-lg font-semibold text-white mb-4">Expense List</h2>
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Expense List</h2>
           <div className="overflow-x-auto">
-            <table className="w-full border rounded-lg bg-black text-white">
-              <thead className="bg-black text-white">
+            <table className="w-full border rounded-lg bg-white text-gray-800">
+              <thead className="bg-white text-gray-800">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Description</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">Description</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-black text-white">
+              <tbody className="bg-white text-gray-800">
                 {expenses.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="text-center py-4 text-gray-400">No expenses recorded.</td>

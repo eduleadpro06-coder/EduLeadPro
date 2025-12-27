@@ -1,8 +1,8 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { 
-  BarChart3, 
-  Users, 
+import {
+  BarChart3,
+  Users,
   Settings,
   IndianRupee,
   Wallet,
@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Sparkles,
   Clock,
+  Baby,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getActiveAIFeatures, getComingSoonFeatures, isAIFeaturePath } from "@/config/aiFeatures";
@@ -20,6 +21,7 @@ const navigation = [
   { name: "Lead Management", href: "/leads", icon: Users },
   { name: "Employee Management", href: "/staff-ai", icon: UserCheck },
   { name: "Student, Fees & EMI", href: "/student-fees", icon: IndianRupee },
+  { name: "Daycare Management", href: "/daycare", icon: Baby },
   { name: "Expenses", href: "/expenses", icon: Wallet },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
@@ -61,7 +63,7 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="w-64 bg-black fixed h-full z-10 sidebar-black-shadow flex flex-col justify-between">
+    <div className="w-64 bg-white fixed h-full z-10 shadow-xl border-r border-gray-200 flex flex-col justify-between">
       <div>
         <div className="p-6 pb-2">
           <Link href="/landing">
@@ -75,10 +77,10 @@ export default function Sidebar() {
           </Link>
         </div>
         {customInstituteName && (
-          <div className="px-6 py-4 bg-black border-b border-[#232a3a]">
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 rounded-full bg-primary"></div>
-              <p className="text-base font-medium text-foreground">{customInstituteName}</p>
+              <p className="text-base font-medium text-gray-800">{customInstituteName}</p>
             </div>
           </div>
         )}
@@ -97,19 +99,19 @@ export default function Sidebar() {
                   >
                     <div
                       className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer relative group 
-                        ${isActive ? 'bg-[#181f36] border-l-4 border-[#a259ff]' : 'hover:bg-[#131b2d] hover:text-[#a084fa]'}
+                        ${isActive ? 'bg-purple-50 border-l-4 border-[#a259ff]' : 'hover:bg-gray-100 hover:text-purple-600'}
                       `}
                     >
-                      <span className={isActive ? 'text-[#a259ff]' : 'text-[#8b9cc9] group-hover:text-[#a084fa]'}>
+                      <span className={isActive ? 'text-[#a259ff]' : 'text-gray-500 group-hover:text-purple-600'}>
                         <Icon size={18} />
                       </span>
-                      <span className={`font-medium text-sm ${isActive ? 'text-[#a259ff]' : 'text-[#8b9cc9] group-hover:text-[#a084fa]'}`}>
+                      <span className={`font-medium text-sm ${isActive ? 'text-[#a259ff]' : 'text-gray-600 group-hover:text-purple-600'}`}>
                         {item.name}
                       </span>
                     </div>
                   </Link>
                   {dividerAfter && (
-                    <div className="my-2 border-t border-[#232a3a] mx-2"></div>
+                    <div className="my-2 border-t border-gray-200 mx-2"></div>
                   )}
                 </>
               );
@@ -119,17 +121,17 @@ export default function Sidebar() {
             <div className="mt-4">
               <div
                 onClick={() => setIsAIExpanded(!isAIExpanded)}
-                className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer group hover:bg-[#131b2d]`}
+                className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer group hover:bg-gray-100`}
               >
                 <div className="flex items-center space-x-3">
-                  <span className="text-[#8b9cc9] group-hover:text-[#a084fa]">
+                  <span className="text-gray-500 group-hover:text-purple-600">
                     <Sparkles size={18} />
                   </span>
-                  <span className="font-medium text-sm text-[#8b9cc9] group-hover:text-[#a084fa]">
+                  <span className="font-medium text-sm text-gray-600 group-hover:text-purple-600">
                     AI Features
                   </span>
                 </div>
-                <span className="text-[#8b9cc9] group-hover:text-[#a084fa]">
+                <span className="text-gray-500 group-hover:text-purple-600">
                   {isAIExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </span>
               </div>
@@ -145,17 +147,17 @@ export default function Sidebar() {
                       <Link key={feature.id} href={feature.href}>
                         <div
                           className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer relative group
-                            ${isActive ? 'bg-[#181f36] border-l-4 border-[#a259ff]' : 'hover:bg-[#131b2d] hover:text-[#a084fa]'}
+                            ${isActive ? 'bg-purple-50 border-l-4 border-[#a259ff]' : 'hover:bg-gray-100 hover:text-purple-600'}
                           `}
                         >
-                          <span className={isActive ? 'text-[#a259ff]' : 'text-[#8b9cc9] group-hover:text-[#a084fa]'}>
+                          <span className={isActive ? 'text-[#a259ff]' : 'text-gray-500 group-hover:text-purple-600'}>
                             <Icon size={16} />
                           </span>
                           <div className="flex-1">
-                            <span className={`font-medium text-sm ${isActive ? 'text-[#a259ff]' : 'text-[#8b9cc9] group-hover:text-[#a084fa]'}`}>
+                            <span className={`font-medium text-sm ${isActive ? 'text-[#a259ff]' : 'text-gray-600 group-hover:text-purple-600'}`}>
                               {feature.name}
                             </span>
-                            <div className={`text-xs ${isActive ? 'text-[#a259ff]/70' : 'text-[#8b9cc9]/70 group-hover:text-[#a084fa]/70'}`}>
+                            <div className={`text-xs ${isActive ? 'text-[#a259ff]/70' : 'text-gray-500 group-hover:text-purple-600/70'}`}>
                               {feature.description}
                             </div>
                           </div>
@@ -168,7 +170,7 @@ export default function Sidebar() {
                   {comingSoonFeatures.length > 0 && (
                     <>
                       <div className="px-3 py-2 mt-3">
-                        <div className="text-xs font-medium text-[#8b9cc9]/60 uppercase tracking-wider">
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Coming Soon
                         </div>
                       </div>
@@ -179,17 +181,17 @@ export default function Sidebar() {
                             key={feature.id}
                             className="flex items-center space-x-3 px-3 py-2 rounded-lg opacity-60 cursor-not-allowed"
                           >
-                            <span className="text-[#8b9cc9]/50">
+                            <span className="text-gray-400">
                               <Icon size={16} />
                             </span>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="font-medium text-sm text-[#8b9cc9]/50">
+                                <span className="font-medium text-sm text-gray-400">
                                   {feature.name}
                                 </span>
-                                <Clock size={12} className="text-[#8b9cc9]/40" />
+                                <Clock size={12} className="text-gray-400" />
                               </div>
-                              <div className="text-xs text-[#8b9cc9]/40">
+                              <div className="text-xs text-gray-400">
                                 {feature.description}
                               </div>
                             </div>
@@ -203,7 +205,7 @@ export default function Sidebar() {
             </div>
 
             {/* Divider after AI Features */}
-            <div className="my-2 border-t border-[#232a3a] mx-2"></div>
+            <div className="my-2 border-t border-gray-200 mx-2"></div>
           </div>
         </nav>
       </div>

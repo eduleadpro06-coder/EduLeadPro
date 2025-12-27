@@ -1,60 +1,62 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
-import { insertLeadSchema, insertFollowUpSchema, Lead, InsertLead, InsertEmiPlan } from "../shared/schema.js";
+import { insertLeadSchema, insertFollowUpSchema, Lead, InsertLead, InsertEmiPlan, InsertFeePayment } from "../shared/schema.js";
+import * as schema from "../shared/schema.js";
 import { perplexityAI } from "./perplexity-ai.js";
 import PDFDocument from "pdfkit";
 import { db } from "./db.js";
-import { forecastEnrollments, generateMarketingRecommendations } from "./ai.js";
+import { forecastEnrollments, generateMarketingRecommendations, predictAdmissionLikelihood } from "./ai.js";
 import aiComprehensiveRouter from "./api/ai-comprehensive.js";
 import { sql } from "drizzle-orm";
+import { registerDaycareRoutes } from "./daycareRoutes.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("🚀 Starting route registration...");
-  
+
   // Test route to verify routes are working
   app.get("/api/test", (req, res) => {
     res.json({ message: "Routes are working!", timestamp: new Date().toISOString() });
   });
-  
+
   // Dashboard stats
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
       const leadStats = await storage.getLeadStats();
       const enrollmentStats = await storage.getEnrollmentStats();
       const feeStats = await storage.getFeeStats();
-      
+
       // Calculate trends (comparing current month vs previous month)
       const currentDate = new Date();
       const currentMonth = currentDate.getMonth();
       const currentYear = currentDate.getFullYear();
-      
+
       // Get current month leads
       const currentMonthLeads = await storage.getLeadsByDateRange(
         new Date(currentYear, currentMonth, 1),
         new Date(currentYear, currentMonth + 1, 0)
       );
-      
+
       // Get previous month leads
       const previousMonthLeads = await storage.getLeadsByDateRange(
         new Date(currentYear, currentMonth - 1, 1),
         new Date(currentYear, currentMonth, 0)
       );
-      
+
       // Calculate trends
-      const leadTrend = previousMonthLeads.length > 0 
+      const leadTrend = previousMonthLeads.length > 0
         ? ((currentMonthLeads.length - previousMonthLeads.length) / previousMonthLeads.length) * 100
         : 0;
-      
+
       // Calculate conversion rate
-      const conversionRate = leadStats.totalLeads > 0 
-        ? (leadStats.conversions / leadStats.totalLeads) * 100 
+      const conversionRate = leadStats.totalLeads > 0
+        ? (leadStats.conversions / leadStats.totalLeads) * 100
         : 0;
-      
+
       // Calculate estimated revenue (assuming average fee per student)
       const avgFeePerStudent = 80000; // ₹80,000 average fee
       const revenue = enrollmentStats.activeEnrollments * avgFeePerStudent;
-      
+
       const stats = {
         totalLeads: leadStats.totalLeads,
         activeStudents: enrollmentStats.activeEnrollments,
@@ -74,7 +76,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalEnrollments: enrollmentStats.totalEnrollments,
         newEnrollmentsThisMonth: enrollmentStats.newEnrollmentsThisMonth
       };
-      
+
       res.json(stats);
     } catch (error) {
       console.error("Dashboard stats error:", error);
@@ -116,7 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/leads/import-csv", async (req, res) => {
     try {
       const { csvData } = req.body;
-      
+
       if (!csvData || !Array.isArray(csvData)) {
         return res.status(400).json({ message: "Invalid CSV data format" });
       }
@@ -124,10 +126,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const importedLeads = [];
       const errors = [];
       const duplicates = [];
-      
+
       for (let i = 0; i < csvData.length; i++) {
         const row = csvData[i];
-        
+
         try {
           // Validate required fields
           if (!row.name || !row.phone || !row.class) {
@@ -154,11 +156,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Check for duplicates before creating
           const allLeads = await storage.getAllLeads(true); // Include deleted leads
-          const existingLead = allLeads.find(lead => 
-            lead.phone === leadData.phone || 
+          const existingLead = allLeads.find(lead =>
+            lead.phone === leadData.phone ||
             (leadData.email && lead.email === leadData.email)
           );
-          
+
           if (existingLead) {
             duplicates.push({
               row: i + 1,
@@ -171,13 +173,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           const lead = await storage.createLead(leadData);
-          
+
           importedLeads.push(lead);
         } catch (error: any) {
           errors.push(`Row ${i + 1}: ${error.message}`);
         }
       }
-      
+
       const response = {
         message: `Successfully imported ${importedLeads.length} leads`,
         imported: importedLeads.length,
@@ -191,11 +193,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (errors.length > 0) {
         response.message += ` with ${errors.length} errors`;
       }
-      
+
       if (duplicates.length > 0) {
         response.message += ` and ${duplicates.length} duplicates skipped`;
       }
-      
+
       res.json(response);
     } catch (error) {
       console.error("CSV import error:", error);
@@ -207,19 +209,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
-      
+
       // Check if username and password are provided
       if (!username || !password) {
         return res.status(400).json({ success: false, message: "Username and password are required" });
       }
-      
+
       console.log("Login attempt with username:", username);
-      
+
       // Get user from database
       const user = await storage.getUserByUsername(username);
-      
+
       console.log("User found:", user);
-      
+
       // Check if user exists and password matches
       if (user && user.password === password) {
         console.log("Login successful for user:", username);
@@ -245,15 +247,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/signup", async (req, res) => {
     try {
       const { username, password, email } = req.body;
-      
+
       console.log("Signup attempt with data:", { username, password, email });
-      
+
       // Validate required fields
       if (!username || !password) {
         console.log("Missing required fields");
         return res.status(400).json({ success: false, message: "Username and password are required" });
       }
-      
+
       // Check if username already exists
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
@@ -288,9 +290,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Signup error details:", error);
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-      res.status(500).json({ success: false, message: "Signup failed", error: error.message });
+      console.error("Error message:", (error as any).message);
+      console.error("Error stack:", (error as any).stack);
+      res.status(500).json({ success: false, message: "Signup failed", error: (error as any).message });
     }
   });
 
@@ -356,29 +358,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertLeadSchema.parse(req.body);
       const forceCreate = req.query.force === "true";
-      
+
       // Set lastContactedAt to current timestamp when creating a lead
       validatedData.lastContactedAt = new Date();
-      
+
       console.log("=== CREATE LEAD REQUEST ===");
       console.log("Phone:", validatedData.phone);
       console.log("Email:", validatedData.email);
       console.log("Force create:", forceCreate);
-      
+
       // First check only active leads for duplicates
       const activeLeads = await storage.getAllLeads(false); // Exclude deleted leads
       console.log("Active leads count:", activeLeads.length);
-      
-      const existingActiveLead = activeLeads.find(lead => 
-        lead.phone === validatedData.phone || 
+
+      const existingActiveLead = activeLeads.find(lead =>
+        lead.phone === validatedData.phone ||
         (validatedData.email && lead.email === validatedData.email)
       );
-      
+
       console.log("Existing active lead found:", !!existingActiveLead);
-      
+
       if (existingActiveLead) {
         console.log("Active duplicate detected, returning 409");
-        return res.status(409).json({ 
+        return res.status(409).json({
           message: "A lead with this phone number or email already exists",
           existingLead: {
             id: existingActiveLead.id,
@@ -389,7 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
       }
-      
+
       // Check if there's a deleted lead with the same contact info (only if not forcing creation)
       if (!forceCreate) {
         console.log("Checking for deleted leads...");
@@ -398,25 +400,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { recentlyDeletedLeads } = await import("@shared/schema");
           const { db } = await import("./db");
           const { or, eq } = await import("drizzle-orm");
-          
+
           let whereConditions = [eq(recentlyDeletedLeads.phone, validatedData.phone)];
           if (validatedData.email) {
             whereConditions.push(eq(recentlyDeletedLeads.email, validatedData.email));
           }
-          
+
           console.log("Querying recentlyDeletedLeads table...");
           const deletedLeadResults = await db
             .select()
             .from(recentlyDeletedLeads)
             .where(or(...whereConditions))
             .limit(1);
-          
+
           console.log("Deleted lead results:", deletedLeadResults.length);
-          
+
           if (deletedLeadResults.length > 0) {
             const deletedLead = deletedLeadResults[0];
             console.log("Found deleted lead, returning restore option");
-            return res.status(409).json({ 
+            return res.status(409).json({
               message: "A deleted lead with this contact information exists. Would you like to restore it instead?",
               isDeletedLead: true,
               deletedLead: {
@@ -436,7 +438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         console.log("Force create mode - skipping deleted lead check");
       }
-      
+
       const lead = await storage.createLead(validatedData);
       res.status(201).json(lead);
     } catch (error: any) {
@@ -486,8 +488,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const daysSinceCreation = Math.floor(
         (Date.now() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60 * 24)
       );
-      
-      const lastContactDays = lead.lastContactedAt ? 
+
+      const lastContactDays = lead.lastContactedAt ?
         Math.floor((Date.now() - new Date(lead.lastContactedAt).getTime()) / (1000 * 60 * 60 * 24)) :
         undefined;
 
@@ -502,8 +504,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Determine seasonal context
       const currentMonth = new Date().getMonth();
-      const seasonalFactor = [2, 3, 4, 5].includes(currentMonth) ? 'peak_admission' : 
-                           [10, 11, 0, 1].includes(currentMonth) ? 'planning_phase' : 'off_season';
+      const seasonalFactor = [2, 3, 4, 5].includes(currentMonth) ? 'peak_admission' :
+        [10, 11, 0, 1].includes(currentMonth) ? 'planning_phase' : 'off_season';
 
       const prediction = await predictAdmissionLikelihood({
         status: lead.status,
@@ -542,7 +544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/follow-ups", async (req, res) => {
     try {
       const { leadId, counselorId } = req.query;
-      
+
       let followUps;
       if (leadId) {
         followUps = await storage.getFollowUpsByLead(Number(leadId));
@@ -551,7 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         followUps = await storage.getOverdueFollowUps();
       }
-      
+
       res.json(followUps);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch follow-ups" });
@@ -575,13 +577,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update follow-up
   app.patch("/api/follow-ups/:id", async (req, res) => {
     try {
+      console.log("PATCH /api/follow-ups/:id - Request received");
+      console.log("Follow-up ID:", req.params.id);
+      console.log("Request body:", JSON.stringify(req.body, null, 2));
+
       const followUp = await storage.updateFollowUp(Number(req.params.id), req.body);
+
       if (!followUp) {
+        console.log("Follow-up not found for ID:", req.params.id);
         return res.status(404).json({ message: "Follow-up not found" });
       }
+
+      console.log("Follow-up updated successfully:", JSON.stringify(followUp, null, 2));
       res.json(followUp);
     } catch (error) {
-      res.status(500).json({ message: "Failed to update follow-up" });
+      console.error("Error updating follow-up:", error);
+      console.error("Error details:", error instanceof Error ? error.message : String(error));
+      console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+      res.status(500).json({
+        message: "Failed to update follow-up",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
@@ -590,14 +606,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const stats = await storage.getLeadStats();
       const trend = await storage.getMonthlyEnrollmentTrend();
-      
+
       const forecast = await forecastEnrollments({
         totalLeads: stats.totalLeads,
         hotLeads: stats.hotLeads,
         conversions: stats.conversions,
         monthlyTrend: trend
       });
-      
+
       res.json(forecast);
     } catch (error) {
       console.error("Forecasting error:", error);
@@ -610,14 +626,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { ageGroup, location, budget } = req.body;
       const sourcePerformance = await storage.getLeadSourcePerformance();
-      
+
       const recommendations = await generateMarketingRecommendations({
         targetClass: ageGroup || "Grade 10-12",
         budget: budget || 50000,
         currentLeadSources: sourcePerformance.map(s => s.source),
         competitorAnalysis: location || "Local market"
       });
-      
+
       res.json(recommendations);
     } catch (error) {
       console.error("Marketing recommendations error:", error);
@@ -665,7 +681,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const overdueFollowUps = await storage.getOverdueFollowUps();
       res.json(overdueFollowUps);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch overdue follow-ups" });
+      console.error("Overdue follow-ups error:", error);
+      res.status(500).json({
+        message: "Failed to fetch overdue follow-ups",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
@@ -689,9 +709,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { type } = req.body;
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         message: `${type} campaign ${id} sent successfully`,
         sent: Math.floor(Math.random() * 50) + 10
       });
@@ -742,7 +762,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { entities } = req.body;
-      
+
       res.json({
         success: true,
         message: `Synced ${entities.join(", ")} for system ${id}`,
@@ -769,10 +789,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+
+  // Message Templates Routes
+  app.get("/api/message-templates", async (req, res) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const templates = await storage.getAllMessageTemplates(category);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching message templates:", error);
+      res.status(500).json({ message: "Failed to fetch message templates" });
+    }
+  });
+
+  app.get("/api/message-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getMessageTemplate(Number(req.params.id));
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch template" });
+    }
+  });
+
+  app.post("/api/message-templates", async (req, res) => {
+    try {
+      const newTemplate = await storage.createMessageTemplate(req.body);
+      res.status(201).json(newTemplate);
+    } catch (error) {
+      console.error("Error creating template:", error);
+      res.status(500).json({ message: "Failed to create template" });
+    }
+  });
+
+  app.patch("/api/message-templates/:id", async (req, res) => {
+    try {
+      const updated = await storage.updateMessageTemplate(Number(req.params.id), req.body);
+      if (!updated) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating template:", error);
+      res.status(500).json({ message: "Failed to update template" });
+    }
+  });
+
+  app.delete("/api/message-templates/:id", async (req, res) => {
+    try {
+      await storage.deleteMessageTemplate(Number(req.params.id));
+      res.sendStatus(204);
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      res.status(500).json({ message: "Failed to delete template" });
+    }
+  });
+
   app.post("/api/ai/summarize-session", async (req, res) => {
     try {
       const { transcript, leadId, leadName } = req.body;
-      
+
       const summary = `Counseling session with ${leadName} covered admission requirements and next steps. Student shows strong interest in Science stream.`;
       const keyPoints = [
         "Student interested in Science stream",
@@ -785,7 +864,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "Follow up after visit"
       ];
       const sentiment = transcript.toLowerCase().includes("interested") || transcript.toLowerCase().includes("excited") ? "positive" : "neutral";
-      
+
       res.json({
         summary,
         keyPoints,
@@ -871,17 +950,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       console.log(`API: Attempting to delete E-Mandate with ID: ${id}`);
-      
+
       const mandate = await storage.getEMandate(parseInt(id));
       if (!mandate) {
         console.log(`API: E-Mandate ${id} not found`);
         return res.status(404).json({ message: "E-Mandate not found" });
       }
-      
+
       console.log(`API: Found mandate:`, JSON.stringify(mandate, null, 2));
-      
+
       const result = await storage.deleteEMandate(mandate.id);
-      
+
       if (result) {
         console.log(`API: E-Mandate ${id} deleted successfully`);
         res.json({ message: "E-Mandate deleted successfully" });
@@ -889,11 +968,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`API: Failed to delete E-Mandate ${id} - storage.deleteEMandate returned false`);
         res.status(400).json({ message: "E-Mandate could not be deleted" });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("API: Delete E-Mandate DETAILED ERROR:", error);
       console.error("API: Error stack:", error.stack);
       console.error("API: Error message:", error.message);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to delete E-Mandate",
         error: error.message,
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined
@@ -934,7 +1013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/global-class-fees", async (req, res) => {
     try {
       console.log("Received global class fee request:", req.body);
-      
+
       const globalClassFeeData = {
         className: req.body.className,
         feeType: req.body.feeType,
@@ -944,12 +1023,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: req.body.description,
         isActive: req.body.isActive !== undefined ? req.body.isActive : true
       };
-      
+
       console.log("Processed global class fee data:", globalClassFeeData);
-      
+
       const globalClassFee = await storage.createGlobalClassFee(globalClassFeeData);
       console.log("Created global class fee:", globalClassFee);
-      
+
       res.status(201).json(globalClassFee);
     } catch (error) {
       console.error("Global class fee creation error:", error);
@@ -968,7 +1047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: req.body.description,
         isActive: req.body.isActive
       };
-      
+
       const globalClassFee = await storage.updateGlobalClassFee(parseInt(req.params.id), updates);
       if (!globalClassFee) {
         return res.status(404).json({ message: "Global class fee not found" });
@@ -1014,7 +1093,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         installments: req.body.installments,
         academicYear: req.body.academicYear
       };
-      
+
       const feeStructure = await storage.createFeeStructure(feeStructureData);
       res.status(201).json(feeStructure);
     } catch (error) {
@@ -1050,11 +1129,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receiptNumber: req.body.receiptNumber,
         installmentNumber: req.body.installmentNumber,
         transactionId: req.body.transactionId,
-        status: req.body.status || "completed"
+        status: req.body.status || "completed",
+        paymentCategory: req.body.paymentCategory || "fee_payment", // Default to fee_payment
+        chargeType: req.body.chargeType || null, // Optional charge type
       };
-      
+
       const feePayment = await storage.createFeePayment(feePaymentData);
-      
+
+      // CRITICAL: Ensure receipt number is generated and persisted if not provided
+      if (!feePayment.receiptNumber) {
+        try {
+          const academicYear = "2025-26";
+          const receiptNumber = `MEL/${academicYear}/${String(feePayment.id).padStart(6, '0')}`;
+          console.log(`Generating persistent receipt number for payment ${feePayment.id}: ${receiptNumber}`);
+
+          const updatedPayment = await storage.updateFeePayment(feePayment.id, { receiptNumber });
+          if (updatedPayment) {
+            console.log("Payment updated with receipt number");
+            // Check if this payment is for an EMI plan and update completion status
+            if (req.body.installmentNumber) {
+              const emiPlans = await storage.getEmiPlansByStudent(req.body.leadId);
+              for (const emiPlan of emiPlans) {
+                const isCompleted = await storage.checkEmiPlanCompletion(emiPlan.id);
+                if (isCompleted && emiPlan.status !== 'completed') {
+                  await storage.updateEmiPlan(emiPlan.id, { status: 'completed' });
+                }
+              }
+            }
+            return res.status(201).json(updatedPayment);
+          }
+        } catch (updateError) {
+          console.error("Failed to update receipt number:", updateError);
+          // Fallback to returning original payment, client might generate one locally (but it won't be persisted)
+        }
+      }
+
       // Check if this payment is for an EMI plan and update completion status
       if (req.body.installmentNumber) {
         const emiPlans = await storage.getEmiPlansByStudent(req.body.leadId);
@@ -1065,11 +1174,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       res.status(201).json(feePayment);
     } catch (error) {
       console.error("Fee payment creation error:", error);
       res.status(500).json({ message: "Failed to create fee payment" });
+    }
+  });
+
+  // BACKFILL ENDPOINT (Temporary) to fix existing payments
+  app.post("/api/debug/backfill-receipts", async (req, res) => {
+    try {
+      console.log("Starting backfill of receipt numbers...");
+      const allPayments = await storage.getAllFeePayments();
+      let updatedCount = 0;
+
+      for (const payment of allPayments) {
+        if (!payment.receiptNumber) {
+          const academicYear = "2025-26";
+          // Use payment ID to ensure uniqueness and persistence
+          const receiptNumber = `MEL/${academicYear}/${String(payment.id).padStart(6, '0')}`;
+          await storage.updateFeePayment(payment.id, { receiptNumber });
+          updatedCount++;
+        }
+      }
+
+      console.log(`Backfilled ${updatedCount} payments.`);
+      res.json({ success: true, message: `Backfilled ${updatedCount} payments with persistent receipt numbers.` });
+    } catch (error) {
+      console.error("Backfill error:", error);
+      res.status(500).json({ success: false, error: "Backfill failed" });
     }
   });
 
@@ -1164,37 +1298,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/emi-plans", async (req, res) => {
     try {
-      const { 
-        studentId, 
-        totalAmount, 
-        emiPeriod, 
-        emiAmount,
-        startDate, 
-        status 
+      console.log("Received EMI plan request:", req.body);
+      const {
+        studentId,
+        totalAmount,
+        numberOfInstallments,
+        installmentAmount,
+        startDate,
+        endDate,
+        status
       } = req.body;
-      
-      const numberOfInstallments = parseInt(emiPeriod);
-      const installmentAmount = parseFloat(emiAmount);
-      
-      const endDate = new Date(startDate);
-      endDate.setMonth(endDate.getMonth() + numberOfInstallments);
-      
+
+      // Validate required fields
+      if (!studentId || !totalAmount || !numberOfInstallments || !installmentAmount || !startDate || !endDate) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Validate amounts
+      if (parseFloat(totalAmount) <= 0 || parseFloat(installmentAmount) <= 0) {
+        return res.status(400).json({ message: "Invalid amounts - must be greater than zero" });
+      }
+
+      if (parseInt(numberOfInstallments) <= 0) {
+        return res.status(400).json({ message: "Number of installments must be positive" });
+      }
+
+      // Validate dates
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (end <= start) {
+        return res.status(400).json({ message: "End date must be after start date" });
+      }
+
+      // Check for duplicate active EMI plans
+      const existingPlans = await storage.getActiveEmiPlans(parseInt(studentId));
+      if (existingPlans.length > 0) {
+        return res.status(409).json({
+          message: "This student already has an active EMI plan. Complete or cancel it first.",
+          existingPlan: existingPlans[0]
+        });
+      }
+
       const finalPlanData: InsertEmiPlan = {
         studentId: parseInt(studentId),
         totalAmount: String(totalAmount),
-        numberOfInstallments,
+        numberOfInstallments: parseInt(numberOfInstallments),
         installmentAmount: String(installmentAmount),
-        startDate: new Date(startDate).toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
+        startDate: startDate, // Already in YYYY-MM-DD format from frontend
+        endDate: endDate, // Already in YYYY-MM-DD format from frontend
         status: status || "active",
       };
 
+      console.log("Creating EMI plan with data:", finalPlanData);
       const emiPlan = await storage.createEmiPlan(finalPlanData);
-      
-      res.status(201).json(emiPlan);
+      console.log("EMI plan created successfully:", emiPlan);
+
+      // Handle Down Payment if present
+      let downPaymentData = null;
+      const { downPayment, paymentMode, transactionId } = req.body;
+      const downPaymentAmount = parseFloat(downPayment || "0");
+
+
+      if (!isNaN(downPaymentAmount) && downPaymentAmount > 0) {
+        console.log("Processing down payment for EMI plan:", downPaymentAmount);
+
+        const paymentData: InsertFeePayment = {
+          leadId: parseInt(studentId),
+          amount: String(downPaymentAmount),
+          paymentDate: startDate, // Use start date as payment date
+          paymentMode: paymentMode || 'cash',
+          receiptNumber: null, // System-generated
+          transactionId: transactionId || null,
+          status: 'completed',
+          installmentNumber: 0, // 0 indicates down payment
+        };
+
+        const payment = await storage.createFeePayment(paymentData);
+        console.log("Down payment recorded successfully:", payment);
+        downPaymentData = payment;
+
+        // Generate receipt number if not provided
+        if (!payment.receiptNumber) {
+          const academicYear = "2025-26";
+          const generatedReceiptNumber = `MEL/${academicYear}/${String(payment.id).padStart(6, '0')}`;
+          const updatedPayment = await storage.updateFeePayment(payment.id, { receiptNumber: generatedReceiptNumber });
+          if (updatedPayment) {
+            downPaymentData = updatedPayment;
+          }
+        }
+      }
+
+      res.status(201).json({ emiPlan, downPayment: downPaymentData });
     } catch (error) {
       console.error("EMI plan creation error:", error);
-      res.status(500).json({ message: "Failed to create EMI plan" });
+      res.status(500).json({ message: "Failed to create EMI plan", error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.delete("/api/emi-plans/:id", async (req, res) => {
+    try {
+      const planId = parseInt(req.params.id);
+
+      // Check if plan exists
+      const plan = await storage.getEmiPlanById(planId);
+      if (!plan) {
+        return res.status(404).json({ message: "EMI plan not found" });
+      }
+
+      // Check if plan has payments
+      const payments = await storage.getEmiPlanPayments(planId);
+      if (payments.length > 0) {
+        return res.status(409).json({
+          message: "Cannot delete EMI plan with existing payments. Cancel the plan instead.",
+          paymentCount: payments.length
+        });
+      }
+
+      // Delete the plan
+      await storage.deleteEmiPlan(planId);
+      res.json({ message: "EMI plan deleted successfully" });
+    } catch (error) {
+      console.error("EMI plan deletion error:", error);
+      res.status(500).json({ message: "Failed to delete EMI plan" });
+    }
+  });
+
+  app.patch("/api/emi-plans/:id", async (req, res) => {
+    try {
+      const planId = parseInt(req.params.id);
+      const { status } = req.body;
+
+      // Validate status
+      const validStatuses = ['active', 'completed', 'cancelled'];
+      if (status && !validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status. Must be: active, completed, or cancelled" });
+      }
+
+      // Update the plan
+      const updatedPlan = await storage.updateEmiPlan(planId, { status });
+      if (!updatedPlan) {
+        return res.status(404).json({ message: "EMI plan not found" });
+      }
+
+      res.json(updatedPlan);
+    } catch (error) {
+      console.error("EMI plan update error:", error);
+      res.status(500).json({ message: "Failed to update EMI plan" });
+    }
+  });
+
+  app.get("/api/emi-plans/:id/payments", async (req, res) => {
+    try {
+      const planId = parseInt(req.params.id);
+      const payments = await storage.getEmiPlanPayments(planId);
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching EMI plan payments:", error);
+      res.status(500).json({ message: "Failed to fetch payments" });
     }
   });
 
@@ -1227,12 +1487,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { class: className } = req.query;
       let students = await storage.getAllStudents();
-      
+
       // Apply filters
       if (className && className !== 'all') {
         students = students.filter(s => s.class === className);
       }
-      
+
       res.json(students);
     } catch (error) {
       console.error("Get students error:", error);
@@ -1244,11 +1504,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const student = await storage.getStudent(parseInt(id));
-      
+
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
       }
-      
+
       res.json(student);
     } catch (error) {
       console.error("Get student by ID error:", error);
@@ -1271,9 +1531,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const updates = { ...req.body };
-      
+
       console.log("PUT /api/students/:id - Received updates:", updates);
-      
+
       // Convert date fields to Date objects if they are valid strings
       const dateFields = ["dateOfJoining", "createdAt", "updatedAt"];
       for (const field of dateFields) {
@@ -1284,14 +1544,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       console.log("Final updates being passed to storage:", updates);
-      
+
       const student = await storage.updateStudent(parseInt(id), updates);
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
       }
-      
+
       console.log("Returning student data:", student);
       res.json(student);
     } catch (error) {
@@ -1303,21 +1563,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Student route without /api prefix to match staff pattern  
   app.put("/students/:id", async (req, res) => {
     console.log("=== STUDENT ROUTE HIT ===", req.params, req.body);
-    
+
     // Simple test response first
-    res.json({ 
+    res.json({
       message: "Student route working!",
-      id: req.params.id, 
-      updates: req.body 
+      id: req.params.id,
+      updates: req.body
     });
     return;
-    
+
     try {
       const { id } = req.params;
       const updates = { ...req.body };
-      
+
       console.log("PUT /students/:id - Received updates:", updates);
-      
+
       // Convert date fields to Date objects if they are valid strings
       const dateFields = ["dateOfJoining", "createdAt", "updatedAt"];
       for (const field of dateFields) {
@@ -1328,14 +1588,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       console.log("Final updates being passed to storage:", updates);
-      
+
       const student = await storage.updateStudent(parseInt(id), updates);
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
       }
-      
+
       console.log("Returning student data:", student);
       res.json(student);
     } catch (error) {
@@ -1348,11 +1608,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       console.log(`API: Attempting to delete student with ID: ${id}`);
-      
-      
+
+
       const result = await storage.deleteStudent(parseInt(id));
       console.log(`API: Delete student result: ${result}`);
-      
+
       if (result) {
         console.log(`API: Student ${id} deleted successfully`);
         res.json({ message: "Student deleted successfully" });
@@ -1360,17 +1620,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`API: Failed to delete student ${id}`);
         res.status(400).json({ message: "Student could not be deleted. It may have related data that prevents deletion." });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("API: Delete student error:", error);
       console.error("API: Error type:", typeof error);
       console.error("API: Error code:", error.code);
       console.error("API: Error details:", error.details);
       console.error("API: Error keys:", Object.keys(error));
-      
-      // Check if error is related to active financial obligations
-      if (error.code === 'ACTIVE_FINANCIAL_OBLIGATIONS') {
+
+      if (error.code === '23505') { // Unique violation
+        res.status(409).json({ message: "Student with this enrollment number already exists" });
+      } else if (error.code === 'ACTIVE_FINANCIAL_OBLIGATIONS') {
         console.log("API: 🎯 Detected ACTIVE_FINANCIAL_OBLIGATIONS error, sending structured response");
-        const response = { 
+        const response = {
           message: error.message,
           code: 'ACTIVE_FINANCIAL_OBLIGATIONS',
           details: error.details || {},
@@ -1381,7 +1642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (error.message && error.message.includes('active EMI')) {
         console.log("API: 🎯 Detected legacy EMI error format");
         // Fallback for old error format
-        res.status(400).json({ 
+        res.status(400).json({
           message: error.message,
           code: 'ACTIVE_EMI_FOUND',
           cannotDelete: true
@@ -1398,7 +1659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { role, department, status } = req.query;
       let staff = await storage.getAllStaff();
-      
+
       // Apply filters
       if (role) {
         staff = staff.filter(s => s.role === role);
@@ -1409,7 +1670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status) {
         staff = staff.filter(s => s.isActive === (status === 'active'));
       }
-      
+
       res.json(staff);
     } catch (error) {
       console.error("Get staff error:", error);
@@ -1421,11 +1682,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const staff = await storage.getStaff(parseInt(id));
-      
+
       if (!staff) {
         return res.status(404).json({ message: "Staff not found" });
       }
-      
+
       res.json(staff);
     } catch (error) {
       console.error("Get staff by ID error:", error);
@@ -1471,11 +1732,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           staffId: newStaff.id,
           month,
           year,
-          basicSalary: Number(newStaff.salary) || 0,
-          allowances: 0,
-          deductions: 0,
-          overtime: 0,
-          netSalary: Number(newStaff.salary) || 0,
+          basicSalary: String(Number(newStaff.salary) || 0),
+          allowances: "0",
+          deductions: "0",
+          overtime: "0",
+          netSalary: String(Number(newStaff.salary) || 0),
           attendedDays: 30,
           status: 'pending',
         });
@@ -1495,9 +1756,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const updates = { ...req.body };
-      
+
       console.log("PUT /api/staff/:id - Received updates:", updates);
-      
+
       // Convert date fields to Date objects if they are valid strings
       const dateFields = ["dateOfJoining", "createdAt", "updatedAt"];
       for (const field of dateFields) {
@@ -1508,20 +1769,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       // Explicitly handle boolean fields
       if ('isActive' in updates) {
         updates.isActive = Boolean(updates.isActive);
         console.log("Converted isActive to boolean:", updates.isActive);
       }
-      
+
       console.log("Final updates being passed to storage:", updates);
-      
+
       const staff = await storage.updateStaff(parseInt(id), updates);
       if (!staff) {
         return res.status(404).json({ message: "Staff not found" });
       }
-      
+
       console.log("Returning staff data:", staff);
       res.json(staff);
     } catch (error) {
@@ -1534,11 +1795,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const success = await storage.deleteStaff(parseInt(id));
-      
+
       if (!success) {
         return res.status(404).json({ message: "Staff not found" });
       }
-      
+
       res.json({ message: "Staff deleted successfully" });
     } catch (error) {
       console.error("Delete staff error:", error);
@@ -1561,34 +1822,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/staff/import-csv", async (req, res) => {
     try {
       const { csvData } = req.body;
-      
+
       if (!csvData || !Array.isArray(csvData)) {
         return res.status(400).json({ message: "Invalid CSV data format" });
       }
 
       const results = {
-        staff: [],
+        staff: [] as any[],
         duplicates: 0,
         errors: 0,
-        duplicateDetails: []
+        duplicateDetails: [] as any[]
       };
 
       for (const staffData of csvData) {
         try {
           // Check for duplicates before creating
           const duplicate = await storage.checkDuplicateStaff(
-            staffData.phone, 
-            staffData.email, 
+            staffData.phone,
+            staffData.email,
             staffData.employeeId
           );
-          
+
           if (duplicate) {
             results.duplicates++;
             results.duplicateDetails.push({
               csvData: staffData,
               existingStaff: duplicate,
-              matchType: duplicate.phone === staffData.phone ? 'phone' : 
-                        duplicate.email === staffData.email ? 'email' : 'employeeId'
+              matchType: duplicate.phone === staffData.phone ? 'phone' :
+                duplicate.email === staffData.email ? 'email' : 'employeeId'
             });
             continue;
           }
@@ -1596,7 +1857,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Create new staff member
           const newStaff = await storage.createStaff(staffData);
           results.staff.push(newStaff);
-          
+
         } catch (error) {
           console.error("Error creating staff from CSV:", error);
           results.errors++;
@@ -1614,15 +1875,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/staff/check-duplicate", async (req, res) => {
     try {
       const { phone, email, employeeId } = req.body;
-      
+
       const existingStaff = await storage.checkDuplicateStaff(phone, email, employeeId);
-      
+
       if (existingStaff) {
         res.json({
           isDuplicate: true,
           existingStaff,
-          matchType: existingStaff.phone === phone ? 'phone' : 
-                    existingStaff.email === email ? 'email' : 'employeeId'
+          matchType: existingStaff.phone === phone ? 'phone' :
+            existingStaff.email === email ? 'email' : 'employeeId'
         });
       } else {
         res.json({ isDuplicate: false });
@@ -1638,7 +1899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const staffId = parseInt(id);
-      
+
       if (isNaN(staffId)) {
         return res.status(400).json({ message: "Invalid staff ID" });
       }
@@ -1667,13 +1928,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { month, year } = req.query;
-      
+
       const attendance = await storage.getAttendanceByStaff(
-        parseInt(id), 
+        parseInt(id),
         month ? parseInt(month as string) : undefined,
         year ? parseInt(year as string) : undefined
       );
-      
+
       res.json(attendance);
     } catch (error) {
       console.error("Get attendance error:", error);
@@ -1711,7 +1972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/payroll", async (req, res) => {
     try {
       const { month, year, staffId } = req.query;
-      
+
       let payroll;
       if (staffId) {
         payroll = await storage.getPayrollByStaff(parseInt(staffId as string));
@@ -1722,7 +1983,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const allPayroll = await storage.getAllPayroll();
         payroll = allPayroll;
       }
-      
+
       res.json(payroll);
     } catch (error) {
       console.error("Get payroll error:", error);
@@ -1746,11 +2007,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const payrollData = req.body;
       console.log('Creating payroll with data:', JSON.stringify(payrollData, null, 2));
       // Validate required fields
-      if (!payrollData.staffId || !payrollData.month || !payrollData.year || 
-          !payrollData.basicSalary || !payrollData.netSalary) {
+      if (!payrollData.staffId || !payrollData.month || !payrollData.year ||
+        !payrollData.basicSalary || !payrollData.netSalary) {
         console.error('Missing required payroll fields:', payrollData);
-        return res.status(400).json({ 
-          message: "Missing required fields: staffId, month, year, basicSalary, netSalary" 
+        return res.status(400).json({
+          message: "Missing required fields: staffId, month, year, basicSalary, netSalary"
         });
       }
       // Ensure numeric values are properly formatted
@@ -1784,7 +2045,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Create payroll error:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         success: false,
         message: "Failed to process payroll record",
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -1812,9 +2073,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { month, year, staffIds, payrollData } = req.body;
       console.log('Bulk payroll generation request:', JSON.stringify(req.body, null, 2));
       if (!payrollData || !Array.isArray(payrollData)) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: "Invalid payroll data format" 
+          message: "Invalid payroll data format"
         });
       }
       const createdPayrolls = [];
@@ -1822,8 +2083,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const payrollItem of payrollData) {
         try {
           // Validate required fields for each payroll item
-          if (!payrollItem.staffId || !payrollItem.month || !payrollItem.year || 
-              !payrollItem.basicSalary || !payrollItem.netSalary) {
+          if (!payrollItem.staffId || !payrollItem.month || !payrollItem.year ||
+            !payrollItem.basicSalary || !payrollItem.netSalary) {
             console.error('Missing required fields for payroll item:', payrollItem);
             failedPayrolls.push({
               staffId: payrollItem.staffId,
@@ -1878,7 +2139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Bulk payroll generation error:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         success: false,
         message: "Failed to process bulk payroll",
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -1907,7 +2168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const staff = await storage.getAllStaff();
       const currentDate = new Date();
-      
+
       // Calculate analytics
       const totalStaff = staff.length;
       const activeStaff = staff.filter(s => s.isActive).length;
@@ -1915,14 +2176,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         acc[s.role] = (acc[s.role] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
-      
+
       const departmentBreakdown = staff.reduce((acc, s) => {
         if (s.department) {
           acc[s.department] = (acc[s.department] || 0) + 1;
         }
         return acc;
       }, {} as Record<string, number>);
-      
+
       // Calculate average salary by role
       const salaryByRole = staff.reduce((acc, s) => {
         if (s.salary) {
@@ -1934,7 +2195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         return acc;
       }, {} as Record<string, { total: number; count: number }>);
-      
+
       // Calculate average salaries
       const averageSalaryByRole: Record<string, number> = {};
       Object.keys(salaryByRole).forEach(role => {
@@ -1942,14 +2203,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           averageSalaryByRole[role] = salaryByRole[role].total / salaryByRole[role].count;
         }
       });
-      
+
       // Recent hires (last 6 months)
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      const recentHires = staff.filter(s => 
+      const recentHires = staff.filter(s =>
         new Date(s.dateOfJoining) >= sixMonthsAgo
       ).length;
-      
+
       const analytics = {
         totalStaff,
         activeStaff,
@@ -1960,7 +2221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recentHires,
         averageSalary: staff.reduce((sum, s) => sum + (s.salary ? Number(s.salary) : 0), 0) / staff.filter(s => s.salary).length
       };
-      
+
       res.json(analytics);
     } catch (error) {
       console.error("Get staff analytics error:", error);
@@ -2010,7 +2271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const chunks: Buffer[] = [];
-      
+
       doc.on('data', (chunk: Buffer) => {
         chunks.push(chunk);
       });
@@ -2018,12 +2279,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.on('end', () => {
         try {
           const pdfData = Buffer.concat(chunks);
-          
+
           res.setHeader('Content-Type', 'application/pdf');
           res.setHeader('Content-Length', pdfData.length);
           res.setHeader('Content-Disposition', 'attachment; filename="test-document.pdf"');
           res.setHeader('Cache-Control', 'no-cache');
-          
+
           res.end(pdfData);
         } catch (error) {
           console.error("Error sending test PDF response:", error);
@@ -2042,7 +2303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.fontSize(12).text('This is a test PDF to verify PDF generation is working.');
       doc.moveDown();
       doc.text(`Generated at: ${new Date().toLocaleString()}`);
-      
+
       doc.end();
 
     } catch (error) {
@@ -2055,7 +2316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/payroll/generate-slip/:employeeId/:month/:year", async (req, res) => {
     try {
       const { employeeId, month, year } = req.params;
-      
+
       // Validate parameters
       if (!employeeId || !month || !year) {
         return res.status(400).json({ message: "Missing required parameters" });
@@ -2070,7 +2331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get payroll details
       const payrollDetails = await storage.getPayrollByStaff(employee.id);
       const currentPayroll = payrollDetails.find(p => p.month === parseInt(month) && p.year === parseInt(year));
-      
+
       if (!currentPayroll) {
         return res.status(404).json({ message: "Payroll not found for the specified month" });
       }
@@ -2085,7 +2346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create a buffer to store the PDF
       const chunks: Buffer[] = [];
-      
+
       doc.on('data', (chunk: Buffer) => {
         chunks.push(chunk);
       });
@@ -2093,13 +2354,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.on('end', () => {
         try {
           const pdfData = Buffer.concat(chunks);
-          
+
           // Set proper headers for PDF download
           res.setHeader('Content-Type', 'application/pdf');
           res.setHeader('Content-Length', pdfData.length);
           res.setHeader('Content-Disposition', `attachment; filename="salary-slip-${employee.name.replace(/[^a-zA-Z0-9]/g, '_')}-${month}-${year}.pdf"`);
           res.setHeader('Cache-Control', 'no-cache');
-          
+
           // Send the PDF data
           res.end(pdfData);
         } catch (error) {
@@ -2139,7 +2400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         basicSalary = currentPayroll.basicSalary !== undefined ? Number(currentPayroll.basicSalary) : dailyRate * presentDays;
         absentDeduction = currentPayroll.deductions !== undefined ? Number(currentPayroll.deductions) : absentDays * dailyRate;
         netSalary = currentPayroll.netSalary !== undefined ? Number(currentPayroll.netSalary) : basicSalary - absentDeduction;
-        
+
         console.log('Using payroll values:');
         console.log('Present Days:', presentDays);
         console.log('Absent Days:', absentDays);
@@ -2154,7 +2415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         basicSalary = dailyRate * presentDays;
         absentDeduction = absentDays * dailyRate;
         netSalary = basicSalary - absentDeduction;
-        
+
         console.log('Using fallback calculations:');
         console.log('Present Days:', presentDays);
         console.log('Absent Days:', absentDays);
@@ -2235,17 +2496,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { month, year } = req.query;
       const currentMonth = month ? parseInt(month as string) : new Date().getMonth() + 1;
       const currentYear = year ? parseInt(year as string) : new Date().getFullYear();
-      
+
       // Get all payroll records for the specified month/year
       const payrollRecords = await storage.getPayrollByMonth(currentMonth, currentYear);
-      
+
       // Get all staff
       const allStaff = await storage.getAllStaff();
-      
+
       // Check which staff have payroll records
       const staffWithPayroll = payrollRecords.map(p => p.staffId);
       const staffWithoutPayroll = allStaff.filter(s => !staffWithPayroll.includes(s.id));
-      
+
       res.json({
         success: true,
         month: currentMonth,
@@ -2258,7 +2519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Test payroll save error:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         success: false,
         message: "Failed to test payroll save",
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -2271,16 +2532,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Bulk delete request received:", req.body);
       const { staffIds } = req.body;
-      
+
       if (!Array.isArray(staffIds) || staffIds.length === 0) {
         console.log("Invalid staffIds:", staffIds);
         return res.status(400).json({ message: "No staff IDs provided" });
       }
-      
+
       console.log("Attempting to delete staff IDs:", staffIds);
       const deletedIds = [];
       const failedIds = [];
-      
+
       for (const id of staffIds) {
         try {
           console.log(`Attempting to delete staff ID: ${id}`);
@@ -2292,25 +2553,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           failedIds.push({ id, error: error instanceof Error ? error.message : 'Unknown error' });
         }
       }
-      
+
       console.log("Delete operation completed. Deleted:", deletedIds, "Failed:", failedIds);
-      
+
       if (failedIds.length > 0) {
-        return res.status(207).json({ 
+        return res.status(207).json({
           message: "Some staff members could not be deleted",
           deleted: deletedIds,
           failed: failedIds
         });
       }
-      
-      res.json({ 
+
+      res.json({
         message: "Staff deleted successfully",
         deleted: deletedIds
       });
     } catch (error) {
       console.error("Bulk delete staff error:", error);
       console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to delete staff",
         error: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -2322,23 +2583,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       console.log(`Testing staff ID: ${id}`);
-      
+
       // Check if staff exists
       const staff = await storage.getStaff(id);
       console.log(`Staff found:`, staff);
-      
+
       if (!staff) {
         return res.status(404).json({ message: "Staff not found" });
       }
-      
+
       // Check related payroll records
       const payrollRecords = await storage.getPayrollByStaff(id);
       console.log(`Payroll records:`, payrollRecords);
-      
+
       // Check related attendance records
       const attendanceRecords = await storage.getAttendanceByStaff(id);
       console.log(`Attendance records:`, attendanceRecords);
-      
+
       res.json({
         staff,
         payrollCount: payrollRecords.length,
@@ -2348,7 +2609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Test endpoint error:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Test failed",
         error: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -2361,14 +2622,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, type, limit } = req.query;
       const userIdNum = userId ? parseInt(userId as string) : 1; // Default to user 1 for now
       const limitNum = limit ? parseInt(limit as string) : 50;
-      
+
       let notifications;
       if (type) {
         notifications = await storage.getNotificationsByType(type as string, limitNum);
       } else {
         notifications = await storage.getNotificationsByUser(userIdNum, limitNum);
       }
-      
+
       res.json(notifications);
     } catch (error) {
       console.error("Get notifications error:", error);
@@ -2380,7 +2641,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.query;
       const userIdNum = userId ? parseInt(userId as string) : 1; // Default to user 1 for now
-      
+
       const notifications = await storage.getUnreadNotificationsByUser(userIdNum);
       res.json(notifications);
     } catch (error) {
@@ -2393,7 +2654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.query;
       const userIdNum = userId ? parseInt(userId as string) : 1; // Default to user 1 for now
-      
+
       const stats = await storage.getNotificationStats(userIdNum);
       res.json(stats);
     } catch (error) {
@@ -2418,11 +2679,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const notification = await storage.markNotificationAsRead(id);
-      
+
       if (!notification) {
         return res.status(404).json({ message: "Notification not found" });
       }
-      
+
       res.json(notification);
     } catch (error) {
       console.error("Mark notification as read error:", error);
@@ -2434,7 +2695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.body;
       const userIdNum = userId ? parseInt(userId as string) : 1; // Default to user 1 for now
-      
+
       const count = await storage.markAllNotificationsAsRead(userIdNum);
       res.json({ message: `Marked ${count} notifications as read` });
     } catch (error) {
@@ -2448,11 +2709,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteNotification(id);
-      
+
       if (!success) {
         return res.status(404).json({ message: "Notification not found" });
       }
-      
+
       res.json({ message: "Notification deleted successfully" });
     } catch (error) {
       console.error("Delete notification error:", error);
@@ -2464,7 +2725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.body;
       const userIdNum = userId ? parseInt(userId as string) : 1; // Default to user 1 for now
-      
+
       const count = await storage.deleteAllNotifications(userIdNum);
       res.json({ message: `Deleted ${count} notifications` });
     } catch (error) {
@@ -2524,7 +2785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Test basic database connection
       const testQuery = await db.execute(sql`SELECT 1 as test`);
       console.log('Database connection test result:', testQuery);
-      
+
       // Test if payroll table exists
       const tableExists = await db.execute(sql`
         SELECT EXISTS (
@@ -2534,7 +2795,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ) as exists
       `);
       console.log('Payroll table exists:', tableExists);
-      
+
       // Test if we can query payroll table
       let payrollCount = 0;
       try {
@@ -2544,7 +2805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error('Error querying payroll table:', error);
       }
-      
+
       res.json({
         success: true,
         databaseConnected: true,
@@ -2554,7 +2815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Database test error:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         databaseConnected: false
@@ -2623,7 +2884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
            WHERE is_active = true`
         )
       );
-      const totalNetPayroll = result.rows?.[0]?.totalNetPayroll || 0;
+      const totalNetPayroll = (result as any)[0]?.totalNetPayroll || 0;
       res.json({ totalNetPayroll });
     } catch (error) {
       console.error("Active payroll total error:", error);
@@ -2637,11 +2898,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteExpense(id);
-      
+
       if (!success) {
         return res.status(404).json({ message: "Expense not found" });
       }
-      
+
       res.json({ message: "Expense deleted successfully" });
     } catch (error) {
       console.error("Delete expense error:", error);
@@ -2667,6 +2928,216 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Mount AI Comprehensive Analytics Routes
   app.use("/api/ai", aiComprehensiveRouter);
+
+  // Global Class Fees
+  app.get("/api/global-class-fees", async (req, res) => {
+    try {
+      const fees = await storage.getAllGlobalClassFees();
+      res.json(fees);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch global class fees" });
+    }
+  });
+
+  app.get("/api/emi-plans", async (req, res) => {
+    try {
+      const result = await db.select().from(schema.emiPlans);
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to fetch EMI plans:", error);
+      res.status(500).json({ message: "Failed to fetch EMI plans" });
+    }
+  });
+
+  // Message Templates Routes
+  app.get("/api/message-templates", async (req, res) => {
+    try {
+      const { category } = req.query;
+      const templates = await storage.getAllMessageTemplates(category as string | undefined);
+      res.json(templates);
+    } catch (error) {
+      console.error("Get message templates error:", error);
+      res.status(500).json({ message: "Failed to fetch message templates" });
+    }
+  });
+
+  app.get("/api/message-templates/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const template = await storage.getMessageTemplate(id);
+
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+
+      res.json(template);
+    } catch (error) {
+      console.error("Get message template error:", error);
+      res.status(500).json({ message: "Failed to fetch message template" });
+    }
+  });
+
+  app.post("/api/message-templates", async (req, res) => {
+    try {
+      const templateData = req.body;
+      const template = await storage.createMessageTemplate(templateData);
+      res.json(template);
+    } catch (error) {
+      console.error("Create message template error:", error);
+      res.status(500).json({ message: "Failed to create message template" });
+    }
+  });
+
+  app.put("/api/message-templates/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates = req.body;
+      const template = await storage.updateMessageTemplate(id, updates);
+
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+
+      res.json(template);
+    } catch (error) {
+      console.error("Update message template error:", error);
+      res.status(500).json({ message: "Failed to update message template" });
+    }
+  });
+
+  app.delete("/api/message-templates/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteMessageTemplate(id);
+      res.json({ message: "Template deleted successfully" });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Cannot delete default templates") {
+        return res.status(403).json({ message: error.message });
+      }
+      console.error("Delete message template error:", error);
+      res.status(500).json({ message: "Failed to delete message template" });
+    }
+  });
+
+  // Communication Routes
+  app.get("/api/communications", async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const logs = await storage.getCommunicationLogs(limit);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching communication logs:", error);
+      res.status(500).json({ message: "Failed to fetch communication logs" });
+    }
+  });
+
+  app.post("/api/communications/send", async (req, res) => {
+    try {
+      const { recipients, message, subject, type, groupName } = req.body;
+
+      if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+        return res.status(400).json({ message: "No recipients provided" });
+      }
+
+      console.log(`Processing ${type} blast for ${recipients.length} recipients`);
+
+      const results = {
+        total: recipients.length,
+        sent: 0,
+        failed: 0,
+        errors: [] as any[]
+      };
+
+      // Prefetch global fees if needed for dynamic replacement
+      const needsFeeCalculation = message.includes("{{total_fee}}") || message.includes("{{fee_breakdown}}");
+      let globalFees: any[] = [];
+      if (needsFeeCalculation) {
+        globalFees = await storage.getAllGlobalClassFees();
+      }
+
+      for (const recipient of recipients) {
+        try {
+          let personalizedMessage = message;
+
+          // Dynamic Fee Calculation and Replacement
+          if (needsFeeCalculation && recipient.role === 'student') {
+            const studentId = recipient.data?.id || recipient.id;
+            let studentClass = recipient.data?.class;
+
+            // If class is missing in recipient data, try to fetch student
+            if (!studentClass && studentId) {
+              const student = await storage.getStudent(studentId);
+              if (student) {
+                studentClass = student.class;
+              }
+            }
+
+            if (studentClass) {
+              // Calculate fees for this class
+              const classFees = globalFees.filter(f => f.className === studentClass && f.isActive);
+              const totalFee = classFees.reduce((sum, f) => sum + Number(f.amount), 0);
+
+              // Replace variables
+              personalizedMessage = personalizedMessage.replace(/{{total_fee}}/g, totalFee.toFixed(2));
+
+              if (personalizedMessage.includes("{{fee_breakdown}}")) {
+                const breakdown = classFees.map(f => `- ${f.feeType}: ${f.amount} (${f.frequency})`).join("\\n");
+                personalizedMessage = personalizedMessage.replace(/{{fee_breakdown}}/g, breakdown);
+              }
+            } else {
+              // Fallback if class not found
+              personalizedMessage = personalizedMessage.replace(/{{total_fee}}/g, "[Fee Info Unavailable]");
+              personalizedMessage = personalizedMessage.replace(/{{fee_breakdown}}/g, "");
+            }
+          }
+
+          // Replace basic variables
+          personalizedMessage = personalizedMessage
+            .replace(/{{name}}/g, recipient.name || 'Parent/Student')
+            .replace(/{{email}}/g, recipient.email || '')
+            .replace(/{{phone}}/g, recipient.phone || '');
+
+
+          // --- MOCK SENDING LOGIC (Replace with actual SMS/Email provider) ---
+          console.log(`Sending ${type} to ${recipient.name} (${recipient.phone || recipient.email}): ${personalizedMessage.substring(0, 50)}...`);
+          // -------------------------------------------------------------------
+
+          // Create Communication Log
+          await storage.createCommunicationLog({
+            recipientType: recipient.role || 'student',
+            recipientId: recipient.id ? parseInt(recipient.id) : null,
+            groupName: groupName || null,
+            type: type,
+            subject: subject,
+            message: personalizedMessage,
+            status: 'sent',
+            createdBy: 1, // Default to admin for now
+          });
+
+          results.sent++;
+        } catch (error) {
+          console.error(`Failed to send to ${recipient.name}:`, error);
+          results.failed++;
+          results.errors.push({ recipient: recipient.name, error: error instanceof Error ? error.message : String(error) });
+        }
+      }
+
+      res.json({
+        message: `Processed ${results.total} messages`,
+        ...results
+      });
+
+    } catch (error) {
+      console.error("Error sending communications:", error);
+      res.status(500).json({ message: "Failed to process communication request" });
+    }
+  });
+
+  // ============================================
+  // DAYCARE MANAGEMENT ROUTES
+  // ============================================
+  registerDaycareRoutes(app);
+
 
   const httpServer = createServer(app);
   return httpServer;

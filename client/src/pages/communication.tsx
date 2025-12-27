@@ -44,6 +44,7 @@ export default function Communication() {
   const [createTemplateOpen, setCreateTemplateOpen] = useState(false);
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [messageType, setMessageType] = useState<string>("sms");
+  const [prefilledData, setPrefilledData] = useState<{ message: string, subject?: string }>({ message: "" });
   const [filterType, setFilterType] = useState<string>("all");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -52,17 +53,17 @@ export default function Communication() {
   });
 
   // Fetch communication logs
-  const { data: communicationLogs = [] } = useQuery({
+  const { data: communicationLogs = [] } = useQuery<CommunicationLog[]>({
     queryKey: ["/api/communications"],
   });
 
   // Fetch templates
-  const { data: templates = [] } = useQuery({
-    queryKey: ["/api/communication-templates"],
+  const { data: templates = [] } = useQuery<CommunicationTemplate[]>({
+    queryKey: ["/api/message-templates"],
   });
 
   // Fetch students and parents for recipient selection
-  const { data: students = [] } = useQuery({
+  const { data: students = [] } = useQuery<any[]>({
     queryKey: ["/api/students"],
   });
 
@@ -73,10 +74,7 @@ export default function Communication() {
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("/api/communications/send", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/communications/send", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/communications"] });
@@ -92,13 +90,10 @@ export default function Communication() {
   // Create template mutation
   const createTemplateMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("/api/communication-templates", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/message-templates", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/communication-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/message-templates"] });
       setCreateTemplateOpen(false);
       toast({
         title: "Success",
@@ -107,11 +102,65 @@ export default function Communication() {
     },
   });
 
+  const getRecipientLabel = (value: string) => {
+    const bulkAction = bulkActions.find(a => a.value === value);
+    if (bulkAction) return bulkAction.label;
+
+    // Check if it's a student ID (prefixed or just ID - assuming format "student-ID")
+    if (value.startsWith("student-")) {
+      const id = parseInt(value.replace("student-", ""));
+      const student = students.find((s: any) => s.id === id);
+      return student ? `${student.name} (Student)` : value;
+    }
+
+    return value;
+  };
+
   const handleSendMessage = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+
+    // Resolve recipients
+    let finalRecipients: any[] = [];
+
+    if (selectedRecipients.includes("all_students")) {
+      // Add all students
+      finalRecipients = [
+        ...finalRecipients,
+        ...students.map((s: any) => ({
+          role: "student",
+          id: s.id,
+          name: s.name,
+          email: s.email,
+          phone: s.contactNo || s.mobileNumber, // Adjust based on student schema
+          data: { class: s.class }
+        }))
+      ];
+    } else {
+      // Handle individual selections
+      selectedRecipients.forEach(value => {
+        if (value.startsWith("student-")) {
+          const id = parseInt(value.replace("student-", ""));
+          const student = students.find((s: any) => s.id === id);
+          if (student) {
+            finalRecipients.push({
+              role: "student",
+              id: student.id,
+              name: student.name,
+              email: student.email,
+              phone: student.contactNo || student.mobileNumber,
+              data: { class: student.class }
+            });
+          }
+        }
+      });
+    }
+
+    // Remove duplicates by ID
+    finalRecipients = Array.from(new Map(finalRecipients.map(item => [item.id, item])).values());
+
     const data = {
-      recipients: selectedRecipients,
+      recipients: finalRecipients,
       type: messageType,
       subject: formData.get("subject"),
       message: formData.get("message"),
@@ -131,6 +180,16 @@ export default function Communication() {
       category: formData.get("category"),
     };
     createTemplateMutation.mutate(data);
+  };
+
+  const handleUseTemplate = (template: CommunicationTemplate) => {
+    setMessageType(template.type);
+    setPrefilledData({
+      message: template.content,
+      subject: template.subject || ""
+    });
+    setSendMessageOpen(true);
+    // Switch to logs tab (which contains the open dialog) or ensure dialog is visible
   };
 
   const getStatusColor = (status: string) => {
@@ -154,11 +213,8 @@ export default function Communication() {
 
   const bulkActions = [
     { label: "All Students", value: "all_students" },
-    { label: "All Parents", value: "all_parents" },
-    { label: "All Staff", value: "all_staff" },
-    { label: "Fee Defaulters", value: "fee_defaulters" },
-    { label: "Absent Students Today", value: "absent_today" },
-    { label: "New Admissions", value: "new_admissions" },
+    // { label: "All Parents", value: "all_parents" },
+    // { label: "All Staff", value: "all_staff" },
   ];
 
   const handleTabChange = (value: string) => {
@@ -179,7 +235,7 @@ export default function Communication() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {communicationLogs.filter((log: CommunicationLog) => 
+              {communicationLogs.filter((log: CommunicationLog) =>
                 format(new Date(log.sentAt), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
               ).length}
             </div>
@@ -288,12 +344,12 @@ export default function Communication() {
                 </div>
                 <div>
                   <Label htmlFor="content">Message Content</Label>
-                  <Textarea 
-                    id="content" 
-                    name="content" 
+                  <Textarea
+                    id="content"
+                    name="content"
                     rows={4}
                     placeholder="Use {{name}}, {{amount}}, {{date}} for dynamic content"
-                    required 
+                    required
                   />
                 </div>
                 <div className="flex justify-end gap-2">
@@ -357,14 +413,20 @@ export default function Communication() {
                             {action.label}
                           </SelectItem>
                         ))}
+                        <div className="p-2 text-xs text-muted-foreground font-semibold">Individual Students</div>
+                        {students.map((student: any) => (
+                          <SelectItem key={`student-${student.id}`} value={`student-${student.id}`}>
+                            {student.name} (Class {student.class})
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
-                    
+
                     {selectedRecipients.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {selectedRecipients.map((recipient, index) => (
                           <Badge key={index} variant="secondary">
-                            {bulkActions.find(a => a.value === recipient)?.label || recipient}
+                            {getRecipientLabel(recipient)}
                             <button
                               type="button"
                               className="ml-1 text-xs"
@@ -384,13 +446,20 @@ export default function Communication() {
                 {messageType === "email" && (
                   <div>
                     <Label htmlFor="subject">Subject</Label>
-                    <Input id="subject" name="subject" />
+                    <Input id="subject" name="subject" defaultValue={prefilledData.subject} />
                   </div>
                 )}
 
                 <div>
                   <Label htmlFor="message">Message</Label>
-                  <Textarea id="message" name="message" rows={5} required />
+                  <Textarea
+                    id="message"
+                    name="message"
+                    rows={5}
+                    required
+                    defaultValue={prefilledData.message}
+                    key={prefilledData.message} // Force re-render when template changes
+                  />
                 </div>
 
                 <div>
@@ -454,7 +523,7 @@ export default function Communication() {
                         {log.subject || log.message}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="status" className={getStatusColor(log.status)}>
+                        <Badge variant="outline" className={getStatusColor(log.status)}>
                           {log.status}
                         </Badge>
                       </TableCell>
@@ -503,7 +572,7 @@ export default function Communication() {
                     <Button size="sm" variant="outline">
                       Edit
                     </Button>
-                    <Button size="sm">
+                    <Button size="sm" onClick={() => handleUseTemplate(template)}>
                       Use Template
                     </Button>
                   </div>
@@ -524,14 +593,14 @@ export default function Communication() {
                   {["sms", "email", "whatsapp"].map((type) => {
                     const count = communicationLogs.filter((log: CommunicationLog) => log.type === type).length;
                     const percentage = communicationLogs.length > 0 ? (count / communicationLogs.length) * 100 : 0;
-                    
+
                     return (
                       <div key={type} className="flex justify-between items-center">
                         <span className="capitalize">{type}</span>
                         <div className="flex items-center gap-2">
                           <div className="w-20 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full" 
+                            <div
+                              className="bg-blue-600 h-2 rounded-full"
                               style={{ width: `${percentage}%` }}
                             />
                           </div>
@@ -553,14 +622,14 @@ export default function Communication() {
                   {["delivered", "sent", "read", "failed"].map((status) => {
                     const count = communicationLogs.filter((log: CommunicationLog) => log.status === status).length;
                     const percentage = communicationLogs.length > 0 ? (count / communicationLogs.length) * 100 : 0;
-                    
+
                     return (
                       <div key={status} className="flex justify-between items-center">
                         <span className="capitalize">{status}</span>
                         <div className="flex items-center gap-2">
                           <div className="w-20 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-green-600 h-2 rounded-full" 
+                            <div
+                              className="bg-green-600 h-2 rounded-full"
                               style={{ width: `${percentage}%` }}
                             />
                           </div>

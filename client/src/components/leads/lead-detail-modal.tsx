@@ -8,12 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  User, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Calendar, 
+import {
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Calendar,
   MessageSquare,
   FileText,
 
@@ -21,10 +21,10 @@ import {
   Edit,
   Plus,
   Clock,
-
+  CheckCircle2,
   Trash2
 } from "lucide-react";
-import { type LeadWithCounselor as BaseLeadWithCounselor, type User as UserType, type FollowUp } from "@shared/schema";
+import { type LeadWithCounselor as BaseLeadWithCounselor, type User as UserType, type FollowUp, type GlobalClassFee } from "@shared/schema";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { useHashState } from "@/hooks/use-hash-state";
@@ -51,7 +51,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
   const [activeTab, setActiveTab] = useHashState("details");
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<any>(lead || {});
-  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
   const [followUpForm, setFollowUpForm] = useState<FollowUpForm>({
     scheduledAt: "",
     remarks: "",
@@ -65,18 +65,18 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
     if (!phone || phone.trim() === "") {
       return "Phone number is required";
     }
-    
+
     // Check if contains only allowed characters
     if (!/^[\d\s\-\+\(\)]+$/.test(phone)) {
       return "Phone number can only contain digits, spaces, hyphens, plus signs, and parentheses";
     }
-    
+
     // Count only digits
     const digitsOnly = phone.replace(/\D/g, '');
     if (digitsOnly.length !== 10) {
       return "Phone number must contain exactly 10 digits";
     }
-    
+
     return null;
   };
 
@@ -91,25 +91,25 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
   };
 
   const validateForm = (): boolean => {
-    const errors: {[key: string]: string} = {};
-    
+    const errors: { [key: string]: string } = {};
+
     // Validate phone
     const phoneError = validatePhone(editForm.phone);
     if (phoneError) {
       errors.phone = phoneError;
     }
-    
+
     // Validate email
     const emailError = validateEmail(editForm.email);
     if (emailError) {
       errors.email = emailError;
     }
-    
+
     // Validate required fields
     if (!editForm.name || editForm.name.trim() === "") {
       errors.name = "Student name is required";
     }
-    
+
     if (!editForm.class || editForm.class.trim() === "") {
       errors.class = "Class is required";
     }
@@ -117,7 +117,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
     if (!editForm.source || editForm.source.trim() === "") {
       errors.source = "Lead source is required";
     }
-    
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -151,11 +151,29 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
     queryKey: ["/api/counselors"],
   });
 
+  const { data: globalFees } = useQuery<GlobalClassFee[]>({
+    queryKey: ["/api/global-class-fees"],
+  });
+
+  const { data: followUps = [] } = useQuery<FollowUp[]>({
+    queryKey: ["/api/follow-ups", { leadId: lead?.id }],
+    queryFn: async () => {
+      if (!lead?.id) return [];
+      const res = await apiRequest("GET", `/follow-ups?leadId=${lead.id}`);
+      return res.json();
+    },
+    enabled: !!lead?.id,
+  });
+
+  const classOptions = globalFees
+    ? Array.from(new Set(globalFees.filter(f => f.isActive).map(f => f.className))).sort()
+    : [];
+
   const updateLeadMutation = useMutation({
     mutationFn: async (updates: any) => {
       try {
         const response = await apiRequest("PATCH", `/leads/${lead?.id}`, updates);
-        
+
         // Check content type to ensure we're receiving JSON
         const contentType = response.headers.get("Content-Type");
         if (contentType && contentType.includes("application/json")) {
@@ -172,15 +190,15 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       setIsEditing(false);
       setValidationErrors({}); // Clear validation errors on successful save
-      
+
       // Update the edit form with the latest data
       setEditForm(updatedLead);
-      
+
       // Notify parent component to update the selected lead
       if (onLeadUpdated) {
         onLeadUpdated(updatedLead);
       }
-      
+
       toast({
         title: "Lead Updated",
         description: "Lead information has been updated successfully",
@@ -188,13 +206,13 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
     },
     onError: (error: any) => {
       let errorMessage = "Failed to update lead information";
-      
+
       if (error.errorData?.message) {
         errorMessage = error.errorData.message;
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       toast({
         title: "Update Failed",
         description: errorMessage,
@@ -211,7 +229,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
           leadId: lead?.id,
           counselorId: lead?.counselorId || 1
         });
-        
+
         // Check content type to ensure we're receiving JSON
         const contentType = response.headers.get("Content-Type");
         if (contentType && contentType.includes("application/json")) {
@@ -226,6 +244,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/follow-ups"] });
       setFollowUpForm({ scheduledAt: "", remarks: "", outcome: "" });
       toast({
         title: "Follow-up Scheduled",
@@ -234,15 +253,59 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
     },
     onError: (error: any) => {
       let errorMessage = "Failed to schedule follow-up";
-      
+
       if (error.errorData?.message) {
         errorMessage = error.errorData.message;
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       toast({
         title: "Scheduling Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const completeFollowUpMutation = useMutation({
+    mutationFn: async (followUpId: number) => {
+      try {
+        const response = await apiRequest("PATCH", `/follow-ups/${followUpId}`, {
+          completedAt: new Date().toISOString()
+        });
+
+        const contentType = response.headers.get("Content-Type");
+        if (contentType && contentType.includes("application/json")) {
+          return await response.json();
+        } else {
+          throw new Error("Received non-JSON response from server");
+        }
+      } catch (error: any) {
+        console.error("API request error:", error);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/follow-ups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/follow-ups/overdue"] });
+      toast({
+        title: "Follow-up Completed",
+        description: "Follow-up has been marked as completed",
+      });
+    },
+    onError: (error: any) => {
+      let errorMessage = "Failed to mark follow-up as completed";
+
+      if (error.errorData?.message) {
+        errorMessage = error.errorData.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast({
+        title: "Update Failed",
         description: errorMessage,
         variant: "destructive"
       });
@@ -260,7 +323,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
       });
       return;
     }
-    
+
     updateLeadMutation.mutate(editForm);
   };
 
@@ -318,7 +381,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="status" className={getStatusColor(lead.status)}>
+              <Badge className={getStatusColor(lead.status)}>
                 {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
               </Badge>
 
@@ -330,9 +393,19 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="followups">Follow-ups</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 bg-gray-100">
+            <TabsTrigger
+              value="details"
+              className="data-[state=active]:bg-[#643ae5] data-[state=active]:text-white"
+            >
+              Details
+            </TabsTrigger>
+            <TabsTrigger
+              value="followups"
+              className="data-[state=active]:bg-[#643ae5] data-[state=active]:text-white"
+            >
+              Follow-ups
+            </TabsTrigger>
 
           </TabsList>
 
@@ -353,10 +426,10 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                       }
                       setIsEditing(!isEditing);
                     }}
-                    className="text-white"
+                    className="border-[#643ae5] text-[#643ae5] hover:bg-[#643ae5]/10"
                   >
                     <Edit size={16} className="mr-2" />
-                    <span className="text-white">{isEditing ? "Cancel" : "Edit"}</span>
+                    <span>{isEditing ? "Cancel" : "Edit"}</span>
                   </Button>
                   {lead.status !== "deleted" && (
                     <AlertDialog>
@@ -381,11 +454,11 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                               try {
                                 const res = await fetch(`/api/leads/${lead.id}`, { method: "DELETE" });
                                 if (!res.ok) throw new Error('Failed to delete lead');
-                                
+
                                 // Invalidate queries to refresh data
                                 queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
                                 invalidateNotifications(queryClient);
-                                
+
                                 if (onLeadDeleted) onLeadDeleted();
                                 onOpenChange(false);
                                 toast({ title: 'Lead deleted', description: 'The lead was deleted.' });
@@ -428,7 +501,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                           onChange={(e) => {
                             const newValue = e.target.value;
                             setEditForm((prev: typeof editForm) => ({ ...prev, name: newValue }));
-                            
+
                             // Real-time validation
                             const errors = { ...validationErrors };
                             if (!newValue || newValue.trim() === "") {
@@ -473,7 +546,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                           onChange={(e) => {
                             const newValue = e.target.value;
                             setEditForm((prev: typeof editForm) => ({ ...prev, phone: newValue }));
-                            
+
                             // Real-time validation
                             const errors = { ...validationErrors };
                             const phoneError = validatePhone(newValue);
@@ -520,7 +593,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                           onChange={(e) => {
                             const newValue = e.target.value;
                             setEditForm((prev: typeof editForm) => ({ ...prev, email: newValue }));
-                            
+
                             // Real-time validation
                             const errors = { ...validationErrors };
                             const emailError = validateEmail(newValue);
@@ -619,10 +692,11 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Class 9">Class 9</SelectItem>
-                              <SelectItem value="Class 10">Class 10</SelectItem>
-                              <SelectItem value="Class 11">Class 11</SelectItem>
-                              <SelectItem value="Class 12">Class 12</SelectItem>
+                              {classOptions.map((cls) => (
+                                <SelectItem key={cls} value={cls}>
+                                  {cls}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <Select
@@ -670,7 +744,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Badge variant="status" className={getStatusColor(lead.status)}>
+                      <Badge className={getStatusColor(lead.status)}>
                         {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
                       </Badge>
                     )}
@@ -799,10 +873,10 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                 </CardContent>
               </Card>
 
-              {lead.followUps && lead.followUps.length > 0 && (
+              {followUps && followUps.length > 0 && (
                 <div className="space-y-3">
                   <h4 className="font-medium text-gray-900">Previous Follow-ups</h4>
-                  {lead.followUps?.map((followUp: FollowUp) => (
+                  {followUps.map((followUp: FollowUp) => (
                     <div key={followUp.id} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -811,15 +885,32 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                             {formatDate(followUp.scheduledAt)}
                           </span>
                         </div>
-                        <Badge variant={followUp.completedAt ? "default" : "outline"}>
-                          {followUp.completedAt ? "Completed" : "Pending"}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={followUp.completedAt ? "default" : "outline"}>
+                            {followUp.completedAt ? "Completed" : "Pending"}
+                          </Badge>
+                          {!followUp.completedAt && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => completeFollowUpMutation.mutate(followUp.id)}
+                              disabled={completeFollowUpMutation.isPending}
+                              className="border-green-500 text-green-600 hover:bg-green-50"
+                            >
+                              <CheckCircle2 size={14} className="mr-1" />
+                              {completeFollowUpMutation.isPending ? "Marking..." : "Mark as Completed"}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       {followUp.remarks && (
-                        <p className="text-sm text-gray-600 mt-2">{followUp.remarks}</p>
+                        <div className="mt-3 p-3 bg-gray-50 rounded-md border-l-4 border-gray-300">
+                          <p className="text-xs font-semibold text-gray-500 mb-1">Remarks/Notes:</p>
+                          <p className="text-sm text-gray-700">{followUp.remarks}</p>
+                        </div>
                       )}
                       {followUp.outcome && (
-                        <p className="text-sm text-blue-600 mt-1">
+                        <p className="text-sm text-blue-600 mt-2">
                           <span className="font-medium">Outcome:</span> {followUp.outcome}
                         </p>
                       )}

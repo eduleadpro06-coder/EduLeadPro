@@ -30,20 +30,20 @@ export async function forecastEnrollments(currentData: {
   let predictedEnrollments = 0;
   const confidence = 0.75;
   const factors: string[] = [];
-  
+
   // Calculate conversion rate
   const conversionRate = currentData.totalLeads > 0 ? currentData.conversions / currentData.totalLeads : 0.1;
-  
+
   // Base prediction from hot leads
   predictedEnrollments = Math.floor(currentData.hotLeads * conversionRate);
   factors.push(`${currentData.hotLeads} hot leads with ${(conversionRate * 100).toFixed(1)}% conversion rate`);
-  
+
   // Analyze monthly trend
   const recentMonths = currentData.monthlyTrend.slice(-3);
   if (recentMonths.length >= 2) {
     const lastMonth = recentMonths[recentMonths.length - 1];
     const previousMonth = recentMonths[recentMonths.length - 2];
-    
+
     if (lastMonth.enrollments > previousMonth.enrollments) {
       predictedEnrollments = Math.floor(predictedEnrollments * 1.2);
       factors.push("Positive enrollment trend detected");
@@ -54,7 +54,7 @@ export async function forecastEnrollments(currentData: {
       factors.push("Stable enrollment pattern");
     }
   }
-  
+
   // Seasonal adjustments (assuming academic calendar)
   const currentMonth = new Date().getMonth();
   if ([2, 3, 4].includes(currentMonth)) { // March-May (admission season)
@@ -64,20 +64,20 @@ export async function forecastEnrollments(currentData: {
     predictedEnrollments = Math.floor(predictedEnrollments * 1.1);
     factors.push("Planning season increase");
   }
-  
+
   // Determine trend
   let trend: "increasing" | "decreasing" | "stable" = "stable";
   if (recentMonths.length >= 2) {
     const avgRecent = recentMonths.reduce((sum, month) => sum + month.enrollments, 0) / recentMonths.length;
     const avgPrevious = currentData.monthlyTrend.slice(-6, -3).reduce((sum, month) => sum + month.enrollments, 0) / 3;
-    
+
     if (avgRecent > avgPrevious * 1.1) {
       trend = "increasing";
     } else if (avgRecent < avgPrevious * 0.9) {
       trend = "decreasing";
     }
   }
-  
+
   return {
     predictedEnrollments: Math.max(0, predictedEnrollments),
     confidence,
@@ -93,7 +93,7 @@ export async function generateMarketingRecommendations(targetData: {
   competitorAnalysis?: string;
 }): Promise<MarketingRecommendation[]> {
   const recommendations: MarketingRecommendation[] = [];
-  
+
   // Digital Marketing Recommendations
   if (targetData.budget >= 10000) {
     recommendations.push({
@@ -105,7 +105,7 @@ export async function generateMarketingRecommendations(targetData: {
       expected_leads: Math.floor(targetData.budget * 0.4 / 200) // Assuming ₹200 per lead
     });
   }
-  
+
   if (targetData.budget >= 5000) {
     recommendations.push({
       campaign_type: "Facebook & Instagram",
@@ -116,7 +116,7 @@ export async function generateMarketingRecommendations(targetData: {
       expected_leads: Math.floor(targetData.budget * 0.3 / 150) // Assuming ₹150 per lead
     });
   }
-  
+
   // Referral program
   recommendations.push({
     campaign_type: "Referral Program",
@@ -126,7 +126,7 @@ export async function generateMarketingRecommendations(targetData: {
     ad_copy: "Refer a friend and get exclusive benefits! Help other families discover quality education while earning rewards.",
     expected_leads: Math.floor(targetData.budget * 0.15 / 100) // Assuming ₹100 per referral lead
   });
-  
+
   // Local community engagement
   if (!targetData.currentLeadSources || !targetData.currentLeadSources.includes("community_events")) {
     recommendations.push({
@@ -138,6 +138,15 @@ export async function generateMarketingRecommendations(targetData: {
       expected_leads: Math.floor(targetData.budget * 0.15 / 300) // Assuming ₹300 per event lead
     });
   }
-  
+
   return recommendations;
+}
+
+export async function predictAdmissionLikelihood(data: any) {
+  // Stub implementation
+  return {
+    likelihood: 85,
+    factors: ["High engagement", "Positive trend"],
+    recommendedAction: "Follow up immediately"
+  };
 }

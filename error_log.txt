@@ -1,0 +1,263 @@
+
+> rest-express@1.0.0 check
+> tsc
+
+client/src/components/campaigns/campaign-manager.tsx(484,30): error TS2322: Type '"status"' is not assignable to type '"default" | "destructive" | "outline" | "secondary" | null | undefined'.
+client/src/components/charts/enrollment-chart.tsx(10,38): error TS18046: 'monthlyEnrollments' is of type 'unknown'.
+client/src/components/charts/enrollment-chart.tsx(10,61): error TS7006: Parameter 'm' implicitly has an 'any' type.
+client/src/components/charts/enrollment-chart.tsx(21,10): error TS18046: 'monthlyEnrollments' is of type 'unknown'.
+client/src/components/charts/enrollment-chart.tsx(27,14): error TS18046: 'monthlyEnrollments' is of type 'unknown'.
+client/src/components/charts/enrollment-chart.tsx(27,38): error TS7006: Parameter 'data' implicitly has an 'any' type.
+client/src/components/charts/enrollment-chart.tsx(27,44): error TS7006: Parameter 'index' implicitly has an 'any' type.
+client/src/components/charts/enrollment-chart.tsx(29,44): error TS18046: 'monthlyEnrollments' is of type 'unknown'.
+client/src/components/dashboard/lead-management.tsx(222,23): error TS2322: Type '"status"' is not assignable to type '"default" | "destructive" | "outline" | "secondary" | null | undefined'.
+client/src/components/erp-integration/erp-connector.tsx(200,32): error TS2322: Type '"status"' is not assignable to type '"default" | "destructive" | "outline" | "secondary" | null | undefined'.
+client/src/components/leads/csv-import.tsx(200,7): error TS18047: 'c.name' is possibly 'null'.
+client/src/components/leads/csv-import.tsx(201,44): error TS18047: 'c.name' is possibly 'null'.
+client/src/components/leads/lead-detail-modal.tsx(340,22): error TS2322: Type '"status"' is not assignable to type '"default" | "destructive" | "outline" | "secondary" | null | undefined'.
+client/src/components/leads/lead-detail-modal.tsx(693,30): error TS2322: Type '"status"' is not assignable to type '"default" | "destructive" | "outline" | "secondary" | null | undefined'.
+client/src/components/leads/lead-status-badge.tsx(20,12): error TS2322: Type '"status"' is not assignable to type '"default" | "destructive" | "outline" | "secondary" | null | undefined'.
+client/src/lib/supabase.ts(61,7): error TS2353: Object literal may only specify known properties, and 'redirectTo' does not exist in type '{ autoRefreshToken?: boolean | undefined; storageKey?: string | undefined; persistSession?: boolean | undefined; detectSessionInUrl?: boolean | undefined; storage?: SupportedStorage | undefined; flowType?: AuthFlowType | undefined; debug?: boolean | ... 1 more ... | undefined; lock?: LockFunc | undefined; }'.
+client/src/pages/ai-enhanced-dashboard.tsx(163,39): error TS2339: Property 'summary' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(169,39): error TS2339: Property 'summary' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(175,40): error TS2339: Property 'summary' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(181,39): error TS2339: Property 'summary' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(224,39): error TS2339: Property 'highPriorityLeads' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(256,42): error TS2339: Property 'averageScore' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(262,42): error TS2339: Property 'totalLeads' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(268,42): error TS2339: Property 'highPriorityLeads' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(272,47): error TS2339: Property 'averageScore' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(290,36): error TS2339: Property 'leadScores' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(359,42): error TS2339: Property 'leadScores' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(393,49): error TS2339: Property 'revenueForecasting' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(399,49): error TS2339: Property 'revenueForecasting' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(405,49): error TS2339: Property 'revenueForecasting' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(411,50): error TS2339: Property 'revenueForecasting' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(428,48): error TS2339: Property 'paymentRiskAnalysis' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(434,49): error TS2339: Property 'paymentRiskAnalysis' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(439,46): error TS2339: Property 'paymentRiskAnalysis' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(462,48): error TS2339: Property 'cashFlowOptimization' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(467,46): error TS2339: Property 'cashFlowOptimization' does not exist on type '{}'.
+client/src/pages/ai-enhanced-dashboard.tsx(530,35): error TS2339: Property 'recommendations' does not exist on type '{}'.
+client/src/pages/auth/callback.tsx(72,69): error TS2339: Property 'getSessionFromUrl' does not exist on type 'SupabaseAuthClient'.
+client/src/pages/communication.tsx(76,59): error TS2345: Argument of type '{ method: string; body: string; }' is not assignable to parameter of type 'string'.
+client/src/pages/communication.tsx(95,63): error TS2345: Argument of type '{ method: string; body: string; }' is not assignable to parameter of type 'string'.
+client/src/pages/communication.tsx(182,16): error TS18046: 'communicationLogs' is of type 'unknown'.
+client/src/pages/communication.tsx(203,50): error TS18046: 'templates' is of type 'unknown'.
+client/src/pages/communication.tsx(213,16): error TS18046: 'communicationLogs' is of type 'unknown'.
+client/src/pages/communication.tsx(442,20): error TS18046: 'communicationLogs' is of type 'unknown'.
+client/src/pages/communication.tsx(457,32): error TS2322: Type '"status"' is not assignable to type '"default" | "destructive" | "outline" | "secondary" | null | undefined'.
+client/src/pages/communication.tsx(474,14): error TS18046: 'templates' is of type 'unknown'.
+client/src/pages/communication.tsx(525,35): error TS18046: 'communicationLogs' is of type 'unknown'.
+client/src/pages/communication.tsx(526,40): error TS18046: 'communicationLogs' is of type 'unknown'.
+client/src/pages/communication.tsx(526,80): error TS18046: 'communicationLogs' is of type 'unknown'.
+client/src/pages/communication.tsx(554,35): error TS18046: 'communicationLogs' is of type 'unknown'.
+client/src/pages/communication.tsx(555,40): error TS18046: 'communicationLogs' is of type 'unknown'.
+client/src/pages/communication.tsx(555,80): error TS18046: 'communicationLogs' is of type 'unknown'.
+client/src/pages/comprehensive-ai-dashboard.tsx(191,38): error TS2339: Property 'modelPerformance' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(205,86): error TS2339: Property 'analytics' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(207,38): error TS2339: Property 'analytics' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(220,86): error TS2339: Property 'summary' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(222,38): error TS2339: Property 'summary' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(277,46): error TS2339: Property 'analytics' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(285,46): error TS2339: Property 'analytics' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(293,47): error TS2339: Property 'predictions' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(293,94): error TS2339: Property 'analytics' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(301,40): error TS2339: Property 'predictions' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(390,38): error TS2339: Property 'pricingRecommendations' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(459,44): error TS2339: Property 'summary' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(467,44): error TS2339: Property 'summary' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(475,44): error TS2339: Property 'summary' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(483,38): error TS2339: Property 'staffMetrics' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(551,41): error TS2339: Property 'curriculumAnalytics' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(737,36): error TS2339: Property 'recentActivity' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(743,36): error TS2339: Property 'recentActivity' does not exist on type '{}'.
+client/src/pages/comprehensive-ai-dashboard.tsx(749,36): error TS2339: Property 'systemHealth' does not exist on type '{}'.
+client/src/pages/e-mandate.tsx(89,50): error TS2345: Argument of type '{ method: string; body: string; }' is not assignable to parameter of type 'string'.
+client/src/pages/e-mandate.tsx(108,62): error TS2345: Argument of type '{ method: string; body: string; }' is not assignable to parameter of type 'string'.
+client/src/pages/e-mandate.tsx(163,29): error TS18046: 'eMandates' is of type 'unknown'.
+client/src/pages/e-mandate.tsx(168,12): error TS18046: 'students' is of type 'unknown'.
+client/src/pages/e-mandate.tsx(172,12): error TS18046: 'eMandates' is of type 'unknown'.
+client/src/pages/e-mandate.tsx(176,12): error TS18046: 'emiSchedules' is of type 'unknown'.
+client/src/pages/e-mandate.tsx(183,12): error TS18046: 'eMandates' is of type 'unknown'.
+client/src/pages/e-mandate.tsx(206,16): error TS18046: 'eMandates' is of type 'unknown'.
+client/src/pages/e-mandate.tsx(216,50): error TS18046: 'upcomingEmis' is of type 'unknown'.
+client/src/pages/e-mandate.tsx(275,37): error TS18046: 'students' is of type 'unknown'.
+client/src/pages/e-mandate.tsx(284,22): error TS18046: 'students' is of type 'unknown'.
+client/src/pages/e-mandate.tsx(378,30): error TS2322: Type '"status"' is not assignable to type '"default" | "destructive" | "outline" | "secondary" | null | undefined'.
+client/src/pages/e-mandate.tsx(449,20): error TS18046: 'emiSchedules' is of type 'unknown'.
+client/src/pages/e-mandate.tsx(459,34): error TS2322: Type '"status"' is not assignable to type '"default" | "destructive" | "outline" | "secondary" | null | undefined'.
+client/src/pages/e-mandate.tsx(590,20): error TS18046: 'upcomingEmis' is of type 'unknown'.
+client/src/pages/e-mandate.tsx(601,34): error TS2322: Type '"status"' is not assignable to type '"default" | "destructive" | "outline" | "secondary" | null | undefined'.
+client/src/pages/forecasting.tsx(5,29): error TS2307: Cannot find module '@/hooks/use-forecasting' or its corresponding type declarations.
+client/src/pages/forecasting.tsx(6,26): error TS2307: Cannot find module '@/hooks/use-leads' or its corresponding type declarations.
+client/src/pages/forecasting.tsx(13,45): error TS7006: Parameter 'l' implicitly has an 'any' type.
+client/src/pages/forecasting.tsx(19,36): error TS7006: Parameter 'l' implicitly has an 'any' type.
+client/src/pages/forecasting.tsx(132,43): error TS7006: Parameter 'trend' implicitly has an 'any' type.
+client/src/pages/forecasting.tsx(132,50): error TS7006: Parameter 'index' implicitly has an 'any' type.
+client/src/pages/landing.tsx(35,8): error TS1192: Module '"E:/WorkSpaceEduLeadPro/EduLeadPro/client/src/components/ui/feature-steps"' has no default export.
+client/src/pages/leads.tsx(229,36): error TS2322: Type '"status"' is not assignable to type '"default" | "destructive" | "outline" | "secondary" | null | undefined'.
+client/src/pages/marketing.tsx(40,32): error TS2304: Cannot find name 'useQuery'.
+client/src/pages/marketing.tsx(45,44): error TS7006: Parameter 'f' implicitly has an 'any' type.
+client/src/pages/marketing.tsx(45,65): error TS7006: Parameter 'f' implicitly has an 'any' type.
+client/src/pages/marketing.tsx(102,33): error TS2322: Type 'unknown' is not assignable to type 'Key | null | undefined'.
+client/src/pages/marketing.tsx(102,43): error TS2322: Type 'unknown' is not assignable to type 'string'.
+client/src/pages/marketing.tsx(103,23): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+client/src/pages/reports.tsx(55,40): error TS2339: Property 'map' does not exist on type '{}'.
+client/src/pages/reports.tsx(55,44): error TS7006: Parameter 'counselor' implicitly has an 'any' type.
+client/src/pages/reports.tsx(79,38): error TS2339: Property 'map' does not exist on type '{}'.
+client/src/pages/reports.tsx(79,42): error TS7006: Parameter 'source' implicitly has an 'any' type.
+client/src/pages/reports.tsx(329,43): error TS7006: Parameter 'source' implicitly has an 'any' type.
+client/src/pages/reports.tsx(329,51): error TS7006: Parameter 'index' implicitly has an 'any' type.
+client/src/pages/reports.tsx(366,46): error TS7006: Parameter 'counselor' implicitly has an 'any' type.
+client/src/pages/reports.tsx(405,33): error TS2339: Property 'map' does not exist on type '{}'.
+client/src/pages/reports.tsx(405,38): error TS7006: Parameter 'data' implicitly has an 'any' type.
+client/src/pages/reports.tsx(405,44): error TS7006: Parameter 'index' implicitly has an 'any' type.
+client/src/pages/reports.tsx(406,70): error TS2339: Property 'map' does not exist on type '{}'.
+client/src/pages/reports.tsx(406,74): error TS7006: Parameter 't' implicitly has an 'any' type.
+client/src/pages/reports.tsx(470,71): error TS7006: Parameter 's' implicitly has an 'any' type.
+client/src/pages/student-fees.tsx(1211,33): error TS2339: Property 'emiAmount' does not exist on type 'EmiPlan'.
+client/src/pages/student-fees.tsx(2036,47): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+client/src/pages/student-fees.tsx(2038,53): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+client/src/pages/student-fees.tsx(2193,60): error TS2339: Property 'transactionId' does not exist on type '{ totalAmount: string; emiPeriod: string; emiAmount: string; downPayment: string; interestRate: string; startDate: string; frequency: string; processingFee: string; lateFee: string; receiptNumber: string; discount: string; paymentMode: string; }'.
+client/src/pages/student-fees.tsx(2215,60): error TS2339: Property 'transactionId' does not exist on type '{ totalAmount: string; emiPeriod: string; emiAmount: string; downPayment: string; interestRate: string; startDate: string; frequency: string; processingFee: string; lateFee: string; receiptNumber: string; discount: string; paymentMode: string; }'.
+client/src/pages/student-fees.tsx(2401,52): error TS2339: Property 'transactionId' does not exist on type '{ totalAmount: string; emiPeriod: string; emiAmount: string; downPayment: string; interestRate: string; startDate: string; frequency: string; processingFee: string; lateFee: string; receiptNumber: string; discount: string; paymentMode: string; }'.
+client/src/pages/student-fees.tsx(2486,37): error TS2353: Object literal may only specify known properties, and 'transactionId' does not exist in type 'SetStateAction<{ totalAmount: string; emiPeriod: string; emiAmount: string; downPayment: string; interestRate: string; startDate: string; frequency: string; processingFee: string; lateFee: string; receiptNumber: string; discount: string; paymentMode: string; }>'.
+client/src/pages/student-fees.tsx(3008,46): error TS2551: Property 'paymentCategory' does not exist on type 'FeePayment'. Did you mean 'paymentDate'?
+client/src/pages/student-fees.tsx(3010,50): error TS2339: Property 'chargeType' does not exist on type 'FeePayment'.
+client/src/pages/student-fees.tsx(3011,51): error TS2339: Property 'chargeType' does not exist on type 'FeePayment'.
+client/src/pages/student-fees.tsx(3020,23): error TS18048: 'selectedPaymentForDetails.installmentNumber' is possibly 'undefined'.
+client/src/pages/students.tsx(103,52): error TS2345: Argument of type '{ method: string; body: string; }' is not assignable to parameter of type 'string'.
+client/src/pages/students.tsx(171,69): error TS2345: Argument of type '{ method: string; body: string; }' is not assignable to parameter of type 'string'.
+client/src/pages/students.tsx(181,26): error TS2345: Argument of type 'Response' is not assignable to parameter of type 'SetStateAction<{ id: number; name: string; email: string | null; createdAt: Date; updatedAt: Date; phone: string; class: string; stream: string; status: string | null; parentName: string; parentPhone: string; address: string | null; rollNumber: string; dateOfBirth: string | null; admissionDate: string; } | null>'.
+  Type 'Response' is missing the following properties from type '{ id: number; name: string; email: string | null; createdAt: Date; updatedAt: Date; phone: string; class: string; stream: string; status: string | null; parentName: string; parentPhone: string; address: string | null; rollNumber: string; dateOfBirth: string | null; admissionDate: string; }': id, name, email, createdAt, and 10 more.
+client/src/pages/students.tsx(185,40): error TS2339: Property 'name' does not exist on type 'Response'.
+client/src/pages/students.tsx(322,60): error TS2339: Property 'studentId' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(326,64): error TS2339: Property 'studentId' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; status: string | null; leadId: number; paymentDate: string; amount: string; discount: string | null; paymentMode: string; receiptNumber: string | null; installmentNumber: number | null; transactionId: string | null; paymentCategory: string | null; chargeType: string | ...'.
+client/src/pages/students.tsx(333,92): error TS2339: Property 'amount' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(344,11): error TS2339: Property 'status' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(344,48): error TS2339: Property 'dueDate' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(352,7): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+client/src/pages/students.tsx(361,76): error TS2339: Property 'totalPending' does not exist on type '{}'.
+client/src/pages/students.tsx(370,76): error TS2339: Property 'totalPaid' does not exist on type '{}'.
+client/src/pages/students.tsx(379,76): error TS2339: Property 'totalOverdue' does not exist on type '{}'.
+client/src/pages/students.tsx(388,75): error TS2339: Property 'collectionRate' does not exist on type '{}'.
+client/src/pages/students.tsx(453,49): error TS2322: Type '{ children: Element[]; name: string; required: true; className: string; }' is not assignable to type 'IntrinsicAttributes & SelectSharedProps & { value?: string | undefined; defaultValue?: string | undefined; onValueChange?(value: string): void; }'.
+  Property 'className' does not exist on type 'IntrinsicAttributes & SelectSharedProps & { value?: string | undefined; defaultValue?: string | undefined; onValueChange?(value: string): void; }'.
+client/src/pages/students.tsx(468,41): error TS2322: Type '{ children: Element[]; name: string; className: string; }' is not assignable to type 'IntrinsicAttributes & SelectSharedProps & { value?: string | undefined; defaultValue?: string | undefined; onValueChange?(value: string): void; }'.
+  Property 'className' does not exist on type 'IntrinsicAttributes & SelectSharedProps & { value?: string | undefined; defaultValue?: string | undefined; onValueChange?(value: string): void; }'.
+client/src/pages/students.tsx(620,78): error TS2339: Property 'studentId' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(621,41): error TS2339: Property 'status' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(621,78): error TS2339: Property 'dueDate' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(626,39): error TS2339: Property 'feeType' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(627,77): error TS2339: Property 'amount' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(628,55): error TS2339: Property 'dueDate' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(630,89): error TS2339: Property 'status' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(631,56): error TS2339: Property 'status' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(635,30): error TS2339: Property 'installmentNumber' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'.
+client/src/pages/students.tsx(635,54): error TS2551: Property 'totalInstallments' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; class: string; stream: string; totalFees: string; installments: number; academicYear: string; }'. Did you mean 'installments'?
+client/src/pages/students.tsx(669,82): error TS2339: Property 'studentId' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; status: string | null; leadId: number; paymentDate: string; amount: string; discount: string | null; paymentMode: string; receiptNumber: string | null; installmentNumber: number | null; transactionId: string | null; paymentCategory: string | null; chargeType: string | ...'.
+client/src/pages/students.tsx(676,37): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+client/src/pages/students.tsx(676,77): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+client/src/pages/students.tsx(680,73): error TS2551: Property 'paymentMethod' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; status: string | null; leadId: number; paymentDate: string; amount: string; discount: string | null; paymentMode: string; receiptNumber: string | null; installmentNumber: number | null; transactionId: string | null; paymentCategory: string | null; chargeType: string | ...'. Did you mean 'paymentMode'?
+client/src/pages/students.tsx(681,36): error TS2551: Property 'paymentMethod' does not exist on type '{ id: number; createdAt: Date; updatedAt: Date; status: string | null; leadId: number; paymentDate: string; amount: string; discount: string | null; paymentMode: string; receiptNumber: string | null; installmentNumber: number | null; transactionId: string | null; paymentCategory: string | null; chargeType: string | ...'. Did you mean 'paymentMode'?
+client/src/pages/students.tsx(717,53): error TS2322: Type '{ children: Element[]; name: string; required: true; className: string; }' is not assignable to type 'IntrinsicAttributes & SelectSharedProps & { value?: string | undefined; defaultValue?: string | undefined; onValueChange?(value: string): void; }'.
+  Property 'className' does not exist on type 'IntrinsicAttributes & SelectSharedProps & { value?: string | undefined; defaultValue?: string | undefined; onValueChange?(value: string): void; }'.
+components/ui/globe.tsx(4,25): error TS2307: Cannot find module 'cobe' or its corresponding type declarations.
+server/ai-dynamic-pricing.ts(123,28): error TS2339: Property 'course' does not exist on type 'PgTableWithColumns<{ name: "students"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "students"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; ... 6 more ...; generated: undefined; }, {}, {}>; ... 13 more ...; updatedAt: PgColumn...'.
+server/ai-dynamic-pricing.ts(124,30): error TS2339: Property 'course' does not exist on type 'PgTableWithColumns<{ name: "students"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "students"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; ... 6 more ...; generated: undefined; }, {}, {}>; ... 13 more ...; updatedAt: PgColumn...'.
+server/ai-dynamic-pricing.ts(126,45): error TS2339: Property 'feeAmount' does not exist on type 'PgTableWithColumns<{ name: "students"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "students"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; ... 6 more ...; generated: undefined; }, {}, {}>; ... 13 more ...; updatedAt: PgColumn...'.
+server/ai-dynamic-pricing.ts(127,65): error TS2339: Property 'enrollmentDate' does not exist on type 'PgTableWithColumns<{ name: "students"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "students"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; ... 6 more ...; generated: undefined; }, {}, {}>; ... 13 more ...; updatedAt: PgColumn...'.
+server/ai-dynamic-pricing.ts(130,26): error TS2339: Property 'isActive' does not exist on type 'PgTableWithColumns<{ name: "students"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "students"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; ... 6 more ...; generated: undefined; }, {}, {}>; ... 13 more ...; updatedAt: PgColumn...'.
+server/ai-dynamic-pricing.ts(131,25): error TS2339: Property 'course' does not exist on type 'PgTableWithColumns<{ name: "students"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "students"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; ... 6 more ...; generated: undefined; }, {}, {}>; ... 13 more ...; updatedAt: PgColumn...'.
+server/ai-dynamic-pricing.ts(165,26): error TS2339: Property 'isActive' does not exist on type 'PgTableWithColumns<{ name: "students"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "students"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; ... 6 more ...; generated: undefined; }, {}, {}>; ... 13 more ...; updatedAt: PgColumn...'.
+server/ai-dynamic-pricing.ts(323,11): error TS7022: 'students' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+server/ai-dynamic-pricing.ts(325,13): error TS2448: Block-scoped variable 'students' used before its declaration.
+server/ai-dynamic-pricing.ts(326,17): error TS2448: Block-scoped variable 'students' used before its declaration.
+server/ai-dynamic-pricing.ts(354,27): error TS2339: Property 'studentId' does not exist on type 'PgTableWithColumns<{ name: "fee_payments"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "fee_payments"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; ... 7 more ...; generated: undefined; }, {}, {}>; ... 12 more ...; updatedAt: PgColumn<...>; }; ...'.
+server/ai-dynamic-pricing.ts(473,48): error TS2339: Property 'feeAmount' does not exist on type '{ id: number; rollNumber: string; name: string; email: string | null; phone: string; class: string; stream: string; parentName: string; parentPhone: string; address: string | null; dateOfBirth: string | null; admissionDate: string; status: string | null; createdAt: Date; updatedAt: Date; }'.
+server/ai-dynamic-pricing.ts(507,27): error TS2339: Property 'studentId' does not exist on type 'PgTableWithColumns<{ name: "fee_payments"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "fee_payments"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; ... 7 more ...; generated: undefined; }, {}, {}>; ... 12 more ...; updatedAt: PgColumn<...>; }; ...'.
+server/ai-staff-management.ts(250,26): error TS2339: Property 'isActive' does not exist on type 'PgTableWithColumns<{ name: "students"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "students"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; ... 6 more ...; generated: undefined; }, {}, {}>; ... 13 more ...; updatedAt: PgColumn...'.
+server/ai-staff-management.ts(475,26): error TS2339: Property 'isActive' does not exist on type 'PgTableWithColumns<{ name: "students"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "students"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; ... 6 more ...; generated: undefined; }, {}, {}>; ... 13 more ...; updatedAt: PgColumn...'.
+server/ai-staff-management.ts(921,36): error TS2802: Type 'Map<string, { staff: any[]; workloads: WorkloadMetrics[]; }>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
+server/ai-staff-management.ts(922,50): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+server/ai-staff-management.ts(922,55): error TS7006: Parameter 'w' implicitly has an 'any' type.
+server/ai-staff-management.ts(923,69): error TS7006: Parameter 'w' implicitly has an 'any' type.
+server/ai-staff-management.ts(924,54): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+server/ai-staff-management.ts(924,59): error TS7006: Parameter 'w' implicitly has an 'any' type.
+server/ai-staff-management.ts(935,48): error TS7006: Parameter 'w' implicitly has an 'any' type.
+server/ai-staff-management.ts(936,51): error TS7006: Parameter 'w' implicitly has an 'any' type.
+server/ai-student-success.ts(65,29): error TS2339: Property 'studentId' does not exist on type 'PgTableWithColumns<{ name: "fee_payments"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "fee_payments"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; ... 7 more ...; generated: undefined; }, {}, {}>; ... 12 more ...; updatedAt: PgColumn<...>; }; ...'.
+server/ai-student-success.ts(407,26): error TS2339: Property 'isActive' does not exist on type 'PgTableWithColumns<{ name: "students"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "students"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; ... 6 more ...; generated: undefined; }, {}, {}>; ... 13 more ...; updatedAt: PgColumn...'.
+server/ai-student-success.ts(459,11): error TS7022: 'students' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+server/ai-student-success.ts(461,13): error TS2345: Argument of type 'Omit<PgSelectBase<any, any, "single", {} | Record<any, "not-null">, false, "where", { [x: string]: any; }[], any>, "where">' is not assignable to parameter of type 'SQL<unknown> | PgTable<TableConfig> | Subquery<string, Record<string, unknown>> | PgViewBase<string, boolean, ColumnsSelection>'.
+  Type 'Omit<PgSelectBase<any, any, "single", {} | Record<any, "not-null">, false, "where", { [x: string]: any; }[], any>, "where">' is not assignable to type 'Subquery<string, Record<string, unknown>>'.
+    Types of property '_' are incompatible.
+      Type '{ readonly dialect: "pg"; readonly hkt: PgSelectHKT; readonly tableName: any; readonly selection: any; readonly selectMode: "single"; readonly nullabilityMap: {} | Record<any, "not-null">; readonly dynamic: false; readonly excludedMethods: "where"; readonly result: { ...; }[]; readonly selectedFields: any; }' is missing the following properties from type '{ brand: "Subquery"; sql: SQL<unknown>; selectedFields: Record<string, unknown>; alias: string; isWith: boolean; }': brand, sql, alias, isWith
+server/ai-student-success.ts(461,30): error TS2448: Block-scoped variable 'students' used before its declaration.
+server/ai-student-success.ts(461,49): error TS2448: Block-scoped variable 'students' used before its declaration.
+server/ai-student-success.ts(465,20): error TS7006: Parameter 'student' implicitly has an 'any' type.
+server/api/ai-comprehensive.ts(46,11): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(value: { studentId: number | SQL<unknown> | Placeholder<string, any>; predictionType: string | SQL<unknown> | Placeholder<string, any>; prediction: string | SQL<...> | Placeholder<...>; id?: number | ... 2 more ... | undefined; createdAt?: SQL<...> | ... 2 more ... | undefined; confidence?: string | ... 3 more ... | undefined; }): PgInsertBase<...>', gave the following error.
+    Object literal may only specify known properties, and 'entityType' does not exist in type '{ studentId: number | SQL<unknown> | Placeholder<string, any>; predictionType: string | SQL<unknown> | Placeholder<string, any>; prediction: string | SQL<...> | Placeholder<...>; id?: number | ... 2 more ... | undefined; createdAt?: SQL<...> | ... 2 more ... | undefined; confidence?: string | ... 3 more ... | undefi...'.
+  Overload 2 of 2, '(values: { studentId: number | SQL<unknown> | Placeholder<string, any>; predictionType: string | SQL<unknown> | Placeholder<string, any>; prediction: string | SQL<...> | Placeholder<...>; id?: number | ... 2 more ... | undefined; createdAt?: SQL<...> | ... 2 more ... | undefined; confidence?: string | ... 3 more ... | undefined; }[]): PgInsertBase<...>', gave the following error.
+    Object literal may only specify known properties, and 'entityType' does not exist in type '{ studentId: number | SQL<unknown> | Placeholder<string, any>; predictionType: string | SQL<unknown> | Placeholder<string, any>; prediction: string | SQL<...> | Placeholder<...>; id?: number | ... 2 more ... | undefined; createdAt?: SQL<...> | ... 2 more ... | undefined; confidence?: string | ... 3 more ... | undefi...'.
+server/api/ai-comprehensive.ts(288,25): error TS2531: Object is possibly 'null'.
+server/api/ai-comprehensive.ts(304,23): error TS2531: Object is possibly 'null'.
+server/api/ai-comprehensive.ts(546,89): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+server/api/ai-enhanced.ts(191,7): error TS2740: Type 'Omit<PgSelectBase<"leads", { id: PgColumn<{ name: "id"; tableName: "leads"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; isPrimaryKey: true; isAutoincrement: false; ... 4 more ...; generated: undefined; }, {}, {}>; ... 18 more ...; deletedAt: PgColum...' is missing the following properties from type 'PgSelectBase<"leads", { id: PgColumn<{ name: "id"; tableName: "leads"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; isPrimaryKey: true; isAutoincrement: false; ... 4 more ...; generated: undefined; }, {}, {}>; ... 18 more ...; deletedAt: PgColumn<......': config, joinsNotNullableMap, tableName, isPartialSelect, and 5 more.
+server/api/ai-enhanced.ts(195,7): error TS2740: Type 'Omit<PgSelectBase<"leads", { id: PgColumn<{ name: "id"; tableName: "leads"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; isPrimaryKey: true; isAutoincrement: false; ... 4 more ...; generated: undefined; }, {}, {}>; ... 18 more ...; deletedAt: PgColum...' is missing the following properties from type 'PgSelectBase<"leads", { id: PgColumn<{ name: "id"; tableName: "leads"; dataType: "number"; columnType: "PgSerial"; data: number; driverParam: number; notNull: true; hasDefault: true; isPrimaryKey: true; isAutoincrement: false; ... 4 more ...; generated: undefined; }, {}, {}>; ... 18 more ...; deletedAt: PgColumn<......': config, joinsNotNullableMap, tableName, isPartialSelect, and 5 more.
+server/init-db.ts(41,63): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(value: { role: string | SQL<unknown> | Placeholder<string, any>; name: string | SQL<unknown> | Placeholder<string, any>; phone: string | SQL<unknown> | Placeholder<string, any>; ... 14 more ...; panNumber?: string | ... 3 more ... | undefined; }): PgInsertBase<...>', gave the following error.
+    Argument of type '{ employeeId: string; name: string; email: string; phone: string; role: string; department: string; dateOfJoining: Date; salary: string; qualifications: string; bankAccountNumber: string; ifscCode: string; panNumber: string; }[]' is not assignable to parameter of type '{ role: string | SQL<unknown> | Placeholder<string, any>; name: string | SQL<unknown> | Placeholder<string, any>; phone: string | SQL<unknown> | Placeholder<string, any>; ... 14 more ...; panNumber?: string | ... 3 more ... | undefined; }'.
+      Type '{ employeeId: string; name: string; email: string; phone: string; role: string; department: string; dateOfJoining: Date; salary: string; qualifications: string; bankAccountNumber: string; ifscCode: string; panNumber: string; }[]' is missing the following properties from type '{ role: string | SQL<unknown> | Placeholder<string, any>; name: string | SQL<unknown> | Placeholder<string, any>; phone: string | SQL<unknown> | Placeholder<string, any>; ... 14 more ...; panNumber?: string | ... 3 more ... | undefined; }': role, name, phone, dateOfJoining
+server/init-db.ts(115,62): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(value: { name: string | SQL<unknown> | Placeholder<string, any>; phone: string | SQL<unknown> | Placeholder<string, any>; class: string | SQL<unknown> | Placeholder<string, any>; ... 11 more ...; dateOfBirth?: string | ... 3 more ... | undefined; }): PgInsertBase<...>', gave the following error.
+    Argument of type '{ rollNumber: string; name: string; email: string; phone: string; class: string; stream: string; parentName: string; parentPhone: string; address: string; dateOfBirth: Date; admissionDate: Date; status: string; }[]' is not assignable to parameter of type '{ name: string | SQL<unknown> | Placeholder<string, any>; phone: string | SQL<unknown> | Placeholder<string, any>; class: string | SQL<unknown> | Placeholder<string, any>; ... 11 more ...; dateOfBirth?: string | ... 3 more ... | undefined; }'.
+      Type '{ rollNumber: string; name: string; email: string; phone: string; class: string; stream: string; parentName: string; parentPhone: string; address: string; dateOfBirth: Date; admissionDate: Date; status: string; }[]' is missing the following properties from type '{ name: string | SQL<unknown> | Placeholder<string, any>; phone: string | SQL<unknown> | Placeholder<string, any>; class: string | SQL<unknown> | Placeholder<string, any>; ... 11 more ...; dateOfBirth?: string | ... 3 more ... | undefined; }': name, phone, class, stream, and 4 more.
+server/init-db.ts(386,50): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(value: { studentId: number | SQL<unknown> | Placeholder<string, any>; predictionType: string | SQL<unknown> | Placeholder<string, any>; prediction: string | SQL<...> | Placeholder<...>; id?: number | ... 2 more ... | undefined; createdAt?: SQL<...> | ... 2 more ... | undefined; confidence?: string | ... 3 more ... | undefined; }): PgInsertBase<...>', gave the following error.
+    Argument of type '{ entityType: string; entityId: number; predictionType: string; predictionValue: string; confidence: string; metadata: string; modelVersion: string; }[]' is not assignable to parameter of type '{ studentId: number | SQL<unknown> | Placeholder<string, any>; predictionType: string | SQL<unknown> | Placeholder<string, any>; prediction: string | SQL<...> | Placeholder<...>; id?: number | ... 2 more ... | undefined; createdAt?: SQL<...> | ... 2 more ... | undefined; confidence?: string | ... 3 more ... | undefi...'.
+      Type '{ entityType: string; entityId: number; predictionType: string; predictionValue: string; confidence: string; metadata: string; modelVersion: string; }[]' is missing the following properties from type '{ studentId: number | SQL<unknown> | Placeholder<string, any>; predictionType: string | SQL<unknown> | Placeholder<string, any>; prediction: string | SQL<...> | Placeholder<...>; id?: number | ... 2 more ... | undefined; createdAt?: SQL<...> | ... 2 more ... | undefined; confidence?: string | ... 3 more ... | undefi...': studentId, predictionType, prediction
+server/ml-prediction.ts(174,10): error TS2484: Export declaration conflicts with exported declaration of 'MLFeatures'.
+server/ml-prediction.ts(174,22): error TS2484: Export declaration conflicts with exported declaration of 'MLPredictionResult'.
+server/ml-prediction.ts(174,42): error TS2484: Export declaration conflicts with exported declaration of 'MLPredictionConfig'.
+server/ollama-ai.ts(1,24): error TS2307: Cannot find module 'ollama' or its corresponding type declarations.
+server/ollama-ai.ts(53,41): error TS7006: Parameter 'model' implicitly has an 'any' type.
+server/storage.ts(1672,7): error TS2322: Type '{ id: number; name: string | null; email: string | null; username: string | null; password: string | null; role: string | null; createdAt: Date | null; updatedAt: Date | null; } | undefined' is not assignable to type '{ id: number; username: string; password: string; role: string; name: string | null; email: string | null; createdAt: Date; updatedAt: Date; } | undefined'.
+  Type '{ id: number; name: string | null; email: string | null; username: string | null; password: string | null; role: string | null; createdAt: Date | null; updatedAt: Date | null; }' is not assignable to type '{ id: number; username: string; password: string; role: string; name: string | null; email: string | null; createdAt: Date; updatedAt: Date; }'.
+    Types of property 'username' are incompatible.
+      Type 'string | null' is not assignable to type 'string'.
+        Type 'null' is not assignable to type 'string'.
+server/storage.ts(1711,5): error TS2322: Type '{ id: number; description: string; amount: string; category: string; date: string; status: string | null; receiptUrl: string | null; submittedBy: number | null; approvedBy: number | null; createdAt: Date; updatedAt: Date; approver: { ...; } | undefined; }[]' is not assignable to type 'ExpenseWithApprover[]'.
+  Type '{ id: number; description: string; amount: string; category: string; date: string; status: string | null; receiptUrl: string | null; submittedBy: number | null; approvedBy: number | null; createdAt: Date; updatedAt: Date; approver: { ...; } | undefined; }' is not assignable to type 'ExpenseWithApprover'.
+    Type '{ id: number; description: string; amount: string; category: string; date: string; status: string | null; receiptUrl: string | null; submittedBy: number | null; approvedBy: number | null; createdAt: Date; updatedAt: Date; approver: { ...; } | undefined; }' is not assignable to type '{ approver?: { id: number; username: string; password: string; role: string; name: string | null; email: string | null; createdAt: Date; updatedAt: Date; } | undefined; }'.
+      Types of property 'approver' are incompatible.
+        Type '{ id: number; name: string | null; email: string | null; username: string | null; password: string | null; role: string | null; createdAt: Date | null; updatedAt: Date | null; } | undefined' is not assignable to type '{ id: number; username: string; password: string; role: string; name: string | null; email: string | null; createdAt: Date; updatedAt: Date; } | undefined'.
+          Type '{ id: number; name: string | null; email: string | null; username: string | null; password: string | null; role: string | null; createdAt: Date | null; updatedAt: Date | null; }' is not assignable to type '{ id: number; username: string; password: string; role: string; name: string | null; email: string | null; createdAt: Date; updatedAt: Date; }'.
+            Types of property 'username' are incompatible.
+              Type 'string | null' is not assignable to type 'string'.
+                Type 'null' is not assignable to type 'string'.
+server/storage.ts(1763,5): error TS2322: Type '{ id: number; description: string; amount: string; category: string; date: string; status: string | null; receiptUrl: string | null; submittedBy: number | null; approvedBy: number | null; createdAt: Date; updatedAt: Date; approver: { ...; } | undefined; }[]' is not assignable to type 'ExpenseWithApprover[]'.
+  Type '{ id: number; description: string; amount: string; category: string; date: string; status: string | null; receiptUrl: string | null; submittedBy: number | null; approvedBy: number | null; createdAt: Date; updatedAt: Date; approver: { ...; } | undefined; }' is not assignable to type 'ExpenseWithApprover'.
+    Type '{ id: number; description: string; amount: string; category: string; date: string; status: string | null; receiptUrl: string | null; submittedBy: number | null; approvedBy: number | null; createdAt: Date; updatedAt: Date; approver: { ...; } | undefined; }' is not assignable to type '{ approver?: { id: number; username: string; password: string; role: string; name: string | null; email: string | null; createdAt: Date; updatedAt: Date; } | undefined; }'.
+      Types of property 'approver' are incompatible.
+        Type '{ id: number; name: string | null; email: string | null; username: string | null; password: string | null; role: string | null; createdAt: Date | null; updatedAt: Date | null; } | undefined' is not assignable to type '{ id: number; username: string; password: string; role: string; name: string | null; email: string | null; createdAt: Date; updatedAt: Date; } | undefined'.
+          Type '{ id: number; name: string | null; email: string | null; username: string | null; password: string | null; role: string | null; createdAt: Date | null; updatedAt: Date | null; }' is not assignable to type '{ id: number; username: string; password: string; role: string; name: string | null; email: string | null; createdAt: Date; updatedAt: Date; }'.
+            Types of property 'username' are incompatible.
+              Type 'string | null' is not assignable to type 'string'.
+                Type 'null' is not assignable to type 'string'.
+server/storage.ts(1818,5): error TS2322: Type '{ id: number; description: string; amount: string; category: string; date: string; status: string | null; receiptUrl: string | null; submittedBy: number | null; approvedBy: number | null; createdAt: Date; updatedAt: Date; approver: { ...; } | undefined; }[]' is not assignable to type 'ExpenseWithApprover[]'.
+  Type '{ id: number; description: string; amount: string; category: string; date: string; status: string | null; receiptUrl: string | null; submittedBy: number | null; approvedBy: number | null; createdAt: Date; updatedAt: Date; approver: { ...; } | undefined; }' is not assignable to type 'ExpenseWithApprover'.
+    Type '{ id: number; description: string; amount: string; category: string; date: string; status: string | null; receiptUrl: string | null; submittedBy: number | null; approvedBy: number | null; createdAt: Date; updatedAt: Date; approver: { ...; } | undefined; }' is not assignable to type '{ approver?: { id: number; username: string; password: string; role: string; name: string | null; email: string | null; createdAt: Date; updatedAt: Date; } | undefined; }'.
+      Types of property 'approver' are incompatible.
+        Type '{ id: number; name: string | null; email: string | null; username: string | null; password: string | null; role: string | null; createdAt: Date | null; updatedAt: Date | null; } | undefined' is not assignable to type '{ id: number; username: string; password: string; role: string; name: string | null; email: string | null; createdAt: Date; updatedAt: Date; } | undefined'.
+          Type '{ id: number; name: string | null; email: string | null; username: string | null; password: string | null; role: string | null; createdAt: Date | null; updatedAt: Date | null; }' is not assignable to type '{ id: number; username: string; password: string; role: string; name: string | null; email: string | null; createdAt: Date; updatedAt: Date; }'.
+            Types of property 'username' are incompatible.
+              Type 'string | null' is not assignable to type 'string'.
+                Type 'null' is not assignable to type 'string'.

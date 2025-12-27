@@ -8,14 +8,14 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { 
-  Brain, 
-  Target, 
-  TrendingUp, 
+import {
+  Brain,
+  Target,
+  TrendingUp,
   TrendingDown,
-  Users, 
-  DollarSign, 
-  MessageSquare, 
+  Users,
+  DollarSign,
+  MessageSquare,
   Phone,
   Mail,
   AlertTriangle,
@@ -92,7 +92,7 @@ export default function AIEnhancedDashboard() {
 
   if (dashboardLoading || leadScoresLoading) {
     return (
-      <div className="min-h-screen bg-black relative overflow-hidden">
+      <div className="min-h-screen bg-gray-50 relative overflow-hidden">
         <Glow />
         <Header className="py-4 relative z-10" />
         <main className="p-6 relative z-10">
@@ -125,10 +125,10 @@ export default function AIEnhancedDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
+    <div className="min-h-screen bg-gray-50 relative overflow-hidden">
       <Glow />
       <Header className="py-4 relative z-10" />
-      
+
       <main className="p-6 relative z-10">
         <motion.div
           variants={containerVariants}
@@ -268,8 +268,8 @@ export default function AIEnhancedDashboard() {
                             {leadScores?.highPriorityLeads || 0}
                           </span>
                         </div>
-                        <Progress 
-                          value={(leadScores?.averageScore || 0)} 
+                        <Progress
+                          value={(leadScores?.averageScore || 0)}
                           className="h-3 bg-gray-700"
                         />
                       </div>
@@ -363,7 +363,7 @@ export default function AIEnhancedDashboard() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <Button 
+                        <Button
                           onClick={() => selectedLeadId && generatePlanMutation.mutate(selectedLeadId)}
                           disabled={!selectedLeadId || generatePlanMutation.isPending}
                           className="bg-purple-600 hover:bg-purple-700"

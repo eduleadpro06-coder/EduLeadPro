@@ -12,10 +12,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import Header from "@/components/layout/header";
-import { 
+import {
   CreditCard,
   TrendingUp,
-  AlertCircle, 
+  AlertCircle,
   Bot,
   Calendar,
   Building,
@@ -35,8 +35,10 @@ import {
   CheckCircle,
   Info,
   Trash2,
-  Edit 
+  Edit,
+  Printer
 } from "lucide-react";
+import { generateMelonsFeeReceipt, type FeeReceiptData } from "@/lib/receipt-generator";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { useHashState } from "@/hooks/use-hash-state";
@@ -54,6 +56,7 @@ interface Student {
   parentName?: string;
   parentPhone?: string;
   address?: string;
+  type?: string;
 }
 
 interface FeeStructure {
@@ -157,21 +160,98 @@ interface GlobalClassFee {
 interface EmiPlan {
   id: number;
   studentId: number;
-  planType: string;
   totalAmount: string;
-  emiPeriod: number;
-  emiAmount: string;
-  downPayment: string;
-  discount: string;
-  interestRate: string;
+  numberOfInstallments: number;
+  installmentAmount: string;
   startDate: string;
-  frequency: string;
-  processingFee: string;
-  lateFee: string;
-  receiptNumber?: string;
+  endDate: string;
   status: string;
+  discount?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+// EMI Payment Progress Component
+function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, status }: { planId: number; totalInstallments: number; installmentAmount: string; status?: string }) {
+  const queryClient = useQueryClient();
+  const { data: payments, isLoading } = useQuery({
+    queryKey: [`/api/emi-plans/${planId}/payments`],
+    queryFn: async () => {
+      const res = await fetch(`/api/emi-plans/${planId}/payments`);
+      if (!res.ok) return [];
+      return res.json();
+    }
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/emi-plans/${planId}`, { status: 'completed' });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/emi-plans"] });
+    }
+  });
+
+  const paidInstallments = new Set(payments?.filter((p: any) => p.installmentNumber && p.installmentNumber > 0).map((p: any) => p.installmentNumber) || []);
+  const progress = (paidInstallments.size / totalInstallments) * 100;
+
+  useEffect(() => {
+    if (!isLoading && progress === 100 && status !== 'completed') {
+      updateStatusMutation.mutate();
+    }
+  }, [isLoading, progress, status, updateStatusMutation]);
+
+  if (isLoading) {
+    return <div className="text-sm text-gray-500">Loading...</div>;
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="text-sm">
+        <span className="text-gray-500">EMI Amount:</span> ₹{parseFloat(installmentAmount).toLocaleString()}
+      </div>
+      <div className="text-sm">
+        <span className="text-gray-500">Progress:</span> {paidInstallments.size}/{totalInstallments} installments
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-2">
+        <div
+          className={`h-2 rounded-full transition-all ${progress === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Record Payment Button Component - checks if all payments are complete
+function RecordPaymentButton({ plan, onClick }: { plan: any; onClick: () => void }) {
+  const { data: payments, isLoading } = useQuery({
+    queryKey: [`/api/emi-plans/${plan.id}/payments`],
+    queryFn: async () => {
+      const res = await fetch(`/api/emi-plans/${plan.id}/payments`);
+      if (!res.ok) return [];
+      return res.json();
+    }
+  });
+
+  // Filter out down payments (installmentNumber: 0) when checking EMI completion
+  const emiPayments = payments?.filter((p: any) => p.installmentNumber && p.installmentNumber > 0) || [];
+  const paidInstallments = new Set(emiPayments.map((p: any) => p.installmentNumber));
+  const allPaid = paidInstallments.size >= plan.numberOfInstallments;
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className={allPaid ? "border-gray-300 text-gray-400 cursor-not-allowed" : "border-[#643ae5] text-[#643ae5] hover:bg-slate-50"}
+      onClick={onClick}
+      disabled={allPaid || isLoading}
+    >
+      <CreditCard className="mr-1 h-3 w-3" />
+      Record Payment
+    </Button>
+  );
 }
 
 export default function StudentFees() {
@@ -189,9 +269,10 @@ export default function StudentFees() {
   const [editingClassFee, setEditingClassFee] = useState<ClassFeeStructure | null>(null);
   const [emiModalOpen, setEmiModalOpen] = useState(false);
   const [emiEditingFee, setEmiEditingFee] = useState<FeeStructure | null>(null);
-  const [emiData, setEmiData] = useState<Record<number, {emiPeriod: string, paidAmount: string, emiDues: string}>>({});
+  const [emiData, setEmiData] = useState<Record<number, { emiPeriod: string, paidAmount: string, emiDues: string }>>({});
   const [classFilter, setClassFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [studentPaymentStatusFilter, setStudentPaymentStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [studentsPerPage, setStudentsPerPage] = useState(10);
   const [mandateFrequency, setMandateFrequency] = useState("monthly");
@@ -200,10 +281,10 @@ export default function StudentFees() {
   const [academicYear, setAcademicYear] = useState("2024-25");
   const [viewTotalFeesModalOpen, setViewTotalFeesModalOpen] = useState(false);
   const [selectedClassForTotal, setSelectedClassForTotal] = useState<string>("");
-  
+
   // Student edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [isImportOpen, setIsImportOpen] = useState(false);
 
   // Validation functions
@@ -220,20 +301,20 @@ export default function StudentFees() {
   };
 
   const validateForm = (student: Partial<Student>) => {
-    const errors: {[key: string]: string} = {};
-    
+    const errors: { [key: string]: string } = {};
+
     if (!student.name?.trim()) {
       errors.name = "Name is required";
     }
-    
+
     if (student.parentPhone && !validatePhone(student.parentPhone)) {
       errors.parentPhone = "Please enter a valid phone number";
     }
-    
+
     if ((student as any).email && !validateEmail((student as any).email)) {
       errors.email = "Please enter a valid email address";
     }
-    
+
     return errors;
   };
 
@@ -267,7 +348,7 @@ export default function StudentFees() {
     a.download = `students-export-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-    
+
     toast({
       title: "Export Successful",
       description: `${allStudents.length} students exported to CSV`,
@@ -284,19 +365,19 @@ export default function StudentFees() {
       const text = e.target?.result as string;
       const lines = text.split('\n');
       const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
-      
+
       // For now, just show a success message
       toast({
         title: "Import Started",
         description: `Processing ${lines.length - 1} rows from CSV file`,
       });
-      
+
       // Reset the input
       event.target.value = '';
     };
     reader.readAsText(file);
   };
-  
+
   // Payment management state
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<FeePayment | null>(null);
@@ -314,7 +395,7 @@ export default function StudentFees() {
     monthlyCollection: 0,
     collectionRate: 0
   });
-  
+
   // EMI Payment Modal state
   const [emiPaymentModalOpen, setEmiPaymentModalOpen] = useState(false);
   const [selectedEmiPlan, setSelectedEmiPlan] = useState<EmiPlan | null>(null);
@@ -332,6 +413,10 @@ export default function StudentFees() {
   const [emiPaymentProgress, setEmiPaymentProgress] = useState<any>(null);
   const [pendingEmis, setPendingEmis] = useState<any[]>([]);
 
+  // Payment Details Modal state
+  const [paymentDetailsOpen, setPaymentDetailsOpen] = useState(false);
+  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<FeePayment | null>(null);
+
   // Query for EMI payment progress
   const { data: emiProgressData, refetch: refetchEmiProgress } = useQuery({
     queryKey: ["/api/emi-plans", selectedEmiPlan?.id, "payment-progress"],
@@ -343,6 +428,22 @@ export default function StudentFees() {
     },
     enabled: !!selectedEmiPlan,
   });
+
+  // Query for EMI payments to calculate next installment number
+  const { data: emiPaymentsForModal } = useQuery({
+    queryKey: ["/api/emi-plans", selectedEmiPlan?.id, "payments"],
+    queryFn: async () => {
+      if (!selectedEmiPlan) return [];
+      const res = await fetch(`/api/emi-plans/${selectedEmiPlan.id}/payments`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedEmiPlan,
+  });
+
+  const nextInstallmentNumber = emiPaymentsForModal?.length && emiPaymentsForModal.length > 0
+    ? Math.max(...emiPaymentsForModal.map((p: any) => p.installmentNumber || 0)) + 1
+    : 1;
 
   // Query for pending EMIs
   const { data: pendingEmisData, refetch: refetchPendingEmis } = useQuery({
@@ -366,7 +467,9 @@ export default function StudentFees() {
     receiptNumber: "",
     installmentNumber: "",
     transactionId: "",
-    status: "completed"
+    status: "completed",
+    paymentCategory: "additional_charge", // Default for direct payments
+    chargeType: "annual_function", // Default charge type
   });
 
   // EMI Modal state
@@ -383,7 +486,8 @@ export default function StudentFees() {
     processingFee: '0',
     lateFee: '0',
     receiptNumber: '',
-    discount: ''
+    discount: '',
+    paymentMode: ''
   });
 
   // Fetch data
@@ -395,9 +499,9 @@ export default function StudentFees() {
   const { data: classFeeStructures = [] } = useQuery<ClassFeeStructure[]>({ queryKey: ["/api/class-fee-structures"] });
   const { data: globalClassFees = [], refetch: refetchGlobalFees } = useQuery<GlobalClassFee[]>({ queryKey: ["/api/global-class-fees"] });
   const { data: emiPlans = [], refetch: refetchEmiPlans } = useQuery<EmiPlan[]>({ queryKey: ["/api/emi-plans"] });
-  
+
   // Fetch enrolled leads
-  const { data: enrolledLeads = [], refetch: refetchLeads } = useQuery<LeadWithCounselor[]>({ 
+  const { data: enrolledLeads = [], refetch: refetchLeads } = useQuery<LeadWithCounselor[]>({
     queryKey: ["/api/leads", "enrolled"],
     queryFn: async () => {
       const response = await fetch("/api/leads?status=enrolled");
@@ -435,11 +539,11 @@ export default function StudentFees() {
     mutationFn: async (data: Partial<GlobalClassFee>) => {
       const url = editingGlobalFee ? `/api/global-class-fees/${editingGlobalFee.id}` : "/api/global-class-fees";
       const method = editingGlobalFee ? "PUT" : "POST";
-      
+
       console.log("Sending global class fee data:", data);
       console.log("URL:", url);
       console.log("Method:", method);
-      
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -447,16 +551,16 @@ export default function StudentFees() {
         },
         body: JSON.stringify(data),
       });
-      
+
       console.log("Response status:", response.status);
       console.log("Response ok:", response.ok);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error("API error response:", errorText);
         throw new Error(`Failed to save global class fee: ${errorText}`);
       }
-      
+
       const result = await response.json();
       console.log("API success response:", result);
       return result;
@@ -541,13 +645,18 @@ export default function StudentFees() {
       console.log("API success response:", result);
       return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fee-stats"] });
       setAddPaymentOpen(false);
       setEmiPaymentModalOpen(false);
+      setEmiModalOpen(false); // Also close EMI modal if payment came from there
       resetPaymentForm();
       resetEmiPaymentForm();
+
+      // Payment is recorded with receipt number
+      // Users can print receipt later from Payments tab
+
       toast({
         title: "Success",
         description: "Payment recorded successfully",
@@ -584,9 +693,14 @@ export default function StudentFees() {
       console.log("API success response:", result);
       return result;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/emi-plans"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
+
+      // Down payment is recorded automatically by backend
+      // Users can print receipt later from Payments tab
+
+
       setEmiModalOpen(false);
       resetEmiForm();
       toast({
@@ -616,6 +730,27 @@ export default function StudentFees() {
     return eMandates.find((m: EMandate) => m.leadId === studentId);
   };
 
+  // Helper to include global fees
+  const getStudentFeesWithGlobal = (student: Student | CombinedStudent) => {
+    const explicitFees = feeStructures.filter((f: FeeStructure) => f.studentId === student.id);
+    const globalFees = globalClassFees.filter(
+      (fee: GlobalClassFee) => fee.className === student.class && fee.academicYear === academicYear && fee.isActive
+    );
+    const explicitFeeTypes = new Set(explicitFees.map((f: FeeStructure) => f.feeType));
+    const virtualGlobalFees = globalFees
+      .filter((fee: GlobalClassFee) => !explicitFeeTypes.has(fee.feeType))
+      .map((fee: GlobalClassFee) => ({
+        ...fee,
+        studentId: student.id,
+        status: "pending",
+        isGlobal: true,
+        dueDate: '',
+        installmentNumber: 1,
+        totalInstallments: 1,
+      }));
+    return [...explicitFees, ...virtualGlobalFees] as FeeStructure[];
+  };
+
   const calculateTotalFees = (fees: FeeStructure[]) => {
     return fees.reduce((sum: number, fee: FeeStructure) => sum + parseFloat(fee.amount), 0);
   };
@@ -624,14 +759,23 @@ export default function StudentFees() {
     return payments.reduce((sum: number, payment: FeePayment) => sum + parseFloat(payment.amount), 0);
   };
 
-  const calculateOutstanding = (studentId: number) => {
-    const fees = getStudentFees(studentId);
-    const payments = getStudentPayments(studentId);
-    
+  const calculateOutstanding = (student: Student | CombinedStudent) => {
+    const fees = getStudentFeesWithGlobal(student);
+    const payments = getStudentPayments(student.id);
+
     const totalFees = calculateTotalFees(fees);
     const totalPaid = calculatePaidAmount(payments);
-    
-    return Math.max(0, totalFees - totalPaid);
+
+    // Calculate total discounts from payments
+    const paymentDiscounts = payments.reduce((sum, p) => sum + (parseFloat(p.discount || "0") || 0), 0);
+
+    // Calculate discounts from active/completed EMI plans
+    const studentEmiPlans = emiPlans.filter(p => p.studentId === student.id && p.status !== 'cancelled');
+    const emiPlanDiscounts = studentEmiPlans.reduce((sum, p) => sum + (parseFloat(p.discount || "0") || 0), 0);
+
+    const totalDiscounts = paymentDiscounts + emiPlanDiscounts;
+
+    return Math.max(0, totalFees - totalPaid - totalDiscounts);
   };
 
   const getFeeStatusColor = (status: string) => {
@@ -689,10 +833,10 @@ export default function StudentFees() {
       frequency: mandateFrequency,
       status: "active",
     };
-    
+
     console.log("Creating E-Mandate with data:", data);
     console.log("Selected student:", selectedStudent);
-    
+
     addEMandateMutation.mutate(data);
   };
 
@@ -761,14 +905,14 @@ export default function StudentFees() {
   };
 
   // Reset currentPage when filters/search/page size change
-  useEffect(() => { 
-    setCurrentPage(1); 
+  useEffect(() => {
+    setCurrentPage(1);
   }, [classFilter, statusFilter, studentSearch, studentsPerPage]);
 
   const handleDeleteMandate = async (mandateId: number) => {
     try {
       const response = await fetch(`/api/e-mandates/${mandateId}`, { method: 'DELETE' });
-      
+
       if (response.ok) {
         queryClient.invalidateQueries({ queryKey: ["/api/e-mandates"] });
         queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
@@ -796,8 +940,8 @@ export default function StudentFees() {
 
   // Utility functions for global class fees
   const calculateClassTotalFees = (className: string, academicYear: string) => {
-    const classFees = globalClassFees.filter(fee => 
-      fee.className === className && 
+    const classFees = globalClassFees.filter(fee =>
+      fee.className === className &&
       fee.academicYear === academicYear &&
       fee.isActive
     );
@@ -805,8 +949,8 @@ export default function StudentFees() {
   };
 
   const getClassFeeBreakdown = (className: string, academicYear: string) => {
-    return globalClassFees.filter(fee => 
-      fee.className === className && 
+    return globalClassFees.filter(fee =>
+      fee.className === className &&
       fee.academicYear === academicYear &&
       fee.isActive
     );
@@ -837,39 +981,39 @@ export default function StudentFees() {
       const now = new Date();
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
-      
+
       const totalCollected = displayFeePayments
         .filter(p => p.status === "completed")
         .reduce((sum, p) => sum + parseFloat(p.amount), 0);
-      
+
       const totalPending = displayFeePayments
         .filter(p => p.status === "pending")
         .reduce((sum, p) => sum + parseFloat(p.amount), 0);
-      
+
       const totalFailed = displayFeePayments
         .filter(p => p.status === "failed")
         .reduce((sum, p) => sum + parseFloat(p.amount), 0);
-      
+
       const monthlyCollection = displayFeePayments
         .filter(p => {
           const paymentDate = new Date(p.paymentDate);
-          return p.status === "completed" && 
-                 paymentDate.getMonth() === currentMonth && 
-                 paymentDate.getFullYear() === currentYear;
+          return p.status === "completed" &&
+            paymentDate.getMonth() === currentMonth &&
+            paymentDate.getFullYear() === currentYear;
         })
         .reduce((sum, p) => sum + parseFloat(p.amount), 0);
-      
+
       const totalExpected = allStudents.reduce((sum, student) => {
-        const classFees = globalClassFees.filter(fee => 
-          fee.className === student.class && 
-          fee.academicYear === academicYear && 
+        const classFees = globalClassFees.filter(fee =>
+          fee.className === student.class &&
+          fee.academicYear === academicYear &&
           fee.isActive
         );
         return sum + classFees.reduce((classSum, fee) => classSum + parseFloat(fee.amount), 0);
       }, 0);
-      
+
       const collectionRate = totalExpected > 0 ? (totalCollected / totalExpected) * 100 : 0;
-      
+
       setPaymentStats({
         totalCollected,
         totalPending,
@@ -878,7 +1022,7 @@ export default function StudentFees() {
         collectionRate
       });
     };
-    
+
     calculatePaymentStats();
   }, [displayFeePayments, allStudents, globalClassFees, academicYear]);
 
@@ -886,12 +1030,12 @@ export default function StudentFees() {
   const filteredPayments = displayFeePayments.filter((payment) => {
     const student = allStudents.find(s => s.id === payment.leadId);
     if (!student) return false;
-    
+
     const matchesSearch = student.name.toLowerCase().includes(paymentSearch.toLowerCase()) ||
-                         student.studentId.toLowerCase().includes(paymentSearch.toLowerCase()) ||
-                         payment.receiptNumber?.toLowerCase().includes(paymentSearch.toLowerCase()) ||
-                         payment.transactionId?.toLowerCase().includes(paymentSearch.toLowerCase());
-    
+      student.studentId.toLowerCase().includes(paymentSearch.toLowerCase()) ||
+      payment.receiptNumber?.toLowerCase().includes(paymentSearch.toLowerCase()) ||
+      payment.transactionId?.toLowerCase().includes(paymentSearch.toLowerCase());
+
     const matchesDate = paymentDateFilter === "all" || (() => {
       const paymentDate = new Date(payment.paymentDate);
       const now = new Date();
@@ -899,7 +1043,7 @@ export default function StudentFees() {
       const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
       const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
       const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      
+
       switch (paymentDateFilter) {
         case "today": return paymentDate >= today;
         case "yesterday": return paymentDate >= yesterday && paymentDate < today;
@@ -908,16 +1052,16 @@ export default function StudentFees() {
         default: return true;
       }
     })();
-    
+
     const matchesMode = paymentModeFilter === "all" || payment.paymentMode === paymentModeFilter;
     const matchesStatus = paymentStatusFilter === "all" || payment.status === paymentStatusFilter;
-    
+
     return matchesSearch && matchesDate && matchesMode && matchesStatus;
   });
 
   const totalPaymentPages = Math.ceil(filteredPayments.length / paymentsPerPage);
   const paginatedPayments = filteredPayments.slice(
-    (paymentCurrentPage - 1) * paymentsPerPage, 
+    (paymentCurrentPage - 1) * paymentsPerPage,
     paymentCurrentPage * paymentsPerPage
   );
 
@@ -928,7 +1072,7 @@ export default function StudentFees() {
 
   const handleAddPayment = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    
+
     // Validate required fields
     if (!paymentFormData.studentSelect || !paymentFormData.amount || !paymentFormData.paymentDate || !paymentFormData.paymentMode) {
       toast({
@@ -938,7 +1082,7 @@ export default function StudentFees() {
       });
       return;
     }
-    
+
     const data = {
       leadId: parseInt(paymentFormData.studentSelect),
       amount: paymentFormData.amount,
@@ -948,12 +1092,14 @@ export default function StudentFees() {
       receiptNumber: paymentFormData.receiptNumber || undefined,
       installmentNumber: paymentFormData.installmentNumber ? parseInt(paymentFormData.installmentNumber) : undefined,
       transactionId: paymentFormData.transactionId || undefined,
-      status: paymentFormData.status
+      status: paymentFormData.status,
+      paymentCategory: paymentFormData.paymentCategory || 'additional_charge', // Always additional_charge for direct payments
+      chargeType: paymentFormData.chargeType || undefined, // Specific charge type
     };
-    
+
     console.log("Recording payment with data:", data);
     console.log("Selected student:", selectedStudent);
-    
+
     addPaymentMutation.mutate(data);
   };
 
@@ -967,7 +1113,9 @@ export default function StudentFees() {
       receiptNumber: "",
       installmentNumber: "",
       transactionId: "",
-      status: "completed"
+      status: "completed",
+      paymentCategory: "additional_charge", // Default for direct payments
+      chargeType: "annual_function", // Default charge type
     });
     setSelectedStudent(null);
   };
@@ -984,7 +1132,8 @@ export default function StudentFees() {
       processingFee: '0',
       lateFee: '0',
       receiptNumber: '',
-      discount: ''
+      discount: '',
+      paymentMode: ''
     });
     setPaymentType('emi');
     setSelectedStudentForEMI(null);
@@ -992,7 +1141,7 @@ export default function StudentFees() {
 
   const handleEmiPayment = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    
+
     if (!selectedEmiPlan) {
       toast({
         title: "Error",
@@ -1001,7 +1150,7 @@ export default function StudentFees() {
       });
       return;
     }
-    
+
     const data = {
       leadId: selectedEmiPlan.studentId,
       amount: emiPaymentFormData.amount,
@@ -1013,9 +1162,9 @@ export default function StudentFees() {
       transactionId: emiPaymentFormData.transactionId || undefined,
       status: emiPaymentFormData.status
     };
-    
+
     console.log("Recording EMI payment with data:", data);
-    
+
     addPaymentMutation.mutate(data, {
       onSuccess: () => {
         refetchEmiProgress();
@@ -1062,7 +1211,7 @@ export default function StudentFees() {
         amount: selectedEmiPlan.emiAmount,
         installmentNumber: 1
       }));
-      
+
       // If we have pending EMIs data, set the next installment
       if (pendingEmis.length > 0) {
         setEmiPaymentFormData(prev => ({
@@ -1092,7 +1241,7 @@ export default function StudentFees() {
     } else {
       setEmiFormData(prev => ({ ...prev, totalAmount: '', emiAmount: '' }));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStudentForEMI, globalClassFees, academicYear]);
 
   // Update state when data changes
@@ -1159,6 +1308,15 @@ export default function StudentFees() {
       : statusFilter === 'No E-Mandate'
         ? !displayEMandates.some(m => m.leadId === student.id)
         : (student as any).status === statusFilter);
+
+    // Payment Status Logic
+    const matchesPaymentStatus = studentPaymentStatusFilter === 'all' || (() => {
+      const outstanding = calculateOutstanding(student);
+      if (studentPaymentStatusFilter === 'pending') return outstanding > 0;
+      if (studentPaymentStatusFilter === 'completed') return outstanding <= 0;
+      return true;
+    })();
+
     const search = studentSearch.trim().toLowerCase();
     const matchesSearch =
       search === '' ||
@@ -1166,31 +1324,12 @@ export default function StudentFees() {
       (student.studentId && student.studentId.toLowerCase().includes(search)) ||
       (student.parentPhone && student.parentPhone.includes(search)) ||
       ((student as any).email && (student as any).email.toLowerCase().includes(search));
-    return matchesClass && matchesStatus && matchesSearch;
+    return matchesClass && matchesStatus && matchesPaymentStatus && matchesSearch;
   });
   const totalStudentPages = Math.max(1, Math.ceil(filteredStudents.length / studentsPerPage));
   const paginatedStudents = filteredStudents.slice((currentPage - 1) * studentsPerPage, currentPage * studentsPerPage);
 
-  // Add this helper function after feeStructures/globalClassFees are defined:
-  function getStudentFeesWithGlobal(student: Student) {
-    const explicitFees = feeStructures.filter(f => f.studentId === student.id);
-    const globalFees = globalClassFees.filter(
-      fee => fee.className === student.class && fee.academicYear === academicYear && fee.isActive
-    );
-    const explicitFeeTypes = new Set(explicitFees.map(f => f.feeType));
-    const virtualGlobalFees = globalFees
-      .filter(fee => !explicitFeeTypes.has(fee.feeType))
-      .map(fee => ({
-        ...fee,
-        studentId: student.id,
-        status: "pending",
-        isGlobal: true,
-        dueDate: '',
-        installmentNumber: 1,
-        totalInstallments: 1,
-      }));
-    return [...explicitFees, ...virtualGlobalFees] as FeeStructure[];
-  }
+
 
   const [editedStudent, setEditedStudent] = useState<Partial<Student> | null>(null);
   const [financialBlockingOpen, setFinancialBlockingOpen] = useState(false);
@@ -1263,14 +1402,14 @@ export default function StudentFees() {
         console.log("ErrorData details:", error.errorData.details);
       }
       console.log("=== END DEBUG ===");
-      
+
       // Check if this is a financial obligations error (check both direct properties and errorData)
       const errorData = error.errorData || {};
       const code = error.code || errorData.code;
       const details = error.details || errorData.details;
-      
+
       console.log("Student-fees: Checking error condition - Code:", code, "Has details:", !!details);
-      
+
       if (code === 'ACTIVE_FINANCIAL_OBLIGATIONS' && details) {
         console.log("🎯 SHOWING FINANCIAL BLOCKING DIALOG (Student-Fees)");
         setFinancialBlockingDetails({
@@ -1284,45 +1423,72 @@ export default function StudentFees() {
       }
     }
   });
-  
+
   return (
     <>
-      <Header className="py-4 bg-black" />
+      <Header className="py-4 bg-white border-b border-gray-200" />
       {/* Custom header row with search, filters, and pagination */}
-      <div className="flex items-center justify-between px-6 pt-2 pb-4 bg-black gap-4">
+      {/* Custom header row with search, filters, and pagination */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 bg-white border-b border-gray-100 gap-4">
         {/* Search bar */}
-        <div className="flex-1 max-w-xl">
-          <div className="flex items-center bg-[#232328] rounded-lg px-4 py-2">
-            <svg className="w-5 h-5 text-[#b0b3b8] mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" /></svg>
-            <input
+        <div className="flex-1 w-full sm:max-w-xl">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
               type="text"
-              placeholder="Search contacts by name, email, or company..."
-              className="bg-transparent outline-none text-white w-full placeholder-[#b0b3b8]"
+              placeholder="Search students..."
+              className="pl-9 h-10 w-full bg-gray-50 border-gray-200 focus:bg-white transition-colors"
               value={studentSearch}
               onChange={e => setStudentSearch(e.target.value)}
             />
           </div>
         </div>
-        {/* All Classes dropdown */}
-        <select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="border border-[#23272f] bg-[#23242a] text-white rounded px-2 py-1 ml-4">
-          <option value="all">All Classes</option>
-          {Array.from(new Set(displayStudents.map(s => s.class))).map(cls => (
-            <option key={cls} value={cls}>{cls}</option>
-          ))}
-        </select>
-        {/* All Statuses dropdown */}
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border border-[#23272f] bg-[#23242a] text-white rounded px-2 py-1 ml-2">
-          <option value="all">All Statuses</option>
-          <option value="E-Mandate Active">E-Mandate Active</option>
-          <option value="No E-Mandate">No E-Mandate</option>
-          <option value="enrolled">Enrolled</option>
-          <option value="interested">Interested</option>
-          <option value="contacted">Contacted</option>
-          <option value="new">New</option>
-        </select>
-        {/* Action buttons */}
-        <div className="flex items-center gap-3 ml-6">
-          <div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {/* Dropdowns */}
+          <Select value={classFilter} onValueChange={setClassFilter}>
+            <SelectTrigger className="w-[140px] h-10 bg-white border-gray-200">
+              <SelectValue placeholder="All Classes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Classes</SelectItem>
+              {Array.from(new Set([
+                ...allStudents.map(s => s.class),
+                ...globalClassFees.map(f => f.className)
+              ])).filter(Boolean).sort().map(cls => (
+                <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[160px] h-10 bg-white border-gray-200">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="E-Mandate Active">E-Mandate Active</SelectItem>
+              <SelectItem value="No E-Mandate">No E-Mandate</SelectItem>
+              <SelectItem value="enrolled">Enrolled</SelectItem>
+              <SelectItem value="interested">Interested</SelectItem>
+              <SelectItem value="contacted">Contacted</SelectItem>
+              <SelectItem value="new">New</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={studentPaymentStatusFilter} onValueChange={setStudentPaymentStatusFilter}>
+            <SelectTrigger className="w-[180px] h-10 bg-white border-gray-200">
+              <SelectValue placeholder="Payment Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Payment Statuses</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Buttons */}
+          <div className="flex items-center gap-2">
             <input
               type="file"
               accept=".csv"
@@ -1331,48 +1497,50 @@ export default function StudentFees() {
               id="csv-import"
             />
             <label htmlFor="csv-import">
-              <button 
+              <Button
+                variant="outline"
                 type="button"
-                className="flex items-center gap-2 px-5 py-2 rounded-lg border border-[#643ae5] text-white font-semibold hover:bg-[#643ae5]/10 transition"
+                className="flex items-center gap-2 px-4 h-10 border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer"
                 onClick={() => document.getElementById('csv-import')?.click()}
               >
-                <Download className="w-5 h-5" />
+                <Download className="w-4 h-4" />
                 Import
-              </button>
+              </Button>
             </label>
+
+            <Button
+              onClick={exportToCSV}
+              className="flex items-center gap-2 px-4 h-10 bg-[#643ae5] text-white hover:bg-[#552dbf] shadow-sm"
+            >
+              <Upload className="w-4 h-4" />
+              Export
+            </Button>
           </div>
-          <button 
-            onClick={exportToCSV}
-            className="flex items-center gap-2 px-5 py-2 rounded-lg border border-[#643ae5] text-white font-semibold hover:bg-[#643ae5]/10 transition"
-          >
-            <Upload className="w-5 h-5" />
-            Export
-          </button>
         </div>
       </div>
-      <div className="flex min-h-screen bg-black p-6">
+      <div className="flex min-h-screen bg-gray-50 p-6">
         {/* Sidebar: Student List */}
-        <aside className="w-[320px] bg-[#23242a] rounded-2xl border border-[#23272f] shadow h-fit mr-6 flex flex-col">
-          <div className="px-6 pt-6 pb-2 text-base font-semibold text-white">
+        <aside className="w-[320px] bg-white rounded-2xl border border-gray-200 shadow h-fit mr-6 flex flex-col">
+          <div className="px-6 pt-6 pb-2 text-base font-semibold text-gray-800">
             {allStudents.length} contacts
           </div>
           {/* Remove old search, class, status, and pagination controls from sidebar */}
-          <div className="flex-1 overflow-y-auto">
-            <ul className="divide-y divide-[#23272f]">
+          <div className="flex-1 overflow-y-auto border-t border-gray-200">
+            <ul className="divide-y divide-gray-200">
               {paginatedStudents.map((student) => (
                 <li
                   key={`${student.type}-${student.id}`}
-                  className={`flex items-center gap-3 px-6 py-4 cursor-pointer transition rounded-xl ${selectedStudent?.id === student.id ? 'bg-[#23272f] border border-[#643ae5]' : 'hover:bg-[#23242a]'} text-white`}
+                  className={`flex items-center gap-3 px-6 py-4 cursor-pointer transition rounded-xl ${selectedStudent?.id === student.id && selectedStudent?.type === student.type ? 'bg-purple-50 border border-[#643ae5]' : 'hover:bg-white'} text-gray-800`}
                   onClick={() => setSelectedStudent(student as Student)}
                 >
                   <div className="relative">
-                    <div className="h-10 w-10 rounded-full flex items-center justify-center bg-[#62656e] text-white font-bold text-sm border-2 border-[#23272f]">
-                      {student.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
+                    <div className="h-10 w-10 rounded-full flex items-center justify-center bg-purple-100 text-gray-800 font-bold text-sm border-2 border-gray-200">
+                      {student.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                     </div>
-                    <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#23272f] ${((student as any).status === 'active' || (student as any).status === 'enrolled') ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+                    <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-gray-200 ${((student as any).status === 'active' || (student as any).status === 'enrolled') ? 'bg-green-500' : 'bg-gray-500'}`}></span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-white truncate">{student.name}</div>
+                    <div className="font-medium text-gray-800 truncate">{student.name}</div>
                     <div className="text-xs text-[#b0b3b8] truncate">{student.class || 'No Class'}</div>
                     <div className="text-xs text-[#62656e]">{student.email || 'No email'}</div>
                   </div>
@@ -1383,7 +1551,7 @@ export default function StudentFees() {
           {/* Pagination Controls */}
           <div className="flex items-center gap-2 px-6 py-2">
             <button
-              className="px-2 py-1 rounded border border-[#23272f] text-sm text-white bg-[#23242a] disabled:opacity-50"
+              className="px-2 py-1 rounded border border-gray-200 text-sm text-gray-800 bg-white disabled:opacity-50"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
             >
@@ -1392,14 +1560,14 @@ export default function StudentFees() {
             {[...Array(totalStudentPages)].map((_, i) => (
               <button
                 key={i}
-                className={`px-2 py-1 rounded border border-[#23272f] text-sm ${currentPage === i + 1 ? 'bg-[#643ae5] text-white' : 'bg-[#23242a] text-[#b0b3b8]'}`}
+                className={`px-2 py-1 rounded border border-gray-200 text-sm ${currentPage === i + 1 ? 'bg-[#643ae5] text-gray-800' : 'bg-white text-[#b0b3b8]'}`}
                 onClick={() => setCurrentPage(i + 1)}
               >
                 {i + 1}
               </button>
             ))}
             <button
-              className="px-2 py-1 rounded border border-[#23272f] text-sm text-white bg-[#23242a] disabled:opacity-50"
+              className="px-2 py-1 rounded border border-gray-200 text-sm text-gray-800 bg-white disabled:opacity-50"
               onClick={() => setCurrentPage((p) => Math.min(totalStudentPages, p + 1))}
               disabled={currentPage === totalStudentPages}
             >
@@ -1410,25 +1578,25 @@ export default function StudentFees() {
         {/* Details Panel */}
         <main className="flex-1">
           {selectedStudent ? (
-            <div className="bg-[#23242a] rounded-2xl shadow border border-[#23272f] p-8 min-h-[600px] text-white">
+            <div className="bg-white rounded-2xl shadow border border-gray-200 p-8 min-h-[600px] text-gray-800">
               <div className="flex items-center gap-6 mb-6">
                 <div className="relative">
-                  <div className="h-16 w-16 rounded-full flex items-center justify-center bg-[#62656e] text-white font-bold text-2xl border-2 border-[#23272f]">
-                    {selectedStudent.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
+                  <div className="h-16 w-16 rounded-full flex items-center justify-center bg-purple-100 text-gray-800 font-bold text-2xl border-2 border-gray-200">
+                    {selectedStudent.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xl font-bold text-white">{selectedStudent.name}</span>
-                    <span className="text-sm text-[#b0b3b8] font-medium">{selectedStudent.class}</span>
+                    <span className="text-2xl font-bold text-gray-800">{selectedStudent.name}</span>
+                    <span className="text-sm text-gray-500 font-medium">{selectedStudent.class}</span>
                   </div>
                 </div>
                 {/* Edit and Delete buttons */}
                 <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
-                    className="border-[#643ae5] text-white hover:bg-[#643ae5]/10"
+                    className="border-[#643ae5] text-gray-800 hover:bg-[#643ae5]/10"
                     onClick={() => {
                       console.log("Edit button clicked, selectedStudent:", selectedStudent);
                       setEditedStudent({ ...selectedStudent });
@@ -1464,12 +1632,12 @@ export default function StudentFees() {
                 </div>
               </div>
               {/* Tabs for student details */}
-              <div className="border-b border-[#23272f] mb-4">
+              <div className="border-b border-gray-200 mb-4">
                 <div className="flex gap-4">
                   {['Overview', 'Payments', 'Mandates', 'EMI'].map(tab => (
                     <button
                       key={tab}
-                      className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${studentDetailsTab === tab ? 'bg-[#643ae5] text-white' : 'bg-[#23242a] text-[#b0b3b8] hover:bg-[#181A20]'}`}
+                      className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${studentDetailsTab === tab ? 'bg-[#643ae5] text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
                       onClick={() => setStudentDetailsTab(tab as 'Overview' | 'Payments' | 'Mandates' | 'EMI')}
                     >
                       {tab}
@@ -1482,7 +1650,7 @@ export default function StudentFees() {
                 {studentDetailsTab === 'Overview' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Contact Information Card */}
-                    <Card className="bg-[#23242a] text-white border border-[#23272f] rounded-2xl">
+                    <Card className="bg-white text-gray-800 border border-gray-200 rounded-2xl">
                       <CardHeader>
                         <CardTitle>Contact Information</CardTitle>
                       </CardHeader>
@@ -1498,7 +1666,7 @@ export default function StudentFees() {
                       </CardContent>
                     </Card>
                     {/* Fee Information Card */}
-                    <Card className="bg-[#23242a] text-white border border-[#23272f] rounded-2xl">
+                    <Card className="bg-white text-gray-800 border border-gray-200 rounded-2xl">
                       <CardHeader>
                         <CardTitle>Fee Information</CardTitle>
                       </CardHeader>
@@ -1506,7 +1674,7 @@ export default function StudentFees() {
                         <div className="space-y-2">
                           <div><span className="font-semibold">Total Fees:</span> ₹{calculateTotalFees(getStudentFeesWithGlobal(selectedStudent)).toLocaleString()}</div>
                           <div><span className="font-semibold">Paid Amount:</span> ₹{calculatePaidAmount(getStudentPayments(selectedStudent.id)).toLocaleString()}</div>
-                          <div><span className="font-semibold">Outstanding:</span> ₹{calculateOutstanding(selectedStudent.id).toLocaleString()}</div>
+                          <div><span className="font-semibold">Outstanding:</span> ₹{calculateOutstanding(selectedStudent).toLocaleString()}</div>
                           <div><span className="font-semibold">Mandates:</span> {(() => {
                             const mandates = getStudentMandate(selectedStudent.id);
                             if (!mandates) return 'None';
@@ -1524,7 +1692,15 @@ export default function StudentFees() {
                     {/* Payments content: list, add, delete payments for selectedStudent */}
                     <div className="mb-4 flex justify-between items-center">
                       <div className="font-semibold">Payments</div>
-                      <Button className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none" onClick={() => setAddPaymentOpen(true)}>Add Payment</Button>
+                      <Button
+                        className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none"
+                        onClick={() => {
+                          setPaymentFormData(prev => ({ ...prev, studentSelect: selectedStudent.id.toString() }));
+                          setAddPaymentOpen(true);
+                        }}
+                      >
+                        Add Payment
+                      </Button>
                     </div>
                     <Table>
                       <TableHeader>
@@ -1533,7 +1709,7 @@ export default function StudentFees() {
                           <TableHead>Amount</TableHead>
                           <TableHead>Mode</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Actions</TableHead>
+                          <TableHead className="w-auto">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1541,10 +1717,40 @@ export default function StudentFees() {
                           <TableRow key={payment.id}>
                             <TableCell>{formatDate(payment.paymentDate)}</TableCell>
                             <TableCell>₹{payment.amount}</TableCell>
-                            <TableCell>{payment.paymentMode}</TableCell>
-                            <TableCell>{payment.status}</TableCell>
-                            <TableCell>
-                              <Button variant="destructive" size="sm" className="bg-red-600 text-white rounded-lg" onClick={() => deletePaymentMutation.mutate(payment.id)}>Delete</Button>
+                            <TableCell>{payment.paymentMode.charAt(0).toUpperCase() + payment.paymentMode.slice(1)}</TableCell>
+                            <TableCell>{payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}</TableCell>
+                            <TableCell className="w-auto">
+                              <div className="flex gap-2 items-center">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedPaymentForDetails(payment);
+                                    setPaymentDetailsOpen(true);
+                                  }}
+                                >
+                                  <Eye className="mr-1 h-3 w-3" />
+                                  View Details
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const receiptData: FeeReceiptData = {
+                                      studentName: selectedStudent.name,
+                                      className: selectedStudent.class,
+                                      paymentMode: payment.paymentMode,
+                                      amount: payment.amount,
+                                      date: format(new Date(payment.paymentDate), "dd-MM-yyyy"),
+                                    };
+                                    generateMelonsFeeReceipt(receiptData, payment.receiptNumber);
+                                  }}
+                                >
+                                  <Printer className="mr-1 h-3 w-3" />
+                                  Print
+                                </Button>
+                                <Button variant="destructive" size="sm" className="bg-red-600 text-white rounded-lg" onClick={() => deletePaymentMutation.mutate(payment.id)}>Delete</Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1579,17 +1785,78 @@ export default function StudentFees() {
                             </div>
                             <div className="grid gap-2">
                               <Label htmlFor="paymentMode">Payment Mode</Label>
-                              <Input
-                                id="paymentMode"
-                                name="paymentMode"
-                                required
+                              <Select
                                 value={paymentFormData.paymentMode}
-                                onChange={e => setPaymentFormData(prev => ({ ...prev, paymentMode: e.target.value }))}
+                                onValueChange={(value) => setPaymentFormData(prev => ({ ...prev, paymentMode: value }))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select mode" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="cash">Cash</SelectItem>
+                                  <SelectItem value="card">Card</SelectItem>
+                                  <SelectItem value="upi">UPI</SelectItem>
+                                  <SelectItem value="net_banking">Net Banking</SelectItem>
+                                  <SelectItem value="cheque">Cheque</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="chargeType">Charge Type</Label>
+                              <Select value={paymentFormData.chargeType || 'annual_function'} onValueChange={value => setPaymentFormData(prev => ({ ...prev, chargeType: value, paymentCategory: 'additional_charge' }))}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select charge type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="annual_function">Annual Function Fee</SelectItem>
+                                  <SelectItem value="sports_day">Sports Day Fee</SelectItem>
+                                  <SelectItem value="picnic">Picnic/Field Trip Fee</SelectItem>
+                                  <SelectItem value="uniform">Uniform Fee</SelectItem>
+                                  <SelectItem value="books">Books/Study Materials</SelectItem>
+                                  <SelectItem value="exam_fee">Examination Fee</SelectItem>
+                                  <SelectItem value="transport">Transportation Fee</SelectItem>
+                                  <SelectItem value="late_fee">Late Payment Fee</SelectItem>
+                                  <SelectItem value="security_deposit">Security Deposit</SelectItem>
+                                  <SelectItem value="other">Other</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-sm text-gray-500">
+                                Additional charges are tracked separately and don't count toward regular tuition fees.
+                              </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="grid gap-2">
+                                <Label htmlFor="transactionId">Transaction ID</Label>
+                                <Input
+                                  id="transactionId"
+                                  value={paymentFormData.transactionId || ''}
+                                  onChange={e => setPaymentFormData(prev => ({ ...prev, transactionId: e.target.value }))}
+                                  placeholder="Optional"
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <Label htmlFor="receiptNumber">Receipt Number</Label>
+                                <Input
+                                  id="receiptNumber"
+                                  value={paymentFormData.receiptNumber || ''}
+                                  onChange={e => setPaymentFormData(prev => ({ ...prev, receiptNumber: e.target.value }))}
+                                  placeholder="Optional"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="discount">Discount (₹)</Label>
+                              <Input
+                                id="discount"
+                                type="number"
+                                value={paymentFormData.discount || ''}
+                                onChange={e => setPaymentFormData(prev => ({ ...prev, discount: e.target.value }))}
+                                placeholder="0"
                               />
                             </div>
                             {/* Add more fields as needed */}
                             <div className="flex justify-end gap-2">
-                              <Button type="button" variant="outline" className="border-[#643ae5] text-white" onClick={() => setAddPaymentOpen(false)}>
+                              <Button type="button" variant="outline" className="border-[#643ae5] text-[#643ae5] hover:bg-slate-50" onClick={() => setAddPaymentOpen(false)}>
                                 Cancel
                               </Button>
                               <Button type="submit" className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none">Add Payment</Button>
@@ -1706,11 +1973,19 @@ export default function StudentFees() {
                     <div className="mb-4 flex justify-between items-center">
                       <div className="font-semibold">EMI Plans</div>
                       <button
-                        className="px-6 py-2 rounded-lg bg-[#643ae5] text-white font-semibold shadow hover:bg-[#7c4dff] transition"
+                        className={`px-6 py-2 rounded-lg font-semibold shadow transition ${emiPlans.filter(plan => plan.studentId === selectedStudent.id && plan.status === 'active').length > 0 ||
+                          feePayments.filter(payment => payment.leadId === selectedStudent.id && payment.installmentNumber === null).length > 0
+                          ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                          : 'bg-[#643ae5] text-white hover:bg-[#7c4dff]'
+                          }`}
                         onClick={() => {
                           setEmiModalOpen(true);
                           setSelectedStudentForEMI(selectedStudent as CombinedStudent);
                         }}
+                        disabled={
+                          emiPlans.filter(plan => plan.studentId === selectedStudent.id && plan.status === 'active').length > 0 ||
+                          feePayments.filter(payment => payment.leadId === selectedStudent.id && payment.installmentNumber === null).length > 0
+                        }
                       >
                         Add EMI Plan
                       </button>
@@ -1743,15 +2018,15 @@ export default function StudentFees() {
                             {emiPlans.filter(plan => plan.studentId === selectedStudent.id).map((plan) => (
                               <TableRow key={plan.id} className="hover:bg-gray-50">
                                 <TableCell>
-                                  <Badge 
-                                    variant="outline" 
+                                  <Badge
+                                    variant="outline"
                                     className={
-                                      plan.planType === 'emi' 
-                                        ? "bg-blue-100 text-blue-800 border-blue-200"
-                                        : "bg-green-100 text-green-800 border-green-200"
+                                      plan.numberOfInstallments > 1
+                                        ? "bg-blue-100 text-blue-800 border-blue-200 whitespace-nowrap px-2"
+                                        : "bg-green-100 text-green-800 border-green-200 whitespace-nowrap px-2"
                                     }
                                   >
-                                    {plan.planType === 'emi' ? 'EMI Plan' : 'Full Payment'}
+                                    {plan.numberOfInstallments > 1 ? 'EMI Payment' : 'Full Payment'}
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
@@ -1765,20 +2040,8 @@ export default function StudentFees() {
                                   )}
                                 </TableCell>
                                 <TableCell>
-                                  {plan.planType === 'emi' ? (
-                                    <div className="space-y-1">
-                                      <div className="text-sm">
-                                        <span className="text-gray-500">EMI Amount:</span> ₹{parseFloat(plan.emiAmount).toLocaleString()}
-                                      </div>
-                                      <div className="text-sm">
-                                        <span className="text-gray-500">Period:</span> {plan.emiPeriod} months
-                                      </div>
-                                      {parseFloat(plan.downPayment) > 0 && (
-                                        <div className="text-sm">
-                                          <span className="text-gray-500">Down Payment:</span> ₹{parseFloat(plan.downPayment).toLocaleString()}
-                                        </div>
-                                      )}
-                                    </div>
+                                  {plan.numberOfInstallments > 1 ? (
+                                    <EMIPaymentProgress planId={plan.id} totalInstallments={plan.numberOfInstallments} installmentAmount={plan.installmentAmount} status={plan.status} />
                                   ) : (
                                     <div className="text-sm text-gray-500">Full payment</div>
                                   )}
@@ -1789,13 +2052,13 @@ export default function StudentFees() {
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  <Badge 
+                                  <Badge
                                     className={
-                                      plan.status === "active" 
+                                      plan.status === "active"
                                         ? "bg-green-500 text-white rounded-full px-3 py-1"
                                         : plan.status === "completed"
-                                        ? "bg-blue-500 text-white rounded-full px-3 py-1"
-                                        : "bg-gray-500 text-white rounded-full px-3 py-1"
+                                          ? "bg-blue-500 text-white rounded-full px-3 py-1"
+                                          : "bg-gray-500 text-white rounded-full px-3 py-1"
                                     }
                                   >
                                     {plan.status.charAt(0).toUpperCase() + plan.status.slice(1)}
@@ -1803,46 +2066,76 @@ export default function StudentFees() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex space-x-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="border-[#643ae5] text-white"
-                                      onClick={() => {
-                                        setSelectedEmiPlan(plan);
-                                        setEmiPaymentModalOpen(true);
-                                      }}
-                                    >
-                                      <CreditCard className="mr-1 h-3 w-3" />
-                                      Record Payment
-                                    </Button>
+                                    {plan.status !== 'cancelled' && (
+                                      <RecordPaymentButton
+                                        plan={plan}
+                                        onClick={() => {
+                                          setSelectedEmiPlan(plan);
+                                          setEmiPaymentModalOpen(true);
+                                        }}
+                                      />
+                                    )}
+                                    {plan.status === 'active' && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                                        onClick={async () => {
+                                          if (confirm('Cancel this EMI plan? This will mark it as cancelled.')) {
+                                            try {
+                                              const response = await fetch(`/api/emi-plans/${plan.id}`, {
+                                                method: 'PATCH',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ status: 'cancelled' })
+                                              });
+                                              if (!response.ok) throw new Error('Failed to cancel EMI plan');
+                                              await refetchEmiPlans();
+                                              toast({ title: "EMI plan cancelled" });
+                                            } catch (error: any) {
+                                              toast({
+                                                title: "Error",
+                                                description: error.message,
+                                                variant: "destructive"
+                                              });
+                                            }
+                                          }
+                                        }}
+                                      >
+                                        Cancel Plan
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="destructive"
                                       size="sm"
                                       className="bg-red-600 text-white rounded-lg"
                                       onClick={async () => {
-                                        if (confirm(`Are you sure you want to delete the EMI plan? This action cannot be undone.`))
-                                          try {
-                                            const response = await fetch(`/api/emi-plans/${plan.id}`, {
-                                              method: "DELETE",
-                                              headers: {
-                                                "Content-Type": "application/json",
-                                              },
-                                            });
-                                            if (!response.ok) throw new Error("Failed to delete EMI plan");
-                                            await refetchEmiPlans();
-                                            await queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
-                                            await queryClient.invalidateQueries({ queryKey: ["/api/fee-stats"] });
-                                            toast({
-                                              title: "Success",
-                                              description: "EMI plan deleted successfully",
-                                            });
-                                          } catch (error: any) {
-                                            toast({
-                                              title: "Error",
-                                              description: `Failed to delete EMI plan: ${error.message}`,
-                                              variant: "destructive",
-                                            });
+                                        if (!confirm(`Are you sure you want to delete the EMI plan? This action cannot be undone.`)) return;
+
+                                        try {
+                                          const response = await fetch(`/api/emi-plans/${plan.id}`, {
+                                            method: "DELETE",
+                                            headers: { "Content-Type": "application/json" },
+                                          });
+
+                                          if (!response.ok) {
+                                            const error = await response.json();
+                                            throw new Error(error.message || "Failed to delete EMI plan");
                                           }
+
+                                          await refetchEmiPlans();
+                                          await queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
+                                          await queryClient.invalidateQueries({ queryKey: ["/api/fee-stats"] });
+                                          toast({
+                                            title: "Success",
+                                            description: "EMI plan deleted successfully",
+                                          });
+                                        } catch (error: any) {
+                                          toast({
+                                            title: "Cannot Delete",
+                                            description: error.message,
+                                            variant: "destructive",
+                                          });
+                                        }
                                       }}
                                     >
                                       <Settings className="mr-1 h-3 w-3" />
@@ -1883,21 +2176,46 @@ export default function StudentFees() {
                           <form onSubmit={e => {
                             e.preventDefault();
                             if (!selectedStudentForEMI) return;
-                            const numberOfInstallments = parseInt(emiFormData.emiPeriod);
-                            const installmentAmount = emiFormData.emiAmount;
-                            const startDate = emiFormData.startDate;
-                            const endDateObj = new Date(startDate);
-                            endDateObj.setMonth(endDateObj.getMonth() + numberOfInstallments);
-                            const endDate = endDateObj.toISOString().split('T')[0];
-                            addEmiPlanMutation.mutate({
-                              studentId: selectedStudentForEMI.id,
-                              totalAmount: emiFormData.totalAmount,
-                              numberOfInstallments,
-                              installmentAmount,
-                              startDate,
-                              endDate,
-                              status: 'active',
-                            });
+
+                            // Check payment type and handle accordingly
+                            if (paymentType === 'full') {
+                              // For full payment, record as a single payment
+                              const totalAmount = parseFloat(emiFormData.totalAmount);
+                              const discount = parseFloat(emiFormData.discount || '0');
+                              const finalAmount = totalAmount - discount;
+
+                              addPaymentMutation.mutate({
+                                leadId: selectedStudentForEMI.id,
+                                amount: finalAmount.toString(),
+                                paymentDate: emiFormData.startDate,
+                                paymentMode: 'cash', // Default, can be modified if needed
+                                receiptNumber: null, // System-generated
+                                transactionId: emiFormData.transactionId || null,
+                                status: 'completed',
+                                installmentNumber: null,
+                              });
+                            } else {
+                              // For EMI payment, create EMI plan
+                              const numberOfInstallments = parseInt(emiFormData.emiPeriod);
+                              const installmentAmount = emiFormData.emiAmount;
+                              const startDate = emiFormData.startDate;
+                              const endDateObj = new Date(startDate);
+                              endDateObj.setMonth(endDateObj.getMonth() + numberOfInstallments);
+                              const endDate = endDateObj.toISOString().split('T')[0];
+                              addEmiPlanMutation.mutate({
+                                studentId: selectedStudentForEMI.id,
+                                totalAmount: emiFormData.totalAmount,
+                                numberOfInstallments,
+                                installmentAmount,
+                                startDate,
+                                endDate,
+                                status: 'active',
+                                downPayment: emiFormData.downPayment,
+                                paymentMode: emiFormData.paymentMode,
+                                transactionId: emiFormData.transactionId,
+                                discount: emiFormData.discount
+                              });
+                            }
                           }} className="space-y-6">
                             {/* Payment Type Selection */}
                             <div className="space-y-4">
@@ -1949,11 +2267,11 @@ export default function StudentFees() {
                             <div className="grid grid-cols-2 gap-4">
                               <div className="grid gap-2">
                                 <Label htmlFor="totalAmount">Total Amount (₹)</Label>
-                                <Input 
-                                  id="totalAmount" 
-                                  name="totalAmount" 
-                                  type="number" 
-                                  required 
+                                <Input
+                                  id="totalAmount"
+                                  name="totalAmount"
+                                  type="number"
+                                  required
                                   placeholder="Enter total fee amount"
                                   min="0"
                                   step="0.01"
@@ -1964,10 +2282,10 @@ export default function StudentFees() {
                               </div>
                               <div className="grid gap-2">
                                 <Label htmlFor="discount">Discount (₹)</Label>
-                                <Input 
-                                  id="discount" 
-                                  name="discount" 
-                                  type="number" 
+                                <Input
+                                  id="discount"
+                                  name="discount"
+                                  type="number"
                                   placeholder="0"
                                   min="0"
                                   step="0.01"
@@ -1991,10 +2309,10 @@ export default function StudentFees() {
                                 <div className="grid grid-cols-3 gap-4">
                                   <div className="grid gap-2">
                                     <Label htmlFor="downPayment">Down Payment (₹)</Label>
-                                    <Input 
-                                      id="downPayment" 
-                                      name="downPayment" 
-                                      type="number" 
+                                    <Input
+                                      id="downPayment"
+                                      name="downPayment"
+                                      type="number"
                                       placeholder="0"
                                       min="0"
                                       step="0.01"
@@ -2012,12 +2330,30 @@ export default function StudentFees() {
                                     />
                                   </div>
                                   <div className="grid gap-2">
+                                    <Label htmlFor="paymentMode">Payment Mode</Label>
+                                    <Select
+                                      value={emiFormData.paymentMode}
+                                      onValueChange={(value) => setEmiFormData(prev => ({ ...prev, paymentMode: value }))}
+                                      disabled={!parseFloat(emiFormData.downPayment || "0")}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select mode" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="cash">Cash</SelectItem>
+                                        <SelectItem value="online">Online</SelectItem>
+                                        <SelectItem value="cheque">Cheque</SelectItem>
+                                        <SelectItem value="transfer">Transfer</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="grid gap-2">
                                     <Label htmlFor="emiPeriod">Number of EMIs</Label>
-                                    <Select 
-                                      value={emiFormData.emiPeriod} 
+                                    <Select
+                                      value={emiFormData.emiPeriod}
                                       onValueChange={(value) => {
-                                        setEmiFormData(prev => ({ 
-                                          ...prev, 
+                                        setEmiFormData(prev => ({
+                                          ...prev,
                                           emiPeriod: value,
                                           emiAmount: emiFormData.totalAmount && value
                                             ? ((parseFloat(emiFormData.totalAmount) - (parseFloat(emiFormData.downPayment) || 0) - (parseFloat(emiFormData.discount) || 0)) / parseInt(value)).toFixed(2)
@@ -2029,19 +2365,23 @@ export default function StudentFees() {
                                         <SelectValue placeholder="Select period" />
                                       </SelectTrigger>
                                       <SelectContent>
+                                        <SelectItem value="2">2</SelectItem>
                                         <SelectItem value="3">3</SelectItem>
+                                        <SelectItem value="4">4</SelectItem>
+                                        <SelectItem value="5">5</SelectItem>
                                         <SelectItem value="6">6</SelectItem>
                                         <SelectItem value="9">9</SelectItem>
+                                        <SelectItem value="12">12</SelectItem>
                                       </SelectContent>
                                     </Select>
                                   </div>
                                   <div className="grid gap-2">
                                     <Label htmlFor="startDate">Transaction Date</Label>
-                                    <Input 
-                                      id="startDate" 
-                                      name="startDate" 
-                                      type="date" 
-                                      required 
+                                    <Input
+                                      id="startDate"
+                                      name="startDate"
+                                      type="date"
+                                      required
                                       min={new Date().toISOString().split('T')[0]}
                                       value={emiFormData.startDate}
                                       onChange={(e) => setEmiFormData(prev => ({ ...prev, startDate: e.target.value }))}
@@ -2050,16 +2390,16 @@ export default function StudentFees() {
                                 </div>
                               </>
                             )}
-                            {/* Receipt/Transaction Field */}
+                            {/* Transaction ID Field */}
                             <div className="grid gap-2 mt-4">
-                              <Label htmlFor="receiptNumber">Receipt/Transaction ID (Optional)</Label>
+                              <Label htmlFor="transactionId">Transaction ID (Optional)</Label>
                               <Input
-                                id="receiptNumber"
-                                name="receiptNumber"
+                                id="transactionId"
+                                name="transactionId"
                                 type="text"
-                                placeholder="Enter receipt or transaction number"
-                                value={emiFormData.receiptNumber || ''}
-                                onChange={e => setEmiFormData(prev => ({ ...prev, receiptNumber: e.target.value }))}
+                                placeholder="Enter transaction ID"
+                                value={emiFormData.transactionId || ''}
+                                onChange={e => setEmiFormData(prev => ({ ...prev, transactionId: e.target.value }))}
                               />
                             </div>
                             {/* Payment Summary */}
@@ -2125,10 +2465,10 @@ export default function StudentFees() {
                               </CardContent>
                             </Card>
                             <div className="flex justify-end gap-3">
-                              <Button 
-                                type="button" 
-                                variant="outline" 
-                                className="border-[#643ae5] text-white"
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="border-[#643ae5] text-[#643ae5] hover:bg-slate-50"
                                 onClick={() => {
                                   setEmiModalOpen(false);
                                   setSelectedStudentForEMI(null);
@@ -2143,14 +2483,17 @@ export default function StudentFees() {
                                     frequency: 'monthly',
                                     processingFee: '0',
                                     lateFee: '0',
-                                    receiptNumber: '',
-                                    discount: ''
+                                    transactionId: '',
+                                    discount: '',
+                                    paymentMode: ''
                                   });
                                 }}
                               >
                                 Cancel
                               </Button>
-                              <Button type="submit" className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none">Add EMI Plan</Button>
+                              <Button type="submit" className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none">
+                                {paymentType === 'full' ? 'Record Payment' : 'Add EMI Plan'}
+                              </Button>
                             </div>
                           </form>
                         </DialogContent>
@@ -2168,8 +2511,8 @@ export default function StudentFees() {
 
       {/* Student Edit Modal */}
       {selectedStudent && (
-        <Dialog 
-          open={isEditModalOpen} 
+        <Dialog
+          open={isEditModalOpen}
           onOpenChange={(open) => {
             console.log("Dialog onOpenChange:", { open, selectedStudent });
             setIsEditModalOpen(open);
@@ -2193,7 +2536,7 @@ export default function StudentFees() {
                 </div>
               </DialogTitle>
             </DialogHeader>
-            
+
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -2300,7 +2643,7 @@ export default function StudentFees() {
                     <p className="text-sm text-gray-600">
                       <strong>{financialBlockingDetails.student?.name}</strong> cannot be deleted because they have active financial obligations that must be resolved first.
                     </p>
-                    
+
                     {/* Outstanding EMI Payments */}
                     {financialBlockingDetails.activePayments?.length > 0 && (
                       <div className="bg-red-50 p-4 rounded-lg">
@@ -2314,9 +2657,8 @@ export default function StudentFees() {
                                 <p className="font-medium">Installment #{payment.installmentNumber}</p>
                                 <p className="text-sm text-gray-600">Due: {new Date(payment.dueDate).toLocaleDateString()}</p>
                                 <p className="text-sm">
-                                  <span className={`px-2 py-1 rounded-full text-xs ${
-                                    payment.status === 'overdue' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                                  }`}>
+                                  <span className={`px-2 py-1 rounded-full text-xs ${payment.status === 'overdue' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
                                     {payment.status}
                                   </span>
                                 </p>
@@ -2456,6 +2798,271 @@ export default function StudentFees() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* EMI Payment Recording Modal */}
+      {selectedEmiPlan && (
+        <Dialog open={emiPaymentModalOpen} onOpenChange={setEmiPaymentModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Record EMI Payment</DialogTitle>
+              <DialogDescription>
+                Record a payment for this EMI plan
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const installmentNumber = parseInt(formData.get('installmentNumber') as string);
+
+              // Check for duplicate payment
+              try {
+                const paymentsRes = await fetch(`/api/emi-plans/${selectedEmiPlan.id}/payments`);
+                if (paymentsRes.ok) {
+                  const existingPayments = await paymentsRes.json();
+                  const alreadyPaid = existingPayments.some((p: any) => p.installmentNumber === installmentNumber);
+
+                  if (alreadyPaid) {
+                    toast({
+                      title: "Duplicate Payment",
+                      description: `Installment #${installmentNumber} has already been paid`,
+                      variant: "destructive"
+                    });
+                    return;
+                  }
+                }
+              } catch (error) {
+                console.error("Error checking payments:", error);
+              }
+
+              // Proceed with payment
+              addPaymentMutation.mutate({
+                leadId: selectedEmiPlan.studentId,
+                amount: formData.get('amount'),
+                discount: '0',
+                paymentDate: formData.get('paymentDate'),
+                paymentMode: formData.get('paymentMode'),
+                receiptNumber: formData.get('receiptNumber'),
+                transactionId: formData.get('transactionId'),
+                installmentNumber: installmentNumber,
+                status: 'completed'
+              });
+
+              // Invalidate EMI plan payments query to refresh progress
+              setTimeout(() => {
+                queryClient.invalidateQueries({ queryKey: [`/api/emi-plans/${selectedEmiPlan.id}/payments`] });
+                queryClient.invalidateQueries({ queryKey: ["/api/emi-plans"] });
+              }, 500);
+
+              setEmiPaymentModalOpen(false);
+            }}>
+              <div className="space-y-4">
+                <div className="bg-slate-50 p-4 rounded-lg">
+                  <h4 className="font-semibold mb-2">EMI Plan Details</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div><span className="text-gray-600">Total Amount:</span> ₹{parseFloat(selectedEmiPlan.totalAmount).toLocaleString()}</div>
+                    <div><span className="text-gray-600">Installment Amount:</span> ₹{parseFloat(selectedEmiPlan.installmentAmount).toLocaleString()}</div>
+                    <div><span className="text-gray-600">Number of Installments:</span> {selectedEmiPlan.numberOfInstallments}</div>
+                    <div><span className="text-gray-600">Status:</span> {selectedEmiPlan.status}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="installmentNumber">Installment Number *</Label>
+                    <Input
+                      id="installmentNumber"
+                      name="installmentNumber"
+                      type="number"
+                      min="1"
+                      max={selectedEmiPlan.numberOfInstallments}
+                      defaultValue={nextInstallmentNumber}
+                      key={`installment-${nextInstallmentNumber}`}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="amount">Amount *</Label>
+                    <Input
+                      id="amount"
+                      name="amount"
+                      type="number"
+                      step="0.01"
+                      defaultValue={selectedEmiPlan.installmentAmount}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="paymentDate">Payment Date *</Label>
+                    <Input
+                      id="paymentDate"
+                      name="paymentDate"
+                      type="date"
+                      defaultValue={new Date().toISOString().split('T')[0]}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="paymentMode">Payment Mode *</Label>
+                    <Select name="paymentMode" required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="card">Card</SelectItem>
+                        <SelectItem value="upi">UPI</SelectItem>
+                        <SelectItem value="net_banking">Net Banking</SelectItem>
+                        <SelectItem value="cheque">Cheque</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="receiptNumber">Receipt Number</Label>
+                    <Input
+                      id="receiptNumber"
+                      name="receiptNumber"
+                      type="text"
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="transactionId">Transaction ID</Label>
+                    <Input
+                      id="transactionId"
+                      name="transactionId"
+                      type="text"
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEmiPaymentModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-[#643ae5] hover:bg-[#552dbf]">
+                  Record Payment
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Payment Details Modal */}
+      {selectedPaymentForDetails && (
+        <Dialog open={paymentDetailsOpen} onOpenChange={setPaymentDetailsOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Payment Details</DialogTitle>
+              <DialogDescription>
+                View complete payment information
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-gray-500">Amount</Label>
+                  <div className="font-semibold text-lg">₹{parseFloat(selectedPaymentForDetails.amount).toLocaleString()}</div>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Payment Date</Label>
+                  <div className="font-medium">{format(new Date(selectedPaymentForDetails.paymentDate), "MMM dd, yyyy")}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-gray-500">Payment Mode</Label>
+                  <div className="font-medium capitalize">{selectedPaymentForDetails.paymentMode}</div>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Status</Label>
+                  <Badge className={selectedPaymentForDetails.status === 'completed' ? 'bg-green-500' : 'bg-orange-500'}>
+                    {selectedPaymentForDetails.status}
+                  </Badge>
+                </div>
+              </div>
+
+              {selectedPaymentForDetails.installmentNumber && (
+                <div>
+                  <Label className="text-gray-500">Installment Number</Label>
+                  <div className="font-medium">#{selectedPaymentForDetails.installmentNumber}</div>
+                </div>
+              )}
+
+              <div>
+                <Label className="text-gray-500">Payment Type</Label>
+                <div className="font-medium">
+                  {selectedPaymentForDetails.paymentCategory === 'additional_charge' ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-800">
+                      {selectedPaymentForDetails.chargeType ?
+                        selectedPaymentForDetails.chargeType.split('_').map((word: string) =>
+                          word.charAt(0).toUpperCase() + word.slice(1)
+                        ).join(' ')
+                        : 'Additional Charge'}
+                    </span>
+                  ) : selectedPaymentForDetails.installmentNumber === 0 ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                      Down Payment
+                    </span>
+                  ) : selectedPaymentForDetails.installmentNumber > 0 ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                      EMI Installment
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+                      Fee Payment
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {selectedPaymentForDetails.receiptNumber && (
+                <div>
+                  <Label className="text-gray-500">Receipt Number</Label>
+                  <div className="font-medium">{selectedPaymentForDetails.receiptNumber}</div>
+                </div>
+              )}
+
+              {selectedPaymentForDetails.transactionId && (
+                <div>
+                  <Label className="text-gray-500">Transaction ID</Label>
+                  <div className="font-mono text-sm bg-slate-100 p-2 rounded">{selectedPaymentForDetails.transactionId}</div>
+                </div>
+              )}
+
+              {selectedPaymentForDetails.discount && parseFloat(selectedPaymentForDetails.discount) > 0 && (
+                <div>
+                  <Label className="text-gray-500">Discount Applied</Label>
+                  <div className="font-medium text-green-600">₹{parseFloat(selectedPaymentForDetails.discount).toLocaleString()}</div>
+                </div>
+              )}
+
+              <div className="border-t pt-4">
+                <Label className="text-gray-500">Recorded On</Label>
+                <div className="text-sm text-gray-600">{selectedPaymentForDetails.createdAt ? format(new Date(selectedPaymentForDetails.createdAt), "PPpp") : 'N/A'}</div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPaymentDetailsOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

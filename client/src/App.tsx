@@ -22,6 +22,7 @@ import Students from "@/pages/students";
 import EMandate from "@/pages/e-mandate";
 import StudentFees from "@/pages/student-fees";
 import StaffAI from "@/pages/staff-ai";
+import Daycare from "@/pages/daycare";
 import Sidebar from "@/components/layout/sidebar";
 import NotFound from "@/pages/not-found";
 import Expenses from "@/pages/expenses";
@@ -32,6 +33,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
+import FollowUpMonitor from "@/components/notifications/follow-up-monitor";
 
 function Router() {
   return (
@@ -190,6 +192,18 @@ function Router() {
           )} />
         )}
       </Route>
+      <Route path="/daycare">
+        {() => (
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <Daycare />
+              </div>
+            </div>
+          )} />
+        )}
+      </Route>
       <Route path="/staff-ai">
         {() => (
           <ProtectedRoute component={() => (
@@ -275,8 +289,8 @@ function App() {
               Error details: {errorMessage}
             </pre>
           </div>
-          <button 
-            onClick={() => window.location.reload()} 
+          <button
+            onClick={() => window.location.reload()}
             className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition duration-200"
           >
             Refresh Page
@@ -292,6 +306,7 @@ function App() {
         <NotificationProvider>
           <AuthProvider>
             <TooltipProvider>
+              <FollowUpMonitor />
               <Toaster />
               <Router />
               <EnvironmentInfo />

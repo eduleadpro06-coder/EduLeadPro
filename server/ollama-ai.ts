@@ -1,4 +1,35 @@
-import { Ollama } from 'ollama';
+// Native fetch implementation to replace missing 'ollama' package
+class Ollama {
+  private baseUrl = 'http://localhost:11434/api';
+
+  async list() {
+    try {
+      const res = await fetch(`${this.baseUrl}/tags`);
+      if (!res.ok) throw new Error('Failed to list models');
+      return await res.json();
+    } catch (e) {
+      return { models: [] };
+    }
+  }
+
+  async pull(request: { model: string }) {
+    const res = await fetch(`${this.baseUrl}/pull`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+    if (!res.ok) throw new Error('Failed to pull model');
+    return await res.json();
+  }
+
+  async generate(request: { model: string; prompt: string; stream?: boolean; options?: any }) {
+    const res = await fetch(`${this.baseUrl}/generate`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+    if (!res.ok) throw new Error('Failed to generate response');
+    return await res.json();
+  }
+}
 
 const ollama = new Ollama();
 
@@ -47,17 +78,17 @@ async function initializeOllama() {
   try {
     // Check if Ollama is running and pull required models
     const models = await ollama.list();
-    
+
     // Pull llama3.2 if not available (lightweight but powerful model)
     const requiredModel = 'llama3.2:3b';
-    const hasModel = models.models.some(model => model.name.includes('llama3.2'));
-    
+    const hasModel = models.models.some((model: any) => model.name.includes('llama3.2'));
+
     if (!hasModel) {
       console.log('Pulling Ollama model llama3.2:3b...');
       await ollama.pull({ model: requiredModel });
       console.log('Model llama3.2:3b ready for use');
     }
-    
+
     return requiredModel;
   } catch (error) {
     console.error('Ollama initialization failed:', error);
@@ -114,7 +145,7 @@ export async function generateMarketingRecommendations(targetData: {
 }): Promise<MarketingRecommendation[]> {
   try {
     const model = await initializeOllama();
-    
+
     const prompt = `As an AI marketing expert for educational institutions, create marketing campaign recommendations:
 
 Campaign Parameters:
@@ -158,7 +189,7 @@ Focus on:
 
     try {
       const recommendations = JSON.parse(response.response);
-      
+
       if (!Array.isArray(recommendations)) {
         throw new Error('Expected array of recommendations');
       }
@@ -171,7 +202,7 @@ Focus on:
         ad_copy: rec.ad_copy || 'Quality education for your child\'s bright future.',
         expected_leads: Math.max(1, rec.expected_leads || Math.floor(targetData.budget / 200))
       }));
-      
+
     } catch (parseError) {
       console.error('Failed to parse marketing response:', parseError);
       return fallbackMarketingRecommendations(targetData);
@@ -189,7 +220,7 @@ Focus on:
 function fallbackEnrollmentForecast(currentData: any): EnrollmentForecast {
   const conversionRate = currentData.totalLeads > 0 ? currentData.conversions / currentData.totalLeads : 0.1;
   const predicted = Math.floor(currentData.hotLeads * conversionRate);
-  
+
   return {
     predictedEnrollments: predicted,
     confidence: 0.6,
@@ -221,7 +252,7 @@ export async function analyzeFeeOptimization(studentData: {
 }): Promise<FeeOptimizationRecommendation> {
   try {
     await initializeOllama();
-    
+
     const prompt = `Analyze the following student fee data and provide optimization recommendations:
     
 Student ID: ${studentData.studentId}
@@ -266,7 +297,7 @@ export async function analyzeStaffPerformance(staffData: {
 }): Promise<StaffPerformanceAnalysis> {
   try {
     await initializeOllama();
-    
+
     const prompt = `Analyze the following staff performance data:
     
 Staff ID: ${staffData.staffId}
@@ -336,7 +367,7 @@ function fallbackStaffAnalysis(staffData: any): StaffPerformanceAnalysis {
   const recentAttendance = staffData.attendance.slice(-30);
   const presentDays = recentAttendance.filter((a: any) => a.status === 'present').length;
   const attendanceRate = (presentDays / recentAttendance.length) * 100;
-  
+
   let performanceScore = Math.min(100, attendanceRate + 10);
   let salaryRecommendation = staffData.salary;
   let promotionEligibility = false;

@@ -10,10 +10,10 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
 import Header from "@/components/layout/header";
-import { 
-  Bot, 
-  TrendingUp, 
-  Users, 
+import {
+  Bot,
+  TrendingUp,
+  Users,
   Calendar,
   IndianRupee,
   Award,
@@ -262,7 +262,7 @@ export default function StaffAI() {
   console.log('canManageStaff:', canManageStaff);
 
   // Fetch data
-  const { data: staff = [] } = useQuery({ 
+  const { data: staff = [] } = useQuery({
     queryKey: ["/api/staff"]
   });
   const displayStaff: Staff[] = (staff as Staff[]);
@@ -284,8 +284,8 @@ export default function StaffAI() {
 
   // Clear localStorage only when month/year actually changes (not on initial mount)
   useEffect(() => {
-    if ((prevMonth !== selectedMonth || prevYear !== selectedYear) && 
-        (prevMonth !== 0 && prevYear !== 0)) { // Skip initial mount
+    if ((prevMonth !== selectedMonth || prevYear !== selectedYear) &&
+      (prevMonth !== 0 && prevYear !== 0)) { // Skip initial mount
       console.log('Month/Year changed, clearing localStorage');
       const oldKey1 = 'editablePayrollData_' + prevMonth + '_' + prevYear;
       const oldKey2 = 'manualPayrollInputs_' + prevMonth + '_' + prevYear;
@@ -303,12 +303,12 @@ export default function StaffAI() {
     if (payroll && Array.isArray(payroll) && staff && Array.isArray(staff)) {
       const existingPayrollData: { [key: number]: { attendedDays: number | ''; basicSalary: number | ''; netSalary: number } } = {};
       const existingManualInputs: { [key: number]: { daysWorked: string | number; basicSalary: number | ''; isManual: boolean } } = {};
-      
+
       (staff as Staff[]).forEach((member: Staff) => {
         const existingPayroll = (payroll as Payroll[]).find(
           p => p.staffId === member.id && p.month === selectedMonth && p.year === selectedYear
         );
-        
+
         if (existingPayroll) {
           existingPayrollData[member.id] = {
             attendedDays: existingPayroll.attendedDays || 30,
@@ -317,7 +317,7 @@ export default function StaffAI() {
           };
         }
       });
-      
+
       if (Object.keys(existingPayrollData).length > 0) {
         setEditablePayrollData(existingPayrollData);
         const key = 'editablePayrollData_' + selectedMonth + '_' + selectedYear;
@@ -331,7 +331,7 @@ export default function StaffAI() {
     mutationFn: async (staffId: number) => {
       const staffMember = (staff as Staff[]).find(s => s.id === staffId);
       const staffAttendance = (attendance as Attendance[]).filter(a => a.staffId === staffId);
-      
+
       if (!staffMember) throw new Error("Staff member not found");
 
       const response = await fetch("/api/ai/staff-performance", {
@@ -448,31 +448,31 @@ export default function StaffAI() {
         });
 
         clearTimeout(timeoutId);
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           console.error('PDF generation failed:', response.status, errorText);
           throw new Error(errorText || 'Failed to generate salary slip (' + response.status + ')');
         }
-        
+
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/pdf')) {
           console.error('Invalid content type received:', contentType);
           throw new Error('Received invalid content type from server');
         }
-        
+
         const blob = await response.blob();
-        
+
         // Verify blob size and type
         if (blob.size === 0) {
           throw new Error('Received empty PDF file');
         }
-        
+
         if (blob.type !== 'application/pdf') {
           console.error('Blob type mismatch:', blob.type);
           throw new Error('Received invalid file format from server');
         }
-        
+
         return blob;
       } catch (error) {
         if (error instanceof Error) {
@@ -501,21 +501,21 @@ export default function StaffAI() {
         const a = document.createElement('a');
         a.href = url;
         a.style.display = 'none';
-        
+
         // Clean employee name for filename (remove special characters)
         const cleanName = variables.employeeName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
         a.download = 'Salary_Slip_' + cleanName + '_' + variables.month + '_' + variables.year + '.pdf';
-        
+
         // Append to body, click, and cleanup
         document.body.appendChild(a);
         a.click();
-        
+
         // Cleanup with a small delay to ensure download starts
         setTimeout(() => {
           window.URL.revokeObjectURL(url);
           document.body.removeChild(a);
         }, 100);
-        
+
         toast({
           title: "Salary Slip Generated",
           description: "PDF salary slip has been downloaded successfully.",
@@ -576,9 +576,9 @@ export default function StaffAI() {
       Object.keys(editablePayrollData).length === 0
     ) {
       // Check if there's existing payroll data for this month/year
-      const hasExistingPayroll = payroll && Array.isArray(payroll) && 
+      const hasExistingPayroll = payroll && Array.isArray(payroll) &&
         (payroll as Payroll[]).some(p => p.month === selectedMonth && p.year === selectedYear);
-      
+
       // Only initialize if no existing payroll data
       if (!hasExistingPayroll) {
         console.log('Initializing editablePayrollData');
@@ -632,10 +632,10 @@ export default function StaffAI() {
       basicSalary = staffMember.salary;
     } else {
       const staffAttendance = (attendance as Attendance[]).filter(
-        a => a.staffId === staffMember.id && 
-        a.date && !isNaN(new Date(a.date).getTime()) &&
-        new Date(a.date).getMonth() + 1 === selectedMonth &&
-        new Date(a.date).getFullYear() === selectedYear
+        a => a.staffId === staffMember.id &&
+          a.date && !isNaN(new Date(a.date).getTime()) &&
+          new Date(a.date).getMonth() + 1 === selectedMonth &&
+          new Date(a.date).getFullYear() === selectedYear
       );
       presentDays = staffAttendance.filter(a => a.status === 'present').length;
       attendedDays = presentDays > 0 ? presentDays : workingDays;
@@ -696,7 +696,7 @@ export default function StaffAI() {
 
     // Convert string to number and handle empty input
     const numericValue = value === '' ? '' : Number(value);
-    
+
     // Validate and constrain values
     let finalValue = numericValue;
     if (field === 'attendedDays') {
@@ -815,10 +815,10 @@ export default function StaffAI() {
         basicSalary = dailyRate * attendedDays;
       } else {
         const staffAttendance = (attendance as Attendance[]).filter(
-          a => a.staffId === staffMember.id && 
-          a.date && !isNaN(new Date(a.date).getTime()) &&
-          new Date(a.date).getMonth() + 1 === selectedMonth &&
-          new Date(a.date).getFullYear() === selectedYear
+          a => a.staffId === staffMember.id &&
+            a.date && !isNaN(new Date(a.date).getTime()) &&
+            new Date(a.date).getMonth() + 1 === selectedMonth &&
+            new Date(a.date).getFullYear() === selectedYear
         );
         attendedDays = staffAttendance.filter(a => a.status === 'present').length;
         absentDays = 30 - attendedDays;
@@ -883,7 +883,7 @@ export default function StaffAI() {
 
   const getDepartmentStats = (department: string) => {
     const deptStaff = displayStaff.filter((s: Staff) => s.department === department);
-    const deptAttendance = (attendance as Attendance[]).filter((a: Attendance) => 
+    const deptAttendance = (attendance as Attendance[]).filter((a: Attendance) =>
       deptStaff.some((s: Staff) => s.id === a.staffId)
     );
 
@@ -1019,10 +1019,10 @@ export default function StaffAI() {
   };
 
   // Add state for WhatsApp modal
-  const [whatsappModal, setWhatsappModal] = useState<{ 
-    open: boolean; 
-    staff: Staff | null; 
-    netSalary: number; 
+  const [whatsappModal, setWhatsappModal] = useState<{
+    open: boolean;
+    staff: Staff | null;
+    netSalary: number;
   }>({ open: false, staff: null, netSalary: 0 });
 
   // WhatsApp message generator
@@ -1107,13 +1107,13 @@ export default function StaffAI() {
         return member.name.toLowerCase().startsWith(search);
       }
     })
-    .filter((member: Staff) => {
-      const normalizedRole = member.role ? member.role.toLowerCase().trim() : '';
-      const normalizedRoleFilter = roleFilter.toLowerCase().trim();
-      const matchesRole = normalizedRoleFilter === 'all' || normalizedRole === normalizedRoleFilter;
-      const matchesDepartment = departmentFilter === 'all' || member.department === departmentFilter;
-      return matchesRole && matchesDepartment;
-    });
+      .filter((member: Staff) => {
+        const normalizedRole = member.role ? member.role.toLowerCase().trim() : '';
+        const normalizedRoleFilter = roleFilter.toLowerCase().trim();
+        const matchesRole = normalizedRoleFilter === 'all' || normalizedRole === normalizedRoleFilter;
+        const matchesDepartment = departmentFilter === 'all' || member.department === departmentFilter;
+        return matchesRole && matchesDepartment;
+      });
   }, [displayStaff, searchQuery, roleFilter, departmentFilter]);
 
   // Pagination and sorting state
@@ -1197,7 +1197,7 @@ export default function StaffAI() {
         staff.phone || ''
       ].join(','))
     ].join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1247,12 +1247,12 @@ export default function StaffAI() {
     } else {
       // Use attendance-based calculation
       const staffAttendance = (attendance as Attendance[]).filter(
-        a => a.staffId === staffMember.id && 
-        a.date && !isNaN(new Date(a.date).getTime()) &&
-        new Date(a.date).getMonth() + 1 === selectedMonth &&
-        new Date(a.date).getFullYear() === selectedYear
+        a => a.staffId === staffMember.id &&
+          a.date && !isNaN(new Date(a.date).getTime()) &&
+          new Date(a.date).getMonth() + 1 === selectedMonth &&
+          new Date(a.date).getFullYear() === selectedYear
       );
-      
+
       attendedDays = staffAttendance.filter(a => a.status === 'present').length;
       absentDays = 30 - attendedDays;
       const dailyRate = staffMember.salary / 30;
@@ -1280,7 +1280,7 @@ export default function StaffAI() {
       employeeName: staffMember.name, // Add employee name for PDF filename
       status: 'processed' // Set status to processed so download button becomes visible
     };
-    
+
     // First save the payroll data to ensure it exists in the database
     generatePayrollMutation.mutate(payrollData, {
       onSuccess: () => {
@@ -1424,10 +1424,10 @@ export default function StaffAI() {
     if (isEditStaffOpen && selectedStaff) {
       console.log("Populating edit form with selectedStaff:", selectedStaff);
       console.log("selectedStaff.isActive:", selectedStaff.isActive, "Type:", typeof selectedStaff.isActive);
-      
+
       const isActiveValue = Boolean(selectedStaff.isActive);
       console.log("Converted isActive value:", isActiveValue);
-      
+
       editStaffForm.reset({
         name: selectedStaff.name || '',
         phone: selectedStaff.phone || '',
@@ -1445,7 +1445,7 @@ export default function StaffAI() {
         emergencyContact: (selectedStaff as any).emergencyContact || '',
         isActive: isActiveValue, // Ensure proper boolean value
       });
-      
+
       console.log("Form values after reset:", editStaffForm.getValues());
     }
   }, [isEditStaffOpen, selectedStaff, editStaffForm]);
@@ -1467,12 +1467,12 @@ export default function StaffAI() {
     },
     onSuccess: (updatedStaff) => {
       console.log("Staff updated successfully:", updatedStaff);
-      
+
       // Force refetch staff data to ensure UI updates
       queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
       invalidateNotifications(queryClient);
-      
+
       // If staff was made inactive, clear the selection since they'll move to bottom
       if (updatedStaff.isActive === false && selectedStaff?.isActive !== false) {
         setSelectedStaff(null);
@@ -1480,15 +1480,15 @@ export default function StaffAI() {
         // Update the selected staff with the returned data
         setSelectedStaff(updatedStaff);
       }
-      
+
       // Also refetch to be extra sure
       queryClient.refetchQueries({ queryKey: ["/api/staff"] });
-      
+
       // Close modal automatically after successful save
       setIsEditStaffOpen(false);
-      toast({ 
-        title: "Employee updated successfully", 
-        description: `${updatedStaff.name} has been updated. Status: ${updatedStaff.isActive ? 'Active' : 'Inactive'}${updatedStaff.isActive === false ? ' (moved to inactive section)' : ''}` 
+      toast({
+        title: "Employee updated successfully",
+        description: `${updatedStaff.name} has been updated. Status: ${updatedStaff.isActive ? 'Active' : 'Inactive'}${updatedStaff.isActive === false ? ' (moved to inactive section)' : ''}`
       });
     },
     onError: (error: any) => {
@@ -1517,7 +1517,7 @@ export default function StaffAI() {
     }
 
     const csvHeaders = [
-      "Employee ID", "Name", "Email", "Phone", "Role", "Department", 
+      "Employee ID", "Name", "Email", "Phone", "Role", "Department",
       "Date of Joining", "Salary", "Active Status", "Address", "Emergency Contact",
       "Qualifications", "Bank Account", "IFSC Code", "PAN Number"
     ];
@@ -1575,30 +1575,30 @@ export default function StaffAI() {
   });
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-gray-50">
       <Header />
       <div className="max-w-[120rem] mx-auto">
         <EmployeeTabs activeTab={activeTab} setActiveTab={setActiveTab} />
         {activeTab === "overview" && (
-          <div className="min-h-screen h-screen bg-black font-sans overflow-hidden">
+          <div className="min-h-screen h-screen bg-gray-50 font-sans overflow-hidden">
             <div className="w-full px-8 pt-8 pb-4 flex flex-col gap-2">
               <div className="flex items-center gap-10 w-full">
                 <div className="relative flex-grow">
-                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white pointer-events-none" />
+                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-800 pointer-events-none" />
                   <input
                     type="text"
                     placeholder="Search contacts by name, email, or company..."
-                    className="pl-10 pr-4 py-2 w-full rounded-lg bg-[#18181b] text-white placeholder:text-white/70 focus:outline-none focus:ring-2 focus:ring-[#643ae5] border-none shadow"
+                    className="pl-10 pr-4 py-2 w-full rounded-lg bg-white text-gray-800 placeholder:text-gray-800/70 focus:outline-none focus:ring-2 focus:ring-[#643ae5] border-none shadow"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                   />
                 </div>
                 <div className="flex gap-2 items-center">
                   <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                    <SelectTrigger className="w-40 bg-[#18181b] border-[#643ae5] text-white">
+                    <SelectTrigger className="w-40 bg-white border-[#643ae5] text-gray-800">
                       <SelectValue placeholder="All Departments" />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#18181b] border-[#643ae5] text-white">
+                    <SelectContent className="bg-white border-[#643ae5] text-gray-800">
                       <SelectItem value="all">All Departments</SelectItem>
                       {Array.from(new Set(displayStaff.map(s => s.department).filter(Boolean))).map(dept => (
                         <SelectItem key={dept} value={dept}>{dept}</SelectItem>
@@ -1606,10 +1606,10 @@ export default function StaffAI() {
                     </SelectContent>
                   </Select>
                   <Select value={roleFilter} onValueChange={setRoleFilter}>
-                    <SelectTrigger className="w-32 bg-[#18181b] border-[#643ae5] text-white">
+                    <SelectTrigger className="w-32 bg-white border-[#643ae5] text-gray-800">
                       <SelectValue placeholder="All Roles" />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#18181b] border-[#643ae5] text-white">
+                    <SelectContent className="bg-white border-[#643ae5] text-gray-800">
                       <SelectItem value="all">All Roles</SelectItem>
                       {Array.from(new Set(displayStaff.map(s => s.role).filter(Boolean))).map(role => (
                         <SelectItem key={role} value={role}>{role}</SelectItem>
@@ -1617,22 +1617,22 @@ export default function StaffAI() {
                     </SelectContent>
                   </Select>
                   <Button variant="outline"
-                    className="rounded-lg border border-[#643ae5] bg-black text-white font-medium hover:bg-black hover:border-[#a084fa] flex items-center gap-2" onClick={() => setIsAddStaffOpen(true)}>
+                    className="rounded-lg border border-[#643ae5] bg-white border border-purple-500 text-gray-800 font-medium hover:bg-purple-50 hover:border-[#a084fa] flex items-center gap-2" onClick={() => setIsAddStaffOpen(true)}>
                     <UserPlus className="mr-2 h-4 w-4" /> Add New Employee
                   </Button>
                   <Button
                     variant="outline"
-                    className="rounded-lg border border-[#643ae5] bg-black text-white font-medium hover:bg-black hover:border-[#a084fa] flex items-center gap-2"
+                    className="rounded-lg border border-[#643ae5] bg-white border border-purple-500 text-gray-800 font-medium hover:bg-purple-50 hover:border-[#a084fa] flex items-center gap-2"
                     onClick={() => setIsCSVImportOpen(true)}
                   >
-                    <Download className="mr-2 h-4 w-4 text-white" /> Import
+                    <Download className="mr-2 h-4 w-4 text-gray-800" /> Import
                   </Button>
                   <Button
                     variant="outline"
-                    className="rounded-lg border border-[#643ae5] bg-black text-white font-medium hover:bg-black hover:border-[#a084fa] flex items-center gap-2"
+                    className="rounded-lg border border-[#643ae5] bg-white border border-purple-500 text-gray-800 font-medium hover:bg-purple-50 hover:border-[#a084fa] flex items-center gap-2"
                     onClick={exportStaff}
                   >
-                    <Upload className="mr-2 h-4 w-4 text-white" /> Export
+                    <Upload className="mr-2 h-4 w-4 text-gray-800" /> Export
                   </Button>
                 </div>
               </div>
@@ -1646,7 +1646,7 @@ export default function StaffAI() {
                     if (tab === 'All Employees') count = sortedStaff.length;
                     else if (tab === 'Active') count = sortedStaff.filter(s => s.isActive !== false).length;
                     else if (tab === 'Inactive') count = sortedStaff.filter(s => s.isActive === false).length;
-                    
+
                     return (
                       <button
                         key={tab}
@@ -1664,7 +1664,7 @@ export default function StaffAI() {
                 {/* Pagination UI beside the filter buttons */}
                 <div className="flex items-center gap-2">
                   <button
-                    className={`px-3 py-1 rounded-full border text-sm font-medium ${page === 1 ? 'bg-[#643ae5] text-white' : 'bg-[#62656e] text-white'} transition`}
+                    className={`px-3 py-1 rounded-full border text-sm font-medium ${page === 1 ? 'bg-[#643ae5] text-gray-800' : 'bg-gray-100 text-gray-800'} transition`}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
                     style={{ opacity: page === 1 ? 0.5 : 1 }}
@@ -1674,17 +1674,17 @@ export default function StaffAI() {
                   {Array.from({ length: Math.min(totalPages, maxVisiblePage) }, (_, i) => i + 1).map((p) => (
                     <button
                       key={p}
-                      className={`px-3 py-1 rounded-full border text-sm font-medium mx-0.5 ${page === p ? 'bg-[#643ae5] text-white' : 'bg-[#62656e] text-white'} transition`}
+                      className={`px-3 py-1 rounded-full border text-sm font-medium mx-0.5 ${page === p ? 'bg-[#643ae5] text-gray-800' : 'bg-gray-100 text-gray-800'} transition`}
                       onClick={() => setPage(p)}
                     >
                       {p}
                     </button>
                   ))}
                   {maxVisiblePage < totalPages && (
-                    <span className="px-2 text-white">...</span>
+                    <span className="px-2 text-gray-800">...</span>
                   )}
                   <button
-                    className={`px-3 py-1 rounded-full border text-sm font-medium ${page === totalPages ? 'bg-[#643ae5] text-white' : 'bg-[#62656e] text-white'} transition`}
+                    className={`px-3 py-1 rounded-full border text-sm font-medium ${page === totalPages ? 'bg-[#643ae5] text-gray-800' : 'bg-gray-100 text-gray-800'} transition`}
                     onClick={() => {
                       const nextPage = Math.min(totalPages, page + 1);
                       setPage(nextPage);
@@ -1704,21 +1704,21 @@ export default function StaffAI() {
             {/* Main Content: Two Column Layout */}
             <div className="flex gap-6 px-8 pb-8">
               {/* Sidebar: Contact List */}
-              <aside className="w-[320px] glass-card rounded-lg border bg-card text-card-foreground shadow-lg" style={{height: 'fit-content'}}>
+              <aside className="w-[320px] glass-card rounded-lg border bg-card text-card-foreground shadow-lg" style={{ height: 'fit-content' }}>
                 <div className="px-6 pt-6 pb-2 text-base font-semibold">{staffTabFiltered.length} contacts</div>
                 <div className="flex-1 overflow-y-auto">
-                  <ul className="divide-y divide-[#62656e]">
+                  <ul className="divide-y divide-gray-200">
                     {paginatedStaff.map((member) => (
                       <li
                         key={member.id}
-                        className={`flex items-center gap-3 px-6 py-4 cursor-pointer hover:bg-[#7a7ca0] transition rounded-xl ${selectedStaff?.id === member.id ? 'glass-card rounded-lg border bg-card text-card-foreground shadow-lg' : ''}`}
+                        className={`flex items-center gap-3 px-6 py-4 cursor-pointer hover:bg-purple-50 transition rounded-xl ${selectedStaff?.id === member.id ? 'glass-card rounded-lg border bg-card text-card-foreground shadow-lg' : ''}`}
                         onClick={() => setSelectedStaff(member)}
                       >
                         <div className="relative">
                           <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
-                            {member.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
+                            {member.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                           </div>
-                          <span className="absolute bottom-0 right-0 block w-3 h-3 rounded-full border-2 border-[#62656e]" style={{background: member.isActive !== false ? '#52C41A' : '#BFBFBF'}}></span>
+                          <span className="absolute bottom-0 right-0 block w-3 h-3 rounded-full border-2 border-gray-200" style={{ background: member.isActive !== false ? '#52C41A' : '#BFBFBF' }}></span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">{member.name}</div>
@@ -1733,13 +1733,13 @@ export default function StaffAI() {
               {/* Details Panel */}
               <main className="flex-1">
                 {selectedStaff ? (
-                  <div className="w-full glass-card rounded-lg border bg-card text-card-foreground shadow-lg p-8" style={{minHeight: '600px'}}>
+                  <div className="w-full glass-card rounded-lg border bg-card text-card-foreground shadow-lg p-8" style={{ minHeight: '600px' }}>
                     <div className="flex items-center gap-6 mb-6 relative">
                       <div className="relative">
                         <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
-                          {selectedStaff.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
+                          {selectedStaff.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
-                        <span className="absolute bottom-1 right-1 block w-4 h-4 rounded-full border-2 border-[#62656e]" style={{background: selectedStaff.isActive !== false ? '#52C41A' : '#BFBFBF'}}></span>
+                        <span className="absolute bottom-1 right-1 block w-4 h-4 rounded-full border-2 border-gray-200" style={{ background: selectedStaff.isActive !== false ? '#52C41A' : '#BFBFBF' }}></span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -1750,7 +1750,7 @@ export default function StaffAI() {
                       {/* Edit and Delete buttons */}
                       <div className="absolute top-0 right-0 flex gap-2">
                         <button
-                          className="bg-[#643ae5] hover:bg-[#7a7ca0] text-white px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition-colors"
+                          className="bg-[#643ae5] hover:bg-purple-50 text-gray-800 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition-colors"
                           onClick={() => setIsEditStaffOpen(true)}
                           title="Edit Employee"
                         >
@@ -1758,7 +1758,7 @@ export default function StaffAI() {
                           Edit
                         </button>
                         <button
-                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition-colors"
+                          className="bg-red-600 hover:bg-red-700 text-gray-800 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition-colors"
                           onClick={() => {
                             setStaffToDelete(selectedStaff);
                             setDeleteDialogOpen(true);
@@ -1775,7 +1775,7 @@ export default function StaffAI() {
                       {['Overview', 'Activity', 'Payroll'].map(tab => (
                         <button
                           key={tab}
-                          className={`pb-3 px-3 py-1.5 text-sm font-medium transition-colors duration-200 relative rounded-md ${contactTab === tab ? 'text-white bg-[#643ae5]' : 'text-white hover:bg-[#7a7ca0]'} mx-1`}
+                          className={`pb-3 px-3 py-1.5 text-sm font-medium transition-colors duration-200 relative rounded-md ${contactTab === tab ? 'text-white bg-[#643ae5]' : 'text-gray-600 bg-white hover:bg-gray-100'} mx-1`}
                           onClick={() => setContactTab(tab)}
                           style={{ minWidth: 90 }}
                         >
@@ -1847,7 +1847,7 @@ export default function StaffAI() {
                     )}
                     {contactTab === 'Activity' && selectedStaff && <StaffActivityTab staffId={selectedStaff.id} />}
                     {contactTab === 'Payroll' && selectedStaff && (
-                      <div className="w-full glass-card rounded-lg border bg-card text-card-foreground shadow-lg p-6" style={{minHeight: '200px'}}>
+                      <div className="w-full glass-card rounded-lg border bg-card text-card-foreground shadow-lg p-6" style={{ minHeight: '200px' }}>
                         <div className="font-semibold mb-2">Current Month Payroll</div>
                         <table className="w-full text-card-foreground shadow-lg">
                           <thead>
@@ -1890,8 +1890,8 @@ export default function StaffAI() {
                                   <td className="px-6 py-4">
                                     <span className={
                                       payrollStatus === 'processed' ? 'bg-green-100 text-green-800 px-2 py-1 rounded' :
-                                      payrollStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 px-2 py-1 rounded' :
-                                      'bg-red-100 text-red-800 px-2 py-1 rounded'
+                                        payrollStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 px-2 py-1 rounded' :
+                                          'bg-red-100 text-red-800 px-2 py-1 rounded'
                                     }>
                                       {payrollStatus}
                                     </span>
@@ -1930,7 +1930,7 @@ export default function StaffAI() {
                     {/* Other tabs can be filled similarly */}
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-full text-white text-lg">Select a contact to view details</div>
+                  <div className="flex items-center justify-center h-full text-gray-600 text-lg">Select a contact to view details</div>
                 )}
               </main>
             </div>
@@ -1938,7 +1938,7 @@ export default function StaffAI() {
         )}
         {activeTab === "payroll" && (
           <Card>
-            
+
             <CardContent>
               {/* Payroll Tabs */}
               <Tabs defaultValue="current" className="w-full">
@@ -1947,7 +1947,7 @@ export default function StaffAI() {
                   <TabsTrigger value="history">Payment History</TabsTrigger>
                   <TabsTrigger value="settings">Settings</TabsTrigger>
                 </TabsList>
-                
+
                 <TabsContent value="current" className="space-y-4">
                   <Card>
                     <CardHeader>
@@ -2007,7 +2007,7 @@ export default function StaffAI() {
                             </p>
                           </div>
                         </div>
-                        
+
                         <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
                           <div className="text-center">
                             <p className="text-sm text-blue-600 font-medium">Active Employees</p>
@@ -2016,7 +2016,7 @@ export default function StaffAI() {
                             </p>
                           </div>
                         </div>
-                        
+
                         <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
                           <div className="text-center">
                             <p className="text-sm text-purple-600 font-medium">Processed Payrolls</p>
@@ -2086,8 +2086,8 @@ export default function StaffAI() {
                                         <td className="px-6 py-4">
                                           <span className={
                                             payrollStatus === 'processed' ? 'bg-green-100 text-green-800 px-2 py-1 rounded' :
-                                            payrollStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 px-2 py-1 rounded' :
-                                            'bg-red-100 text-red-800 px-2 py-1 rounded'
+                                              payrollStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 px-2 py-1 rounded' :
+                                                'bg-red-100 text-red-800 px-2 py-1 rounded'
                                           }>
                                             {payrollStatus}
                                           </span>
@@ -2128,7 +2128,7 @@ export default function StaffAI() {
                     </CardContent>
                   </Card>
                 </TabsContent>
-                
+
                 <TabsContent value="history" className="space-y-4">
                   <Card>
                     <CardHeader>
@@ -2170,7 +2170,7 @@ export default function StaffAI() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Label>Status:</Label>
-                          <select 
+                          <select
                             value={paymentHistoryStatusFilter}
                             onChange={e => setPaymentHistoryStatusFilter(e.target.value)}
                             className="border rounded px-2 py-1"
@@ -2181,7 +2181,7 @@ export default function StaffAI() {
                           </select>
                         </div>
                       </div>
-                      
+
                       {/* Summary Statistics */}
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                         <div className="p-4 bg-blue-50 rounded-lg">
@@ -2227,7 +2227,7 @@ export default function StaffAI() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -2268,17 +2268,17 @@ export default function StaffAI() {
                                 </TableCell>
                                 <TableCell>
                                   <Badge className={
-                                    payrollRecord.status === 'processed' 
+                                    payrollRecord.status === 'processed'
                                       ? 'bg-green-100 text-green-800 border-green-200'
                                       : payrollRecord.status === 'pending'
-                                      ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                                      : 'bg-red-100 text-red-800 border-red-200'
+                                        ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                                        : 'bg-red-100 text-red-800 border-red-200'
                                   }>
                                     {payrollRecord.status}
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
-                                  {payrollRecord.status === 'processed' 
+                                  {payrollRecord.status === 'processed'
                                     ? new Date(payrollRecord.generatedAt || new Date()).toLocaleDateString('en-IN')
                                     : '-'
                                   }
@@ -2291,20 +2291,20 @@ export default function StaffAI() {
                             (historyYear ? p.year === historyYear : true) &&
                             (paymentHistoryStatusFilter === 'all' ? true : p.status === paymentHistoryStatusFilter)
                           ).length === 0) && (
-                            <TableRow>
-                              <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-                                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                <p>No payroll records found</p>
-                                <p className="text-sm">Generate payroll for staff members to see payment history</p>
-                              </TableCell>
-                            </TableRow>
-                          )}
+                              <TableRow>
+                                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                  <p>No payroll records found</p>
+                                  <p className="text-sm">Generate payroll for staff members to see payment history</p>
+                                </TableCell>
+                              </TableRow>
+                            )}
                         </TableBody>
                       </Table>
                     </CardContent>
                   </Card>
                 </TabsContent>
-                
+
                 <TabsContent value="settings" className="space-y-4">
                   {/* Remove the grid with Payroll Settings and Allowance Settings cards here */}
                 </TabsContent>
@@ -2337,20 +2337,20 @@ export default function StaffAI() {
                       <FormMessage />
                     </FormItem>
                   )} />
-                   <FormField control={addStaffForm.control} name="role" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Role</FormLabel>
-                        <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. Counselor" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={addStaffForm.control} name="address" render={({ field }) => (
+                  <FormField control={addStaffForm.control} name="role" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. Counselor" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={addStaffForm.control} name="address" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Address</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          {...field} 
-                          value={field.value ?? ''} 
+                        <Textarea
+                          {...field}
+                          value={field.value ?? ''}
                           placeholder="Enter employee address"
                           rows={3}
                         />
@@ -2365,7 +2365,7 @@ export default function StaffAI() {
                       <FormMessage />
                     </FormItem>
                   )} />
-                   <FormField control={addStaffForm.control} name="bankAccountNumber" render={({ field }) => (
+                  <FormField control={addStaffForm.control} name="bankAccountNumber" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Bank Account Number</FormLabel>
                       <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
@@ -2381,7 +2381,7 @@ export default function StaffAI() {
                       <FormMessage />
                     </FormItem>
                   )} />
-                   <FormField control={addStaffForm.control} name="dateOfJoining" render={({ field }) => (
+                  <FormField control={addStaffForm.control} name="dateOfJoining" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Date of Joining</FormLabel>
                       <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
@@ -2398,11 +2398,11 @@ export default function StaffAI() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                            <SelectItem value="HR">HR</SelectItem>
-                            <SelectItem value="IT">IT</SelectItem>
-                            <SelectItem value="Finance">Finance</SelectItem>
-                            <SelectItem value="Operations">Operations</SelectItem>
-                            <SelectItem value="Marketing">Marketing</SelectItem>
+                          <SelectItem value="HR">HR</SelectItem>
+                          <SelectItem value="IT">IT</SelectItem>
+                          <SelectItem value="Finance">Finance</SelectItem>
+                          <SelectItem value="Operations">Operations</SelectItem>
+                          <SelectItem value="Marketing">Marketing</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -2412,9 +2412,9 @@ export default function StaffAI() {
                     <FormItem>
                       <FormLabel>Qualifications</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          {...field} 
-                          value={field.value ?? ''} 
+                        <Textarea
+                          {...field}
+                          value={field.value ?? ''}
                           placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
                           rows={3}
                         />
@@ -2422,7 +2422,7 @@ export default function StaffAI() {
                       <FormMessage />
                     </FormItem>
                   )} />
-                   <FormField control={addStaffForm.control} name="ifscCode" render={({ field }) => (
+                  <FormField control={addStaffForm.control} name="ifscCode" render={({ field }) => (
                     <FormItem>
                       <FormLabel>IFSC Code</FormLabel>
                       <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
@@ -2438,7 +2438,7 @@ export default function StaffAI() {
                   )} />
                 </div>
               </div>
-              
+
               <DialogFooter>
                 <Button type="button" variant="secondary" onClick={() => setIsAddStaffOpen(false)}>Cancel</Button>
                 <Button type="submit" disabled={addStaffForm.formState.isSubmitting}>
@@ -2449,7 +2449,7 @@ export default function StaffAI() {
           </Form>
         </DialogContent>
       </Dialog>
-      
+
       {/* WhatsApp Modal */}
       <Dialog open={whatsappModal.open} onOpenChange={(open) => setWhatsappModal({ ...whatsappModal, open })}>
         <DialogContent className="max-w-md">
@@ -2475,13 +2475,13 @@ export default function StaffAI() {
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setWhatsappModal({ open: false, staff: null, netSalary: 0 })}
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 if (whatsappModal.staff?.phone) {
                   const message = getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary);
@@ -2565,9 +2565,9 @@ export default function StaffAI() {
                       <FormItem>
                         <FormLabel>Address</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            {...field} 
-                            value={field.value ?? ''} 
+                          <Textarea
+                            {...field}
+                            value={field.value ?? ''}
                             placeholder="Enter employee address"
                             rows={3}
                           />
@@ -2629,9 +2629,9 @@ export default function StaffAI() {
                       <FormItem>
                         <FormLabel>Qualifications</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            {...field} 
-                            value={field.value ?? ''} 
+                          <Textarea
+                            {...field}
+                            value={field.value ?? ''}
                             placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
                             rows={3}
                           />

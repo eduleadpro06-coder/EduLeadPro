@@ -7,6 +7,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").notNull().default("counselor"), // counselor, admin, marketing_head
+  name: text("name"),
   email: text("email"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -32,6 +33,7 @@ export const leads = pgTable("leads", {
   parentPhone: text("parent_phone"),
   address: text("address"),
   interestedProgram: text("interested_program"),
+  admissionLikelihood: text("admission_likelihood"),
   deletedAt: timestamp("deleted_at"),
 });
 
@@ -110,10 +112,12 @@ export const expenses = pgTable("expenses", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   category: varchar("category", { length: 100 }).notNull(),
   date: date("date").notNull(),
+  submittedBy: integer("submitted_by").references(() => users.id),
   approvedBy: integer("approved_by").references(() => users.id),
   receiptUrl: varchar("receipt_url", { length: 500 }),
   status: varchar("status", { length: 20 }).default("pending"), // pending, approved, rejected
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Student Management
@@ -171,6 +175,8 @@ export const feePayments = pgTable("fee_payments", {
   installmentNumber: integer("installment_number"),
   transactionId: varchar("transaction_id", { length: 100 }),
   status: varchar("status", { length: 20 }).default("completed"), // completed, pending, failed
+  paymentCategory: varchar("payment_category", { length: 50 }).default("fee_payment"), // 'fee_payment' or 'additional_charge'
+  chargeType: varchar("charge_type", { length: 50 }), // Type of additional charge (annual_function, sports_day, etc.)
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -205,10 +211,12 @@ export const emiSchedule = pgTable("emi_schedule", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+
+
 // EMI Plan Configuration - stores the EMI plan details for students
 export const emiPlans = pgTable("emi_plans", {
   id: serial("id").primaryKey(),
-  studentId: integer("student_id").references(() => students.id).notNull(),
+  studentId: integer("student_id").references(() => leads.id).notNull(),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   numberOfInstallments: integer("number_of_installments").notNull(),
   installmentAmount: decimal("installment_amount", { precision: 10, scale: 2 }).notNull(),
@@ -282,6 +290,20 @@ export const recentlyDeletedEmployee = pgTable("recently_deleted_employee", {
   deleted_at: timestamp("deleted_at").notNull(),
 });
 
+// Message Templates for WhatsApp/SMS/Email
+export const messageTemplates = pgTable("message_templates", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(), // Internal reference name (e.g., "welcome", "followup")
+  displayName: varchar("display_name", { length: 100 }).notNull(), // User-facing name (e.g., "Welcome Message")
+  content: text("content").notNull(), // Template message content
+  category: varchar("category", { length: 50 }).default("whatsapp"), // whatsapp, sms, email
+  isActive: boolean("is_active").default(true),
+  isDefault: boolean("is_default").default(false), // System default templates (cannot be deleted)
+  variables: text("variables"), // JSON array of available variables like ["name", "class", "instituteName"]
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
 
 
@@ -432,7 +454,14 @@ export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, creat
       .optional()
       .or(z.literal("")),
   });
-export const insertFollowUpSchema = createInsertSchema(followUps).omit({ id: true, createdAt: true });
+export const insertFollowUpSchema = createInsertSchema(followUps)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    scheduledAt: z.coerce.date(),
+    completedAt: z.coerce.date().nullable().optional(),
+    leadId: z.coerce.number(),
+    counselorId: z.coerce.number()
+  });
 export const insertLeadSourceSchema = createInsertSchema(leadSources).omit({ id: true });
 export const insertStaffSchema = createInsertSchema(staff)
   .omit({ id: true, createdAt: true, updatedAt: true })
@@ -453,6 +482,8 @@ export const insertEmiScheduleSchema = createInsertSchema(emiSchedule).omit({ id
 export const insertEmiPlanSchema = createInsertSchema(emiPlans).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRecentlyDeletedEmployeeSchema = createInsertSchema(recentlyDeletedEmployee).omit({ id: true, created_at: true, updated_at: true });
+export const insertMessageTemplateSchema = createInsertSchema(messageTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+
 
 
 export const insertAIConversationSchema = createInsertSchema(aiConversations).omit({ id: true, startedAt: true });
@@ -483,6 +514,8 @@ export type EmiSchedule = typeof emiSchedule.$inferSelect;
 export type EmiPlan = typeof emiPlans.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type RecentlyDeletedEmployee = typeof recentlyDeletedEmployee.$inferSelect;
+export type MessageTemplate = typeof messageTemplates.$inferSelect;
+
 
 
 export type AIConversation = typeof aiConversations.$inferSelect;
@@ -511,11 +544,13 @@ export type InsertEMandate = z.infer<typeof insertEMandateSchema>;
 export type InsertEmiSchedule = z.infer<typeof insertEmiScheduleSchema>;
 export type InsertEmiPlan = z.infer<typeof insertEmiPlanSchema>;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type InsertMessageTemplate = z.infer<typeof insertMessageTemplateSchema>;
+
 
 // AI-related insert types
 export type InsertAIPrediction = z.infer<typeof insertAIPredictionSchema>;
 export type InsertAIIntervention = z.infer<typeof insertAIInterventionSchema>;
-export type InsertAIAnalytics = z.infer<typeof insertAIAnalyticsSchema>;
+// export type InsertAIAnalytics = z.infer<typeof insertAIAnalyticsSchema>;
 export type InsertAIConversation = z.infer<typeof insertAIConversationSchema>;
 export type InsertAIMessage = z.infer<typeof insertAIMessageSchema>;
 export type InsertAIModelPerformance = z.infer<typeof insertAIModelPerformanceSchema>;
@@ -545,3 +580,278 @@ export type StudentWithFees = Student & {
 export type ExpenseWithApprover = Expense & {
   approver?: User;
 };
+
+// Communication Logs
+export const communicationLogs = pgTable("communication_logs", {
+  id: serial("id").primaryKey(),
+  recipientType: varchar("recipient_type", { length: 20 }).notNull(), // student, parent, staff, group
+  recipientId: integer("recipient_id"),
+  groupName: varchar("group_name", { length: 100 }),
+  type: varchar("type", { length: 20 }).notNull(), // sms, email, whatsapp, call
+  subject: varchar("subject", { length: 200 }),
+  message: text("message").notNull(),
+  status: varchar("status", { length: 20 }).default("sent"),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+export const insertCommunicationLogSchema = createInsertSchema(communicationLogs).omit({ id: true, sentAt: true });
+export type CommunicationLog = typeof communicationLogs.$inferSelect;
+export type InsertCommunicationLog = z.infer<typeof insertCommunicationLogSchema>;
+
+// =====================================================
+// DAYCARE MANAGEMENT SYSTEM - Standalone Module
+// =====================================================
+
+// 1. Daycare Children - Complete child information
+export const daycareChildren = pgTable("daycare_children", {
+  id: serial("id").primaryKey(),
+  childId: varchar("child_id", { length: 50 }).unique().notNull(),
+  childName: varchar("child_name", { length: 100 }).notNull(),
+  dateOfBirth: date("date_of_birth"),
+  ageYears: integer("age_years"),
+  ageMonths: integer("age_months"),
+  gender: varchar("gender", { length: 10 }),
+  bloodGroup: varchar("blood_group", { length: 10 }),
+  photoUrl: text("photo_url"),
+
+  // Parent/Guardian Information
+  parentName: varchar("parent_name", { length: 100 }).notNull(),
+  parentPhone: varchar("parent_phone", { length: 20 }).notNull(),
+  parentEmail: varchar("parent_email", { length: 255 }),
+  alternatePhone: varchar("alternate_phone", { length: 20 }),
+
+  // Address
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 100 }),
+  pincode: varchar("pincode", { length: 10 }),
+
+  // Emergency Contact
+  emergencyContactName: varchar("emergency_contact_name", { length: 100 }),
+  emergencyContactPhone: varchar("emergency_contact_phone", { length: 20 }),
+  emergencyContactRelation: varchar("emergency_contact_relation", { length: 50 }),
+
+  // Medical Information
+  allergies: text("allergies"),
+  medicalConditions: text("medical_conditions"),
+  specialNeeds: text("special_needs"),
+
+  // Status
+  status: varchar("status", { length: 20 }).default("active"), // active, inactive, graduated
+
+  // Metadata
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+// 2. Daycare Inquiries - Lead management for daycare
+export const daycareInquiries = pgTable("daycare_inquiries", {
+  id: serial("id").primaryKey(),
+  inquiryNumber: varchar("inquiry_number", { length: 50 }).unique().notNull(),
+  childName: varchar("child_name", { length: 100 }).notNull(),
+  childAgeYears: integer("child_age_years"),
+  childAgeMonths: integer("child_age_months"),
+
+  parentName: varchar("parent_name", { length: 100 }).notNull(),
+  parentPhone: varchar("parent_phone", { length: 20 }).notNull(),
+  parentEmail: varchar("parent_email", { length: 255 }),
+
+  preferredStartDate: date("preferred_start_date"),
+  preferredTimings: varchar("preferred_timings", { length: 50 }), // full-day, half-day, hourly
+  source: varchar("source", { length: 100 }), // website, referral, walk-in, etc.
+
+  status: varchar("status", { length: 20 }).default("new"), // new, contacted, visited, enrolled, dropped
+  assignedTo: integer("assigned_to").references(() => users.id),
+  priority: varchar("priority", { length: 20 }).default("medium"), // high, medium, low
+
+  notes: text("notes"),
+  followUpDate: date("follow_up_date"),
+  lastContactedAt: timestamp("last_contacted_at"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 3. Daycare Inquiry Follow-ups
+export const daycareInquiryFollowups = pgTable("daycare_inquiry_followups", {
+  id: serial("id").primaryKey(),
+  inquiryId: integer("inquiry_id").references(() => daycareInquiries.id).notNull(),
+
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  completedAt: timestamp("completed_at"),
+
+  followupType: varchar("followup_type", { length: 30 }), // call, visit, email, whatsapp
+  status: varchar("status", { length: 20 }).default("pending"), // pending, completed, cancelled
+
+  notes: text("notes"),
+  outcome: varchar("outcome", { length: 30 }), // interested, not_interested, enrolled, need_more_info
+  nextAction: text("next_action"),
+
+  assignedTo: integer("assigned_to").references(() => users.id),
+  completedBy: integer("completed_by").references(() => users.id),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 4. Daycare Billing Configuration
+export const daycareBillingConfig = pgTable("daycare_billing_config", {
+  id: serial("id").primaryKey(),
+  configName: varchar("config_name", { length: 100 }).notNull(),
+  billingFormula: text("billing_formula").default("Amount Due = Hourly Rate × Total Hours"),
+
+  // Hourly rates
+  hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }),
+  minHourlyChargeMinutes: integer("min_hourly_charge_minutes").default(60),
+
+  // Half-day rates
+  halfDayRate: decimal("half_day_rate", { precision: 10, scale: 2 }),
+  halfDayHours: integer("half_day_hours").default(4),
+
+  // Full-day rates
+  fullDayRate: decimal("full_day_rate", { precision: 10, scale: 2 }),
+  fullDayHours: integer("full_day_hours").default(8),
+
+  // Monthly plans
+  monthlyUnlimitedRate: decimal("monthly_unlimited_rate", { precision: 10, scale: 2 }),
+
+  // Late pickup
+  gracePeriodMinutes: integer("grace_period_minutes").default(15),
+  latePickupChargePerHour: decimal("late_pickup_charge_per_hour", { precision: 10, scale: 2 }),
+
+  // Registration & Security
+  registrationFee: decimal("registration_fee", { precision: 10, scale: 2 }),
+  securityDeposit: decimal("security_deposit", { precision: 10, scale: 2 }),
+
+  isActive: boolean("is_active").default(true),
+  effectiveFrom: date("effective_from"),
+  effectiveUntil: date("effective_until"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 5. Daycare Enrollments
+export const daycareEnrollments = pgTable("daycare_enrollments", {
+  id: serial("id").primaryKey(),
+  childId: integer("child_id").references(() => daycareChildren.id).notNull(),
+  enrollmentNumber: varchar("enrollment_number", { length: 50 }).unique().notNull(),
+  enrollmentDate: date("enrollment_date").notNull(),
+
+  billingPlanId: integer("billing_plan_id").references(() => daycareBillingConfig.id),
+  customHourlyRate: decimal("custom_hourly_rate", { precision: 10, scale: 2 }),
+  customHalfDayRate: decimal("custom_half_day_rate", { precision: 10, scale: 2 }),
+  customFullDayRate: decimal("custom_full_day_rate", { precision: 10, scale: 2 }),
+  customMonthlyRate: decimal("custom_monthly_rate", { precision: 10, scale: 2 }),
+
+  status: varchar("status", { length: 20 }).default("active"), // active, paused, cancelled, completed
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+// 6. Daycare Attendance
+export const daycareAttendance = pgTable("daycare_attendance", {
+  id: serial("id").primaryKey(),
+  enrollmentId: integer("enrollment_id").references(() => daycareEnrollments.id).notNull(),
+  attendanceDate: date("attendance_date").notNull(),
+
+  checkInTime: timestamp("check_in_time", { withTimezone: true }).notNull(),
+  checkOutTime: timestamp("check_out_time", { withTimezone: true }),
+
+  durationMinutes: integer("duration_minutes"),
+  billingType: varchar("billing_type", { length: 20 }), // hourly, half-day, full-day, monthly
+  calculatedCharge: decimal("calculated_charge", { precision: 10, scale: 2 }),
+
+  checkedInBy: integer("checked_in_by").references(() => users.id),
+  checkedOutBy: integer("checked_out_by").references(() => users.id),
+
+  notes: text("notes"),
+  isManualEdit: boolean("is_manual_edit").default(false),
+  editedBy: integer("edited_by").references(() => users.id),
+  editReason: text("edit_reason"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 7. Daycare Payments
+export const daycarePayments = pgTable("daycare_payments", {
+  id: serial("id").primaryKey(),
+  paymentNumber: varchar("payment_number", { length: 50 }).unique().notNull(),
+  childId: integer("child_id").references(() => daycareChildren.id).notNull(),
+  enrollmentId: integer("enrollment_id").references(() => daycareEnrollments.id),
+
+  paymentType: varchar("payment_type", { length: 30 }), // attendance, monthly_plan, registration, late_fee
+  billingPeriodStart: date("billing_period_start"),
+  billingPeriodEnd: date("billing_period_end"),
+
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
+  lateFee: decimal("late_fee", { precision: 10, scale: 2 }).default("0"),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+
+  paymentDate: date("payment_date").notNull(),
+  paymentMode: varchar("payment_mode", { length: 30 }), // cash, card, upi, bank_transfer, cheque
+  transactionId: varchar("transaction_id", { length: 100 }),
+  chequeNumber: varchar("cheque_number", { length: 50 }),
+
+  status: varchar("status", { length: 20 }).default("pending"), // pending, completed, failed, refunded
+  receiptNumber: varchar("receipt_number", { length: 50 }).unique(),
+
+  collectedBy: integer("collected_by").references(() => users.id),
+  notes: text("notes"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Insert Schemas
+export const insertDaycareChildSchema = createInsertSchema(daycareChildren).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDaycareInquirySchema = createInsertSchema(daycareInquiries).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDaycareInquiryFollowupSchema = createInsertSchema(daycareInquiryFollowups).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDaycareBillingConfigSchema = createInsertSchema(daycareBillingConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDaycareEnrollmentSchema = createInsertSchema(daycareEnrollments).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDaycareAttendanceSchema = createInsertSchema(daycareAttendance).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDaycarePaymentSchema = createInsertSchema(daycarePayments).omit({ id: true, createdAt: true, updatedAt: true });
+
+// Types
+export type DaycareChild = typeof daycareChildren.$inferSelect;
+export type DaycareInquiry = typeof daycareInquiries.$inferSelect;
+export type DaycareInquiryFollowup = typeof daycareInquiryFollowups.$inferSelect;
+export type DaycareBillingConfig = typeof daycareBillingConfig.$inferSelect;
+export type DaycareEnrollment = typeof daycareEnrollments.$inferSelect;
+export type DaycareAttendance = typeof daycareAttendance.$inferSelect;
+export type DaycarePayment = typeof daycarePayments.$inferSelect;
+
+export type InsertDaycareChild = z.infer<typeof insertDaycareChildSchema>;
+export type InsertDaycareInquiry = z.infer<typeof insertDaycareInquirySchema>;
+export type InsertDaycareInquiryFollowup = z.infer<typeof insertDaycareInquiryFollowupSchema>;
+export type InsertDaycareBillingConfig = z.infer<typeof insertDaycareBillingConfigSchema>;
+export type InsertDaycareEnrollment = z.infer<typeof insertDaycareEnrollmentSchema>;
+export type InsertDaycareAttendance = z.infer<typeof insertDaycareAttendanceSchema>;
+export type InsertDaycarePayment = z.infer<typeof insertDaycarePaymentSchema>;
+
+// Complex types for joins
+export type DaycareChildWithEnrollment = DaycareChild & {
+  enrollment?: DaycareEnrollment;
+  payments?: DaycarePayment[];
+};
+
+export type DaycareEnrollmentWithChild = DaycareEnrollment & {
+  child: DaycareChild;
+  billingPlan?: DaycareBillingConfig;
+  attendance?: DaycareAttendance[];
+};
+
+export type DaycareInquiryWithFollowups = DaycareInquiry & {
+  followups?: DaycareInquiryFollowup[];
+  assignedUser?: User;
+};
+

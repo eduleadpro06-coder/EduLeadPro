@@ -9,18 +9,19 @@ import { Badge } from "@/components/ui/badge";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Megaphone, 
-  Brain, 
-  Target, 
-  IndianRupee, 
-  MessageSquare, 
+import {
+  Megaphone,
+  Brain,
+  Target,
+  IndianRupee,
+  MessageSquare,
   Share2,
   Lightbulb,
   TrendingUp,
   Copy,
   RefreshCw
 } from "lucide-react";
+import type { GlobalClassFee } from "@shared/schema";
 
 interface MarketingRecommendation {
   targetAudience: string;
@@ -35,6 +36,14 @@ export default function Marketing() {
   const [budget, setBudget] = useState("");
   const [recommendations, setRecommendations] = useState<MarketingRecommendation | null>(null);
   const { toast } = useToast();
+
+  const { data: globalFees } = useQuery<GlobalClassFee[]>({
+    queryKey: ["/api/global-class-fees"],
+  });
+
+  const classOptions = globalFees
+    ? Array.from(new Set(globalFees.filter(f => f.isActive).map(f => f.className))).sort()
+    : [];
 
   const generateRecommendationsMutation = useMutation({
     mutationFn: async (data: { targetClass: string; budget: string }) => {
@@ -88,21 +97,12 @@ export default function Marketing() {
                   <SelectValue placeholder="Select target class" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Pre-K">Pre-K</SelectItem>
-                  <SelectItem value="Kindergarten">Kindergarten</SelectItem>
-                  <SelectItem value="Class 1">Class 1</SelectItem>
-                  <SelectItem value="Class 2">Class 2</SelectItem>
-                  <SelectItem value="Class 3">Class 3</SelectItem>
-                  <SelectItem value="Class 4">Class 4</SelectItem>
-                  <SelectItem value="Class 5">Class 5</SelectItem>
-                  <SelectItem value="Class 6">Class 6</SelectItem>
-                  <SelectItem value="Class 7">Class 7</SelectItem>
-                  <SelectItem value="Class 8">Class 8</SelectItem>
-                  <SelectItem value="Class 9">Class 9</SelectItem>
-                  <SelectItem value="Class 10">Class 10</SelectItem>
-                  <SelectItem value="Class 11">Class 11</SelectItem>
-                  <SelectItem value="Class 12">Class 12</SelectItem>
                   <SelectItem value="All Classes">All Classes</SelectItem>
+                  {classOptions.map((cls) => (
+                    <SelectItem key={cls} value={cls}>
+                      {cls}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -123,7 +123,7 @@ export default function Marketing() {
             </div>
           </div>
           <div className="mt-6">
-            <Button 
+            <Button
               onClick={handleGenerateRecommendations}
               disabled={generateRecommendationsMutation.isPending}
               className="w-full md:w-auto"
