@@ -9,7 +9,7 @@ import type {
   EMandate, InsertEMandate, EmiSchedule, InsertEmiSchedule,
   GlobalClassFee, InsertGlobalClassFee, EmiPlan, InsertEmiPlan,
   Notification, InsertNotification, MessageTemplate, InsertMessageTemplate,
-  CommunicationLog, InsertCommunicationLog
+  CommunicationLog, InsertCommunicationLog, Organization, InsertOrganization
 } from "../shared/schema.js";
 
 // Type definitions for complex queries
@@ -31,10 +31,19 @@ export type StudentWithFees = Student & {
 };
 
 export interface IStorage {
+  // Organizations
+  getOrganization(id: number): Promise<Organization | undefined>;
+  getOrganizationByName(name: string): Promise<Organization | undefined>;
+  getOrganizationBySlug(slug: string): Promise<Organization | undefined>;
+  createOrganization(organization: InsertOrganization): Promise<Organization>;
+  updateOrganization(id: number, updates: Partial<Organization>): Promise<Organization | undefined>;
+  getAllOrganizations(): Promise<Organization[]>;
+
   // Users
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, updates: Partial<User>): Promise<User | undefined>;
   getAllCounselors(): Promise<User[]>;
 
   // Leads
@@ -237,14 +246,78 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Organization operations
+  async getOrganization(id: number): Promise<Organization | undefined> {
+    const result = await db.select().from(schema.organizations).where(eq(schema.organizations.id, id));
+    return result[0];
+  }
+
+  async getOrganizationByName(name: string): Promise<Organization | undefined> {
+    // Case-insensitive search
+    const result = await db.select().from(schema.organizations)
+      .where(sql`LOWER(${schema.organizations.name}) = LOWER(${name})`)
+      .limit(1);
+    return result[0];
+  }
+
+  async getOrganizationBySlug(slug: string): Promise<Organization | undefined> {
+    const result = await db.select().from(schema.organizations).where(eq(schema.organizations.slug, slug));
+    return result[0];
+  }
+
+  async createOrganization(insertOrganization: InsertOrganization): Promise<Organization> {
+    const result = await db.insert(schema.organizations).values(insertOrganization).returning();
+    return result[0];
+  }
+
+  async updateOrganization(id: number, updates: Partial<Organization>): Promise<Organization | undefined> {
+    const result = await db.update(schema.organizations).set({
+      ...updates,
+      updatedAt: new Date()
+    }).where(eq(schema.organizations.id, id)).returning();
+    return result[0];
+  }
+
+  async getAllOrganizations(): Promise<Organization[]> {
+    return await db.select().from(schema.organizations);
+  }
+
   // Basic user operations
   async getUser(id: number): Promise<User | undefined> {
-    const result = await db.select().from(schema.users).where(eq(schema.users.id, id));
+    const result = await db.select({
+      id: schema.users.id,
+      username: schema.users.username,
+      password: schema.users.password,
+      role: schema.users.role,
+      name: schema.users.name,
+      email: schema.users.email,
+      organizationId: schema.users.organizationId,
+      createdAt: schema.users.createdAt,
+      updatedAt: schema.users.updatedAt
+    }).from(schema.users).where(eq(schema.users.id, id));
     return result[0];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await db.select().from(schema.users).where(eq(schema.users.username, username));
+    const result = await db.select({
+      id: schema.users.id,
+      username: schema.users.username,
+      password: schema.users.password,
+      role: schema.users.role,
+      name: schema.users.name,
+      email: schema.users.email,
+      organizationId: schema.users.organizationId,
+      createdAt: schema.users.createdAt,
+      updatedAt: schema.users.updatedAt
+    }).from(schema.users).where(eq(schema.users.username, username));
+    return result[0];
+  }
+
+  async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
+    const result = await db.update(schema.users).set({
+      ...updates,
+      updatedAt: new Date()
+    }).where(eq(schema.users.id, id)).returning();
     return result[0];
   }
 
@@ -360,7 +433,7 @@ export class DatabaseStorage implements IStorage {
     } : undefined) as LeadWithCounselor | undefined;
   }
 
-  async getAllLeads(includeDeleted = false): Promise<LeadWithCounselor[]> {
+  async getAllLeads(includeDeleted = false, organizationId?: number): Promise<LeadWithCounselor[]> {
     const now = new Date();
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     let query = db
@@ -386,6 +459,7 @@ export class DatabaseStorage implements IStorage {
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
+        organizationId: schema.leads.organizationId,
         counselor: {
           id: schema.users.id,
           name: schema.users.name,
@@ -400,14 +474,27 @@ export class DatabaseStorage implements IStorage {
       .from(schema.leads)
       .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id));
 
+    // Build WHERE conditions
+    const conditions = [];
+
+    // Organization filter (CRITICAL for multi-tenancy)
+    if (organizationId !== undefined) {
+      conditions.push(eq(schema.leads.organizationId, organizationId));
+    }
+
+    // Deleted filter
     if (!includeDeleted) {
-      query = (query as any).where(and(
+      conditions.push(
         or(
           isNull(schema.leads.deletedAt),
           gte(schema.leads.deletedAt, ninetyDaysAgo)
         ),
         not(eq(schema.leads.status, "deleted"))
-      ));
+      );
+    }
+
+    if (conditions.length > 0) {
+      query = (query as any).where(and(...conditions));
     }
 
     // Apply order by at the end
@@ -905,12 +992,85 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getAllStaff(): Promise<StaffWithDetails[]> {
+  async getAllStaff(organizationId?: number): Promise<StaffWithDetails[]> {
+    if (organizationId) {
+      return await db.select().from(schema.staff).where(eq(schema.staff.organizationId, organizationId));
+    }
     return await db.select().from(schema.staff);
   }
 
-  async getStaffByRole(role: string): Promise<Staff[]> {
+  async getStaffByRole(role: string, organizationId?: number): Promise<Staff[]> {
+    if (organizationId) {
+      return await db.select().from(schema.staff).where(and(eq(schema.staff.role, role), eq(schema.staff.organizationId, organizationId)));
+    }
     return await db.select().from(schema.staff).where(eq(schema.staff.role, role));
+  }
+
+
+
+  // ... (maintain other methods)
+
+  async getAllExpenses(organizationId?: number): Promise<ExpenseWithApprover[]> {
+    let query = db
+      .select({
+        id: schema.expenses.id,
+        description: schema.expenses.description,
+        amount: schema.expenses.amount,
+        category: schema.expenses.category,
+        date: schema.expenses.date,
+        status: schema.expenses.status,
+        receiptUrl: schema.expenses.receiptUrl,
+        submittedBy: schema.expenses.submittedBy,
+        approvedBy: schema.expenses.approvedBy,
+        createdAt: schema.expenses.createdAt,
+        updatedAt: schema.expenses.updatedAt,
+        organizationId: schema.expenses.organizationId,
+        approverId: schema.users.id,
+        approverName: schema.users.name,
+        approverEmail: schema.users.email,
+        approverUsername: schema.users.username,
+        approverPassword: schema.users.password,
+        approverRole: schema.users.role,
+        approverCreatedAt: schema.users.createdAt,
+        approverUpdatedAt: schema.users.updatedAt,
+        approverOrganizationId: schema.users.organizationId
+      })
+      .from(schema.expenses)
+      .leftJoin(schema.users, eq(schema.expenses.approvedBy, schema.users.id));
+
+    if (organizationId) {
+      // TypeScript might complain about 'where' on a join result if not cast, or if method chaining is strict
+      // Using 'as any' for query builder flexibility if needed, or proper chaining
+      query = query.where(eq(schema.expenses.organizationId, organizationId)) as any;
+    }
+
+    const result = await query.orderBy(desc(schema.expenses.date));
+
+    return result.map(row => ({
+      id: row.id,
+      description: row.description,
+      amount: row.amount,
+      category: row.category,
+      date: row.date,
+      status: row.status,
+      receiptUrl: row.receiptUrl,
+      submittedBy: row.submittedBy,
+      approvedBy: row.approvedBy,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      organizationId: row.organizationId,
+      approver: row.approverId ? {
+        id: row.approverId,
+        name: row.approverName,
+        email: row.approverEmail,
+        username: row.approverUsername!,
+        password: row.approverPassword!,
+        role: row.approverRole!,
+        createdAt: row.approverCreatedAt!,
+        updatedAt: row.approverUpdatedAt!,
+        organizationId: row.approverOrganizationId
+      } : undefined
+    }));
   }
 
   async createStaff(insertStaff: InsertStaff): Promise<Staff> {
@@ -1438,7 +1598,7 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getAttendanceStats(month: number, year: number): Promise<{
+  async getAttendanceStats(month: number, year: number, organizationId?: number): Promise<{
     totalPresent: number;
     totalAbsent: number;
     averageHours: number;
@@ -1446,22 +1606,42 @@ export class DatabaseStorage implements IStorage {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
 
-    const stats = await db
+    let query = db
       .select({
-        totalPresent: sql<number>`count(*) filter (where status = 'present')`,
-        totalAbsent: sql<number>`count(*) filter (where status = 'absent')`,
-        averageHours: sql<number>`avg(CASE WHEN hours_worked IS NOT NULL THEN hours_worked ELSE 0 END)`
+        totalPresent: sql<number>`count(*) filter (where ${schema.attendance.status} = 'present')`,
+        totalAbsent: sql<number>`count(*) filter (where ${schema.attendance.status} = 'absent')`,
+        averageHours: sql<number>`avg(CASE WHEN ${schema.attendance.hoursWorked} IS NOT NULL THEN ${schema.attendance.hoursWorked} ELSE 0 END)`
       })
-      .from(schema.attendance)
-      .where(and(
+      .from(schema.attendance);
+
+    if (organizationId) {
+      // Use raw SQL for complex join if needed, or just chain if typings allow.
+      // Since manual join might be tricky with typings, we use a simpler approach if possible.
+      // Using 'leftJoin' on the query builder.
+      // query = query.leftJoin(...)
+      // But 'query' type inference is tricky here.
+      // I'll use the 'staffId' filter if possible, but we don't have list of staff IDs.
+      // I'll use 'any' casting to bypass TS issues for now as verified in other methods.
+
+      query = query.leftJoin(schema.staff, eq(schema.attendance.staffId, schema.staff.id))
+        .where(and(
+          gte(schema.attendance.date, startDate.toISOString().split('T')[0]),
+          lte(schema.attendance.date, endDate.toISOString().split('T')[0]),
+          eq(schema.staff.organizationId, organizationId)
+        )) as any;
+    } else {
+      query = query.where(and(
         gte(schema.attendance.date, startDate.toISOString().split('T')[0]),
         lte(schema.attendance.date, endDate.toISOString().split('T')[0])
-      ));
+      )) as any;
+    }
+
+    const stats = await query;
 
     return {
-      totalPresent: stats[0].totalPresent || 0,
-      totalAbsent: stats[0].totalAbsent || 0,
-      averageHours: stats[0].averageHours || 0
+      totalPresent: Number(stats[0]?.totalPresent) || 0,
+      totalAbsent: Number(stats[0]?.totalAbsent) || 0,
+      averageHours: Number(stats[0]?.averageHours) || 0
     };
   }
 
@@ -1493,12 +1673,22 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getPayrollByMonth(month: number, year: number): Promise<Payroll[]> {
+  async getPayrollByMonth(month: number, year: number, organizationId?: number): Promise<Payroll[]> {
     try {
-      if (!db) {
-        console.log("Database not available, returning empty payroll array for month");
-        return [];
+      if (!db) return [];
+
+      if (organizationId) {
+        return await db.select()
+          .from(schema.payroll)
+          .leftJoin(schema.staff, eq(schema.payroll.staffId, schema.staff.id))
+          .where(and(
+            eq(schema.payroll.month, month),
+            eq(schema.payroll.year, year),
+            eq(schema.staff.organizationId, organizationId)
+          ))
+          .then(res => res.map(r => r.payroll));
       }
+
       return await db.select().from(schema.payroll)
         .where(and(
           eq(schema.payroll.month, month),
@@ -1510,12 +1700,18 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getAllPayroll(): Promise<Payroll[]> {
+  async getAllPayroll(organizationId?: number): Promise<Payroll[]> {
     try {
-      if (!db) {
-        console.log("Database not available, returning empty payroll array");
-        return [];
+      if (!db) return [];
+
+      if (organizationId) {
+        return await db.select()
+          .from(schema.payroll)
+          .leftJoin(schema.staff, eq(schema.payroll.staffId, schema.staff.id))
+          .where(eq(schema.staff.organizationId, organizationId))
+          .then(res => res.map(r => r.payroll));
       }
+
       return await db.select().from(schema.payroll);
     } catch (error) {
       console.error("Error fetching payroll:", error);
@@ -1603,30 +1799,42 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  async getPayrollStats(month: number, year: number): Promise<{
+  async getPayrollStats(month: number, year: number, organizationId?: number): Promise<{
     totalSalaries: number;
     totalDeductions: number;
     totalAllowances: number;
     netPayroll: number;
   }> {
-    const stats = await db
+    let query = db
       .select({
-        totalSalaries: sql<number>`sum(CAST(base_salary AS DECIMAL))`,
-        totalDeductions: sql<number>`sum(CAST(deductions AS DECIMAL))`,
-        totalAllowances: sql<number>`sum(CAST(allowances AS DECIMAL))`,
-        netPayroll: sql<number>`sum(CAST(net_salary AS DECIMAL))`
+        totalSalaries: sql<number>`sum(CAST(${schema.payroll.baseSalary} AS DECIMAL))`,
+        totalDeductions: sql<number>`sum(CAST(${schema.payroll.deductions} AS DECIMAL))`,
+        totalAllowances: sql<number>`sum(CAST(${schema.payroll.allowances} AS DECIMAL))`,
+        netPayroll: sql<number>`sum(CAST(${schema.payroll.netSalary} AS DECIMAL))`
       })
-      .from(schema.payroll)
-      .where(and(
+      .from(schema.payroll);
+
+    if (organizationId) {
+      query = query.leftJoin(schema.staff, eq(schema.payroll.staffId, schema.staff.id))
+        .where(and(
+          eq(schema.payroll.month, month),
+          eq(schema.payroll.year, year),
+          eq(schema.staff.organizationId, organizationId)
+        )) as any;
+    } else {
+      query = query.where(and(
         eq(schema.payroll.month, month),
         eq(schema.payroll.year, year)
-      ));
+      )) as any;
+    }
+
+    const stats = await query;
 
     return {
-      totalSalaries: stats[0].totalSalaries || 0,
-      totalDeductions: stats[0].totalDeductions || 0,
-      totalAllowances: stats[0].totalAllowances || 0,
-      netPayroll: stats[0].netPayroll || 0
+      totalSalaries: Number(stats[0]?.totalSalaries) || 0,
+      totalDeductions: Number(stats[0]?.totalDeductions) || 0,
+      totalAllowances: Number(stats[0]?.totalAllowances) || 0,
+      netPayroll: Number(stats[0]?.netPayroll) || 0
     };
   }
 
@@ -1674,7 +1882,9 @@ export class DatabaseStorage implements IStorage {
         approverPassword: schema.users.password,
         approverRole: schema.users.role,
         approverCreatedAt: schema.users.createdAt,
-        approverUpdatedAt: schema.users.updatedAt
+        approverUpdatedAt: schema.users.updatedAt,
+        organizationId: schema.expenses.organizationId,
+        approverOrganizationId: schema.users.organizationId
       })
       .from(schema.expenses)
       .leftJoin(schema.users, eq(schema.expenses.approvedBy, schema.users.id))
@@ -1702,14 +1912,20 @@ export class DatabaseStorage implements IStorage {
         username: row.approverUsername!,
         password: row.approverPassword!,
         role: row.approverRole!,
+        organizationId: row.approverOrganizationId,
         createdAt: row.approverCreatedAt!,
         updatedAt: row.approverUpdatedAt!
-      } : undefined
+      } : undefined,
+      organizationId: row.organizationId
     };
   }
 
-  async getAllExpenses(): Promise<ExpenseWithApprover[]> {
-    const result = await db
+
+
+
+
+  async getExpensesByCategory(category: string, organizationId?: number): Promise<ExpenseWithApprover[]> {
+    let query = db
       .select({
         id: schema.expenses.id,
         description: schema.expenses.description,
@@ -1720,6 +1936,7 @@ export class DatabaseStorage implements IStorage {
         receiptUrl: schema.expenses.receiptUrl,
         submittedBy: schema.expenses.submittedBy,
         approvedBy: schema.expenses.approvedBy,
+        organizationId: schema.expenses.organizationId,
         createdAt: schema.expenses.createdAt,
         updatedAt: schema.expenses.updatedAt,
         approverId: schema.users.id,
@@ -1729,63 +1946,19 @@ export class DatabaseStorage implements IStorage {
         approverPassword: schema.users.password,
         approverRole: schema.users.role,
         approverCreatedAt: schema.users.createdAt,
-        approverUpdatedAt: schema.users.updatedAt
-      })
-      .from(schema.expenses)
-      .leftJoin(schema.users, eq(schema.expenses.approvedBy, schema.users.id));
-
-    return result.map(row => ({
-      id: row.id,
-      description: row.description,
-      amount: row.amount,
-      category: row.category,
-      date: row.date,
-      status: row.status,
-      receiptUrl: row.receiptUrl,
-      submittedBy: row.submittedBy,
-      approvedBy: row.approvedBy,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      approver: row.approverId ? {
-        id: row.approverId,
-        name: row.approverName,
-        email: row.approverEmail,
-        username: row.approverUsername!,
-        password: row.approverPassword!,
-        role: row.approverRole!,
-        createdAt: row.approverCreatedAt!,
-        updatedAt: row.approverUpdatedAt!
-      } : undefined
-    }));
-  }
-
-  async getExpensesByCategory(category: string): Promise<ExpenseWithApprover[]> {
-    const result = await db
-      .select({
-        id: schema.expenses.id,
-        description: schema.expenses.description,
-        amount: schema.expenses.amount,
-        category: schema.expenses.category,
-        date: schema.expenses.date,
-        status: schema.expenses.status,
-        receiptUrl: schema.expenses.receiptUrl,
-        submittedBy: schema.expenses.submittedBy,
-        approvedBy: schema.expenses.approvedBy,
-        createdAt: schema.expenses.createdAt,
-        updatedAt: schema.expenses.updatedAt,
-        approverId: schema.users.id,
-        approverName: schema.users.name,
-        approverEmail: schema.users.email,
-        approverUsername: schema.users.username,
-        approverPassword: schema.users.password,
-        approverRole: schema.users.role,
-        approverCreatedAt: schema.users.createdAt,
-        approverUpdatedAt: schema.users.updatedAt
+        approverUpdatedAt: schema.users.updatedAt,
+        approverOrganizationId: schema.users.organizationId
       })
       .from(schema.expenses)
       .leftJoin(schema.users, eq(schema.expenses.approvedBy, schema.users.id))
       .where(eq(schema.expenses.category, category));
 
+    if (organizationId) {
+      query = (query as any).where(and(eq(schema.expenses.category, category), eq(schema.expenses.organizationId, organizationId)));
+    }
+
+    const result = await query;
+
     return result.map(row => ({
       id: row.id,
       description: row.description,
@@ -1796,6 +1969,7 @@ export class DatabaseStorage implements IStorage {
       receiptUrl: row.receiptUrl,
       submittedBy: row.submittedBy,
       approvedBy: row.approvedBy,
+      organizationId: row.organizationId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       approver: row.approverId ? {
@@ -1805,14 +1979,15 @@ export class DatabaseStorage implements IStorage {
         username: row.approverUsername!,
         password: row.approverPassword!,
         role: row.approverRole!,
+        organizationId: row.organizationId,
         createdAt: row.approverCreatedAt!,
         updatedAt: row.approverUpdatedAt!
       } : undefined
     }));
   }
 
-  async getExpensesByDateRange(startDate: string, endDate: string): Promise<ExpenseWithApprover[]> {
-    const result = await db
+  async getExpensesByDateRange(startDate: string, endDate: string, organizationId?: number): Promise<ExpenseWithApprover[]> {
+    let query = db
       .select({
         id: schema.expenses.id,
         description: schema.expenses.description,
@@ -1823,6 +1998,7 @@ export class DatabaseStorage implements IStorage {
         receiptUrl: schema.expenses.receiptUrl,
         submittedBy: schema.expenses.submittedBy,
         approvedBy: schema.expenses.approvedBy,
+        organizationId: schema.expenses.organizationId,
         createdAt: schema.expenses.createdAt,
         updatedAt: schema.expenses.updatedAt,
         approverId: schema.users.id,
@@ -1832,14 +2008,26 @@ export class DatabaseStorage implements IStorage {
         approverPassword: schema.users.password,
         approverRole: schema.users.role,
         approverCreatedAt: schema.users.createdAt,
-        approverUpdatedAt: schema.users.updatedAt
+        approverUpdatedAt: schema.users.updatedAt,
+        approverOrganizationId: schema.users.organizationId
       })
       .from(schema.expenses)
-      .leftJoin(schema.users, eq(schema.expenses.approvedBy, schema.users.id))
-      .where(and(
+      .leftJoin(schema.users, eq(schema.expenses.approvedBy, schema.users.id));
+
+    if (organizationId) {
+      query = query.where(and(
+        gte(schema.expenses.date, startDate),
+        lte(schema.expenses.date, endDate),
+        eq(schema.expenses.organizationId, organizationId)
+      )) as any;
+    } else {
+      query = query.where(and(
         gte(schema.expenses.date, startDate),
         lte(schema.expenses.date, endDate)
-      ));
+      )) as any;
+    }
+
+    const result = await query;
 
     return result.map(row => ({
       id: row.id,
@@ -1851,6 +2039,7 @@ export class DatabaseStorage implements IStorage {
       receiptUrl: row.receiptUrl,
       submittedBy: row.submittedBy,
       approvedBy: row.approvedBy,
+      organizationId: row.organizationId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       approver: row.approverId ? {
@@ -1860,6 +2049,7 @@ export class DatabaseStorage implements IStorage {
         username: row.approverUsername!,
         password: row.approverPassword!,
         role: row.approverRole!,
+        organizationId: row.organizationId,
         createdAt: row.approverCreatedAt!,
         updatedAt: row.approverUpdatedAt!
       } : undefined
@@ -2363,7 +2553,10 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getAllFeeStructures(): Promise<FeeStructure[]> {
+  async getAllFeeStructures(organizationId?: number): Promise<FeeStructure[]> {
+    if (organizationId) {
+      return await db.select().from(schema.feeStructure).where(eq(schema.feeStructure.organizationId, organizationId));
+    }
     return await db.select().from(schema.feeStructure);
   }
 
@@ -2389,7 +2582,17 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getAllFeePayments(): Promise<FeePayment[]> {
+  async getAllFeePayments(organizationId?: number): Promise<FeePayment[]> {
+    if (organizationId) {
+      // Need to join with leads to filter by organizationId if not present on payment itself
+      // But looking at schema, feePayments usually links to lead. Let's check schema.
+      // If feePayments doesn't have organizationId, we filter by lead's organizationId.
+      return await db.select()
+        .from(schema.feePayments)
+        .leftJoin(schema.leads, eq(schema.feePayments.leadId, schema.leads.id))
+        .where(eq(schema.leads.organizationId, organizationId))
+        .then(rows => rows.map(r => r.fee_payments)); // Extract just the payment object
+    }
     return await db.select().from(schema.feePayments);
   }
 
@@ -2444,7 +2647,14 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getAllEMandates(): Promise<EMandate[]> {
+  async getAllEMandates(organizationId?: number): Promise<EMandate[]> {
+    if (organizationId) {
+      return await db.select()
+        .from(schema.eMandates)
+        .leftJoin(schema.leads, eq(schema.eMandates.leadId, schema.leads.id))
+        .where(eq(schema.leads.organizationId, organizationId))
+        .then(rows => rows.map(r => r.e_mandates));
+    }
     return await db.select().from(schema.eMandates);
   }
 
@@ -2529,7 +2739,10 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getAllGlobalClassFees(): Promise<GlobalClassFee[]> {
+  async getAllGlobalClassFees(organizationId?: number): Promise<GlobalClassFee[]> {
+    if (organizationId) {
+      return await db.select().from(schema.globalClassFees).where(eq(schema.globalClassFees.organizationId, organizationId));
+    }
     return await db.select().from(schema.globalClassFees);
   }
 
@@ -2565,7 +2778,14 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.emiPlans).where(eq(schema.emiPlans.studentId, studentId));
   }
 
-  async getAllEmiPlans(): Promise<EmiPlan[]> {
+  async getAllEmiPlans(organizationId?: number): Promise<EmiPlan[]> {
+    if (organizationId) {
+      return await db.select()
+        .from(schema.emiPlans)
+        .leftJoin(schema.leads, eq(schema.emiPlans.studentId, schema.leads.id))
+        .where(eq(schema.leads.organizationId, organizationId))
+        .then(rows => rows.map(r => r.emi_plans));
+    }
     return await db.select().from(schema.emiPlans);
   }
 
@@ -3178,6 +3398,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(schema.communicationLogs.sentAt))
       .limit(limit);
   }
+
 }
 
 // Initialize database with admin user and CSV data

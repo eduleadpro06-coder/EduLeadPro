@@ -78,6 +78,7 @@ import StaffDetailModal from "@/components/staff/StaffDetailModal";
 import StaffCSVImport from "@/components/staff/csv-import";
 import StaffActivityTab from "@/components/staff/staff-activity-tab";
 import { Textarea } from "@/components/ui/textarea";
+import PageHeader from "@/components/layout/page-header";
 
 interface Staff {
   id: number;
@@ -209,7 +210,14 @@ export default function StaffAI() {
   const [isCSVImportOpen, setIsCSVImportOpen] = useState(false);
   const [roleFilter, setRoleFilter] = useState('all');
   const [editablePayrollData, setEditablePayrollData] = useState<{
-    [key: number]: { attendedDays: number | ''; basicSalary: number | ''; netSalary: number }
+    [key: number]: {
+      attendedDays: number | '';
+      basicSalary: number | '';
+      allowances: number | ''; // Added allowances
+      deductions: number | ''; // Added deductions
+      overtime: number | '';   // Added overtime
+      netSalary: number
+    }
   }>(() => {
     // Load from localStorage on component mount with month/year key
     const key = 'editablePayrollData_' + selectedMonth + '_' + selectedYear;
@@ -230,6 +238,9 @@ export default function StaffAI() {
     console.log('Loading manualPayrollInputs from localStorage with key:', key, 'data:', saved);
     return saved ? JSON.parse(saved) : {};
   });
+
+  // Track which payroll is currently being edited
+  const [editingPayrollStaffId, setEditingPayrollStaffId] = useState<number | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -301,7 +312,16 @@ export default function StaffAI() {
   // Load existing payroll data from database when month/year changes
   useEffect(() => {
     if (payroll && Array.isArray(payroll) && staff && Array.isArray(staff)) {
-      const existingPayrollData: { [key: number]: { attendedDays: number | ''; basicSalary: number | ''; netSalary: number } } = {};
+      const existingPayrollData: {
+        [key: number]: {
+          attendedDays: number | '';
+          basicSalary: number | '';
+          allowances: number | '';
+          deductions: number | '';
+          overtime: number | '';
+          netSalary: number
+        }
+      } = {};
       const existingManualInputs: { [key: number]: { daysWorked: string | number; basicSalary: number | ''; isManual: boolean } } = {};
 
       (staff as Staff[]).forEach((member: Staff) => {
@@ -313,6 +333,9 @@ export default function StaffAI() {
           existingPayrollData[member.id] = {
             attendedDays: existingPayroll.attendedDays || 30,
             basicSalary: existingPayroll.basicSalary,
+            allowances: existingPayroll.allowances || 0,
+            deductions: existingPayroll.deductions || 0,
+            overtime: existingPayroll.overtime || 0,
             netSalary: existingPayroll.netSalary
           };
         }
@@ -431,6 +454,32 @@ export default function StaffAI() {
     },
   });
 
+  // Delete payroll mutation
+  const deletePayrollMutation = useMutation({
+    mutationFn: async (payrollId: number) => {
+      const response = await fetch(`/api/payroll/${payrollId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete payroll record");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
+      fetchPayrollOverview();
+      toast({
+        title: "Payroll Deleted",
+        description: "The payroll record has been successfully deleted.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error Deleting Payroll",
+        description: error.message || "Failed to delete payroll record.",
+        variant: "destructive"
+      });
+    }
+  });
+
   // PDF generation mutation
   const generateSalarySlipMutation = useMutation({
     mutationFn: async (payrollData: PayrollGeneration & { employeeName: string }) => {
@@ -539,35 +588,7 @@ export default function StaffAI() {
     }
   });
 
-  // Delete payroll mutation
-  const deletePayrollMutation = useMutation({
-    mutationFn: async (payrollId: number) => {
-      const response = await fetch('/api/payroll/' + payrollId, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Failed to delete payroll record");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
-      toast({
-        title: "Success",
-        description: "Payroll record deleted successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: "Failed to delete payroll record: " + error.message,
-        variant: "destructive"
-      });
-    }
-  });
+
 
   // Only initialize editable data when staff changes and editablePayrollData is empty
   useEffect(() => {
@@ -582,13 +603,25 @@ export default function StaffAI() {
       // Only initialize if no existing payroll data
       if (!hasExistingPayroll) {
         console.log('Initializing editablePayrollData');
-        const initialData: { [key: number]: { attendedDays: number | ''; basicSalary: number | ''; netSalary: number } } = {};
+        const initialData: {
+          [key: number]: {
+            attendedDays: number | '';
+            basicSalary: number | '';
+            allowances: number | '';
+            deductions: number | '';
+            overtime: number | '';
+            netSalary: number
+          }
+        } = {};
         (staff as Staff[]).forEach((member: Staff) => {
           const details = calculatePayrollDetails(member);
           initialData[member.id] = {
-            attendedDays: typeof details.attendedDays === 'number' ? details.attendedDays : 30, // Default to 30 days
-            basicSalary: typeof details.basicSalary === 'number' ? details.basicSalary : member.salary, // Default to full salary
-            netSalary: typeof details.netSalary === 'number' ? details.netSalary : member.salary // Default to full salary
+            attendedDays: typeof details.attendedDays === 'number' ? details.attendedDays : 30,
+            basicSalary: typeof details.basicSalary === 'number' ? details.basicSalary : member.salary,
+            allowances: 0,
+            deductions: 0,
+            overtime: 0,
+            netSalary: typeof details.netSalary === 'number' ? details.netSalary : member.salary
           };
         });
         setEditablePayrollData(initialData);
@@ -680,19 +713,32 @@ export default function StaffAI() {
   };
 
   // Add new function to calculate net salary
-  const calculateNetSalary = (staffMember: Staff, attendedDays: number | '', basicSalary: number | '') => {
+  const calculateNetSalary = (staffMember: Staff, attendedDays: number | '', basicSalary: number | '', allowances: number | '', deductions: number | '', overtime: number | '') => {
     const nAttendedDays = Number(attendedDays) || 30;
     const nBasicSalary = Number(basicSalary) || staffMember.salary;
-    // Net Salary = basic salary / 30 * attended days
-    return (nBasicSalary / 30) * nAttendedDays;
+    const nAllowances = Number(allowances) || 0;
+    const nDeductions = Number(deductions) || 0;
+    const nOvertime = Number(overtime) || 0;
+
+    // Net Salary = ((Basic / 30) * Attended) + Allowances + Overtime - Deductions
+    const dailyRate = nBasicSalary / 30;
+    const basePay = dailyRate * nAttendedDays;
+    const net = Math.max(0, basePay + nAllowances + nOvertime - nDeductions);
+    return Math.round(net);
   };
 
-  const handlePayrollDataChange = (staffId: number, field: 'attendedDays' | 'basicSalary', value: string) => {
+  const handlePayrollDataChange = (staffId: number, field: 'attendedDays' | 'basicSalary' | 'allowances' | 'deductions' | 'overtime', value: string) => {
     const staffMember = (staff as Staff[]).find(s => s.id === staffId);
     if (!staffMember) return;
 
-    const currentData = editablePayrollData[staffId];
-    if (!currentData) return;
+    const currentData = editablePayrollData[staffId] || {
+      attendedDays: 30,
+      basicSalary: staffMember.salary,
+      allowances: 0,
+      deductions: 0,
+      overtime: 0,
+      netSalary: staffMember.salary
+    };
 
     // Convert string to number and handle empty input
     const numericValue = value === '' ? '' : Number(value);
@@ -701,7 +747,8 @@ export default function StaffAI() {
     let finalValue = numericValue;
     if (field === 'attendedDays') {
       finalValue = numericValue === '' ? '' : Math.max(0, Math.min(Number(numericValue), 30)); // Allow up to 30 days
-    } else if (field === 'basicSalary') {
+    } else {
+      // For salary, allowances, deductions, overtime - just ensure non-negative
       finalValue = numericValue === '' ? '' : Math.max(0, Number(numericValue));
     }
 
@@ -713,8 +760,11 @@ export default function StaffAI() {
     // Calculate new net salary, always using numbers
     const netSalary = calculateNetSalary(
       staffMember,
-      Number(newData.attendedDays) || 30, // Default to 30 if empty
-      Number(newData.basicSalary) || staffMember.salary // Default to full salary if empty
+      Number(newData.attendedDays) || 0, // treating empty/0 as 0 for calculation safety, though logic handles it
+      Number(newData.basicSalary) || staffMember.salary,
+      Number(newData.allowances) || 0,
+      Number(newData.deductions) || 0,
+      Number(newData.overtime) || 0
     );
 
     setEditablePayrollData(prev => ({
@@ -763,12 +813,19 @@ export default function StaffAI() {
     const payrollEdit = editablePayrollData[staffMember.id] || {};
     const attendedDays = payrollEdit.attendedDays !== undefined ? payrollEdit.attendedDays : 30;
     const basicSalary = payrollEdit.basicSalary !== undefined ? payrollEdit.basicSalary : staffMember.salary;
-    const totalAllowances = 0;
-    const absentDays = 30 - Number(attendedDays);
-    const dailyRate = Number(basicSalary) / 30;
-    const absentDeduction = absentDays * dailyRate;
-    const totalDeductions = absentDeduction;
-    const netSalary = (Number(basicSalary) / 30) * Number(attendedDays);
+    const allowances = payrollEdit.allowances !== undefined && payrollEdit.allowances !== '' ? Number(payrollEdit.allowances) : 0;
+    const deductions = payrollEdit.deductions !== undefined && payrollEdit.deductions !== '' ? Number(payrollEdit.deductions) : 0;
+    const overtime = payrollEdit.overtime !== undefined && payrollEdit.overtime !== '' ? Number(payrollEdit.overtime) : 0;
+
+    // Calculate locally for immediate visual feedback (server will re-calculate)
+    const netSalary = calculateNetSalary(
+      staffMember,
+      attendedDays,
+      basicSalary,
+      allowances,
+      deductions,
+      overtime
+    );
 
     // Ensure all required fields are present and correct
     const payrollData = {
@@ -776,14 +833,14 @@ export default function StaffAI() {
       month: selectedMonth,
       year: selectedYear,
       basicSalary: Number(basicSalary),
-      allowances: Number(totalAllowances),
-      deductions: Number(totalDeductions),
-      overtime: 0,
-      netSalary: Number(netSalary),
+      allowances: allowances,
+      deductions: deductions,
+      overtime: overtime,
+      netSalary: netSalary,
       attendedDays: Number(attendedDays),
       status: 'processed',
-      workingDays: 30,
-      overtimeHours: 0,
+      workingDays: 30, // Default constant
+      overtimeHours: 0, // Not explicitly tracked yet in UI input, distinct from amount
       employeeName: staffMember.name,
     };
 
@@ -1581,19 +1638,14 @@ export default function StaffAI() {
         <EmployeeTabs activeTab={activeTab} setActiveTab={setActiveTab} />
         {activeTab === "overview" && (
           <div className="min-h-screen h-screen bg-gray-50 font-sans overflow-hidden">
-            <div className="w-full px-8 pt-8 pb-4 flex flex-col gap-2">
-              <div className="flex items-center gap-10 w-full">
-                <div className="relative flex-grow">
-                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-800 pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Search contacts by name, email, or company..."
-                    className="pl-10 pr-4 py-2 w-full rounded-lg bg-white text-gray-800 placeholder:text-gray-800/70 focus:outline-none focus:ring-2 focus:ring-[#643ae5] border-none shadow"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <div className="flex gap-2 items-center">
+            <PageHeader
+              title="Staff Management"
+              subtitle="Manage your team members and their information"
+              searchPlaceholder="Search contacts by name, email, or company..."
+              searchValue={searchQuery}
+              onSearchChange={setSearchQuery}
+              filters={
+                <>
                   <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                     <SelectTrigger className="w-40 bg-white border-[#643ae5] text-gray-800">
                       <SelectValue placeholder="All Departments" />
@@ -1616,6 +1668,10 @@ export default function StaffAI() {
                       ))}
                     </SelectContent>
                   </Select>
+                </>
+              }
+              primaryActions={
+                <>
                   <Button variant="outline"
                     className="rounded-lg border border-[#643ae5] bg-white border border-purple-500 text-gray-800 font-medium hover:bg-purple-50 hover:border-[#a084fa] flex items-center gap-2" onClick={() => setIsAddStaffOpen(true)}>
                     <UserPlus className="mr-2 h-4 w-4" /> Add New Employee
@@ -1634,9 +1690,9 @@ export default function StaffAI() {
                   >
                     <Upload className="mr-2 h-4 w-4 text-gray-800" /> Export
                   </Button>
-                </div>
-              </div>
-            </div>
+                </>
+              }
+            />
             {/* Tabs */}
             <div className="w-full px-8 mb-4">
               <div className="flex gap-6 border-b border-[#E0E0E0] items-center justify-between">
@@ -1848,7 +1904,41 @@ export default function StaffAI() {
                     {contactTab === 'Activity' && selectedStaff && <StaffActivityTab staffId={selectedStaff.id} />}
                     {contactTab === 'Payroll' && selectedStaff && (
                       <div className="w-full glass-card rounded-lg border bg-card text-card-foreground shadow-lg p-6" style={{ minHeight: '200px' }}>
-                        <div className="font-semibold mb-2">Current Month Payroll</div>
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="font-semibold">Current Month Payroll</div>
+                          <div className="flex gap-2">
+                            <Select
+                              value={selectedMonth.toString()}
+                              onValueChange={(val) => setSelectedMonth(parseInt(val))}
+                            >
+                              <SelectTrigger className="w-[120px] bg-white border-[#643ae5] text-gray-800">
+                                <SelectValue placeholder="Month" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white border-[#643ae5] text-gray-800">
+                                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                                  <SelectItem key={m} value={m.toString()}>
+                                    {new Date(0, m - 1).toLocaleString('default', { month: 'long' })}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={selectedYear.toString()}
+                              onValueChange={(val) => setSelectedYear(parseInt(val))}
+                            >
+                              <SelectTrigger className="w-[100px] bg-white border-[#643ae5] text-gray-800">
+                                <SelectValue placeholder="Year" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white border-[#643ae5] text-gray-800">
+                                {[2024, 2025, 2026].map((y) => (
+                                  <SelectItem key={y} value={y.toString()}>
+                                    {y}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
                         <table className="w-full text-card-foreground shadow-lg">
                           <thead>
                             <tr>
@@ -1856,6 +1946,7 @@ export default function StaffAI() {
                               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Basic Salary</th>
                               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Allowances</th>
                               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Deductions</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Overtime</th>
                               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Net Salary</th>
                               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
                               <th className="px-8 py-3 text-left text-xs font-medium uppercase tracking-wider">Actions</th>
@@ -1870,7 +1961,7 @@ export default function StaffAI() {
                               return (
                                 <tr key={member.id}>
                                   <td className="px-6 py-4">
-                                    {payrollStatus !== 'processed' ? (
+                                    {payrollStatus !== 'processed' || editingPayrollStaffId === member.id ? (
                                       <Input
                                         type="number"
                                         min={0}
@@ -1884,9 +1975,67 @@ export default function StaffAI() {
                                     )}
                                   </td>
                                   <td className="px-6 py-4">₹{payroll ? Number(payroll.basicSalary).toLocaleString() : Number(member.salary).toLocaleString()}</td>
-                                  <td className="px-6 py-4">₹{payroll ? Number(payroll.allowances).toLocaleString() : '0'}</td>
-                                  <td className="px-6 py-4">₹{payroll ? Number(payroll.deductions).toLocaleString() : '0'}</td>
-                                  <td className="px-6 py-4 font-bold text-green-600">₹{payroll ? Number(payroll.netSalary).toLocaleString() : Number(member.salary).toLocaleString()}</td>
+                                  <td className="px-6 py-4">
+                                    {payrollStatus !== 'processed' || editingPayrollStaffId === member.id ? (
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        value={editablePayrollData[member.id]?.allowances ?? (payroll ? payroll.allowances : 0)}
+                                        onChange={e => handlePayrollDataChange(member.id, 'allowances', e.target.value)}
+                                        className="w-24 text-center"
+                                        placeholder="0"
+                                      />
+                                    ) : (
+                                      `₹${payroll ? Number(payroll.allowances).toLocaleString() : '0'}`
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    {payrollStatus !== 'processed' || editingPayrollStaffId === member.id ? (
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        value={editablePayrollData[member.id]?.deductions ?? (payroll ? payroll.deductions : 0)}
+                                        onChange={e => handlePayrollDataChange(member.id, 'deductions', e.target.value)}
+                                        className="w-24 text-center"
+                                        placeholder="0"
+                                      />
+                                    ) : (
+                                      `₹${payroll ? Number(payroll.deductions).toLocaleString() : '0'}`
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    {payrollStatus !== 'processed' || editingPayrollStaffId === member.id ? (
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        value={editablePayrollData[member.id]?.overtime ?? (payroll ? payroll.overtime : 0)}
+                                        onChange={e => handlePayrollDataChange(member.id, 'overtime', e.target.value)}
+                                        className="w-24 text-center"
+                                        placeholder="0"
+                                      />
+                                    ) : (
+                                      `₹${payroll ? Number(payroll.overtime || 0).toLocaleString() : '0'}`
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 font-bold text-green-600">
+                                    ₹
+                                    {(() => {
+                                      if (payrollStatus === 'processed' && payroll) {
+                                        return Number(payroll.netSalary).toLocaleString();
+                                      }
+                                      // Live calculation
+                                      const basic = Number(member.salary);
+                                      const attended = Number(editablePayrollData[member.id]?.attendedDays ?? 30);
+                                      const allowances = Number(editablePayrollData[member.id]?.allowances ?? 0);
+                                      const deductions = Number(editablePayrollData[member.id]?.deductions ?? 0);
+                                      const overtime = Number(editablePayrollData[member.id]?.overtime ?? 0);
+
+                                      const dailyRate = basic / 30;
+                                      const basePay = dailyRate * attended;
+                                      const net = Math.max(0, basePay + allowances + overtime - deductions);
+                                      return net.toLocaleString(undefined, { maximumFractionDigits: 0 });
+                                    })()}
+                                  </td>
                                   <td className="px-6 py-4">
                                     <span className={
                                       payrollStatus === 'processed' ? 'bg-green-100 text-green-800 px-2 py-1 rounded' :
@@ -1897,14 +2046,19 @@ export default function StaffAI() {
                                     </span>
                                   </td>
                                   <td className="px-8 py-4">
-                                    {payrollStatus !== 'processed' ? (
+                                    {payrollStatus !== 'processed' || editingPayrollStaffId === member.id ? (
                                       <div className="flex gap-2">
-                                        <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => handleGeneratePayroll(member)}>
-                                          Generate
+                                        <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => {
+                                          handleGeneratePayroll(member);
+                                          setEditingPayrollStaffId(null);
+                                        }}>
+                                          {editingPayrollStaffId === member.id ? 'Save' : 'Generate'}
                                         </Button>
-                                        <Button size="sm" variant="destructive" className="px-2 py-2 rounded-full bg-[#643ae5] text-white hover:bg-[#7a7ca0]" title="Delete Employee" onClick={() => { setStaffToDelete(member); setDeleteDialogOpen(true); }}>
-                                          <Trash2 size={16} />
-                                        </Button>
+                                        {editingPayrollStaffId === member.id && (
+                                          <Button size="sm" variant="outline" className="px-4 py-2 text-base rounded-md" onClick={() => setEditingPayrollStaffId(null)}>
+                                            Cancel
+                                          </Button>
+                                        )}
                                       </div>
                                     ) : (
                                       <div className="flex gap-2">
@@ -1914,7 +2068,30 @@ export default function StaffAI() {
                                         <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => setWhatsappModal({ open: true, staff: member, netSalary: payroll ? payroll.netSalary : 0 })}>
                                           Notify
                                         </Button>
-                                        <Button size="sm" variant="destructive" className="px-2 py-2 rounded-full bg-[#643ae5] text-white hover:bg-[#7a7ca0]" title="Delete Employee" onClick={() => { setStaffToDelete(member); setDeleteDialogOpen(true); }}>
+                                        <Button size="sm" variant="outline" className="px-2 py-2 rounded-full border border-gray-300 hover:bg-gray-100 text-gray-600" title="Edit Payroll" onClick={() => {
+                                          if (payroll) {
+                                            // Populate editable data with existing values
+                                            setEditablePayrollData(prev => ({
+                                              ...prev,
+                                              [member.id]: {
+                                                attendedDays: payroll.attendedDays,
+                                                basicSalary: payroll.basicSalary,
+                                                allowances: payroll.allowances || 0,
+                                                deductions: payroll.deductions || 0,
+                                                overtime: payroll.overtime || 0,
+                                                netSalary: payroll.netSalary
+                                              }
+                                            }));
+                                            setEditingPayrollStaffId(member.id);
+                                          }
+                                        }}>
+                                          <Pencil size={16} />
+                                        </Button>
+                                        <Button size="sm" variant="destructive" className="px-2 py-2 rounded-full text-white hover:bg-red-700 bg-red-600" title="Delete Payroll Record" onClick={() => {
+                                          if (payroll && confirm('Are you sure you want to delete this payroll record?')) {
+                                            deletePayrollMutation.mutate(payroll.id);
+                                          }
+                                        }}>
                                           <Trash2 size={16} />
                                         </Button>
                                       </div>
@@ -1937,782 +2114,894 @@ export default function StaffAI() {
           </div>
         )}
         {activeTab === "payroll" && (
-          <Card>
+          <div className="min-h-screen bg-gray-50">
+            <PageHeader
+              title="Payroll Management"
+              subtitle="Manage employee salaries and payment records"
+              showSearch={false}
+              filters={
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">Month:</span>
+                    <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(Number(v))}>
+                      <SelectTrigger className="w-[140px] bg-white border-[#643ae5]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                          <SelectItem key={m} value={m.toString()}>
+                            {new Date(2000, m - 1).toLocaleString('default', { month: 'long' })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">Year:</span>
+                    <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(Number(v))}>
+                      <SelectTrigger className="w-[100px] bg-white border-[#643ae5]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
+                          <SelectItem key={y} value={y.toString()}>
+                            {y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              }
+              primaryActions={
+                <Button
+                  onClick={() => setBulkPayrollOpen(true)}
+                  className="flex items-center gap-2 px-4 h-10 bg-[#643ae5] text-white hover:bg-[#552dbf]"
+                >
+                  <Calculator className="w-4 h-4" />
+                  Generate Bulk Payroll
+                </Button>
+              }
+            />
+            <div className="px-8">
+              <Card>
+                <CardContent className="pt-6">
+                  {/* Payroll Tabs */}
+                  <Tabs defaultValue="current" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="current">Current Month</TabsTrigger>
+                      <TabsTrigger value="history">Payment History</TabsTrigger>
+                      <TabsTrigger value="settings">Settings</TabsTrigger>
+                    </TabsList>
 
-            <CardContent>
-              {/* Payroll Tabs */}
-              <Tabs defaultValue="current" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="current">Current Month</TabsTrigger>
-                  <TabsTrigger value="history">Payment History</TabsTrigger>
-                  <TabsTrigger value="settings">Settings</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="current" className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Current Month Payroll</CardTitle>
-                      <CardDescription>
-                        {/* Removed month dropdown and year display */}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {/* Payroll Controls */}
-                      <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-6">
-                        <div className="flex gap-4 flex-1">
-                          <div className="relative flex-1 max-w-md">
-                            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                            <Input
-                              placeholder="Search staff by name or ID..."
-                              value={searchQuery}
-                              onChange={e => setSearchQuery(e.target.value)}
-                              className="pl-10"
-                            />
+                    <TabsContent value="current" className="space-y-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Current Month Payroll</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {/* Payroll Controls */}
+                          <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-6">
+                            <div className="flex gap-4 flex-1">
+                              <div className="relative flex-1 max-w-md">
+                                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                <Input
+                                  placeholder="Search staff by name or ID..."
+                                  value={searchQuery}
+                                  onChange={e => setSearchQuery(e.target.value)}
+                                  className="pl-10"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2 items-center">
+                              <Button
+                                variant="outline"
+                                onClick={clearPayrollLocalStorage}
+                                className="flex items-center gap-2"
+                              >
+                                Clear Data
+                                <Trash2 size={16} />
+                              </Button>
+                              <Button
+                                onClick={handleGenerateSelectedPayroll}
+                                disabled={selectedPayrollStaff.length === 0}
+                                className="flex items-center gap-2"
+                              >
+                                <Calculator className="mr-2 h-4 w-4" />
+                                Generate Selected
+                              </Button>
+                              <Button
+                                onClick={handleDownloadSelectedSalarySlips}
+                                disabled={selectedPayrollStaff.length === 0}
+                                className="flex items-center gap-2"
+                              >
+                                Download Selected
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex gap-2 items-center">
-                          <Button
-                            variant="outline"
-                            onClick={clearPayrollLocalStorage}
-                            className="flex items-center gap-2"
-                          >
-                            Clear Data
-                            <Trash2 size={16} />
-                          </Button>
-                          <Button
-                            onClick={handleGenerateSelectedPayroll}
-                            disabled={selectedPayrollStaff.length === 0}
-                            className="flex items-center gap-2"
-                          >
-                            <Calculator className="mr-2 h-4 w-4" />
-                            Generate Selected
-                          </Button>
-                          <Button
-                            onClick={handleDownloadSelectedSalarySlips}
-                            disabled={selectedPayrollStaff.length === 0}
-                            className="flex items-center gap-2"
-                          >
-                            Download Selected
-                          </Button>
-                        </div>
-                      </div>
 
-                      {/* Payroll Summary Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
-                          <div className="text-center">
-                            <p className="text-sm text-green-600 font-medium">Total Net Payroll</p>
-                            <p className="text-2xl font-bold text-green-700">
-                              ₹{summaryTotalNetPayroll.toLocaleString()}
-                            </p>
+                          {/* Payroll Summary Cards */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+                              <div className="text-center">
+                                <p className="text-sm text-green-600 font-medium">Total Net Payroll</p>
+                                <p className="text-2xl font-bold text-green-700">
+                                  ₹{summaryTotalNetPayroll.toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                              <div className="text-center">
+                                <p className="text-sm text-blue-600 font-medium">Active Employees</p>
+                                <p className="text-2xl font-bold text-blue-700">
+                                  {summaryActiveEmployees}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+                              <div className="text-center">
+                                <p className="text-sm text-purple-600 font-medium">Processed Payrolls</p>
+                                <p className="text-2xl font-bold text-purple-700">
+                                  {summaryProcessedPayrolls}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                          <div className="text-center">
-                            <p className="text-sm text-blue-600 font-medium">Active Employees</p>
-                            <p className="text-2xl font-bold text-blue-700">
-                              {summaryActiveEmployees}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-                          <div className="text-center">
-                            <p className="text-sm text-purple-600 font-medium">Processed Payrolls</p>
-                            <p className="text-2xl font-bold text-purple-700">
-                              {summaryProcessedPayrolls}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Payroll Table */}
-                      <Card className="border rounded-lg overflow-hidden">
-                        <CardContent className="p-0">
-                          <div className="overflow-x-auto">
-                            <table className="w-full">
-                              <thead className="bg-gray-50 sticky top-0 z-10">
-                                <tr>
-                                  <th className="px-4 py-3">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedPayrollStaff.length === staffTabFiltered.length && staffTabFiltered.length > 0}
-                                      onChange={e => setSelectedPayrollStaff(e.target.checked ? staffTabFiltered.map(s => s.id) : [])}
-                                    />
-                                  </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days Worked</th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Basic Salary</th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Allowances</th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deductions</th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Net Salary</th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                  <th className="px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-100 text-sm font-normal">
-                                {staffTabFiltered.length === 0 ? (
-                                  <tr>
-                                    <td colSpan={9} className="px-6 py-8 text-center text-gray-400">No staff found</td>
-                                  </tr>
-                                ) : (
-                                  staffTabFiltered.map((member) => {
-                                    const payrollData = payrollOverview.find(p => p.id === member.id);
-                                    const payrollStatus = payrollData ? payrollData.payrollStatus : 'pending';
-                                    const payroll = payrollData ? payrollData.payroll : null;
-                                    return (
-                                      <tr key={member.id}>
-                                        <td className="px-4 py-2"><input type="checkbox" checked={selectedPayrollStaff.includes(member.id)} onChange={e => handlePayrollCheckboxChange(member.id, e.target.checked)} /></td>
-                                        <td className="px-6 py-4 font-medium">{member.name}<div className="text-xs text-gray-500">{member.employeeId}</div></td>
-                                        <td className="px-6 py-4">
-                                          {payrollStatus !== 'processed' ? (
-                                            <Input
-                                              type="number"
-                                              min={0}
-                                              max={30}
-                                              value={editablePayrollData[member.id]?.attendedDays ?? (payroll ? payroll.attendedDays : 30)}
-                                              onChange={e => handlePayrollDataChange(member.id, 'attendedDays', e.target.value)}
-                                              className="w-20 text-center"
-                                            />
-                                          ) : (
-                                            payroll ? payroll.attendedDays : '-'
-                                          )}
-                                        </td>
-                                        <td className="px-6 py-4">₹{payroll ? Number(payroll.basicSalary).toLocaleString() : Number(member.salary).toLocaleString()}</td>
-                                        <td className="px-6 py-4">₹{payroll ? Number(payroll.allowances).toLocaleString() : '0'}</td>
-                                        <td className="px-6 py-4">₹{payroll ? Number(payroll.deductions).toLocaleString() : '0'}</td>
-                                        <td className="px-6 py-4 font-bold text-green-600">₹{payroll ? Number(payroll.netSalary).toLocaleString() : Number(member.salary).toLocaleString()}</td>
-                                        <td className="px-6 py-4">
-                                          <span className={
-                                            payrollStatus === 'processed' ? 'bg-green-100 text-green-800 px-2 py-1 rounded' :
-                                              payrollStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 px-2 py-1 rounded' :
-                                                'bg-red-100 text-red-800 px-2 py-1 rounded'
-                                          }>
-                                            {payrollStatus}
-                                          </span>
-                                        </td>
-                                        <td className="px-8 py-4">
-                                          {payrollStatus !== 'processed' ? (
-                                            <div className="flex gap-2">
-                                              <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => handleGeneratePayroll(member)}>
-                                                Generate
-                                              </Button>
-                                              <Button size="sm" variant="destructive" className="px-2 py-2 rounded-full bg-[#643ae5] text-white hover:bg-[#7a7ca0]" title="Delete Employee" onClick={() => { setStaffToDelete(member); setDeleteDialogOpen(true); }}>
-                                                <Trash2 size={16} />
-                                              </Button>
-                                            </div>
-                                          ) : (
-                                            <div className="flex gap-2">
-                                              <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={e => { e.stopPropagation(); handleDownloadSalarySlip(member); }} disabled={payrollStatus !== 'processed'}>
-                                                Download
-                                              </Button>
-                                              <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => setWhatsappModal({ open: true, staff: member, netSalary: payroll ? payroll.netSalary : 0 })}>
-                                                Notify
-                                              </Button>
-                                              <Button size="sm" variant="destructive" className="px-2 py-2 rounded-full bg-[#643ae5] text-white hover:bg-[#7a7ca0]" title="Delete Employee" onClick={() => { setStaffToDelete(member); setDeleteDialogOpen(true); }}>
-                                                <Trash2 size={16} />
-                                              </Button>
-                                            </div>
-                                          )}
-                                        </td>
+                          {/* Payroll Table */}
+                          <Card className="border rounded-lg overflow-hidden">
+                            <CardContent className="p-0">
+                              <div className="overflow-x-auto">
+                                <table className="w-full">
+                                  <thead className="bg-gray-50 sticky top-0 z-10">
+                                    <tr>
+                                      <th className="px-4 py-3">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedPayrollStaff.length === staffTabFiltered.length && staffTabFiltered.length > 0}
+                                          onChange={e => setSelectedPayrollStaff(e.target.checked ? staffTabFiltered.map(s => s.id) : [])}
+                                        />
+                                      </th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days Worked</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Basic Salary</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Allowances</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deductions</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overtime</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Net Salary</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                      <th className="px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-100 text-sm font-normal">
+                                    {staffTabFiltered.length === 0 ? (
+                                      <tr>
+                                        <td colSpan={9} className="px-6 py-8 text-center text-gray-400">No staff found</td>
                                       </tr>
-                                    );
-                                  })
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
+                                    ) : (
+                                      staffTabFiltered.map((member) => {
+                                        const payrollData = payrollOverview.find(p => p.id === member.id);
+                                        const payrollStatus = payrollData ? payrollData.payrollStatus : 'pending';
+                                        const payroll = payrollData ? payrollData.payroll : null;
+                                        return (
+                                          <tr key={member.id}>
+                                            <td className="px-4 py-2"><input type="checkbox" checked={selectedPayrollStaff.includes(member.id)} onChange={e => handlePayrollCheckboxChange(member.id, e.target.checked)} /></td>
+                                            <td className="px-6 py-4 font-medium">{member.name}<div className="text-xs text-gray-500">{member.employeeId}</div></td>
+                                            <td className="px-6 py-4">
+                                              {payrollStatus !== 'processed' ? (
+                                                <Input
+                                                  type="number"
+                                                  min={0}
+                                                  max={30}
+                                                  value={editablePayrollData[member.id]?.attendedDays ?? (payroll ? payroll.attendedDays : 30)}
+                                                  onChange={e => handlePayrollDataChange(member.id, 'attendedDays', e.target.value)}
+                                                  className="w-20 text-center"
+                                                />
+                                              ) : (
+                                                payroll ? payroll.attendedDays : '-'
+                                              )}
+                                            </td>
+                                            <td className="px-6 py-4">₹{payroll ? Number(payroll.basicSalary).toLocaleString() : Number(member.salary).toLocaleString()}</td>
+                                            <td className="px-6 py-4">
+                                              {payrollStatus !== 'processed' ? (
+                                                <Input
+                                                  type="number"
+                                                  min={0}
+                                                  value={editablePayrollData[member.id]?.allowances ?? (payroll ? payroll.allowances : 0)}
+                                                  onChange={e => handlePayrollDataChange(member.id, 'allowances', e.target.value)}
+                                                  className="w-24 text-center"
+                                                  placeholder="0"
+                                                />
+                                              ) : (
+                                                `₹${payroll ? Number(payroll.allowances).toLocaleString() : '0'}`
+                                              )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                              {payrollStatus !== 'processed' ? (
+                                                <Input
+                                                  type="number"
+                                                  min={0}
+                                                  value={editablePayrollData[member.id]?.deductions ?? (payroll ? payroll.deductions : 0)}
+                                                  onChange={e => handlePayrollDataChange(member.id, 'deductions', e.target.value)}
+                                                  className="w-24 text-center"
+                                                  placeholder="0"
+                                                />
+                                              ) : (
+                                                `₹${payroll ? Number(payroll.deductions).toLocaleString() : '0'}`
+                                              )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                              {payrollStatus !== 'processed' ? (
+                                                <Input
+                                                  type="number"
+                                                  min={0}
+                                                  value={editablePayrollData[member.id]?.overtime ?? (payroll ? payroll.overtime : 0)}
+                                                  onChange={e => handlePayrollDataChange(member.id, 'overtime', e.target.value)}
+                                                  className="w-24 text-center"
+                                                  placeholder="0"
+                                                />
+                                              ) : (
+                                                `₹${payroll ? Number(payroll.overtime || 0).toLocaleString() : '0'}`
+                                              )}
+                                            </td>
+                                            <td className="px-6 py-4 font-bold text-green-600">
+                                              ₹
+                                              {(() => {
+                                                if (payrollStatus === 'processed' && payroll) {
+                                                  return Number(payroll.netSalary).toLocaleString();
+                                                }
+                                                // Live calculation
+                                                const basic = Number(member.salary);
+                                                const attended = Number(editablePayrollData[member.id]?.attendedDays ?? 30);
+                                                const allowances = Number(editablePayrollData[member.id]?.allowances ?? 0);
+                                                const deductions = Number(editablePayrollData[member.id]?.deductions ?? 0);
+                                                const overtime = Number(editablePayrollData[member.id]?.overtime ?? 0);
+
+                                                const dailyRate = basic / 30;
+                                                const basePay = dailyRate * attended;
+                                                const net = Math.max(0, basePay + allowances + overtime - deductions);
+                                                return net.toLocaleString(undefined, { maximumFractionDigits: 0 });
+                                              })()}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                              <span className={
+                                                payrollStatus === 'processed' ? 'bg-green-100 text-green-800 px-2 py-1 rounded' :
+                                                  payrollStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 px-2 py-1 rounded' :
+                                                    'bg-red-100 text-red-800 px-2 py-1 rounded'
+                                              }>
+                                                {payrollStatus}
+                                              </span>
+                                            </td>
+                                            <td className="px-8 py-4">
+                                              {payrollStatus !== 'processed' ? (
+                                                <div className="flex gap-2">
+                                                  <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => handleGeneratePayroll(member)}>
+                                                    Generate
+                                                  </Button>
+                                                </div>
+                                              ) : (
+                                                <div className="flex gap-2">
+                                                  <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={e => { e.stopPropagation(); handleDownloadSalarySlip(member); }} disabled={payrollStatus !== 'processed'}>
+                                                    Download
+                                                  </Button>
+                                                  <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => setWhatsappModal({ open: true, staff: member, netSalary: payroll ? payroll.netSalary : 0 })}>
+                                                    Notify
+                                                  </Button>
+                                                  <Button size="sm" variant="destructive" className="px-2 py-2 rounded-full text-white hover:bg-red-700 bg-red-600" title="Delete Payroll Record" onClick={() => {
+                                                    if (payroll && confirm('Are you sure you want to delete this payroll record?')) {
+                                                      deletePayrollMutation.mutate(payroll.id);
+                                                    }
+                                                  }}>
+                                                    <Trash2 size={16} />
+                                                  </Button>
+                                                </div>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </CardContent>
+                          </Card>
                         </CardContent>
                       </Card>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                    </TabsContent>
 
-                <TabsContent value="history" className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Payment History</CardTitle>
-                      <CardDescription>Complete payroll history for all staff members</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {/* Filter Controls */}
-                      <div className="mb-4 flex gap-4 items-center">
-                        <div className="flex items-center gap-2">
-                          <Label>Month:</Label>
-                          <select
-                            value={historyMonth}
-                            onChange={e => setHistoryMonth(Number(e.target.value))}
-                            className="border rounded px-2 py-1"
-                          >
-                            {availableMonths(historyYear).map(m => (
-                              <option key={m} value={m}>{new Date(historyYear, m - 1).toLocaleDateString('en-IN', { month: 'long' })}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Label>Year:</Label>
-                          <select
-                            value={historyYear}
-                            onChange={e => {
-                              const newYear = Number(e.target.value);
-                              setHistoryYear(newYear);
-                              // If current month is not available in new year, set to max available
-                              const months = availableMonths(newYear);
-                              if (!months.includes(historyMonth)) setHistoryMonth(months[0]);
-                            }}
-                            className="border rounded px-2 py-1"
-                          >
-                            {availableYears.map(y => (
-                              <option key={y} value={y}>{y}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Label>Status:</Label>
-                          <select
-                            value={paymentHistoryStatusFilter}
-                            onChange={e => setPaymentHistoryStatusFilter(e.target.value)}
-                            className="border rounded px-2 py-1"
-                          >
-                            <option value="all">All Status</option>
-                            <option value="processed">Processed</option>
-                            <option value="pending">Pending</option>
-                          </select>
-                        </div>
-                      </div>
+                    <TabsContent value="history" className="space-y-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Payment History</CardTitle>
+                          <CardDescription>Complete payroll history for all staff members</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {/* Filter Controls */}
+                          <div className="mb-4 flex gap-4 items-center">
+                            <div className="flex items-center gap-2">
+                              <Label>Month:</Label>
+                              <select
+                                value={historyMonth}
+                                onChange={e => setHistoryMonth(Number(e.target.value))}
+                                className="border rounded px-2 py-1"
+                              >
+                                {availableMonths(historyYear).map(m => (
+                                  <option key={m} value={m}>{new Date(historyYear, m - 1).toLocaleDateString('en-IN', { month: 'long' })}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Label>Year:</Label>
+                              <select
+                                value={historyYear}
+                                onChange={e => {
+                                  const newYear = Number(e.target.value);
+                                  setHistoryYear(newYear);
+                                  // If current month is not available in new year, set to max available
+                                  const months = availableMonths(newYear);
+                                  if (!months.includes(historyMonth)) setHistoryMonth(months[0]);
+                                }}
+                                className="border rounded px-2 py-1"
+                              >
+                                {availableYears.map(y => (
+                                  <option key={y} value={y}>{y}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Label>Status:</Label>
+                              <select
+                                value={paymentHistoryStatusFilter}
+                                onChange={e => setPaymentHistoryStatusFilter(e.target.value)}
+                                className="border rounded px-2 py-1"
+                              >
+                                <option value="all">All Status</option>
+                                <option value="processed">Processed</option>
+                                <option value="pending">Pending</option>
+                              </select>
+                            </div>
+                          </div>
 
-                      {/* Summary Statistics */}
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        <div className="p-4 bg-blue-50 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-blue-600">Total Records</p>
-                              <p className="text-2xl font-bold text-blue-700">{(payroll as Payroll[]).length}</p>
+                          {/* Summary Statistics */}
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div className="p-4 bg-blue-50 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium text-blue-600">Total Records</p>
+                                  <p className="text-2xl font-bold text-blue-700">{(payroll as Payroll[]).length}</p>
+                                </div>
+                                <FileText className="h-8 w-8 text-blue-600" />
+                              </div>
                             </div>
-                            <FileText className="h-8 w-8 text-blue-600" />
-                          </div>
-                        </div>
-                        <div className="p-4 bg-green-50 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-green-600">Processed</p>
-                              <p className="text-2xl font-bold text-green-700">
-                                {(payroll as Payroll[]).filter(p => p.status === 'processed').length}
-                              </p>
+                            <div className="p-4 bg-green-50 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium text-green-600">Processed</p>
+                                  <p className="text-2xl font-bold text-green-700">
+                                    {(payroll as Payroll[]).filter(p => p.status === 'processed').length}
+                                  </p>
+                                </div>
+                                <CheckCircle className="h-8 w-8 text-green-600" />
+                              </div>
                             </div>
-                            <CheckCircle className="h-8 w-8 text-green-600" />
-                          </div>
-                        </div>
-                        <div className="p-4 bg-yellow-50 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-yellow-600">Pending</p>
-                              <p className="text-2xl font-bold text-yellow-700">
-                                {(payroll as Payroll[]).filter(p => p.status === 'pending').length}
-                              </p>
+                            <div className="p-4 bg-yellow-50 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium text-yellow-600">Pending</p>
+                                  <p className="text-2xl font-bold text-yellow-700">
+                                    {(payroll as Payroll[]).filter(p => p.status === 'pending').length}
+                                  </p>
+                                </div>
+                                <Clock className="h-8 w-8 text-yellow-600" />
+                              </div>
                             </div>
-                            <Clock className="h-8 w-8 text-yellow-600" />
-                          </div>
-                        </div>
-                        <div className="p-4 bg-purple-50 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-purple-600">Total Amount</p>
-                              <p className="text-2xl font-bold text-purple-700">
-                                ₹{(payroll as Payroll[]).reduce((sum, p) => sum + Number(p.netSalary), 0).toLocaleString()}
-                              </p>
+                            <div className="p-4 bg-purple-50 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium text-purple-600">Total Amount</p>
+                                  <p className="text-2xl font-bold text-purple-700">
+                                    ₹{(payroll as Payroll[]).reduce((sum, p) => sum + Number(p.netSalary), 0).toLocaleString()}
+                                  </p>
+                                </div>
+                                <IndianRupee className="h-8 w-8 text-purple-600" />
+                              </div>
                             </div>
-                            <IndianRupee className="h-8 w-8 text-purple-600" />
                           </div>
-                        </div>
-                      </div>
 
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Employee</TableHead>
-                            <TableHead>Month</TableHead>
-                            <TableHead>Basic Salary</TableHead>
-                            <TableHead>Allowances</TableHead>
-                            <TableHead>Deductions</TableHead>
-                            <TableHead>Net Salary</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Payment Date</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {((payroll as Payroll[]).filter(p =>
-                            (historyMonth ? p.month === historyMonth : true) &&
-                            (historyYear ? p.year === historyYear : true) &&
-                            (paymentHistoryStatusFilter === 'all' ? true : p.status === paymentHistoryStatusFilter)
-                          )).map((payrollRecord) => {
-                            const staffMember = (staff as Staff[]).find(s => s.id === payrollRecord.staffId);
-                            if (!staffMember) return null;
-                            return (
-                              <TableRow key={payrollRecord.id}>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-medium">{staffMember.name}</div>
-                                    <div className="text-sm text-gray-500">{staffMember.employeeId}</div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="font-medium">
-                                  {new Date(payrollRecord.year, payrollRecord.month - 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
-                                </TableCell>
-                                <TableCell>₹{Number(payrollRecord.basicSalary).toLocaleString()}</TableCell>
-                                <TableCell>₹{Number(payrollRecord.allowances || 0).toLocaleString()}</TableCell>
-                                <TableCell>₹{Number(payrollRecord.deductions || 0).toLocaleString()}</TableCell>
-                                <TableCell className="font-semibold text-green-600">
-                                  ₹{Number(payrollRecord.netSalary).toLocaleString()}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={
-                                    payrollRecord.status === 'processed'
-                                      ? 'bg-green-100 text-green-800 border-green-200'
-                                      : payrollRecord.status === 'pending'
-                                        ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                                        : 'bg-red-100 text-red-800 border-red-200'
-                                  }>
-                                    {payrollRecord.status}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  {payrollRecord.status === 'processed'
-                                    ? new Date(payrollRecord.generatedAt || new Date()).toLocaleDateString('en-IN')
-                                    : '-'
-                                  }
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                          {((payroll as Payroll[]).filter(p =>
-                            (historyMonth ? p.month === historyMonth : true) &&
-                            (historyYear ? p.year === historyYear : true) &&
-                            (paymentHistoryStatusFilter === 'all' ? true : p.status === paymentHistoryStatusFilter)
-                          ).length === 0) && (
+                          <Table>
+                            <TableHeader>
                               <TableRow>
-                                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-                                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                  <p>No payroll records found</p>
-                                  <p className="text-sm">Generate payroll for staff members to see payment history</p>
-                                </TableCell>
+                                <TableHead>Employee</TableHead>
+                                <TableHead>Month</TableHead>
+                                <TableHead>Basic Salary</TableHead>
+                                <TableHead>Allowances</TableHead>
+                                <TableHead>Deductions</TableHead>
+                                <TableHead>Net Salary</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Payment Date</TableHead>
                               </TableRow>
-                            )}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                            </TableHeader>
+                            <TableBody>
+                              {((payroll as Payroll[]).filter(p =>
+                                (historyMonth ? p.month === historyMonth : true) &&
+                                (historyYear ? p.year === historyYear : true) &&
+                                (paymentHistoryStatusFilter === 'all' ? true : p.status === paymentHistoryStatusFilter)
+                              )).map((payrollRecord) => {
+                                const staffMember = (staff as Staff[]).find(s => s.id === payrollRecord.staffId);
+                                if (!staffMember) return null;
+                                return (
+                                  <TableRow key={payrollRecord.id}>
+                                    <TableCell>
+                                      <div>
+                                        <div className="font-medium">{staffMember.name}</div>
+                                        <div className="text-sm text-gray-500">{staffMember.employeeId}</div>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="font-medium">
+                                      {new Date(payrollRecord.year, payrollRecord.month - 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                                    </TableCell>
+                                    <TableCell>₹{Number(payrollRecord.basicSalary).toLocaleString()}</TableCell>
+                                    <TableCell>₹{Number(payrollRecord.allowances || 0).toLocaleString()}</TableCell>
+                                    <TableCell>₹{Number(payrollRecord.deductions || 0).toLocaleString()}</TableCell>
+                                    <TableCell className="font-semibold text-green-600">
+                                      ₹{Number(payrollRecord.netSalary).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge className={
+                                        payrollRecord.status === 'processed'
+                                          ? 'bg-green-100 text-green-800 border-green-200'
+                                          : payrollRecord.status === 'pending'
+                                            ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                                            : 'bg-red-100 text-red-800 border-red-200'
+                                      }>
+                                        {payrollRecord.status}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      {payrollRecord.status === 'processed'
+                                        ? new Date(payrollRecord.generatedAt || new Date()).toLocaleDateString('en-IN')
+                                        : '-'
+                                      }
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                              {((payroll as Payroll[]).filter(p =>
+                                (historyMonth ? p.month === historyMonth : true) &&
+                                (historyYear ? p.year === historyYear : true) &&
+                                (paymentHistoryStatusFilter === 'all' ? true : p.status === paymentHistoryStatusFilter)
+                              ).length === 0) && (
+                                  <TableRow>
+                                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                                      <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                      <p>No payroll records found</p>
+                                      <p className="text-sm">Generate payroll for staff members to see payment history</p>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
 
-                <TabsContent value="settings" className="space-y-4">
-                  {/* Remove the grid with Payroll Settings and Allowance Settings cards here */}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-      <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Add New Employee</DialogTitle>
-            <DialogDescription>Enter the details for the new Employee below</DialogDescription>
-          </DialogHeader>
-          <Form {...addStaffForm}>
-            <form onSubmit={addStaffForm.handleSubmit(onAddStaffSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <FormField control={addStaffForm.control} name="name" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. John Doe" /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={addStaffForm.control} name="phone" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone</FormLabel>
-                      <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={addStaffForm.control} name="role" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role</FormLabel>
-                      <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. Counselor" /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={addStaffForm.control} name="address" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Address</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          value={field.value ?? ''}
-                          placeholder="Enter employee address"
-                          rows={3}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={addStaffForm.control} name="salary" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Salary (₹)</FormLabel>
-                      <FormControl><Input {...field} type="number" value={field.value ?? ''} required min={0} placeholder="e.g. 50000" /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={addStaffForm.control} name="bankAccountNumber" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Bank Account Number</FormLabel>
-                      <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-                <div className="space-y-4">
-                  <FormField control={addStaffForm.control} name="email" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl><Input {...field} type="email" value={field.value ?? ''} placeholder="john.doe@example.com" /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={addStaffForm.control} name="dateOfJoining" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date of Joining</FormLabel>
-                      <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={addStaffForm.control} name="department" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Department</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a department" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="HR">HR</SelectItem>
-                          <SelectItem value="IT">IT</SelectItem>
-                          <SelectItem value="Finance">Finance</SelectItem>
-                          <SelectItem value="Operations">Operations</SelectItem>
-                          <SelectItem value="Marketing">Marketing</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={addStaffForm.control} name="qualifications" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Qualifications</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          value={field.value ?? ''}
-                          placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
-                          rows={3}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={addStaffForm.control} name="ifscCode" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>IFSC Code</FormLabel>
-                      <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={addStaffForm.control} name="panNumber" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>PAN Number</FormLabel>
-                      <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter PAN number" /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button type="button" variant="secondary" onClick={() => setIsAddStaffOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={addStaffForm.formState.isSubmitting}>
-                  {addStaffForm.formState.isSubmitting ? "Adding..." : "Add Staff"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* WhatsApp Modal */}
-      <Dialog open={whatsappModal.open} onOpenChange={(open) => setWhatsappModal({ ...whatsappModal, open })}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Send WhatsApp Notification</DialogTitle>
-            <DialogDescription>
-              Send salary credited notification to {whatsappModal.staff?.name}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="p-4 bg-green-50 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <MessageSquare className="h-5 w-5 text-green-600" />
-                <span className="font-medium text-green-800">Message Preview</span>
-              </div>
-              <div className="text-sm text-green-700 whitespace-pre-line">
-                {whatsappModal.staff && getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary)}
-              </div>
+                    <TabsContent value="settings" className="space-y-4">
+                      {/* Remove the grid with Payroll Settings and Allowance Settings cards here */}
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
             </div>
-            <div className="text-sm text-gray-600">
-              <p>Phone: {whatsappModal.staff?.phone || 'No phone number available'}</p>
-              <p>Net Salary: ₹{whatsappModal.netSalary.toLocaleString()}</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setWhatsappModal({ open: false, staff: null, netSalary: 0 })}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (whatsappModal.staff?.phone) {
-                  const message = getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary);
-                  const whatsappUrl = `https://wa.me/${whatsappModal.staff.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-                  window.open(whatsappUrl, '_blank');
-                  setWhatsappModal({ open: false, staff: null, netSalary: 0 });
-                  toast({
-                    title: "WhatsApp Opened",
-                    description: "WhatsApp has been opened with the salary notification message.",
-                  });
-                } else {
-                  toast({
-                    title: "No Phone Number",
-                    description: "This employee doesn't have a phone number registered.",
-                    variant: "destructive"
-                  });
-                }
-              }}
-              disabled={!whatsappModal.staff?.phone}
-            >
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Open WhatsApp
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      {/* Edit Modal */}
-      {selectedStaff && (
-        <Dialog open={isEditStaffOpen} onOpenChange={setIsEditStaffOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Edit Employee</DialogTitle>
-              <DialogDescription>Edit the details for this employee below</DialogDescription>
-            </DialogHeader>
-            <Form {...editStaffForm}>
-              <form onSubmit={editStaffForm.handleSubmit((data) => {
-                if (!selectedStaff) return;
-                const payload = { ...data, id: selectedStaff.id };
-                editStaffMutation.mutate(payload);
-              })} className="space-y-6">
-                {/* Active/Inactive Toggle */}
-                <FormField control={editStaffForm.control} name="isActive" render={({ field }) => (
-                  <div className="flex items-center gap-4 mb-2">
-                    <Label htmlFor="isActive-toggle" className="text-base font-medium">
-                      {field.value ? "Active" : "Inactive"}
-                    </Label>
-                    <Switch
-                      id="isActive-toggle"
-                      checked={field.value || false}
-                      onCheckedChange={checked => {
-                        console.log("Toggle changed to:", checked);
-                        field.onChange(checked);
-                      }}
-                    />
+            <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Add New Employee</DialogTitle>
+                  <DialogDescription>Enter the details for the new Employee below</DialogDescription>
+                </DialogHeader>
+                <Form {...addStaffForm}>
+                  <form onSubmit={addStaffForm.handleSubmit(onAddStaffSubmit)} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <FormField control={addStaffForm.control} name="name" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Full Name</FormLabel>
+                            <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. John Doe" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={addStaffForm.control} name="phone" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone</FormLabel>
+                            <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={addStaffForm.control} name="role" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Role</FormLabel>
+                            <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. Counselor" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={addStaffForm.control} name="address" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Address</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                {...field}
+                                value={field.value ?? ''}
+                                placeholder="Enter employee address"
+                                rows={3}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={addStaffForm.control} name="salary" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Salary (₹)</FormLabel>
+                            <FormControl><Input {...field} type="number" value={field.value ?? ''} required min={0} placeholder="e.g. 50000" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={addStaffForm.control} name="bankAccountNumber" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Bank Account Number</FormLabel>
+                            <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                      </div>
+                      <div className="space-y-4">
+                        <FormField control={addStaffForm.control} name="email" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl><Input {...field} type="email" value={field.value ?? ''} placeholder="john.doe@example.com" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={addStaffForm.control} name="dateOfJoining" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Date of Joining</FormLabel>
+                            <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={addStaffForm.control} name="department" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Department</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a department" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="HR">HR</SelectItem>
+                                <SelectItem value="IT">IT</SelectItem>
+                                <SelectItem value="Finance">Finance</SelectItem>
+                                <SelectItem value="Operations">Operations</SelectItem>
+                                <SelectItem value="Marketing">Marketing</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={addStaffForm.control} name="qualifications" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Qualifications</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                {...field}
+                                value={field.value ?? ''}
+                                placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
+                                rows={3}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={addStaffForm.control} name="ifscCode" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>IFSC Code</FormLabel>
+                            <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={addStaffForm.control} name="panNumber" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>PAN Number</FormLabel>
+                            <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter PAN number" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                      </div>
+                    </div>
+
+                    <DialogFooter>
+                      <Button type="button" variant="secondary" onClick={() => setIsAddStaffOpen(false)}>Cancel</Button>
+                      <Button type="submit" disabled={addStaffForm.formState.isSubmitting}>
+                        {addStaffForm.formState.isSubmitting ? "Adding..." : "Add Staff"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+
+            {/* WhatsApp Modal */}
+            <Dialog open={whatsappModal.open} onOpenChange={(open) => setWhatsappModal({ ...whatsappModal, open })}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Send WhatsApp Notification</DialogTitle>
+                  <DialogDescription>
+                    Send salary credited notification to {whatsappModal.staff?.name}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MessageSquare className="h-5 w-5 text-green-600" />
+                      <span className="font-medium text-green-800">Message Preview</span>
+                    </div>
+                    <div className="text-sm text-green-700 whitespace-pre-line">
+                      {whatsappModal.staff && getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary)}
+                    </div>
                   </div>
-                )} />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <FormField control={editStaffForm.control} name="name" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. John Doe" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={editStaffForm.control} name="phone" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone</FormLabel>
-                        <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={editStaffForm.control} name="role" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Role</FormLabel>
-                        <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. Counselor" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={editStaffForm.control} name="address" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Address</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            value={field.value ?? ''}
-                            placeholder="Enter employee address"
-                            rows={3}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={editStaffForm.control} name="salary" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Salary (₹)</FormLabel>
-                        <FormControl><Input {...field} type="number" value={field.value ?? ''} required min={0} placeholder="e.g. 50000" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={editStaffForm.control} name="bankAccountNumber" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Bank Account Number</FormLabel>
-                        <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  </div>
-                  <div className="space-y-4">
-                    <FormField control={editStaffForm.control} name="email" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl><Input {...field} type="email" value={field.value ?? ''} required placeholder="e.g. john.doe@example.com" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={editStaffForm.control} name="dateOfJoining" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Date of Joining</FormLabel>
-                        <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={editStaffForm.control} name="department" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Department</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined} value={field.value ?? undefined}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a department" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="HR">HR</SelectItem>
-                            <SelectItem value="IT">IT</SelectItem>
-                            <SelectItem value="Finance">Finance</SelectItem>
-                            <SelectItem value="Operations">Operations</SelectItem>
-                            <SelectItem value="Marketing">Marketing</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={editStaffForm.control} name="qualifications" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Qualifications</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            value={field.value ?? ''}
-                            placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
-                            rows={3}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={editStaffForm.control} name="ifscCode" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>IFSC Code</FormLabel>
-                        <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={editStaffForm.control} name="panNumber" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>PAN Number</FormLabel>
-                        <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter PAN number" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
+                  <div className="text-sm text-gray-600">
+                    <p>Phone: {whatsappModal.staff?.phone || 'No phone number available'}</p>
+                    <p>Net Salary: ₹{whatsappModal.netSalary.toLocaleString()}</p>
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button type="button" variant="secondary" onClick={() => setIsEditStaffOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={addStaffForm.formState.isSubmitting}>
-                    {addStaffForm.formState.isSubmitting ? "Saving..." : "Save Changes"}
+                  <Button
+                    variant="outline"
+                    onClick={() => setWhatsappModal({ open: false, staff: null, netSalary: 0 })}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (whatsappModal.staff?.phone) {
+                        const message = getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary);
+                        const whatsappUrl = `https://wa.me/${whatsappModal.staff.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+                        window.open(whatsappUrl, '_blank');
+                        setWhatsappModal({ open: false, staff: null, netSalary: 0 });
+                        toast({
+                          title: "WhatsApp Opened",
+                          description: "WhatsApp has been opened with the salary notification message.",
+                        });
+                      } else {
+                        toast({
+                          title: "No Phone Number",
+                          description: "This employee doesn't have a phone number registered.",
+                          variant: "destructive"
+                        });
+                      }
+                    }}
+                    disabled={!whatsappModal.staff?.phone}
+                  >
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Open WhatsApp
                   </Button>
                 </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      )}
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Employee</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {staffToDelete?.name}? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-[#643ae5] text-white hover:bg-[#7a7ca0]"
-              onClick={async () => {
-                if (staffToDelete) {
-                  await deleteStaffMutation.mutateAsync(staffToDelete.id);
-                  setDeleteDialogOpen(false);
-                  setStaffToDelete(null);
-                }
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              </DialogContent>
+            </Dialog>
+            {/* Edit Modal */}
+            {
+              selectedStaff && (
+                <Dialog open={isEditStaffOpen} onOpenChange={setIsEditStaffOpen}>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Edit Employee</DialogTitle>
+                      <DialogDescription>Edit the details for this employee below</DialogDescription>
+                    </DialogHeader>
+                    <Form {...editStaffForm}>
+                      <form onSubmit={editStaffForm.handleSubmit((data) => {
+                        if (!selectedStaff) return;
+                        const payload = { ...data, id: selectedStaff.id };
+                        editStaffMutation.mutate(payload);
+                      })} className="space-y-6">
+                        {/* Active/Inactive Toggle */}
+                        <FormField control={editStaffForm.control} name="isActive" render={({ field }) => (
+                          <div className="flex items-center gap-4 mb-2">
+                            <Label htmlFor="isActive-toggle" className="text-base font-medium">
+                              {field.value ? "Active" : "Inactive"}
+                            </Label>
+                            <Switch
+                              id="isActive-toggle"
+                              checked={field.value || false}
+                              onCheckedChange={checked => {
+                                console.log("Toggle changed to:", checked);
+                                field.onChange(checked);
+                              }}
+                            />
+                          </div>
+                        )} />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-4">
+                            <FormField control={editStaffForm.control} name="name" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Full Name</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. John Doe" /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={editStaffForm.control} name="phone" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Phone</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={editStaffForm.control} name="role" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Role</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. Counselor" /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={editStaffForm.control} name="address" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Address</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    {...field}
+                                    value={field.value ?? ''}
+                                    placeholder="Enter employee address"
+                                    rows={3}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={editStaffForm.control} name="salary" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Salary (₹)</FormLabel>
+                                <FormControl><Input {...field} type="number" value={field.value ?? ''} required min={0} placeholder="e.g. 50000" /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={editStaffForm.control} name="bankAccountNumber" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Bank Account Number</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                          </div>
+                          <div className="space-y-4">
+                            <FormField control={editStaffForm.control} name="email" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl><Input {...field} type="email" value={field.value ?? ''} required placeholder="e.g. john.doe@example.com" /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={editStaffForm.control} name="dateOfJoining" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Date of Joining</FormLabel>
+                                <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={editStaffForm.control} name="department" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Department</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined} value={field.value ?? undefined}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select a department" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="HR">HR</SelectItem>
+                                    <SelectItem value="IT">IT</SelectItem>
+                                    <SelectItem value="Finance">Finance</SelectItem>
+                                    <SelectItem value="Operations">Operations</SelectItem>
+                                    <SelectItem value="Marketing">Marketing</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={editStaffForm.control} name="qualifications" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Qualifications</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    {...field}
+                                    value={field.value ?? ''}
+                                    placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
+                                    rows={3}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={editStaffForm.control} name="ifscCode" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>IFSC Code</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={editStaffForm.control} name="panNumber" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>PAN Number</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter PAN number" /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button type="button" variant="secondary" onClick={() => setIsEditStaffOpen(false)}>Cancel</Button>
+                          <Button type="submit" disabled={addStaffForm.formState.isSubmitting}>
+                            {addStaffForm.formState.isSubmitting ? "Saving..." : "Save Changes"}
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              )
+            }
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete {staffToDelete?.name}? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-[#643ae5] text-white hover:bg-[#7a7ca0]"
+                    onClick={async () => {
+                      if (staffToDelete) {
+                        await deleteStaffMutation.mutateAsync(staffToDelete.id);
+                        setDeleteDialogOpen(false);
+                        setStaffToDelete(null);
+                      }
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
-      {/* CSV Import Modal */}
-      {isCSVImportOpen && (
-        <Dialog open={isCSVImportOpen} onOpenChange={setIsCSVImportOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-            <DialogHeader>
-              <DialogTitle>Import Staff Data</DialogTitle>
-              <DialogDescription>
-                Import staff members from a CSV file
-              </DialogDescription>
-            </DialogHeader>
-            <StaffCSVImport
-              onSuccess={() => {
-                setIsCSVImportOpen(false);
-                queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
-              }}
-              onClose={() => setIsCSVImportOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
+            {/* CSV Import Modal */}
+            {
+              isCSVImportOpen && (
+                <Dialog open={isCSVImportOpen} onOpenChange={setIsCSVImportOpen}>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+                    <DialogHeader>
+                      <DialogTitle>Import Staff Data</DialogTitle>
+                      <DialogDescription>
+                        Import staff members from a CSV file
+                      </DialogDescription>
+                    </DialogHeader>
+                    <StaffCSVImport
+                      onSuccess={() => {
+                        setIsCSVImportOpen(false);
+                        queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+                      }}
+                      onClose={() => setIsCSVImportOpen(false)}
+                    />
+                  </DialogContent>
+                </Dialog>
+              )
+            }
+          </div>
+        )}
+      </div>
     </div>
   );
 }

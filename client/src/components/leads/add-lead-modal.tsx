@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -12,11 +12,33 @@ import { Button } from "@/components/ui/button";
 import { insertLeadSchema, type InsertLead, type User, type GlobalClassFee } from "@shared/schema";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { z } from "zod";
 
 interface AddLeadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+// Extends the base schema with refined validation
+const formSchema = insertLeadSchema.superRefine((data, ctx) => {
+  // Check if class is greater than 10
+  const classString = data.class || "";
+  const match = classString.match(/(\d+)/);
+
+  if (match) {
+    const classNum = parseInt(match[0], 10);
+    // If class > 10, Stream is required
+    if (classNum > 10) {
+      if (!data.stream || data.stream.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Stream is required for Class 11 and above",
+          path: ["stream"],
+        });
+      }
+    }
+  }
+});
 
 export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) {
   const { toast } = useToast();
@@ -29,12 +51,12 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
   });
 
   const form = useForm<InsertLead>({
-    resolver: zodResolver(insertLeadSchema),
+    resolver: zodResolver(formSchema),
     mode: "onChange", // Enable real-time validation
     defaultValues: {
       name: "",
       email: "",
-      phone: "",
+      phone: "", // This will be used as Parent Phone
       class: "",
       stream: "",
       status: "new",
@@ -42,10 +64,34 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
       counselorId: undefined,
       notes: "",
       parentName: "",
-      parentPhone: "",
       address: "",
     },
   });
+
+  // Watch class to toggle stream visibility
+  const selectedClass = form.watch("class");
+  const [showStream, setShowStream] = useState(false);
+
+  useEffect(() => {
+    if (selectedClass) {
+      const match = selectedClass.match(/(\d+)/);
+      if (match) {
+        const classNum = parseInt(match[0], 10);
+        const shouldShow = classNum > 10;
+        setShowStream(shouldShow);
+
+        // Clear stream if hidden
+        if (!shouldShow) {
+          form.setValue("stream", "");
+        }
+      } else {
+        setShowStream(false);
+        form.setValue("stream", "");
+      }
+    } else {
+      setShowStream(false);
+    }
+  }, [selectedClass, form]);
 
   // Reset form when modal closes
   useEffect(() => {
@@ -124,13 +170,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
     },
     onError: (error: any) => {
       console.log("Error in createLeadMutation:", error);
-      console.log("Error message:", error.message);
-      console.log("Error status:", error.status);
-      console.log("Error data:", error.errorData);
-      console.log("Full error object:", error);
-
-      // Handle duplicate lead error specifically
-      // Check for 409 status or error message containing duplicate indicators
+      // ... (error handling code remains same as before) ...
       const isDuplicateError = error.status === 409 ||
         (error.message && (
           error.message.includes("already exists") ||
@@ -235,9 +275,9 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone Number *</FormLabel>
+                    <FormLabel>Parent Phone Number *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter phone number" {...field} />
+                      <Input placeholder="Enter parent phone number" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -259,7 +299,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className={`grid ${showStream ? "grid-cols-2" : "grid-cols-1"} gap-4`}>
               <FormField
                 control={form.control}
                 name="class"
@@ -285,30 +325,32 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="stream"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Stream</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select stream" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {streamOptions.map((stream) => (
-                          <SelectItem key={stream} value={stream}>
-                            {stream}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {showStream && (
+                <FormField
+                  control={form.control}
+                  name="stream"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stream *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select stream" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {streamOptions.map((stream) => (
+                            <SelectItem key={stream} value={stream}>
+                              {stream}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -363,35 +405,19 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="parentName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Parent Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter parent name" {...field} value={field.value ?? ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="parentPhone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Parent Phone</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter parent phone" {...field} value={field.value ?? ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="parentName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Parent Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter parent name" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

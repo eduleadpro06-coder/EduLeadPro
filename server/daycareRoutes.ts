@@ -1,5 +1,23 @@
 import { Express } from "express";
-import { daycareStorage } from "./storage.js";
+import { daycareStorage, storage } from "./storage.js";
+import type { Request } from "express";
+
+async function requireOrganizationId(req: Request): Promise<number> {
+    // Check session first (secure)
+    let username = (req as any).session?.username;
+
+    // Fallback to header (legacy/insecure)
+    if (!username) {
+        username = req.headers['x-user-name'] as string;
+    }
+
+    if (!username) throw new Error("Authentication required");
+    const user = await storage.getUserByUsername(username);
+
+    if (!user?.organizationId) throw new Error("Organization context required");
+
+    return user.organizationId;
+}
 
 /**
  * Daycare Management API Routes
@@ -13,8 +31,9 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/children", async (req, res) => {
         try {
+            const organizationId = await requireOrganizationId(req);
             const includeDeleted = req.query.includeDeleted === 'true';
-            const children = await daycareStorage.getAllDaycareChildren(includeDeleted);
+            const children = await daycareStorage.getAllDaycareChildren(includeDeleted, organizationId);
             res.json(children);
         } catch (error) {
             console.error("Error fetching daycare children:", error);
@@ -24,7 +43,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/children/active", async (req, res) => {
         try {
-            const children = await daycareStorage.getActiveDaycareChildren();
+            const organizationId = await requireOrganizationId(req);
+            const children = await daycareStorage.getActiveDaycareChildren(organizationId);
             res.json(children);
         } catch (error) {
             console.error("Error fetching active daycare children:", error);
@@ -38,7 +58,8 @@ export function registerDaycareRoutes(app: Express): void {
             if (!query) {
                 return res.status(400).json({ error: "Search query is required" });
             }
-            const children = await daycareStorage.searchDaycareChildren(query);
+            const organizationId = await requireOrganizationId(req);
+            const children = await daycareStorage.searchDaycareChildren(query, organizationId);
             res.json(children);
         } catch (error) {
             console.error("Error searching daycare children:", error);
@@ -101,10 +122,11 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/inquiries", async (req, res) => {
         try {
+            const organizationId = await requireOrganizationId(req);
             const status = req.query.status as string;
             const inquiries = status
-                ? await daycareStorage.getInquiriesByStatus(status)
-                : await daycareStorage.getAllDaycareInquiries();
+                ? await daycareStorage.getInquiriesByStatus(status, organizationId)
+                : await daycareStorage.getAllDaycareInquiries(organizationId);
             res.json(inquiries);
         } catch (error) {
             console.error("Error fetching daycare inquiries:", error);
@@ -198,7 +220,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/followups/overdue", async (req, res) => {
         try {
-            const followups = await daycareStorage.getOverdueFollowups();
+            const organizationId = await requireOrganizationId(req);
+            const followups = await daycareStorage.getOverdueFollowups(organizationId);
             res.json(followups);
         } catch (error) {
             console.error("Error fetching overdue followups:", error);
@@ -208,7 +231,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/followups/today", async (req, res) => {
         try {
-            const followups = await daycareStorage.getTodayFollowups();
+            const organizationId = await requireOrganizationId(req);
+            const followups = await daycareStorage.getTodayFollowups(organizationId);
             res.json(followups);
         } catch (error) {
             console.error("Error fetching today's followups:", error);
@@ -251,8 +275,9 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/enrollments", async (req, res) => {
         try {
+            const organizationId = await requireOrganizationId(req);
             const includeInactive = req.query.includeInactive === 'true';
-            const enrollments = await daycareStorage.getAllDaycareEnrollments(includeInactive);
+            const enrollments = await daycareStorage.getAllDaycareEnrollments(includeInactive, organizationId);
             res.json(enrollments);
         } catch (error) {
             console.error("Error fetching enrollments:", error);
@@ -387,7 +412,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/attendance/today", async (req, res) => {
         try {
-            const attendance = await daycareStorage.getTodayAttendance();
+            const organizationId = await requireOrganizationId(req);
+            const attendance = await daycareStorage.getTodayAttendance(organizationId);
             res.json(attendance);
         } catch (error) {
             console.error("Error fetching today's attendance:", error);
@@ -397,7 +423,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/attendance/checked-in", async (req, res) => {
         try {
-            const attendance = await daycareStorage.getCurrentlyCheckedIn();
+            const organizationId = await requireOrganizationId(req);
+            const attendance = await daycareStorage.getCurrentlyCheckedIn(organizationId);
             res.json(attendance);
         } catch (error) {
             console.error("Error fetching checked-in children:", error);
@@ -447,7 +474,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/payments", async (req, res) => {
         try {
-            const payments = await daycareStorage.getAllDaycarePayments();
+            const organizationId = await requireOrganizationId(req);
+            const payments = await daycareStorage.getAllDaycarePayments(organizationId);
             res.json(payments);
         } catch (error) {
             console.error("Error fetching payments:", error);
@@ -467,7 +495,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/payments/pending", async (req, res) => {
         try {
-            const payments = await daycareStorage.getPendingPayments();
+            const organizationId = await requireOrganizationId(req);
+            const payments = await daycareStorage.getPendingPayments(organizationId);
             res.json(payments);
         } catch (error) {
             console.error("Error fetching pending payments:", error);
@@ -479,8 +508,9 @@ export function registerDaycareRoutes(app: Express): void {
         try {
             const startDate = new Date(req.query.startDate as string);
             const endDate = new Date(req.query.endDate as string);
+            const organizationId = await requireOrganizationId(req);
 
-            const payments = await daycareStorage.getPaymentsByDateRange(startDate, endDate);
+            const payments = await daycareStorage.getPaymentsByDateRange(startDate, endDate, organizationId);
             res.json(payments);
         } catch (error) {
             console.error("Error fetching payments by date range:", error);
@@ -549,7 +579,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/billing-config", async (req, res) => {
         try {
-            const configs = await daycareStorage.getBillingConfigs();
+            const organizationId = await requireOrganizationId(req);
+            const configs = await daycareStorage.getBillingConfigs(organizationId);
             res.json(configs);
         } catch (error) {
             console.error("Error fetching billing configs:", error);
@@ -559,7 +590,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/billing-config/active", async (req, res) => {
         try {
-            const config = await daycareStorage.getActiveBillingConfig();
+            const organizationId = await requireOrganizationId(req);
+            const config = await daycareStorage.getActiveBillingConfig(organizationId);
             res.json(config);
         } catch (error) {
             console.error("Error fetching active billing config:", error);
@@ -609,7 +641,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/stats", async (req, res) => {
         try {
-            const stats = await daycareStorage.getDaycareStats();
+            const organizationId = await requireOrganizationId(req);
+            const stats = await daycareStorage.getDaycareStats(organizationId);
             res.json(stats);
         } catch (error) {
             console.error("Error fetching daycare stats:", error);
@@ -621,7 +654,8 @@ export function registerDaycareRoutes(app: Express): void {
         try {
             const year = Number(req.query.year);
             const month = Number(req.query.month);
-            const revenue = await daycareStorage.getMonthlyRevenue(year, month);
+            const organizationId = await requireOrganizationId(req);
+            const revenue = await daycareStorage.getMonthlyRevenue(year, month, organizationId);
             res.json({ revenue });
         } catch (error) {
             console.error("Error fetching monthly revenue:", error);
@@ -647,7 +681,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.get("/api/daycare/conversion-rate", async (req, res) => {
         try {
-            const rate = await daycareStorage.getInquiryConversionRate();
+            const organizationId = await requireOrganizationId(req);
+            const rate = await daycareStorage.getInquiryConversionRate(organizationId);
             res.json({ conversionRate: rate });
         } catch (error) {
             console.error("Error fetching conversion rate:", error);

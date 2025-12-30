@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -15,6 +16,7 @@ interface NavBarProps {
 }
 
 const NavBar = ({ items, className, setLocation, user, loading, activeTab, setActiveTab, handleNavClick }: NavBarProps) => {
+  const [location] = useLocation();
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -93,7 +95,7 @@ const NavBar = ({ items, className, setLocation, user, loading, activeTab, setAc
           >
             Return to Dashboard
           </Button>
-        ) : (
+        ) : location === '/login' ? null : (
           <Button
             onClick={() => (setLocation ? setLocation('/login') : window.location.href = '/login')}
             className="rounded-full px-6 py-2 font-semibold text-white bg-gradient-to-r from-blue-500 to-purple-500 shadow hover:scale-105 hover:brightness-110 transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"

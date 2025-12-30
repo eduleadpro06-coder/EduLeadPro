@@ -17,40 +17,57 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// Helper to get auth headers
+const getAuthHeaders = (): Record<string, string> => {
+  try {
+    const userStr = localStorage.getItem('auth_user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      if (user.email) {
+        return { 'x-user-name': user.email };
+      }
+    }
+  } catch (e) {
+    console.error("Error parsing auth user for headers:", e);
+  }
+  return {};
+};
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const headers = {
+    ...(data ? { "Content-Type": "application/json" } : {}),
+    ...getAuthHeaders() // Inject auth header
+  };
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 
   if (!res.ok) {
     console.log("🔍 Response not ok, status:", res.status);
-    
+
     // Try to get JSON response first
     let errorData: any = null;
     let responseText = '';
-    
+
     try {
       const responseClone = res.clone();
       errorData = await responseClone.json();
-      console.log("✅ Successfully parsed JSON error data:", errorData);
     } catch (jsonError) {
-      console.log("❌ Failed to parse JSON, trying text...");
       try {
         responseText = await res.text();
-        console.log("📄 Got text response:", responseText);
       } catch (textError) {
-        console.log("❌ Failed to get text response too");
         responseText = res.statusText;
       }
     }
-    
+
     // Create the error object
     let error: any;
     if (errorData) {
@@ -61,21 +78,12 @@ export async function apiRequest(
       error.details = errorData.details;
       error.cannotDelete = errorData.cannotDelete;
       error.status = res.status;
-      
-      console.log("✅ Created error with JSON data:", {
-        message: error.message,
-        code: error.code,
-        details: !!error.details,
-        status: error.status
-      });
     } else {
       // Fallback to text error
       error = new Error(`${res.status}: ${responseText}`);
       error.status = res.status;
-      
-      console.log("⚠️ Created fallback error:", error.message);
     }
-    
+
     throw error;
   }
 
@@ -87,18 +95,19 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
-      credentials: "include",
-    });
+    async ({ queryKey }) => {
+      const res = await fetch(queryKey[0] as string, {
+        headers: getAuthHeaders(), // Inject auth header
+        credentials: "include",
+      });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
-    }
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
 
-    await throwIfResNotOk(res);
-    return await res.json();
-  };
+      await throwIfResNotOk(res);
+      return await res.json();
+    };
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -107,7 +116,7 @@ export const queryClient = new QueryClient({
       refetchInterval: false,
       refetchOnWindowFocus: false,
       staleTime: Infinity,
-      retry: false,
+      retry: false, // Don't retry on error
     },
     mutations: {
       retry: false,

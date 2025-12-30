@@ -169,24 +169,24 @@ export default function Daycare() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="bg-white p-1 rounded-lg shadow-sm border border-gray-200">
-                    <TabsTrigger value="dashboard" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+                <TabsList className="bg-white p-1 rounded-lg shadow-sm border border-gray-200 w-full justify-start">
+                    <TabsTrigger value="dashboard" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white flex-1">
                         <TrendingUp className="h-4 w-4 mr-2" />
                         Dashboard
                     </TabsTrigger>
-                    <TabsTrigger value="operations" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+                    <TabsTrigger value="operations" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white flex-1">
                         <Clock className="h-4 w-4 mr-2" />
                         Daily Operations
                     </TabsTrigger>
-                    <TabsTrigger value="children" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+                    <TabsTrigger value="children" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white flex-1">
                         <Baby className="h-4 w-4 mr-2" />
                         Children & Plans
                     </TabsTrigger>
-                    <TabsTrigger value="billing" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+                    <TabsTrigger value="billing" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white flex-1">
                         <DollarSign className="h-4 w-4 mr-2" />
                         Billing & Payments
                     </TabsTrigger>
-                    <TabsTrigger value="reports" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+                    <TabsTrigger value="reports" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white flex-1">
                         <FileText className="h-4 w-4 mr-2" />
                         Reports
                     </TabsTrigger>

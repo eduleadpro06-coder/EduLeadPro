@@ -1,14 +1,26 @@
-import { pgTable, text, serial, integer, boolean, timestamp, decimal, varchar, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, varchar, date, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Organizations - Multi-tenant support
+export const organizations = pgTable("organizations", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  settings: jsonb("settings"), // JSON for logo, timezone, billing config, etc.
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("counselor"), // counselor, admin, marketing_head
+  role: text("role").notNull().default("counselor"), // counselor, admin, marketing_head, super_admin
   name: text("name"),
   email: text("email"),
+  organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -35,6 +47,7 @@ export const leads = pgTable("leads", {
   interestedProgram: text("interested_program"),
   admissionLikelihood: text("admission_likelihood"),
   deletedAt: timestamp("deleted_at"),
+  organizationId: integer("organization_id").references(() => organizations.id),
 });
 
 export const followUps = pgTable("follow_ups", {
@@ -74,6 +87,7 @@ export const staff = pgTable("staff", {
   bankAccountNumber: varchar("bank_account_number", { length: 50 }),
   ifscCode: varchar("ifsc_code", { length: 11 }),
   panNumber: varchar("pan_number", { length: 10 }),
+  organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -116,6 +130,7 @@ export const expenses = pgTable("expenses", {
   approvedBy: integer("approved_by").references(() => users.id),
   receiptUrl: varchar("receipt_url", { length: 500 }),
   status: varchar("status", { length: 20 }).default("pending"), // pending, approved, rejected
+  organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -135,6 +150,7 @@ export const students = pgTable("students", {
   dateOfBirth: date("date_of_birth"),
   admissionDate: date("admission_date").notNull(),
   status: varchar("status", { length: 20 }).default("active"), // active, graduated, dropped_out
+  organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -146,6 +162,7 @@ export const feeStructure = pgTable("fee_structure", {
   totalFees: decimal("total_fees", { precision: 10, scale: 2 }).notNull(),
   installments: integer("installments").notNull(),
   academicYear: varchar("academic_year", { length: 20 }).notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -160,6 +177,7 @@ export const globalClassFees = pgTable("global_class_fees", {
   academicYear: varchar("academic_year", { length: 20 }).notNull(),
   description: text("description"),
   isActive: boolean("is_active").default(true),
+  organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -177,6 +195,7 @@ export const feePayments = pgTable("fee_payments", {
   status: varchar("status", { length: 20 }).default("completed"), // completed, pending, failed
   paymentCategory: varchar("payment_category", { length: 50 }).default("fee_payment"), // 'fee_payment' or 'additional_charge'
   chargeType: varchar("charge_type", { length: 50 }), // Type of additional charge (annual_function, sports_day, etc.)
+  organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -192,6 +211,7 @@ export const eMandates = pgTable("e_mandates", {
   startDate: date("start_date").notNull(),
   endDate: date("end_date"),
   bankName: varchar("bank_name", { length: 100 }).notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -223,6 +243,7 @@ export const emiPlans = pgTable("emi_plans", {
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   status: varchar("status", { length: 20 }).default("active"), // active, completed, cancelled
+  organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -301,6 +322,7 @@ export const messageTemplates = pgTable("message_templates", {
   isDefault: boolean("is_default").default(false), // System default templates (cannot be deleted)
   variables: text("variables"), // JSON array of available variables like ["name", "class", "instituteName"]
   createdBy: integer("created_by").references(() => users.id),
+  organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -439,6 +461,7 @@ export const coursePricing = pgTable("course_pricing", {
 });
 
 // Create insert schemas
+export const insertOrganizationSchema = createInsertSchema(organizations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true })
   .extend({
@@ -497,6 +520,7 @@ export const insertCourseSchema = createInsertSchema(courses).omit({ id: true, c
 export const insertCoursePricingSchema = createInsertSchema(coursePricing).omit({ id: true, createdAt: true });
 
 // Create types
+export type Organization = typeof organizations.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
 export type FollowUp = typeof followUps.$inferSelect;
@@ -528,6 +552,7 @@ export type StudentEngagement = typeof studentEngagement.$inferSelect;
 export type Course = typeof courses.$inferSelect;
 export type CoursePricing = typeof coursePricing.$inferSelect;
 
+export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 export type InsertFollowUp = z.infer<typeof insertFollowUpSchema>;
@@ -640,6 +665,9 @@ export const daycareChildren = pgTable("daycare_children", {
   // Status
   status: varchar("status", { length: 20 }).default("active"), // active, inactive, graduated
 
+  // Organization
+  organizationId: integer("organization_id").references(() => organizations.id),
+
   // Metadata
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -669,6 +697,8 @@ export const daycareInquiries = pgTable("daycare_inquiries", {
   notes: text("notes"),
   followUpDate: date("follow_up_date"),
   lastContactedAt: timestamp("last_contacted_at"),
+
+  organizationId: integer("organization_id").references(() => organizations.id),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -729,6 +759,8 @@ export const daycareBillingConfig = pgTable("daycare_billing_config", {
   effectiveFrom: date("effective_from"),
   effectiveUntil: date("effective_until"),
 
+  organizationId: integer("organization_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -749,6 +781,8 @@ export const daycareEnrollments = pgTable("daycare_enrollments", {
   status: varchar("status", { length: 20 }).default("active"), // active, paused, cancelled, completed
   startDate: date("start_date").notNull(),
   endDate: date("end_date"),
+
+  organizationId: integer("organization_id").references(() => organizations.id),
 
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

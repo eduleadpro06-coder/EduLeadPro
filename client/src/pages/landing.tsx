@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useScrollFloat } from "@/hooks/useScrollFloat";
 import { cn } from "@/lib/utils";
-import { 
+import {
   Home,
   GraduationCap,
   TrendingUp,
@@ -32,7 +32,7 @@ import {
   MessageSquarePlus
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
-import FeatureSteps from "@/components/ui/feature-steps";
+
 import Earth from "../../../components/ui/globe";
 // Remove the AnimatedInsights import
 // import AnimatedInsights from "../components/dashboard/animated-insights";
@@ -233,12 +233,16 @@ function TestimonialCarousel() {
               whileHover={{ y: -8, rotate: 2, boxShadow: "0 8px 32px rgba(251,146,60,0.15)" }}
               animate={{ y: [0, -4, 0], boxShadow: ["0 2px 8px #f59e4222", "0 8px 32px #f59e4222", "0 2px 8px #f59e4222"] }}
               transition={{ repeat: Infinity, duration: 4 }}
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 flex flex-col items-center"
+              className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl p-8 flex flex-col items-center relative overflow-hidden"
             >
-              <img src={testimonials[idx].avatar} alt={testimonials[idx].name} className="w-20 h-20 rounded-full mb-4 border-4 border-orange-200 shadow" />
-              <p className="text-lg text-slate-700 dark:text-slate-200 italic mb-4 text-center">"{testimonials[idx].quote}"</p>
-              <div className="font-semibold text-orange-600 dark:text-orange-400">{testimonials[idx].name}</div>
-              <div className="text-slate-500 dark:text-slate-400 text-sm">{testimonials[idx].role}</div>
+              {/* Decorative elements */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none" />
+
+              <img src={testimonials[idx].avatar} alt={testimonials[idx].name} className="w-20 h-20 rounded-full mb-4 border-4 border-orange-200/20 shadow relative z-10" />
+              <p className="text-lg text-slate-200 italic mb-4 text-center relative z-10">"{testimonials[idx].quote}"</p>
+              <div className="font-semibold text-orange-400 relative z-10">{testimonials[idx].name}</div>
+              <div className="text-slate-400 text-sm relative z-10">{testimonials[idx].role}</div>
             </motion.div>
           </motion.div>
         </AnimatePresence2>
@@ -247,7 +251,7 @@ function TestimonialCarousel() {
         {testimonials.map((_, i) => (
           <button
             key={i}
-            className={`w-3 h-3 rounded-full ${i === idx ? "bg-orange-500" : "bg-slate-300 dark:bg-slate-700"}`}
+            className={`w-3 h-3 rounded-full transition-colors ${i === idx ? "bg-orange-500" : "bg-slate-700 hover:bg-slate-600"}`}
             onClick={() => setIdx(i)}
             aria-label={`Show testimonial ${i + 1}`}
           />
@@ -621,7 +625,7 @@ export default function Landing() {
   const navLinkClass =
     "relative text-slate-900 dark:text-slate-100 hover:text-orange-600 dark:hover:text-orange-400 transition-colors font-semibold px-2 py-1 focus:outline-none group";
 
-  const [ripple, setRipple] = useState<{x: number, y: number, key: number} | null>(null);
+  const [ripple, setRipple] = useState<{ x: number, y: number, key: number } | null>(null);
   const ctaButtonRef = useRef<HTMLButtonElement>(null);
 
   function handleCtaClick(e: React.MouseEvent<HTMLButtonElement>) {
@@ -672,7 +676,7 @@ export default function Landing() {
       image: "/assets/forecasting.png" // Indian students in classroom
     },
     {
-      step: "Step 2", 
+      step: "Step 2",
       title: "Revenue Growth Acceleration",
       content: "Increase revenue by 40% through AI-optimized pricing strategies, targeted upselling, and demand prediction algorithms tailored for Indian education.",
       image: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=800&q=80" // Indian rupee notes
@@ -768,7 +772,7 @@ export default function Landing() {
             alt="Dashboard mockup"
             initial={{ opacity: 0, scale: 1, rotateX: 50, y: 0 }}
             animate={{ opacity: 1, scale: 1, rotateX: 0, y: 0 }}
-            transition={{ type: 'spring', stiffness: 50, damping: 24, delay: 0.4}}
+            transition={{ type: 'spring', stiffness: 50, damping: 24, delay: 0.4 }}
             className="mt-10 mb-[-4rem] md:mb-[-6rem] rounded-2xl shadow-2xl max-w-6xl w-full mx-auto border border-white/10 scale-110 max-h-[600px] md:max-h-[700px]"
           />
         </div>
@@ -884,8 +888,8 @@ export default function Landing() {
         <section className="py-20" style={{ background: "#010205" }}>
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-5xl font-bold mb-6">What Our Clients Say</h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
+              <h2 className="text-3xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">What Our Clients Say</h2>
+              <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
                 Hear from educational leaders who have transformed their admissions with EduLead Pro.
               </p>
             </div>
@@ -894,18 +898,18 @@ export default function Landing() {
         </section>
 
         {/* FAQ Section */}
-        <section id="faq-section" style={{ background: "#010205" }}>
+        <section id="faq-section" style={{ background: "#010205" }} className="py-20">
           <div className="container mx-auto px-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
               className="text-center mb-16"
             >
-              <h2 className="text-3xl md:text-5xl font-bold mb-6">
+              <h2 className="text-3xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                 Frequently Asked Questions
               </h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-xl text-slate-300 max-w-2xl mx-auto">
                 Everything you need to know about EduLead Pro
               </p>
             </motion.div>
@@ -920,29 +924,31 @@ export default function Landing() {
                     transition={{ duration: 0.6, delay: index * 0.1 }}
                     className="mb-4"
                   >
-                    <button
-                      onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                      className="w-full p-6 text-left flex justify-between items-center hover:bg-muted/50 transition-colors"
-                    >
-                      <span className="font-semibold">{faq.question}</span>
-                      <ChevronDown
-                        className={`w-5 h-5 transition-transform ${openFaq === index ? "rotate-180" : ""}`}
-                      />
-                    </button>
-                    <AnimatePresence initial={false}>
-                      {openFaq === index && (
-                        <motion.div
-                          key={faq.question + "-content"}
-                          initial={{ opacity: 0, maxHeight: 0 }}
-                          animate={{ opacity: 1, maxHeight: 500 }}
-                          exit={{ opacity: 0, maxHeight: 0 }}
-                          transition={{ duration: 0.4, ease: "easeInOut" }}
-                          className="px-6 pb-6 overflow-hidden"
-                        >
-                          <p className="text-muted-foreground">{faq.answer}</p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-900/30">
+                      <button
+                        onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                        className="w-full p-6 text-left flex justify-between items-center hover:bg-slate-800/50 transition-colors"
+                      >
+                        <span className="font-semibold text-slate-100">{faq.question}</span>
+                        <ChevronDown
+                          className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === index ? "rotate-180" : ""}`}
+                        />
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {openFaq === index && (
+                          <motion.div
+                            key={faq.question + "-content"}
+                            initial={{ opacity: 0, maxHeight: 0 }}
+                            animate={{ opacity: 1, maxHeight: 500 }}
+                            exit={{ opacity: 0, maxHeight: 0 }}
+                            transition={{ duration: 0.4, ease: "easeInOut" }}
+                            className="px-6 pb-6 overflow-hidden"
+                          >
+                            <p className="text-slate-400 leading-relaxed">{faq.answer}</p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -1104,29 +1110,29 @@ export default function Landing() {
             className="w-full h-full"
           />
           <div className="w-full text-center relative z-10 flex justify-center items-center">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
               className="w-full"
             >
-                <h2 className="text-3xl md:text-5xl font-bold mb-6 text-white">
-                  Ready to Transform Your Institution?
-                </h2>
-                <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90 text-white">
-                  Join 500+ educational institutions that have revolutionized their admissions process with EduLead Pro's AI-powered platform.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-                  <Button size="lg" className="px-8 py-4 rounded-full bg-[#643ae5] hover:bg-[#7a4fff] text-white font-bold text-lg shadow-lg border-none transition-all duration-300 hover:scale-105" onClick={() => setLocation('/book-demo')}>
-                    Book a Demo Today
-                    <ArrowRight className="ml-2 w-5 h-5" />
-                  </Button>
-                  <Button size="lg" variant="outline" className="px-8 py-4 rounded-full border-2 border-white text-white hover:bg-white/10 hover:text-white font-bold text-lg" onClick={() => setLocation('/pricing')}>
-                    View Pricing Plans
-                  </Button>           
-                </div>
-                {/* Animated Taglines (if present in original) */}
-                <RotatingTaglines />
+              <h2 className="text-3xl md:text-5xl font-bold mb-6 text-white">
+                Ready to Transform Your Institution?
+              </h2>
+              <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90 text-white">
+                Join 500+ educational institutions that have revolutionized their admissions process with EduLead Pro's AI-powered platform.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+                <Button size="lg" className="px-8 py-4 rounded-full bg-[#643ae5] hover:bg-[#7a4fff] text-white font-bold text-lg shadow-lg border-none transition-all duration-300 hover:scale-105" onClick={() => setLocation('/book-demo')}>
+                  Book a Demo Today
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+                <Button size="lg" variant="outline" className="px-8 py-4 rounded-full border-2 border-white bg-transparent text-white hover:bg-white hover:text-[#010205] font-bold text-lg transition-colors" onClick={() => setLocation('/pricing')}>
+                  View Pricing Plans
+                </Button>
+              </div>
+              {/* Animated Taglines (if present in original) */}
+              <RotatingTaglines />
             </motion.div>
           </div>
         </section>
@@ -1153,7 +1159,7 @@ export default function Landing() {
                   </a>
                 </div>
               </div>
-        
+
               {/* Quick Links */}
               <div>
                 <h4 className="font-semibold text-white mb-4 text-lg">Quick Links</h4>
@@ -1164,7 +1170,7 @@ export default function Landing() {
                   <li><a href="/book-demo" className="hover:text-white transition-colors">Book a Demo</a></li>
                 </ul>
               </div>
-        
+
               {/* Resources */}
               <div>
                 <h4 className="font-semibold text-white mb-4 text-lg">Resources</h4>
@@ -1174,7 +1180,7 @@ export default function Landing() {
                   <li><a href="#contact" className="hover:text-white transition-colors">Contact Us</a></li>
                 </ul>
               </div>
-        
+
               {/* Newsletter */}
               <div>
                 <h4 className="font-semibold text-white mb-4 text-lg">Stay up to date</h4>
@@ -1193,12 +1199,12 @@ export default function Landing() {
                   </Button>
                 </form>
                 <div className="mt-8">
-                   <h6 className="font-semibold text-white mb-4 text-lg whitespace-nowrap">Have Something To Say?</h6>
-                    <FeedbackButton onClick={() => setIsFeedbackFormOpen(true)} />
-                  </div>
-              </div>  
+                  <h6 className="font-semibold text-white mb-4 text-lg whitespace-nowrap">Have Something To Say?</h6>
+                  <FeedbackButton onClick={() => setIsFeedbackFormOpen(true)} />
+                </div>
+              </div>
             </div>
-        
+
             <div className="border-t border-white/10 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center text-slate-500">
               <p className="mb-4 md:mb-0">&copy; {new Date().getFullYear()} EduLead Pro. All rights reserved.</p>
               <div className="flex space-x-6">

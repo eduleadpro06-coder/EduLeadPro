@@ -505,7 +505,9 @@ export default function StudentFees() {
     queryKey: ["/api/leads", "enrolled"],
     queryFn: async () => {
       const response = await fetch("/api/leads?status=enrolled");
-      return response.json();
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
     },
   });
 

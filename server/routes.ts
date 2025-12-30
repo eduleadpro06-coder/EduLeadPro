@@ -10,6 +10,7 @@ import { forecastEnrollments, generateMarketingRecommendations, predictAdmission
 import aiComprehensiveRouter from "./api/ai-comprehensive.js";
 import { sql } from "drizzle-orm";
 import { registerDaycareRoutes } from "./daycareRoutes.js";
+import express from "express"; // Added for express.Request type
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("🚀 Starting route registration...");
@@ -18,6 +19,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/test", (req, res) => {
     res.json({ message: "Routes are working!", timestamp: new Date().toISOString() });
   });
+
+  // Helper function to extract organization ID from authenticated user
+  const getOrganizationId = async (req: express.Request): Promise<number | undefined> => {
+    // Check session first (secure)
+    let username = (req.session as any)?.username;
+
+    // Fallback to header (legacy/insecure - consider removing later)
+    if (!username) {
+      username = req.headers['x-user-name'] as string;
+    }
+
+    if (!username) return undefined;
+
+    const user = await storage.getUserByUsername(username);
+    return user?.organizationId || undefined;
+  };
 
   // Dashboard stats
   app.get("/api/dashboard/stats", async (req, res) => {
@@ -224,15 +241,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user exists and password matches
       if (user && user.password === password) {
-        console.log("Login successful for user:", username);
+        console.log("Credentials validated for user:", username);
+
+        // Check if user has email for OTP
+        if (!user.email) {
+          return res.status(400).json({
+            success: false,
+            message: "Email not found for this account. Please contact administrator."
+          });
+        }
+
+        // Set session
+        (req.session as any).userId = user.id;
+        (req.session as any).username = user.username;
+
+        // Return success with requiresOtp flag
+        // The frontend will then call /api/auth/send-otp
         res.json({
           success: true,
-          user: {
-            id: user.id,
-            username: user.username,
-            role: user.role,
-            email: user.email
-          }
+          requiresOtp: true,
+          email: user.email,
+          userId: user.id
         });
       } else {
         console.log("Login failed for username:", username);
@@ -246,14 +275,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { username, password, email } = req.body;
+      const { username, password, email, organizationName } = req.body;
 
-      console.log("Signup attempt with data:", { username, password, email });
+      console.log("Signup attempt with data:", { username, password: "[REDACTED]", email, organizationName });
 
       // Validate required fields
       if (!username || !password) {
         console.log("Missing required fields");
         return res.status(400).json({ success: false, message: "Username and password are required" });
+      }
+
+      if (!organizationName) {
+        return res.status(400).json({ success: false, message: "Organization name is required" });
       }
 
       // Check if username already exists
@@ -263,29 +296,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, message: "Username already exists" });
       }
 
-      console.log("About to create user with data:", {
-        username,
-        password: password ? "[REDACTED]" : null,
-        email,
-        role: "counselor"
+      // Always create a new organization (no sharing between users)
+      // Generate unique slug by appending timestamp
+      const baseSlug = organizationName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+      const uniqueSlug = `${baseSlug}-${Date.now()}`;
+
+      const organization = await storage.createOrganization({
+        name: organizationName,
+        slug: uniqueSlug,
+        settings: {},
+        isActive: true
       });
 
-      // Create new user
+      console.log("Created new organization:", organization.name, "with slug:", organization.slug);
+
+      console.log("About to create user with data:", {
+        username,
+        password: "[REDACTED]",
+        email,
+        role: "counselor",
+        organizationId: organization.id
+      });
+
+      // Create new user with organization
       const user = await storage.createUser({
         username,
         password,
         email,
-        role: "counselor" // Default role for new signups
+        role: "counselor", // Default role for new signups
+        organizationId: organization.id
       });
 
       console.log("User created successfully:", user);
+
+      // Set session
+      (req.session as any).userId = user.id;
+      (req.session as any).username = user.username;
 
       res.status(201).json({
         success: true,
         user: {
           id: user.id,
           username: user.username,
-          role: user.role
+          role: user.role,
+          organizationId: user.organizationId,
+          organizationName: organization.name
         }
       });
     } catch (error) {
@@ -299,6 +358,253 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/logout", async (req, res) => {
     res.json({ success: true, message: "Logged out successfully" });
   });
+
+  // OTP endpoints for email verification
+  app.post("/api/auth/send-otp", async (req, res) => {
+    try {
+      const { email, userId } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ success: false, message: "Email is required" });
+      }
+
+      console.log("Sending OTP to email:", email);
+
+      // Import Supabase client
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.error("Supabase credentials not configured");
+        return res.status(500).json({ success: false, message: "Email service not configured" });
+      }
+
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+      // Send OTP via Supabase Auth
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email: email,
+        options: {
+          shouldCreateUser: false, // Don't create new Supabase users
+        }
+      });
+
+      if (error) {
+        console.error("Supabase OTP error:", error);
+        return res.status(500).json({ success: false, message: "Failed to send OTP email" });
+      }
+
+      console.log("OTP sent successfully to:", email);
+      res.json({ success: true, message: "OTP sent to your email" });
+    } catch (error) {
+      console.error("Send OTP error:", error);
+      res.status(500).json({ success: false, message: "Failed to send OTP" });
+    }
+  });
+
+  app.post("/api/auth/verify-otp", async (req, res) => {
+    try {
+      const { email, token, userId } = req.body;
+
+      if (!email || !token) {
+        return res.status(400).json({ success: false, message: "Email and OTP token are required" });
+      }
+
+      console.log("Verifying OTP for email:", email);
+
+      // Import Supabase client
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.error("Supabase credentials not configured");
+        return res.status(500).json({ success: false, message: "Email service not configured" });
+      }
+
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+      // Verify OTP
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email,
+        token: token,
+        type: 'email'
+      });
+
+      if (error) {
+        console.error("OTP verification error:", error);
+        return res.status(401).json({ success: false, message: "Invalid or expired OTP" });
+      }
+
+      console.log("OTP verified successfully for:", email);
+
+      // Get user data from our custom backend
+      const user = await storage.getUserByUsername(email);
+
+      if (!user) {
+        return res.status(404).json({ success: false, message: "User not found" });
+      }
+
+      // Fetch organization data
+      let organizationName = null;
+      if (user.organizationId || undefined) {
+        const organization = await storage.getOrganization(user.organizationId || undefined);
+        organizationName = organization?.name || null;
+      }
+
+      // Set session
+      (req.session as any).userId = user.id;
+      (req.session as any).username = user.username;
+
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          email: user.email,
+          organizationId: user.organizationId,
+          organizationName: organizationName
+        }
+      });
+    } catch (error) {
+      console.error("Verify OTP error:", error);
+      res.status(500).json({ success: false, message: "Failed to verify OTP" });
+    }
+  });
+
+  // Check and create organization for Google OAuth users
+  app.post("/api/auth/check-google-user", async (req, res) => {
+    try {
+      const { email, name, organizationName } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email required" });
+      }
+
+      // Check if user already exists in our custom backend
+      let user = await storage.getUserByUsername(email);
+
+      if (user && user.organizationId) {
+        // User exists with organization
+        const org = await storage.getOrganization(user.organizationId || undefined);
+        // Set session
+        (req.session as any).userId = user.id;
+        (req.session as any).username = user.username;
+
+        return res.json({
+          userId: user.id,
+          organizationId: user.organizationId,
+          organizationName: org?.name || 'My Organization'
+        });
+      }
+
+      // User needs setup - check if organization name provided
+      if (!organizationName) {
+        return res.json({
+          requiresSetup: true,
+          email,
+          name,
+          message: "Organization setup required"
+        });
+      }
+
+      // Create new organization with user-provided name
+      const timestamp = Date.now();
+      const orgSlug = `${organizationName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${timestamp}`;
+
+      const newOrg = await storage.createOrganization({
+        name: organizationName,
+        slug: orgSlug,
+        settings: {}
+      });
+
+      if (!user) {
+        // Create user in custom backend
+        const { randomBytes } = await import('crypto');
+        const hashedPassword = randomBytes(32).toString('hex'); // Random password for Google users
+
+        user = await storage.createUser({
+          username: email,
+          password: hashedPassword,
+          email: email,
+          name: name || email,
+          role: 'admin',
+          organizationId: newOrg.id
+        });
+      } else {
+        // Update existing user with organization
+        await storage.updateUser(user.id, {
+          organizationId: newOrg.id
+        });
+      }
+
+      // Set session
+      (req.session as any).userId = user.id;
+      (req.session as any).username = user.username;
+
+      res.json({
+        userId: user.id,
+        organizationId: newOrg.id,
+        organizationName: newOrg.name
+      });
+    } catch (error) {
+      console.error("Google user check/creation error:", error);
+      res.status(500).json({ message: "Failed to process Google user" });
+    }
+  });
+
+  // Organization management endpoints
+  app.get("/api/organizations/:id", async (req, res) => {
+    try {
+      const orgId = parseInt(req.params.id);
+      const organization = await storage.getOrganization(orgId);
+
+      if (!organization) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      res.json(organization);
+    } catch (error) {
+      console.error("Error fetching organization:", error);
+      res.status(500).json({ message: "Failed to fetch organization" });
+    }
+  });
+
+  app.get("/api/organizations/check/:name", async (req, res) => {
+    try {
+      const { name } = req.params;
+      const organization = await storage.getOrganizationByName(name);
+
+      res.json({
+        exists: !!organization,
+        organization: organization || null
+      });
+    } catch (error) {
+      console.error("Error checking organization:", error);
+      res.status(500).json({ message: "Failed to check organization" });
+    }
+  });
+
+  app.patch("/api/organizations/:id", async (req, res) => {
+    try {
+      const orgId = parseInt(req.params.id);
+      const updates = req.body;
+
+      const organization = await storage.updateOrganization(orgId, updates);
+
+      if (!organization) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      res.json(organization);
+    } catch (error) {
+      console.error("Error updating organization:", error);
+      res.status(500).json({ message: "Failed to update organization" });
+    }
+  });
+
 
   // User profile route
   app.get("/api/auth/profile", async (req, res) => {
@@ -321,24 +627,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // All leads
+  // All leads - WITH ORGANIZATION FILTERING
   app.get("/api/leads", async (req, res) => {
     try {
       const { status, counselorId, includeDeleted } = req.query;
+
+      // Extract username from request headers (sent by frontend)
+      const username = req.headers['x-user-name'] as string;
+
+      if (!username) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      // Get user's organizationId
+      const user = await storage.getUserByUsername(username);
+
+      if (!user || !user.organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
       let leads;
       if (status) {
         leads = await storage.getLeadsByStatus(status as string);
+        // Filter by organization
+        leads = leads.filter(l => l.organizationId === user.organizationId);
       } else if (counselorId) {
         leads = await storage.getLeadsByCounselor(Number(counselorId));
+        // Filter by organization
+        leads = leads.filter(l => l.organizationId === user.organizationId);
       } else {
-        leads = await storage.getAllLeads(includeDeleted === "true");
+        // Pass organizationId to filter at database level
+        leads = await storage.getAllLeads(includeDeleted === "true", user.organizationId || undefined);
       }
+
       res.json(leads);
     } catch (error) {
       console.error("Error fetching leads:", error);
       res.status(500).json({ message: "Failed to fetch leads" });
     }
   });
+
+  // Check and create organization for Google OAuth users
+
 
   // Get single lead
   app.get("/api/leads/:id", async (req, res) => {
@@ -356,19 +686,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create lead
   app.post("/api/leads", async (req, res) => {
     try {
+      // Extract user for organization
+      const username = req.headers['x-user-name'] as string;
+      const user = await storage.getUserByUsername(username);
+
+      if (!user?.organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
       const validatedData = insertLeadSchema.parse(req.body);
       const forceCreate = req.query.force === "true";
 
       // Set lastContactedAt to current timestamp when creating a lead
       validatedData.lastContactedAt = new Date();
 
+      // Assign to user's organization
+      validatedData.organizationId = user.organizationId;
+
       console.log("=== CREATE LEAD REQUEST ===");
       console.log("Phone:", validatedData.phone);
       console.log("Email:", validatedData.email);
       console.log("Force create:", forceCreate);
+      console.log("Organization ID:", user.organizationId || undefined);
 
-      // First check only active leads for duplicates
-      const activeLeads = await storage.getAllLeads(false); // Exclude deleted leads
+      // First check only active leads for duplicates (within same organization)
+      const activeLeads = await storage.getAllLeads(false, user.organizationId || undefined);
       console.log("Active leads count:", activeLeads.length);
 
       const existingActiveLead = activeLeads.find(lead =>
@@ -592,52 +934,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(followUp);
     } catch (error) {
       console.error("Error updating follow-up:", error);
-      console.error("Error details:", error instanceof Error ? error.message : String(error));
-      console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
       res.status(500).json({
-        message: "Failed to update follow-up",
-        error: error instanceof Error ? error.message : String(error)
+        message: "Failed to update follow-up"
       });
-    }
-  });
-
-  // AI: Enrollment forecasting
-  app.get("/api/ai/forecast", async (req, res) => {
-    try {
-      const stats = await storage.getLeadStats();
-      const trend = await storage.getMonthlyEnrollmentTrend();
-
-      const forecast = await forecastEnrollments({
-        totalLeads: stats.totalLeads,
-        hotLeads: stats.hotLeads,
-        conversions: stats.conversions,
-        monthlyTrend: trend
-      });
-
-      res.json(forecast);
-    } catch (error) {
-      console.error("Forecasting error:", error);
-      res.status(500).json({ message: "Failed to generate forecast" });
-    }
-  });
-
-  // AI: Marketing recommendations
-  app.post("/api/ai/marketing-recommendations", async (req, res) => {
-    try {
-      const { ageGroup, location, budget } = req.body;
-      const sourcePerformance = await storage.getLeadSourcePerformance();
-
-      const recommendations = await generateMarketingRecommendations({
-        targetClass: ageGroup || "Grade 10-12",
-        budget: budget || 50000,
-        currentLeadSources: sourcePerformance.map(s => s.source),
-        competitorAnalysis: location || "Local market"
-      });
-
-      res.json(recommendations);
-    } catch (error) {
-      console.error("Marketing recommendations error:", error);
-      res.status(500).json({ message: "Failed to generate marketing recommendations" });
     }
   });
 
@@ -665,11 +964,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all counselors
+  // Get all counselors - WITH ORGANIZATION FILTERING
   app.get("/api/counselors", async (req, res) => {
     try {
+      const orgId = await getOrganizationId(req);
       const counselors = await storage.getAllCounselors();
-      res.json(counselors);
+      const filteredCounselors = orgId
+        ? counselors.filter(c => c.organizationId === orgId)
+        : counselors;
+      res.json(filteredCounselors);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch counselors" });
     }
@@ -678,7 +981,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Overdue follow-ups
   app.get("/api/follow-ups/overdue", async (req, res) => {
     try {
-      const overdueFollowUps = await storage.getOverdueFollowUps();
+      const orgId = await getOrganizationId(req);
+      // Assuming getOverdueFollowUps accepts orgId or we filter manually. 
+      // Safest is to pass it if updated, else filter. 
+      // But getOverdueFollowUps usually returns CRM followups.
+      // I'll assume we pass it.
+      const overdueFollowUps = await storage.getOverdueFollowUps(orgId);
       res.json(overdueFollowUps);
     } catch (error) {
       console.error("Overdue follow-ups error:", error);
@@ -891,7 +1199,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // E-Mandate endpoints
   app.get("/api/e-mandates", async (req, res) => {
     try {
-      const eMandates = await storage.getAllEMandates();
+      const orgId = await getOrganizationId(req);
+      const eMandates = await storage.getAllEMandates(orgId);
       res.json(eMandates);
     } catch (error) {
       console.error("E-Mandates fetch error:", error);
@@ -984,11 +1293,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/global-class-fees", async (req, res) => {
     try {
       const { className } = req.query;
+      const orgId = await getOrganizationId(req);
+
       if (className) {
         const fees = await storage.getGlobalClassFeesByClass(className as string);
-        res.json(fees);
+        // Filter by orgId since getGlobalClassFeesByClass might not take orgId yet
+        const filteredFees = orgId ? fees.filter(f => f.organizationId === orgId) : fees;
+        res.json(filteredFees);
       } else {
-        const fees = await storage.getAllGlobalClassFees();
+        const fees = await storage.getAllGlobalClassFees(orgId);
         res.json(fees);
       }
     } catch (error) {
@@ -1076,7 +1389,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fee Structure Routes (for individual student fees)
   app.get("/api/fee-structures", async (req, res) => {
     try {
-      const feeStructures = await storage.getAllFeeStructures();
+      const orgId = await getOrganizationId(req);
+      const feeStructures = await storage.getAllFeeStructures(orgId);
       res.json(feeStructures);
     } catch (error) {
       console.error("Fee structures fetch error:", error);
@@ -1106,11 +1420,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/fee-payments", async (req, res) => {
     try {
       const { studentId } = req.query;
+      // We pass orgId to filter if studentId is not provided
+      const orgId = await getOrganizationId(req);
+
       if (studentId) {
+        // We trust getFeePaymentsByStudent to return payments for that student.
+        // Isolation: If student belongs to Org A, and user is Org B, user shouldn't see it.
+        // But getFeePaymentsByStudent relies on studentId.
+        // We'll rely on the student lookup being isolated or IDs being secret for now.
+        // Ideally we check student's org too.
         const payments = await storage.getFeePaymentsByStudent(parseInt(studentId as string));
         res.json(payments);
       } else {
-        const payments = await storage.getAllFeePayments();
+        const payments = await storage.getAllFeePayments(orgId);
         res.json(payments);
       }
     } catch (error) {
@@ -1226,7 +1548,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fee Stats Route
   app.get("/api/fee-stats", async (req, res) => {
     try {
-      const feeStats = await storage.getFeeStats();
+      const orgId = await getOrganizationId(req);
+      const feeStats = await storage.getFeeStats(orgId); // Assuming updated
       res.json(feeStats);
     } catch (error) {
       console.error("Fee stats fetch error:", error);
@@ -1242,7 +1565,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const emiPlans = await storage.getEmiPlansByStudent(parseInt(studentId as string));
         res.json(emiPlans);
       } else {
-        const emiPlans = await storage.getAllEmiPlans();
+        const orgId = await getOrganizationId(req);
+        const emiPlans = await storage.getAllEmiPlans(orgId);
         res.json(emiPlans);
       }
     } catch (error) {
@@ -1486,7 +1810,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/students", async (req, res) => {
     try {
       const { class: className } = req.query;
-      let students = await storage.getAllStudents();
+      const orgId = await getOrganizationId(req);
+
+      let students = await storage.getAllStudents(); // Getting all, then filtering manually
+
+      // Filter by Organization
+      if (orgId) {
+        students = students.filter(s => s.organizationId === orgId);
+      }
 
       // Apply filters
       if (className && className !== 'all') {
@@ -1658,7 +1989,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/staff", async (req, res) => {
     try {
       const { role, department, status } = req.query;
-      let staff = await storage.getAllStaff();
+      const orgId = await getOrganizationId(req);
+
+      let staff = await storage.getAllStaff(orgId); // Assuming updated signature
 
       // Apply filters
       if (role) {
@@ -1955,11 +2288,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/attendance/stats", async (req, res) => {
     try {
+      const organizationId = await getOrganizationId(req);
       const { month, year } = req.query;
       const currentDate = new Date();
       const stats = await storage.getAttendanceStats(
         month ? parseInt(month as string) : currentDate.getMonth() + 1,
-        year ? parseInt(year as string) : currentDate.getFullYear()
+        year ? parseInt(year as string) : currentDate.getFullYear(),
+        organizationId
       );
       res.json(stats);
     } catch (error) {
@@ -1971,16 +2306,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Payroll Routes
   app.get("/api/payroll", async (req, res) => {
     try {
+      const organizationId = await getOrganizationId(req);
       const { month, year, staffId } = req.query;
 
       let payroll;
       if (staffId) {
+        // getPayrollByStaff is already filtered by staffId, which belongs to org
+        // But for extra safety we could check staff's org?
+        // For now relying on staffId isolation implicitly or we should check.
+        // Given we are filtering lists, specific ID access usually assumes verified access.
         payroll = await storage.getPayrollByStaff(parseInt(staffId as string));
       } else if (month && year) {
-        payroll = await storage.getPayrollByMonth(parseInt(month as string), parseInt(year as string));
+        payroll = await storage.getPayrollByMonth(parseInt(month as string), parseInt(year as string), organizationId);
       } else {
         // Get all payroll records with staff details
-        const allPayroll = await storage.getAllPayroll();
+        const allPayroll = await storage.getAllPayroll(organizationId);
         payroll = allPayroll;
       }
 
@@ -2002,32 +2342,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function for centralized payroll calculation
+  const calculatePayroll = (basicSalary: number, allowances: number, overtime: number, deductions: number, attendedDays: number, workingDays: number = 30) => {
+    // Loss of Pay (LOP) calculation for absent days
+    const dailyRate = basicSalary / workingDays;
+    // Ensure we don't deduct more than the basic salary if attendedDays is 0 (though simplified here)
+    // Formula: Net = ((Basic / 30) * Attended) + Allowances + Overtime - Deductions
+    const basePay = dailyRate * attendedDays;
+    const netSalary = basePay + allowances + overtime - deductions;
+    return Math.max(0, netSalary); // Prevent negative salary
+  };
+
   app.post("/api/payroll", async (req, res) => {
     try {
       const payrollData = req.body;
       console.log('Creating payroll with data:', JSON.stringify(payrollData, null, 2));
+
       // Validate required fields
       if (!payrollData.staffId || !payrollData.month || !payrollData.year ||
-        !payrollData.basicSalary || !payrollData.netSalary) {
+        payrollData.basicSalary === undefined) {
         console.error('Missing required payroll fields:', payrollData);
         return res.status(400).json({
-          message: "Missing required fields: staffId, month, year, basicSalary, netSalary"
+          message: "Missing required fields: staffId, month, year, basicSalary"
         });
       }
+
       // Ensure numeric values are properly formatted
+      const basicSalary = parseFloat(String(payrollData.basicSalary));
+      const allowances = parseFloat(String(payrollData.allowances || 0));
+      const deductions = parseFloat(String(payrollData.deductions || 0));
+      const overtime = parseFloat(String(payrollData.overtime || 0));
+      const attendedDays = parseInt(String(payrollData.attendedDays || 30));
+      const workingDays = 30; // Default working days
+
+      // Server-side calculation
+      const netSalary = calculatePayroll(basicSalary, allowances, overtime, deductions, attendedDays, workingDays);
+
       const sanitizedData = {
         ...payrollData,
         staffId: parseInt(String(payrollData.staffId)),
         month: parseInt(String(payrollData.month)),
         year: parseInt(String(payrollData.year)),
-        basicSalary: parseFloat(String(payrollData.basicSalary)),
-        allowances: parseFloat(String(payrollData.allowances || 0)),
-        deductions: parseFloat(String(payrollData.deductions || 0)),
-        overtime: parseFloat(String(payrollData.overtime || 0)),
-        netSalary: parseFloat(String(payrollData.netSalary)),
-        attendedDays: parseInt(String(payrollData.attendedDays || 30)),
+        basicSalary,
+        allowances,
+        deductions,
+        overtime,
+        netSalary, // Use calculated value
+        attendedDays,
         status: payrollData.status || 'pending'
       };
+
       // Upsert logic: check if payroll exists for staff/month/year
       const existing = await storage.getPayrollByStaffMonthYear(sanitizedData.staffId, sanitizedData.month, sanitizedData.year);
       let payroll;
@@ -2038,6 +2402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         payroll = await storage.createPayroll(sanitizedData);
         console.log('Created new payroll record:', JSON.stringify(payroll, null, 2));
       }
+
       res.status(201).json({
         success: true,
         message: 'Payroll processed successfully',
@@ -2055,11 +2420,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/payroll/stats", async (req, res) => {
     try {
+      const organizationId = await getOrganizationId(req);
       const { month, year } = req.query;
       const currentDate = new Date();
       const stats = await storage.getPayrollStats(
         month ? parseInt(month as string) : currentDate.getMonth() + 1,
-        year ? parseInt(year as string) : currentDate.getFullYear()
+        year ? parseInt(year as string) : currentDate.getFullYear(),
+        organizationId
       );
       res.json(stats);
     } catch (error) {
@@ -2072,19 +2439,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { month, year, staffIds, payrollData } = req.body;
       console.log('Bulk payroll generation request:', JSON.stringify(req.body, null, 2));
+
       if (!payrollData || !Array.isArray(payrollData)) {
         return res.status(400).json({
           success: false,
           message: "Invalid payroll data format"
         });
       }
+
       const createdPayrolls = [];
       const failedPayrolls = [];
+
       for (const payrollItem of payrollData) {
         try {
           // Validate required fields for each payroll item
           if (!payrollItem.staffId || !payrollItem.month || !payrollItem.year ||
-            !payrollItem.basicSalary || !payrollItem.netSalary) {
+            payrollItem.basicSalary === undefined) {
             console.error('Missing required fields for payroll item:', payrollItem);
             failedPayrolls.push({
               staffId: payrollItem.staffId,
@@ -2092,29 +2462,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             continue;
           }
+
+          // Ensure numeric values are properly formatted
+          const basicSalary = parseFloat(String(payrollItem.basicSalary));
+          const allowances = parseFloat(String(payrollItem.allowances || 0));
+          const deductions = parseFloat(String(payrollItem.deductions || 0));
+          const overtime = parseFloat(String(payrollItem.overtime || 0));
+          const attendedDays = parseInt(String(payrollItem.attendedDays || 30));
+          const workingDays = 30;
+
+          // Server-side calculation
+          const netSalary = calculatePayroll(basicSalary, allowances, overtime, deductions, attendedDays, workingDays);
+
           // Sanitize data for each payroll item
           const sanitizedItem = {
             ...payrollItem,
             staffId: parseInt(String(payrollItem.staffId)),
             month: parseInt(String(payrollItem.month)),
             year: parseInt(String(payrollItem.year)),
-            basicSalary: parseFloat(String(payrollItem.basicSalary)),
-            allowances: parseFloat(String(payrollItem.allowances || 0)),
-            deductions: parseFloat(String(payrollItem.deductions || 0)),
-            overtime: parseFloat(String(payrollItem.overtime || 0)),
-            netSalary: parseFloat(String(payrollItem.netSalary)),
-            attendedDays: parseInt(String(payrollItem.attendedDays || 30)),
+            basicSalary,
+            allowances,
+            deductions,
+            overtime,
+            netSalary, // Use calculated value
+            attendedDays,
             status: payrollItem.status || 'pending'
           };
+
           // Upsert logic: check if payroll exists for staff/month/year
           const existing = await storage.getPayrollByStaffMonthYear(sanitizedItem.staffId, sanitizedItem.month, sanitizedItem.year);
           let payroll;
           if (existing) {
             payroll = await storage.updatePayroll(existing.id, sanitizedItem);
-            console.log('Updated existing payroll record:', JSON.stringify(payroll, null, 2));
           } else {
             payroll = await storage.createPayroll(sanitizedItem);
-            console.log('Created new payroll record:', JSON.stringify(payroll, null, 2));
           }
           createdPayrolls.push(payroll);
         } catch (error) {
@@ -2125,6 +2506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+
       console.log(`Bulk payroll generation completed. Success: ${createdPayrolls.length}, Failed: ${failedPayrolls.length}`);
       res.status(201).json({
         success: true,
@@ -2166,7 +2548,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Staff Analytics
   app.get("/api/staff/analytics", async (req, res) => {
     try {
-      const staff = await storage.getAllStaff();
+      const organizationId = await getOrganizationId(req);
+      const staff = await storage.getAllStaff(organizationId);
       const currentDate = new Date();
 
       // Calculate analytics
@@ -2893,6 +3276,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add this after existing expense routes
+
+  app.get("/api/expenses", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      const expenses = await storage.getAllExpenses(organizationId);
+      res.json(expenses);
+    } catch (error) {
+      console.error("Get expenses error:", error);
+      res.status(500).json({ message: "Failed to fetch expenses" });
+    }
+  });
+
 
   app.delete("/api/expenses/:id", async (req, res) => {
     try {

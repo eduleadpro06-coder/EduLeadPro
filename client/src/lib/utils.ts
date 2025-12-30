@@ -31,37 +31,38 @@ export async function apiRequest(
   body?: any
 ): Promise<Response> {
   const baseURL = "/api";
-  const url = `${baseURL}${path}`;
-  
+  const url = path.startsWith("/api") ? path : `${baseURL}${path}`;
+
   const options: RequestInit = {
     method,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
   };
-  
+
   if (body) {
     options.body = JSON.stringify(body);
   }
-  
+
   console.log(`API Request: ${method} ${url}`);
-  
+
   try {
     const response = await fetch(url, options);
-    
+
     console.log(`API Response: Status ${response.status}`);
-    
+
     const contentType = response.headers.get("Content-Type");
     console.log(`API Response Content-Type: ${contentType}`);
-    
+
     // Clone response for logging if needed (since response body can only be read once)
     const responseClone = response.clone();
-    
+
     // Check if response is successful (status code 2xx)
     if (!response.ok) {
       // Create a custom error object with additional properties
       const error: any = new Error(`HTTP error! Status: ${response.status}`);
-      
+
       // Try to parse response as JSON first
       if (contentType && contentType.includes("application/json")) {
         try {
@@ -79,11 +80,11 @@ export async function apiRequest(
         console.log("Non-JSON Error Response:", responseText);
         error.errorData = { message: responseText };
       }
-      
+
       error.status = response.status;
       throw error;
     }
-    
+
     return response;
   } catch (error) {
     console.error("API Request Failed:", error);
@@ -95,7 +96,7 @@ export function invalidateNotifications(queryClient: QueryClient): void {
   // Invalidate all notification-related queries
   queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
   queryClient.invalidateQueries({ queryKey: ['notifications'] });
-  
+
   // Also trigger a custom event to refresh notifications
   window.dispatchEvent(new CustomEvent('refreshNotifications'));
 }

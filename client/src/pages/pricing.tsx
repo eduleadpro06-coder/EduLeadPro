@@ -155,30 +155,33 @@ const PricingPage = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: index * 0.1 }}
-                whileHover={{ scale: 1.04, boxShadow: "0 8px 32px rgba(251,146,60,0.15)" }}
+                className="h-full"
               >
-                <Card className={`relative shadow-lg hover:shadow-xl transition-all duration-300 border-slate-700 bg-slate-800/20 ${plan.popular ? 'ring-2 ring-orange-500 scale-105' : ''}`}>
+                <div className={`relative h-full flex flex-col shadow-lg hover:shadow-2xl transition-all duration-300 backdrop-blur-sm rounded-xl hover:-translate-y-2 ${plan.popular
+                    ? 'border-2 border-orange-500 bg-slate-800/60 scale-105 z-10'
+                    : 'border border-slate-700 bg-slate-800/40 hover:border-slate-500'
+                  }`}>
                   {plan.popular && (
-                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                      <Badge className="bg-gradient-to-r from-orange-500 to-pink-500 text-white px-4 py-1">
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-20">
+                      <Badge className="bg-gradient-to-r from-orange-500 to-pink-500 text-white px-4 py-1 border-none shadow-lg">
                         <Star className="w-3 h-3 mr-1" />
                         Most Popular
                       </Badge>
                     </div>
                   )}
-                  <CardHeader className="text-center pb-8">
-                    <CardTitle className="text-2xl font-bold text-slate-100">{plan.name}</CardTitle>
-                    <CardDescription className="text-slate-400 mb-4">
+                  <div className="p-6 text-center pb-8 pt-8 flex-grow-0">
+                    <h3 className="text-2xl font-bold text-slate-100">{plan.name}</h3>
+                    <p className="text-slate-400 mb-4 text-sm mt-2">
                       {plan.description}
-                    </CardDescription>
-                    <div className="text-4xl font-bold text-slate-100">
+                    </p>
+                    <div className="text-4xl font-bold text-slate-100 mt-4">
                       <IndianRupee className="inline-block w-6 h-6" />
                       <AnimatedNumber value={parseInt(plan.price.replace(/,/g, ''))} />
                       <span className="text-lg font-normal text-slate-400">/month</span>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-3">
+                  </div>
+                  <div className="p-6 pt-0 flex flex-col flex-grow">
+                    <ul className="space-y-3 mb-8 flex-grow">
                       {plan.features.map((feature, fIndex) => (
                         <li key={fIndex} className="flex items-start gap-3">
                           <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
@@ -186,18 +189,20 @@ const PricingPage = () => {
                         </li>
                       ))}
                     </ul>
-                    <div className="pt-6">
+                    <div className="mt-auto">
                       <Link href="/book-demo">
                         <Button
-                          className={`w-full text-white ${plan.popular ? 'bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600' : 'bg-[#643ae5] hover:bg-[#7a4fff]'}`}
-                          size="lg"
+                          className={`w-full text-white font-bold py-6 rounded-xl shadow-lg transition-transform hover:scale-105 active:scale-95 ${plan.popular
+                              ? 'bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 shadow-orange-500/20'
+                              : 'bg-[#643ae5] hover:bg-[#7a4fff] shadow-purple-500/20'
+                            }`}
                         >
                           Start Free Trial
                         </Button>
                       </Link>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -215,7 +220,7 @@ const PricingPage = () => {
                 Make data-driven decisions with our advanced AI algorithms and predictive analytics.
               </p>
             </div>
-            
+
             <div className="text-center">
               <div className="w-16 h-16 bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Target className="w-8 h-8 text-green-400" />
@@ -225,7 +230,7 @@ const PricingPage = () => {
                 Built specifically for Indian educational institutions with local support and features.
               </p>
             </div>
-            
+
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Shield className="w-8 h-8 text-blue-400" />
@@ -280,7 +285,7 @@ const PricingPage = () => {
         {/* CTA Section */}
         <section className="py-20 px-4">
           <div className="container mx-auto px-4 text-center">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
@@ -298,7 +303,7 @@ const PricingPage = () => {
                 </Button>
                 <Button size="lg" variant="outline" className="px-8 py-4 rounded-full border-2 border-white text-white hover:bg-white/10 hover:text-white font-bold text-lg" onClick={() => setLocation('/pricing')}>
                   View Pricing Plans
-                </Button>           
+                </Button>
               </div>
               <RotatingTaglines />
             </motion.div>

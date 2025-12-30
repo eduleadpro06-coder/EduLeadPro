@@ -38,6 +38,7 @@ import { useHashState } from "@/hooks/use-hash-state";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext } from "@/components/ui/pagination";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import SidebarPageHeader from "@/components/layout/sidebar-page-header";
 
 // WhatsApp SVG Icon (Font Awesome style)
 const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -72,7 +73,36 @@ export default function LeadManagement() {
   const { data, isLoading } = useQuery<LeadWithCounselor[]>({
     queryKey: ["/api/leads"],
     queryFn: async () => {
-      const response = await fetch("/api/leads");
+      // Get user from localStorage
+      const userStr = localStorage.getItem('auth_user');
+      if (!userStr) {
+        console.error('No authenticated user found');
+        toast({
+          title: "Authentication Error",
+          description: "No authenticated user found. Please log in.",
+          variant: "destructive",
+        });
+        throw new Error("No authenticated user found");
+      }
+
+      const user = JSON.parse(userStr);
+
+      const response = await fetch("/api/leads", {
+        headers: {
+          'x-user-name': user.email // Send username for auth
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Failed to fetch leads:", errorData.message || response.statusText);
+        toast({
+          title: "Error",
+          description: errorData.message || "Failed to load leads",
+          variant: "destructive",
+        });
+        throw new Error(errorData.message || "Failed to fetch leads");
+      }
       return response.json();
     },
   });
@@ -272,117 +302,72 @@ export default function LeadManagement() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      {/* Add a wrapper for padding, similar to CardContent */}
-      <div className="py-4">
-        {/* Search and Filter Controls */}
-        <div className="flex flex-col md:flex-row items-center justify-between text-gray-800">
-          <div className="flex gap-4 flex-1 text-gray-800">
-            {/* Search Input */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search leads by name, phone, or email..."
-                value={searchTerm}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                className="pl-10 text-gray-800 placeholder:text-gray-800/70"
-              />
-            </div>
-            {/* Status Dropdown */}
-            <div className="w-40">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="All Status" className="text-[#643ae5]" />
-                </SelectTrigger>
-                <SelectContent className="text-[#643ae5]">
-                  <SelectItem value="all" className="text-[#643ae5]">All Status</SelectItem>
-                  <SelectItem value="new" className="text-[#643ae5]">New</SelectItem>
-                  <SelectItem value="contacted" className="text-[#643ae5]">Contacted</SelectItem>
-                  <SelectItem value="interested" className="text-[#643ae5]">Interested</SelectItem>
-                  <SelectItem value="enrolled" className="text-[#643ae5]">Enrolled</SelectItem>
-                  <SelectItem value="dropped" className="text-[#643ae5]">Dropped</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {/* Source Dropdown */}
-            <div className="w-40">
-              <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="All Sources" className="text-[#643ae5]" />
-                </SelectTrigger>
-                <SelectContent className="text-[#643ae5]">
-                  <SelectItem value="all" className="text-[#643ae5]">All Sources</SelectItem>
-                  <SelectItem value="website" className="text-[#643ae5]">Website</SelectItem>
-                  <SelectItem value="google_ads" className="text-[#643ae5]">Google Ads</SelectItem>
-                  <SelectItem value="facebook" className="text-[#643ae5]">Facebook</SelectItem>
-                  <SelectItem value="referral" className="text-[#643ae5]">Referral</SelectItem>
-                  <SelectItem value="walk_in" className="text-[#643ae5]">Walk-in</SelectItem>
-                  <SelectItem value="csv_import" className="text-[#643ae5]">CSV Import</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 ml-4 space-x-2 text-gray-800">
+      <SidebarPageHeader
+        title="Lead Management"
+        subtitle="Manage and track your leads"
+        searchPlaceholder="Search leads by name, phone, or email..."
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        filters={
+          <>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40 bg-white border-[#643ae5]">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="contacted">Contacted</SelectItem>
+                <SelectItem value="interested">Interested</SelectItem>
+                <SelectItem value="enrolled">Enrolled</SelectItem>
+                <SelectItem value="dropped">Dropped</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-40 bg-white border-[#643ae5]">
+                <SelectValue placeholder="All Sources" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sources</SelectItem>
+                <SelectItem value="website">Website</SelectItem>
+                <SelectItem value="google_ads">Google Ads</SelectItem>
+                <SelectItem value="facebook">Facebook</SelectItem>
+                <SelectItem value="referral">Referral</SelectItem>
+                <SelectItem value="walk_in">Walk-in</SelectItem>
+                <SelectItem value="csv_import">CSV Import</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        }
+        primaryActions={
+          <>
             <Button
               onClick={() => setIsAddModalOpen(true)}
               className="flex items-center gap-2 bg-[#643ae5] hover:bg-[#643ae5]/90 text-white"
             >
-              <UserPlus size={16} className="text-white" />
+              <UserPlus size={16} />
               Add New Lead
             </Button>
             <Button
               variant="outline"
               onClick={() => setIsCSVImportOpen(true)}
-              className="flex items-center gap-2 text-gray-800"
+              className="flex items-center gap-2 border-[#643ae5] text-gray-800"
             >
-              Import CSV
-              <Download size={16} className="text-gray-800" />
+              <Download size={16} />
+              Import
             </Button>
             <Button
               variant="outline"
               onClick={exportLeads}
-              className="flex items-center gap-2 text-gray-800"
+              className="flex items-center gap-2 border-[#643ae5] text-gray-800"
             >
-              Export CSV
-              <Upload size={16} className="text-gray-800" />
+              <Upload size={16} />
+              Export
             </Button>
-            {/* Pagination controls moved here for alignment */}
-            {totalPages > 1 && (
-              <div className="ml-4 text-gray-800">
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        href="#"
-                        onClick={e => { e.preventDefault(); setCurrentPage(p => Math.max(1, p - 1)); }}
-                        aria-disabled={currentPage === 1}
-                      />
-                    </PaginationItem>
-                    {Array.from({ length: totalPages }, (_, i) => (
-                      <PaginationItem key={i}>
-                        <PaginationLink
-                          href="#"
-                          isActive={currentPage === i + 1}
-                          onClick={e => { e.preventDefault(); setCurrentPage(i + 1); }}
-                        >
-                          {i + 1}
-                        </PaginationLink>
-                      </PaginationItem>
-                    ))}
-                    <PaginationItem>
-                      <PaginationNext
-                        href="#"
-                        onClick={e => { e.preventDefault(); setCurrentPage(p => Math.min(totalPages, p + 1)); }}
-                        aria-disabled={currentPage === totalPages}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Leads Table */}
+          </>
+        }
+      />
+      <div className="px-6 pb-6">
         <div className="border rounded-xl overflow-hidden shadow-lg mt-4">
           <div className="overflow-x-auto">
             <table className="w-full glass-card rounded-lg border bg-card text-gray-800 shadow-lg">

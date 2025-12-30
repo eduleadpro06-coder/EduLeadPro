@@ -92,14 +92,14 @@ const BookDemoPage = () => {
           <div className="grid lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
             {/* Demo Form */}
             <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7 }}>
-              <Card className="border border-[#222] bg-[#18122b]/80 text-white shadow-2xl">
-                <CardHeader className="p-3">
-                  <CardTitle className="text-white">Schedule Your Personalized Demo</CardTitle>
-                  <CardDescription className="text-gray-300">
+              <div className="border border-[#222] bg-[#18122b]/80 text-white shadow-2xl rounded-xl backdrop-blur-sm">
+                <div className="p-6 space-y-1.5">
+                  <h3 className="text-2xl font-bold text-white">Schedule Your Personalized Demo</h3>
+                  <p className="text-gray-300 text-sm">
                     Fill out the form below and we'll schedule a 30-minute demo tailored to your institution's needs
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-3 pt-0">
+                  </p>
+                </div>
+                <div className="p-6 pt-0">
                   <form onSubmit={handleSubmit} className="space-y-3">
                     <div className="grid md:grid-cols-2 gap-3">
                       <div className="space-y-1.5">
@@ -182,19 +182,19 @@ const BookDemoPage = () => {
                       {isSubmitting ? "Scheduling Demo..." : "Book My Demo"}
                     </Button>
                   </form>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </motion.div>
             {/* What to Expect */}
             <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7 }} className="space-y-4">
-              <Card className="border border-[#62656e] bg-[#18122b]/80 text-white shadow-2xl">
-                <CardHeader className="p-3">
-                  <CardTitle className="flex items-center gap-2 text-white text-2xl font-bold">
+              <div className="border border-[#62656e] bg-[#18122b]/80 text-white shadow-2xl rounded-xl backdrop-blur-sm">
+                <div className="p-6">
+                  <h3 className="flex items-center gap-2 text-white text-2xl font-bold">
                     <Clock className="h-6 w-6 text-[#643ae5] font-bold" />
                     What to Expect
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 pt-2">
+                  </h3>
+                </div>
+                <div className="p-6 pt-0 space-y-3">
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 bg-[#643ae5] flex items-center justify-center rounded-full font-bold text-lg text-white shadow-lg border-2 border-[#643ae5]">1</div>
                     <div>
@@ -216,16 +216,16 @@ const BookDemoPage = () => {
                       <p className="text-gray-300 text-xs">Get all your questions answered and discuss implementation for your Indian institution</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-              <Card className="border border-[#62656e] bg-[#18122b]/80 text-white shadow-2xl">
-                <CardHeader className="p-3">
-                  <CardTitle className="flex items-center gap-2 text-white text-2xl font-bold">
+                </div>
+              </div>
+              <div className="border border-[#62656e] bg-[#18122b]/80 text-white shadow-2xl rounded-xl backdrop-blur-sm">
+                <div className="p-6">
+                  <h3 className="flex items-center gap-2 text-white text-2xl font-bold">
                     <Users className="h-6 w-6 text-[#643ae5] font-bold" />
                     Join 500+ Indian Institutions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3">
+                  </h3>
+                </div>
+                <div className="p-6 pt-0">
                   <p className="text-gray-300 mb-3 text-sm">
                     Leading Indian schools, colleges, and coaching centers trust our platform to manage their admissions process.
                   </p>
@@ -239,8 +239,8 @@ const BookDemoPage = () => {
                       <div className="text-xs text-gray-300">Faster Lead Processing</div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </motion.div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, desc, sql, isNull, or, asc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql, isNull, or, asc, type SQL } from "drizzle-orm";
 import { db } from "./db.js";
 import * as schema from "../shared/schema.js";
 import type {
@@ -24,11 +24,21 @@ export class DaycareStorage {
     // CHILDREN MANAGEMENT
     // ==========================================
 
-    async getAllDaycareChildren(includeDeleted = false): Promise<DaycareChild[]> {
-        let query = db.select().from(schema.daycareChildren);
+    async getAllDaycareChildren(includeDeleted = false, organizationId?: number): Promise<DaycareChild[]> {
+        const conditions = [];
 
         if (!includeDeleted) {
-            query = query.where(isNull(schema.daycareChildren.deletedAt)) as any;
+            conditions.push(isNull(schema.daycareChildren.deletedAt));
+        }
+
+        if (organizationId) {
+            conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+        }
+
+        let query = db.select().from(schema.daycareChildren);
+
+        if (conditions.length > 0) {
+            query = query.where(and(...conditions)) as any;
         }
 
         return (await query).sort((a, b) =>
@@ -76,30 +86,38 @@ export class DaycareStorage {
         return result.length > 0;
     }
 
-    async searchDaycareChildren(query: string): Promise<DaycareChild[]> {
+    async searchDaycareChildren(query: string, organizationId?: number): Promise<DaycareChild[]> {
         const searchPattern = `%${query}%`;
+        const conditions = [
+            isNull(schema.daycareChildren.deletedAt),
+            or(
+                sql`${schema.daycareChildren.childName} ILIKE ${searchPattern}`,
+                sql`${schema.daycareChildren.parentName} ILIKE ${searchPattern}`,
+                sql`${schema.daycareChildren.parentPhone} ILIKE ${searchPattern}`
+            )
+        ];
+
+        if (organizationId) {
+            conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+        }
+
         const result = await db.select().from(schema.daycareChildren)
-            .where(
-                and(
-                    isNull(schema.daycareChildren.deletedAt),
-                    or(
-                        sql`${schema.daycareChildren.childName} ILIKE ${searchPattern}`,
-                        sql`${schema.daycareChildren.parentName} ILIKE ${searchPattern}`,
-                        sql`${schema.daycareChildren.parentPhone} ILIKE ${searchPattern}`
-                    )
-                )
-            );
+            .where(and(...conditions));
         return result;
     }
 
-    async getActiveDaycareChildren(): Promise<DaycareChild[]> {
+    async getActiveDaycareChildren(organizationId?: number): Promise<DaycareChild[]> {
+        const conditions = [
+            eq(schema.daycareChildren.status, "active"),
+            isNull(schema.daycareChildren.deletedAt)
+        ];
+
+        if (organizationId) {
+            conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+        }
+
         const result = await db.select().from(schema.daycareChildren)
-            .where(
-                and(
-                    eq(schema.daycareChildren.status, "active"),
-                    isNull(schema.daycareChildren.deletedAt)
-                )
-            )
+            .where(and(...conditions))
             .orderBy(schema.daycareChildren.childName);
         return result;
     }
@@ -108,7 +126,12 @@ export class DaycareStorage {
     // INQUIRY MANAGEMENT
     // ==========================================
 
-    async getAllDaycareInquiries(): Promise<DaycareInquiry[]> {
+    async getAllDaycareInquiries(organizationId?: number): Promise<DaycareInquiry[]> {
+        if (organizationId) {
+            return await db.select().from(schema.daycareInquiries)
+                .where(eq(schema.daycareInquiries.organizationId, organizationId))
+                .orderBy(desc(schema.daycareInquiries.createdAt));
+        }
         return await db.select().from(schema.daycareInquiries)
             .orderBy(desc(schema.daycareInquiries.createdAt));
     }
@@ -144,7 +167,15 @@ export class DaycareStorage {
         return await this.updateDaycareInquiry(id, { assignedTo: userId });
     }
 
-    async getInquiriesByStatus(status: string): Promise<DaycareInquiry[]> {
+    async getInquiriesByStatus(status: string, organizationId?: number): Promise<DaycareInquiry[]> {
+        if (organizationId) {
+            return await db.select().from(schema.daycareInquiries)
+                .where(and(
+                    eq(schema.daycareInquiries.status, status),
+                    eq(schema.daycareInquiries.organizationId, organizationId)
+                ))
+                .orderBy(desc(schema.daycareInquiries.createdAt));
+        }
         return await db.select().from(schema.daycareInquiries)
             .where(eq(schema.daycareInquiries.status, status))
             .orderBy(desc(schema.daycareInquiries.createdAt));
@@ -195,33 +226,49 @@ export class DaycareStorage {
             .orderBy(desc(schema.daycareInquiryFollowups.scheduledAt));
     }
 
-    async getOverdueFollowups(): Promise<DaycareInquiryFollowup[]> {
+    async getOverdueFollowups(organizationId?: number): Promise<DaycareInquiryFollowup[]> {
         const now = new Date();
-        return await db.select().from(schema.daycareInquiryFollowups)
-            .where(
-                and(
-                    eq(schema.daycareInquiryFollowups.status, "pending"),
-                    sql`${schema.daycareInquiryFollowups.scheduledAt} < ${now}`
-                )
-            )
+        const conditions: SQL[] = [
+            eq(schema.daycareInquiryFollowups.status, "pending"),
+            sql`${schema.daycareInquiryFollowups.scheduledAt} < ${now}`
+        ];
+
+        if (organizationId) {
+            conditions.push(eq(schema.daycareInquiries.organizationId, organizationId));
+        }
+
+        const result = await db.select()
+            .from(schema.daycareInquiryFollowups)
+            .leftJoin(schema.daycareInquiries, eq(schema.daycareInquiryFollowups.inquiryId, schema.daycareInquiries.id))
+            .where(and(...conditions))
             .orderBy(schema.daycareInquiryFollowups.scheduledAt);
+
+        return result.map(row => row.daycare_inquiry_followups);
     }
 
-    async getTodayFollowups(): Promise<DaycareInquiryFollowup[]> {
+    async getTodayFollowups(organizationId?: number): Promise<DaycareInquiryFollowup[]> {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        return await db.select().from(schema.daycareInquiryFollowups)
-            .where(
-                and(
-                    eq(schema.daycareInquiryFollowups.status, "pending"),
-                    gte(schema.daycareInquiryFollowups.scheduledAt, today),
-                    sql`${schema.daycareInquiryFollowups.scheduledAt} < ${tomorrow.toISOString()}`
-                )
-            )
+        const conditions: SQL[] = [
+            eq(schema.daycareInquiryFollowups.status, "pending"),
+            gte(schema.daycareInquiryFollowups.scheduledAt, today),
+            sql`${schema.daycareInquiryFollowups.scheduledAt} < ${tomorrow.toISOString()}`
+        ];
+
+        if (organizationId) {
+            conditions.push(eq(schema.daycareInquiries.organizationId, organizationId));
+        }
+
+        const result = await db.select()
+            .from(schema.daycareInquiryFollowups)
+            .leftJoin(schema.daycareInquiries, eq(schema.daycareInquiryFollowups.inquiryId, schema.daycareInquiries.id))
+            .where(and(...conditions))
             .orderBy(schema.daycareInquiryFollowups.scheduledAt);
+
+        return result.map(row => row.daycare_inquiry_followups);
     }
 
     async completeFollowup(id: number, outcome: string, notes: string, userId: number): Promise<DaycareInquiryFollowup | undefined> {
@@ -243,21 +290,21 @@ export class DaycareStorage {
     // ENROLLMENT MANAGEMENT
     // ==========================================
 
-    async getAllDaycareEnrollments(includeInactive = false): Promise<DaycareEnrollment[]> {
-        const baseConditions = isNull(schema.daycareEnrollments.deletedAt);
+    async getAllDaycareEnrollments(includeInactive = false, organizationId?: number): Promise<DaycareEnrollment[]> {
+        const conditions: SQL[] = [isNull(schema.daycareEnrollments.deletedAt)];
 
-        const query = includeInactive
-            ? db.select().from(schema.daycareEnrollments).where(baseConditions)
-            : db.select().from(schema.daycareEnrollments).where(
-                and(
-                    baseConditions,
-                    eq(schema.daycareEnrollments.status, "active")
-                )
-            );
+        if (!includeInactive) {
+            conditions.push(eq(schema.daycareEnrollments.status, "active"));
+        }
 
-        return (await query).sort((a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        if (organizationId) {
+            conditions.push(eq(schema.daycareEnrollments.organizationId, organizationId));
+        }
+
+        return await db.select()
+            .from(schema.daycareEnrollments)
+            .where(and(...conditions))
+            .orderBy(desc(schema.daycareEnrollments.createdAt));
     }
 
     async getDaycareEnrollment(id: number): Promise<DaycareEnrollment | undefined> {
@@ -311,7 +358,7 @@ export class DaycareStorage {
     async cancelEnrollment(id: number, reason: string): Promise<DaycareEnrollment | undefined> {
         return await this.updateEnrollment(id, {
             status: "cancelled",
-            endDate: new Date(),
+            endDate: new Date().toISOString().split('T')[0],
             notes: reason
         });
     }
@@ -369,20 +416,42 @@ export class DaycareStorage {
         return result[0];
     }
 
-    async getTodayAttendance(): Promise<DaycareAttendance[]> {
+    async getTodayAttendance(organizationId?: number): Promise<DaycareAttendance[]> {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayStr = today.toISOString().split('T')[0];
 
-        return await db.select().from(schema.daycareAttendance)
-            .where(gte(schema.daycareAttendance.attendanceDate, todayStr))
+        const conditions: SQL[] = [gte(schema.daycareAttendance.attendanceDate, todayStr)];
+
+        if (organizationId) {
+            conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+        }
+
+        const result = await db.select()
+            .from(schema.daycareAttendance)
+            .leftJoin(schema.daycareEnrollments, eq(schema.daycareAttendance.enrollmentId, schema.daycareEnrollments.id))
+            .leftJoin(schema.daycareChildren, eq(schema.daycareEnrollments.childId, schema.daycareChildren.id))
+            .where(and(...conditions))
             .orderBy(desc(schema.daycareAttendance.checkInTime));
+
+        return result.map(row => row.daycare_attendance);
     }
 
-    async getCurrentlyCheckedIn(): Promise<DaycareAttendance[]> {
-        return await db.select().from(schema.daycareAttendance)
-            .where(isNull(schema.daycareAttendance.checkOutTime))
+    async getCurrentlyCheckedIn(organizationId?: number): Promise<DaycareAttendance[]> {
+        const conditions: SQL[] = [isNull(schema.daycareAttendance.checkOutTime)];
+
+        if (organizationId) {
+            conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+        }
+
+        const result = await db.select()
+            .from(schema.daycareAttendance)
+            .leftJoin(schema.daycareEnrollments, eq(schema.daycareAttendance.enrollmentId, schema.daycareEnrollments.id))
+            .leftJoin(schema.daycareChildren, eq(schema.daycareEnrollments.childId, schema.daycareChildren.id))
+            .where(and(...conditions))
             .orderBy(schema.daycareAttendance.checkInTime);
+
+        return result.map(row => row.daycare_attendance);
     }
 
     async getAttendanceHistory(enrollmentId: number, startDate?: Date, endDate?: Date): Promise<DaycareAttendance[]> {
@@ -459,9 +528,19 @@ export class DaycareStorage {
         return result[0];
     }
 
-    async getAllDaycarePayments(): Promise<DaycarePayment[]> {
-        return await db.select().from(schema.daycarePayments)
+    async getAllDaycarePayments(organizationId?: number): Promise<DaycarePayment[]> {
+        const conditions: SQL[] = [];
+        if (organizationId) {
+            conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+        }
+
+        const result = await db.select()
+            .from(schema.daycarePayments)
+            .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id))
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(desc(schema.daycarePayments.paymentDate));
+
+        return result.map(row => row.daycare_payments);
     }
 
     async getPaymentsByChild(childId: number): Promise<DaycarePayment[]> {
@@ -470,24 +549,41 @@ export class DaycareStorage {
             .orderBy(desc(schema.daycarePayments.paymentDate));
     }
 
-    async getPaymentsByDateRange(startDate: Date, endDate: Date): Promise<DaycarePayment[]> {
+    async getPaymentsByDateRange(startDate: Date, endDate: Date, organizationId?: number): Promise<DaycarePayment[]> {
         const startStr = startDate.toISOString().split('T')[0];
         const endStr = endDate.toISOString().split('T')[0];
 
-        return await db.select().from(schema.daycarePayments)
-            .where(
-                and(
-                    gte(schema.daycarePayments.paymentDate, startStr),
-                    lte(schema.daycarePayments.paymentDate, endStr)
-                )
-            )
+        const conditions: SQL[] = [
+            gte(schema.daycarePayments.paymentDate, startStr),
+            lte(schema.daycarePayments.paymentDate, endStr)
+        ];
+
+        if (organizationId) {
+            conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+        }
+
+        const result = await db.select()
+            .from(schema.daycarePayments)
+            .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id))
+            .where(and(...conditions))
             .orderBy(desc(schema.daycarePayments.paymentDate));
+
+        return result.map(row => row.daycare_payments);
     }
 
-    async getPendingPayments(): Promise<DaycarePayment[]> {
-        return await db.select().from(schema.daycarePayments)
-            .where(eq(schema.daycarePayments.status, "pending"))
+    async getPendingPayments(organizationId?: number): Promise<DaycarePayment[]> {
+        const conditions: SQL[] = [eq(schema.daycarePayments.status, "pending")];
+        if (organizationId) {
+            conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+        }
+
+        const result = await db.select()
+            .from(schema.daycarePayments)
+            .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id))
+            .where(and(...conditions))
             .orderBy(schema.daycarePayments.paymentDate);
+
+        return result.map(row => row.daycare_payments);
     }
 
     async recordPayment(
@@ -533,12 +629,26 @@ export class DaycareStorage {
     // BILLING CONFIGURATION
     // ==========================================
 
-    async getBillingConfigs(): Promise<DaycareBillingConfig[]> {
+    async getBillingConfigs(organizationId?: number): Promise<DaycareBillingConfig[]> {
+        if (organizationId) {
+            return await db.select().from(schema.daycareBillingConfig)
+                .where(eq(schema.daycareBillingConfig.organizationId, organizationId))
+                .orderBy(desc(schema.daycareBillingConfig.createdAt));
+        }
         return await db.select().from(schema.daycareBillingConfig)
             .orderBy(desc(schema.daycareBillingConfig.createdAt));
     }
 
-    async getActiveBillingConfig(): Promise<DaycareBillingConfig | undefined> {
+    async getActiveBillingConfig(organizationId?: number): Promise<DaycareBillingConfig | undefined> {
+        if (organizationId) {
+            const result = await db.select().from(schema.daycareBillingConfig)
+                .where(and(
+                    eq(schema.daycareBillingConfig.isActive, true),
+                    eq(schema.daycareBillingConfig.organizationId, organizationId)
+                ))
+                .limit(1);
+            return result[0];
+        }
         const result = await db.select().from(schema.daycareBillingConfig)
             .where(eq(schema.daycareBillingConfig.isActive, true))
             .limit(1);
@@ -573,7 +683,7 @@ export class DaycareStorage {
     // ANALYTICS & REPORTS
     // ==========================================
 
-    async getDaycareStats(): Promise<{
+    async getDaycareStats(organizationId?: number): Promise<{
         totalChildren: number;
         activeEnrollments: number;
         newInquiries: number;
@@ -582,59 +692,88 @@ export class DaycareStorage {
         monthRevenue: number;
         pendingPayments: number;
     }> {
+        // 1. Total Children
+        const childrenConditions: SQL[] = [isNull(schema.daycareChildren.deletedAt)];
+        if (organizationId) childrenConditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+
         const totalChildren = await db.select({ count: sql<number>`count(*)` })
             .from(schema.daycareChildren)
-            .where(isNull(schema.daycareChildren.deletedAt));
+            .where(and(...childrenConditions));
+
+        // 2. Active Enrollments (Join Children)
+        const enrollConditions: SQL[] = [
+            eq(schema.daycareEnrollments.status, "active"),
+            isNull(schema.daycareEnrollments.deletedAt)
+        ];
+        if (organizationId) enrollConditions.push(eq(schema.daycareChildren.organizationId, organizationId));
 
         const activeEnrollments = await db.select({ count: sql<number>`count(*)` })
             .from(schema.daycareEnrollments)
-            .where(
-                and(
-                    eq(schema.daycareEnrollments.status, "active"),
-                    isNull(schema.daycareEnrollments.deletedAt)
-                )
-            );
+            .leftJoin(schema.daycareChildren, eq(schema.daycareEnrollments.childId, schema.daycareChildren.id))
+            .where(and(...enrollConditions));
+
+        // 3. New Inquiries
+        const inquiryConditions: SQL[] = [eq(schema.daycareInquiries.status, "new")];
+        if (organizationId) inquiryConditions.push(eq(schema.daycareInquiries.organizationId, organizationId));
 
         const newInquiries = await db.select({ count: sql<number>`count(*)` })
             .from(schema.daycareInquiries)
-            .where(eq(schema.daycareInquiries.status, "new"));
+            .where(and(...inquiryConditions));
+
+        // 4. Currently Checked In (Join Attendance -> Enrollments -> Children)
+        const checkInConditions: SQL[] = [isNull(schema.daycareAttendance.checkOutTime)];
+        if (organizationId) checkInConditions.push(eq(schema.daycareChildren.organizationId, organizationId));
 
         const currentlyCheckedIn = await db.select({ count: sql<number>`count(*)` })
             .from(schema.daycareAttendance)
-            .where(isNull(schema.daycareAttendance.checkOutTime));
+            .leftJoin(schema.daycareEnrollments, eq(schema.daycareAttendance.enrollmentId, schema.daycareEnrollments.id))
+            .leftJoin(schema.daycareChildren, eq(schema.daycareEnrollments.childId, schema.daycareChildren.id))
+            .where(and(...checkInConditions));
 
+        // 5. & 6. Revenue queries (Join Payments -> Children)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const todayStr = today.toISOString().split('T')[0]; // Convert to YYYY-MM-DD format
+        const todayStr = today.toISOString().split('T')[0];
+
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const firstDayStr = firstDayOfMonth.toISOString().split('T')[0];
+
+        // Today Revenue
+        const todayRevConditions: SQL[] = [
+            gte(schema.daycarePayments.paymentDate, todayStr),
+            eq(schema.daycarePayments.status, "completed")
+        ];
+        if (organizationId) todayRevConditions.push(eq(schema.daycareChildren.organizationId, organizationId));
 
         const todayRevenue = await db.select({
             sum: sql<string>`COALESCE(SUM(CAST(total_amount AS DECIMAL)), 0)`
         })
             .from(schema.daycarePayments)
-            .where(
-                and(
-                    gte(schema.daycarePayments.paymentDate, todayStr),
-                    eq(schema.daycarePayments.status, "completed")
-                )
-            );
+            .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id))
+            .where(and(...todayRevConditions));
 
-        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        const firstDayStr = firstDayOfMonth.toISOString().split('T')[0]; // Convert to YYYY-MM-DD format
+        // Month Revenue
+        const monthRevConditions: SQL[] = [
+            gte(schema.daycarePayments.paymentDate, firstDayStr),
+            eq(schema.daycarePayments.status, "completed")
+        ];
+        if (organizationId) monthRevConditions.push(eq(schema.daycareChildren.organizationId, organizationId));
 
         const monthRevenue = await db.select({
             sum: sql<string>`COALESCE(SUM(CAST(total_amount AS DECIMAL)), 0)`
         })
             .from(schema.daycarePayments)
-            .where(
-                and(
-                    gte(schema.daycarePayments.paymentDate, firstDayStr),
-                    eq(schema.daycarePayments.status, "completed")
-                )
-            );
+            .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id))
+            .where(and(...monthRevConditions));
+
+        // 7. Pending Payments (Join Payments -> Children)
+        const pendingConditions: SQL[] = [eq(schema.daycarePayments.status, "pending")];
+        if (organizationId) pendingConditions.push(eq(schema.daycareChildren.organizationId, organizationId));
 
         const pendingPayments = await db.select({ count: sql<number>`count(*)` })
             .from(schema.daycarePayments)
-            .where(eq(schema.daycarePayments.status, "pending"));
+            .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id))
+            .where(and(...pendingConditions));
 
         return {
             totalChildren: totalChildren[0]?.count || 0,
@@ -647,23 +786,25 @@ export class DaycareStorage {
         };
     }
 
-    async getMonthlyRevenue(year: number, month: number): Promise<number> {
+    async getMonthlyRevenue(year: number, month: number, organizationId?: number): Promise<number> {
         const startDate = new Date(year, month - 1, 1);
         const endDate = new Date(year, month, 0);
         const startStr = startDate.toISOString().split('T')[0];
         const endStr = endDate.toISOString().split('T')[0];
 
+        const conditions: SQL[] = [
+            gte(schema.daycarePayments.paymentDate, startStr),
+            lte(schema.daycarePayments.paymentDate, endStr),
+            eq(schema.daycarePayments.status, "completed")
+        ];
+        if (organizationId) conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+
         const result = await db.select({
             sum: sql<string>`COALESCE(SUM(CAST(total_amount AS DECIMAL)), 0)`
         })
             .from(schema.daycarePayments)
-            .where(
-                and(
-                    gte(schema.daycarePayments.paymentDate, startStr),
-                    lte(schema.daycarePayments.paymentDate, endStr),
-                    eq(schema.daycarePayments.status, "completed")
-                )
-            );
+            .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id))
+            .where(and(...conditions));
 
         return parseFloat(result[0].sum);
     }
@@ -697,13 +838,22 @@ export class DaycareStorage {
         };
     }
 
-    async getInquiryConversionRate(): Promise<number> {
-        const totalInquiries = await db.select({ count: sql<number>`count(*)` })
-            .from(schema.daycareInquiries);
+    async getInquiryConversionRate(organizationId?: number): Promise<number> {
+        // Enrolled
+        const enrolledConditions: SQL[] = [eq(schema.daycareInquiries.status, "enrolled")];
+        if (organizationId) enrolledConditions.push(eq(schema.daycareInquiries.organizationId, organizationId));
 
         const enrolled = await db.select({ count: sql<number>`count(*)` })
             .from(schema.daycareInquiries)
-            .where(eq(schema.daycareInquiries.status, "enrolled"));
+            .where(and(...enrolledConditions));
+
+        // Total
+        const totalConditions: SQL[] = [];
+        if (organizationId) totalConditions.push(eq(schema.daycareInquiries.organizationId, organizationId));
+
+        const totalInquiries = await db.select({ count: sql<number>`count(*)` })
+            .from(schema.daycareInquiries)
+            .where(totalConditions.length > 0 ? and(...totalConditions) : undefined);
 
         if (totalInquiries[0].count === 0) return 0;
         return (enrolled[0].count / totalInquiries[0].count) * 100;

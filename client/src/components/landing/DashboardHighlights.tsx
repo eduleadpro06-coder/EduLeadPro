@@ -442,10 +442,10 @@ const DashboardHighlights = () => {
               transition={{ duration: 0.5, delay: 0.6 }}
               viewport={{ once: true }}
             >
-              <Card className="bg-[#0e0f12] p-8 rounded-3xl h-full flex flex-col">
-                <div className="space-y-4 mb-6">
+              <div className="bg-[#0e0f12] p-8 rounded-3xl h-full flex flex-col overflow-hidden border border-slate-800/50 relative">
+                <div className="space-y-4 mb-6 relative z-10">
                   <motion.div
-                    className="flex items-center gap-4 bg-white/5 p-3 rounded-lg"
+                    className="flex items-center gap-4 bg-white/5 p-3 rounded-lg border border-white/5"
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.2 }}
@@ -460,7 +460,7 @@ const DashboardHighlights = () => {
                     </div>
                   </motion.div>
                   <motion.div
-                    className="flex items-center gap-4 bg-white/5 p-3 rounded-lg"
+                    className="flex items-center gap-4 bg-white/5 p-3 rounded-lg border border-white/5"
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.3 }}
@@ -475,7 +475,7 @@ const DashboardHighlights = () => {
                     </div>
                   </motion.div>
                   <motion.div
-                    className="flex items-center gap-4 bg-white/5 p-3 rounded-lg"
+                    className="flex items-center gap-4 bg-white/5 p-3 rounded-lg border border-white/5"
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.4 }}
@@ -491,13 +491,18 @@ const DashboardHighlights = () => {
                   </motion.div>
                 </div>
 
-                <h3 className="text-white font-bold text-3xl tracking-tight">
-                  Personalized AI Dashboards
-                </h3>
-                <p className="text-slate-400 mt-2">
-                  Empowering every team member with role-specific insights and automated workflows.
-                </p>
-              </Card>
+                <div className="relative z-10 mt-auto">
+                  <h3 className="text-white font-bold text-3xl tracking-tight">
+                    Personalized AI Dashboards
+                  </h3>
+                  <p className="text-slate-400 mt-2">
+                    Empowering every team member with role-specific insights and automated workflows.
+                  </p>
+                </div>
+
+                {/* Decorative background element */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+              </div>
             </motion.div>
           </div>
         </div>

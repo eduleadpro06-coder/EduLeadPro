@@ -1,3 +1,4 @@
+// Force restart
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
@@ -72,7 +73,7 @@ app.use((req, res, next) => {
     // Log the full error for diagnostics
     try {
       console.error(err);
-    } catch {}
+    } catch { }
   });
 
   // importantly only setup vite in development and after
@@ -96,3 +97,4 @@ app.use((req, res, next) => {
     );
   });
 })();
+// Trigger restart

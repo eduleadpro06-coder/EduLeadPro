@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getActiveAIFeatures, getComingSoonFeatures, isAIFeaturePath } from "@/config/aiFeatures";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -28,6 +29,7 @@ const navigation = [
 
 export default function Sidebar() {
   const [location] = useLocation();
+  const { user } = useAuth();
   const [customInstituteName, setCustomInstituteName] = useState(() => {
     return localStorage.getItem("customInstituteName") || "";
   });
@@ -76,11 +78,13 @@ export default function Sidebar() {
             </div>
           </Link>
         </div>
-        {customInstituteName && (
-          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+        {user?.organizationName && (
+          <div className="px-6 py-4 bg-purple-50 border-b border-purple-100">
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 rounded-full bg-primary"></div>
-              <p className="text-base font-medium text-gray-800">{customInstituteName}</p>
+              <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></div>
+              <p className="text-base font-semibold text-purple-700">
+                {user.organizationName}
+              </p>
             </div>
           </div>
         )}
@@ -219,6 +223,6 @@ export default function Sidebar() {
           </div>
         </Link>
       </div> */}
-    </div>
+    </div >
   );
 }

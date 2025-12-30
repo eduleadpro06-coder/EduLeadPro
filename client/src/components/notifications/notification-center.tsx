@@ -27,7 +27,7 @@ interface NotificationCategory {
 export default function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
-  
+
   const {
     notifications,
     stats,
@@ -73,12 +73,22 @@ export default function NotificationCenter() {
           <div className="flex gap-2">
             {notifications.length > 0 && (
               <>
-                <Button size="sm" variant="ghost" onClick={() => markAllAsRead()}>
-                  <Check size={16} className="mr-2" />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => markAllAsRead()}
+                  className="h-8 px-3 text-sm hover:bg-purple-50 hover:text-[#643ae5]"
+                >
+                  <Check size={12} className="mr-1.5" />
                   Mark all read
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => clearAll()}>
-                  <X size={16} className="mr-2" />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => clearAll()}
+                  className="h-8 px-3 text-sm hover:bg-red-50 hover:text-red-600"
+                >
+                  <X size={12} className="mr-1.5" />
                   Clear all
                 </Button>
               </>
@@ -103,8 +113,10 @@ export default function NotificationCenter() {
                 >
                   <DropdownMenuItem
                     className={cn(
-                      "flex flex-col items-start p-4 cursor-pointer",
-                      !notification.read && "bg-muted/50"
+                      "flex flex-col items-start p-4 cursor-pointer transition-colors bg-white",
+                      "focus:bg-gray-50 focus:text-gray-900 data-[highlighted]:bg-gray-50 data-[highlighted]:text-gray-900",
+                      !notification.read && "border-l-4 border-l-purple-500",
+                      notification.read && "border-l-4 border-l-transparent"
                     )}
                     onClick={() => markAsRead(notification.id)}
                   >
@@ -114,15 +126,15 @@ export default function NotificationCenter() {
                           {getTypeIcon(notification.type)}
                         </div>
                         <div>
-                          <p className="font-medium">{notification.title}</p>
-                          <p className="text-sm text-muted-foreground">{notification.message}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="font-medium text-gray-900">{notification.title}</p>
+                          <p className="text-sm text-gray-600">{notification.message}</p>
+                          <p className="text-xs text-gray-500 mt-1">
                             {format(new Date(notification.createdAt), "MMM d, h:mm a")}
                           </p>
                         </div>
                       </div>
                       {!notification.read && (
-                        <Badge variant="secondary" className="ml-2">
+                        <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-700 hover:bg-purple-100">
                           New
                         </Badge>
                       )}

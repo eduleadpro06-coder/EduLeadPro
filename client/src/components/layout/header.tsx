@@ -71,6 +71,9 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
                     </Avatar>
                     <div>
                       <p className="text-sm font-medium text-foreground">{user?.displayName || user?.email || 'User'}</p>
+                      {user?.organizationName && (
+                        <p className="text-xs text-purple-600 font-medium">{user.organizationName}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">{user?.id?.slice(0, 8)}</p>
                     </div>
                   </div>
