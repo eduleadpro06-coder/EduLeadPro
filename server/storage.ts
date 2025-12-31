@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, lt, sql, desc, or, isNull, isNotNull, not, asc } from "drizzle-orm";
+import { eq, and, ne, gte, lte, lt, sql, desc, or, isNull, isNotNull, not, asc } from "drizzle-orm";
 import { db } from "./db.js";
 import * as schema from "../shared/schema.js";
 import type {
@@ -97,6 +97,37 @@ export interface IStorage {
     enrollments: number;
   }>>;
 
+  getDashboardAnalytics(organizationId?: number): Promise<{
+    kpis: {
+      leadManagement: { value: number; change: string };
+      studentFee: { value: number; change: string };
+      staffManagement: { value: number; change: string };
+      expenses: { value: number; change: string };
+    };
+    leadAnalytics: {
+      sourceDistribution: Array<{ label: string; value: number }>;
+      monthlyTrends: Array<{ month: string; leads: number; conversions: number }>;
+      conversionRate: number;
+      bestPerformingSource: string;
+    };
+    feeAnalytics: {
+      paidVsPending: Array<{ label: string; value: number }>;
+      monthlyCollection: Array<{ month: string; collected: number; pending: number }>;
+      collectionRate: number;
+      totalRevenue: number;
+    };
+    staffAnalytics: {
+      departmentDistribution: Array<{ label: string; value: number }>;
+      totalStaff: number;
+      attendanceRate: number;
+    };
+    expenseAnalytics: {
+      categoryBreakdown: Array<{ label: string; value: number }>;
+      totalExpenses: number;
+      monthlyTrend: Array<{ month: string; amount: number }>;
+    };
+  }>;
+
   // Staff Management
   getStaff(id: number): Promise<Staff | undefined>;
   getAllStaff(): Promise<StaffWithDetails[]>;
@@ -134,7 +165,7 @@ export interface IStorage {
 
   // Expenses
   getExpense(id: number): Promise<ExpenseWithApprover | undefined>;
-  getAllExpenses(): Promise<ExpenseWithApprover[]>;
+  getAllExpenses(organizationId?: number): Promise<ExpenseWithApprover[]>;
   getExpensesByCategory(category: string): Promise<ExpenseWithApprover[]>;
   getExpensesByDateRange(startDate: string, endDate: string): Promise<ExpenseWithApprover[]>;
   createExpense(expense: InsertExpense): Promise<Expense>;
@@ -985,6 +1016,838 @@ export class DatabaseStorage implements IStorage {
       month: e.month,
       enrollments: e.count
     }));
+  }
+
+  async getDashboardAnalytics(organizationId?: number): Promise<{
+    kpis: {
+      leadManagement: { value: number; change: string };
+      studentFee: { value: number; change: string };
+      staffManagement: { value: number; change: string };
+      payroll: { value: number; change: string };
+      expenses: { value: number; change: string };
+      totalReceivables: { value: number; change: string }; // New KPI replacing responseTime
+      avgOrderValue: { value: number; change: string }; // New KPI
+      conversionRate: { value: number; change: string }; // New KPI
+      daycareRevenue: { value: number; change: string }; // New KPI
+    };
+    leadAnalytics: {
+      sourceDistribution: Array<{ label: string; value: number }>;
+      monthlyTrends: Array<{ month: string; leads: number; conversions: number }>;
+      conversionRate: number;
+      bestPerformingSource: string;
+      engagementCurve: Array<{ date: string; impressions: number; conversions: number }>; // New Chart Data
+      funnelData: Array<{ month: string; captured: number; engaged: number; qualified: number; converted: number }>; // Updated for monthly trend
+    };
+    feeAnalytics: {
+      paidVsPending: Array<{ label: string; value: number }>;
+      monthlyCollection: Array<{ month: string; collected: number; pending: number }>;
+      collectionRate: number;
+      totalRevenue: number;
+      totalPending: number;
+    };
+    staffAnalytics: {
+      departmentDistribution: Array<{ label: string; value: number }>;
+      totalStaff: number;
+      attendanceRate: number;
+    };
+    expenseAnalytics: {
+      categoryBreakdown: Array<{ label: string; value: number }>;
+      totalExpenses: number;
+      monthlyTrend: Array<{ month: string; amount: number }>;
+    };
+    recentLeads: Array<Lead>;
+    recentActivity: Array<Notification>;
+  }> {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+
+    // Helper to get YYYY-MM-DD from a Date object using local time instead of UTC
+    // This fixes the Dec 31st / timezone bug
+    const toLocalDateString = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    // Current month date range
+    const currentMonthStart = new Date(currentYear, currentMonth, 1);
+    const currentMonthEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+
+    const currentMonthStartStr = toLocalDateString(currentMonthStart);
+    const currentMonthEndStr = toLocalDateString(currentMonthEnd);
+
+    // Previous month date range for trend calculation
+    const prevMonthStart = new Date(currentYear, currentMonth - 1, 1);
+    const prevMonthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59);
+
+    const prevMonthStartStr = toLocalDateString(prevMonthStart);
+    const prevMonthEndStr = toLocalDateString(prevMonthEnd);
+
+    // ===== KPI CALCULATIONS =====
+
+    // 1. Lead Management KPI (Total Leads)
+    const [currentLeads, prevLeads] = await Promise.all([
+      db.select({ count: sql<number>`cast(count(*) as integer)` })
+        .from(schema.leads)
+        .where(organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`),
+      db.select({ count: sql<number>`cast(count(*) as integer)` })
+        .from(schema.leads)
+        .where(
+          and(
+            organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`,
+            lt(schema.leads.createdAt, currentMonthStart)
+          )
+        )
+    ]);
+
+    const totalLeads = currentLeads[0]?.count || 0;
+    const previousTotalLeads = prevLeads[0]?.count || 0;
+    const leadChange = previousTotalLeads > 0
+      ? (((totalLeads - previousTotalLeads) / previousTotalLeads) * 100).toFixed(1)
+      : "0.0";
+
+    // 2. Student Fee KPI (Collected THIS Month)
+    const [currentMonthRevenueResult, prevMonthRevenueResult] = await Promise.all([
+      db.select({ total: sql<number>`cast(coalesce(sum(${schema.feePayments.amount}), 0) as integer)` })
+        .from(schema.feePayments)
+        .where(
+          and(
+            organizationId ? eq(schema.feePayments.organizationId, organizationId) : sql`1=1`,
+            gte(schema.feePayments.paymentDate, currentMonthStartStr),
+            lte(schema.feePayments.paymentDate, currentMonthEndStr)
+          )
+        ),
+      db.select({ total: sql<number>`cast(coalesce(sum(${schema.feePayments.amount}), 0) as integer)` })
+        .from(schema.feePayments)
+        .where(
+          and(
+            organizationId ? eq(schema.feePayments.organizationId, organizationId) : sql`1=1`,
+            gte(schema.feePayments.paymentDate, prevMonthStartStr),
+            lte(schema.feePayments.paymentDate, prevMonthEndStr)
+          )
+        )
+    ]);
+
+    const monthlyRevenue = currentMonthRevenueResult[0]?.total || 0;
+    const prevRevenue = prevMonthRevenueResult[0]?.total || 0;
+    const revenueChange = prevRevenue > 0
+      ? (((monthlyRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1)
+      : monthlyRevenue > 0 ? "100.0" : "0.0";
+
+    // 3. Staff Management KPI (Active Staff)
+    const [currentStaff, prevStaff] = await Promise.all([
+      db.select({ count: sql<number>`cast(count(*) as integer)` })
+        .from(schema.staff)
+        .where(
+          and(
+            eq(schema.staff.isActive, true),
+            organizationId ? eq(schema.staff.organizationId, organizationId) : sql`1=1`
+          )
+        ),
+      db.select({ count: sql<number>`cast(count(*) as integer)` })
+        .from(schema.staff)
+        .where(
+          and(
+            eq(schema.staff.isActive, true),
+            organizationId ? eq(schema.staff.organizationId, organizationId) : sql`1=1`,
+            lt(schema.staff.createdAt, currentMonthStart)
+          )
+        )
+    ]);
+
+    const totalStaff = currentStaff[0]?.count || 0;
+    const prevTotalStaff = prevStaff[0]?.count || 0;
+    const staffChange = prevTotalStaff > 0
+      ? (((totalStaff - prevTotalStaff) / prevTotalStaff) * 100).toFixed(1)
+      : totalStaff > 0 ? "100.0" : "0.0";
+
+    // 4. Payroll KPI (Current Month Cost)
+    // We try to get from payroll table first
+    let currentPayroll = 0;
+    let prevPayroll = 0;
+
+    const [currPayrollResult, prevPayrollResult] = await Promise.all([
+      db.select({ total: sql<number>`cast(coalesce(sum(${schema.payroll.netSalary}), 0) as integer)` })
+        .from(schema.payroll)
+        .where(
+          and(
+            organizationId ? eq(schema.staff.organizationId, organizationId) : sql`1=1`,
+            eq(schema.payroll.month, currentMonth + 1), // JS month is 0-based
+            eq(schema.payroll.year, currentYear)
+          )
+        )
+        .leftJoin(schema.staff, eq(schema.payroll.staffId, schema.staff.id)), // Implicit join for org filter
+      db.select({ total: sql<number>`cast(coalesce(sum(${schema.payroll.netSalary}), 0) as integer)` })
+        .from(schema.payroll)
+        .where(
+          and(
+            organizationId ? eq(schema.staff.organizationId, organizationId) : sql`1=1`,
+            eq(schema.payroll.month, currentMonth), // Previous month
+            eq(schema.payroll.year, currentMonth === 0 ? currentYear - 1 : currentYear)
+          )
+        )
+        .leftJoin(schema.staff, eq(schema.payroll.staffId, schema.staff.id))
+    ]);
+
+    currentPayroll = currPayrollResult[0]?.total || 0;
+    prevPayroll = prevPayrollResult[0]?.total || 0;
+
+    // Fallback: If no payroll data for this month, sum up active staff salaries as an estimate
+    if (currentPayroll === 0) {
+      const staffSalaries = await db.select({ total: sql<number>`cast(coalesce(sum(${schema.staff.salary}), 0) as integer)` })
+        .from(schema.staff)
+        .where(
+          and(
+            eq(schema.staff.isActive, true),
+            organizationId ? eq(schema.staff.organizationId, organizationId) : sql`1=1`
+          )
+        );
+      currentPayroll = staffSalaries[0]?.total || 0;
+    }
+    // Fallback for previous if 0 (rough estimate)
+    if (prevPayroll === 0) {
+      // Just use same as current for fallback to avoid wild swings, unless we truly have 0 payroll history
+      prevPayroll = currentPayroll;
+    }
+
+    const payrollChange = prevPayroll > 0
+      ? (((currentPayroll - prevPayroll) / prevPayroll) * 100).toFixed(1)
+      : "0.0";
+
+    // 5. Expenses KPI
+    // 5. Expenses KPI
+    const [currentExpenses, prevExpenses, allTimeExpenses] = await Promise.all([
+      db.select({ total: sql<number>`cast(coalesce(sum(${schema.expenses.amount}), 0) as integer)` })
+        .from(schema.expenses)
+        .where(
+          and(
+            organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`,
+            gte(schema.expenses.date, currentMonthStart.toISOString().split('T')[0]),
+            lte(schema.expenses.date, currentMonthEnd.toISOString().split('T')[0])
+          )
+        ),
+      db.select({ total: sql<number>`cast(coalesce(sum(${schema.expenses.amount}), 0) as integer)` })
+        .from(schema.expenses)
+        .where(
+          and(
+            organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`,
+            gte(schema.expenses.date, prevMonthStart.toISOString().split('T')[0]),
+            lte(schema.expenses.date, prevMonthEnd.toISOString().split('T')[0])
+          )
+        ),
+      db.select({ total: sql<number>`cast(coalesce(sum(${schema.expenses.amount}), 0) as integer)` })
+        .from(schema.expenses)
+        .where(organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`)
+    ]);
+
+    const monthlyExpenses = currentExpenses[0]?.total || 0;
+    const prevMonthlyExpenses = prevExpenses[0]?.total || 0;
+    const totalExpensesAllTime = allTimeExpenses[0]?.total || 0;
+
+    const expenseChange = prevMonthlyExpenses > 0
+      ? (((monthlyExpenses - prevMonthlyExpenses) / prevMonthlyExpenses) * 100).toFixed(1)
+      : monthlyExpenses > 0 ? "100.0" : "0.0";
+
+
+    // ===== DETAILED ANALYTICS =====
+
+    // --- Lead Analytics (Same as before) ---
+    const sourceData = await db
+      .select({
+        source: schema.leads.source,
+        count: sql<number>`cast(count(*) as integer)`
+      })
+      .from(schema.leads)
+      .where(organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`)
+      .groupBy(schema.leads.source);
+
+    const sourceDistribution = sourceData.map(s => ({
+      label: s.source || 'Unknown',
+      value: s.count
+    }));
+
+    const monthlyTrendsData = await db
+      .select({
+        month: sql<string>`to_char(${schema.leads.createdAt}, 'Mon')`,
+        yearMonth: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM')`,
+        totalLeads: sql<number>`cast(count(*) as integer)`,
+        conversions: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'enrolled') as integer)`
+      })
+      .from(schema.leads)
+      .where(
+        and(
+          organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`,
+          gte(schema.leads.createdAt, new Date(currentYear, currentMonth - 5, 1))
+        )
+      )
+      .groupBy(sql`to_char(${schema.leads.createdAt}, 'Mon')`, sql`to_char(${schema.leads.createdAt}, 'YYYY-MM')`)
+      .orderBy(sql`to_char(${schema.leads.createdAt}, 'YYYY-MM')`);
+
+    const monthlyTrends = monthlyTrendsData.map(m => ({
+      month: m.month,
+      leads: m.totalLeads,
+      conversions: m.conversions
+    }));
+
+    const conversionData = await db
+      .select({
+        total: sql<number>`cast(count(*) as integer)`,
+        enrolled: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'enrolled') as integer)`
+      })
+      .from(schema.leads)
+      .where(organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`);
+
+    const conversionRate = conversionData[0]?.total > 0
+      ? ((conversionData[0].enrolled / conversionData[0].total) * 100)
+      : 0;
+
+    const bestSource = await db
+      .select({
+        source: schema.leads.source,
+        conversionRate: sql<number>`cast(
+          (count(*) filter (where ${schema.leads.status} = 'enrolled')::float / 
+           nullif(count(*)::float, 0) * 100) as integer
+        )`
+      })
+      .from(schema.leads)
+      .where(organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`)
+      .groupBy(schema.leads.source)
+      .orderBy(sql`(count(*) filter (where ${schema.leads.status} = 'enrolled')::float / 
+                     nullif(count(*)::float, 0) * 100) desc`)
+      .limit(1);
+
+    const bestPerformingSource = bestSource[0]?.source || 'N/A';
+
+
+    // --- FEE ANALYTICS (IMPROVED) ---
+
+    // 1. Total Collected (All Time) - USED FOR REVENUE
+    const allTimeCollectedResult = await db
+      .select({ total: sql<number>`cast(coalesce(sum(${schema.feePayments.amount}), 0) as integer)` })
+      .from(schema.feePayments)
+      .where(organizationId ? eq(schema.feePayments.organizationId, organizationId) : sql`1=1`);
+    const totalCollectedAllTime = allTimeCollectedResult[0]?.total || 0;
+
+    // 2. Total Pending (Calculated)
+    // Get all enrolled students and their fee structures
+    const enrolledStudents = await db
+      .select({
+        id: schema.leads.id,
+        class: schema.leads.class,
+        stream: schema.leads.stream
+      })
+      .from(schema.leads)
+      .where(
+        and(
+          eq(schema.leads.status, 'enrolled'),
+          organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`
+        )
+      );
+
+    // Get all fee structures
+    const [allFeeStructures, allEmiPlans, allInstallments] = await Promise.all([
+      db.select().from(schema.feeStructure)
+        .where(organizationId ? eq(schema.feeStructure.organizationId, organizationId) : sql`1=1`),
+      db.select().from(schema.emiPlans)
+        .where(organizationId ? eq(schema.emiPlans.organizationId, organizationId) : sql`1=1`),
+      db.select().from(schema.emiSchedule)
+        .where(ne(schema.emiSchedule.status, 'paid'))
+    ]);
+
+    // Map EMI plans for quick lookup: studentId -> totalAmount
+    const emiPlanMap = new Map<number, number>();
+    allEmiPlans.forEach(plan => {
+      emiPlanMap.set(plan.studentId, Number(plan.totalAmount));
+    });
+
+    // Map fee structures for quick lookup: class_stream -> amount
+    const feeMap = new Map<string, number>();
+    allFeeStructures.forEach(fs => {
+      // Create a key that handles potential null streams
+      const key = `${fs.class}_${fs.stream}`;
+      feeMap.set(key, Number(fs.totalFees));
+    });
+
+    // Memory-safe filtering for Pending installments (avoiding complex JOIN syntax issues)
+    const enrolledStudentIds = new Set(enrolledStudents.map(s => s.id));
+    const totalPendingEMIs = allInstallments
+      .filter(i => enrolledStudentIds.has(i.studentId))
+      .reduce((sum, i) => sum + Number(i.amount), 0);
+
+    // REFINED GROSS POTENTIAL CALCULATION (User Accounting Model):
+    // Total Receivables = Sum of all Enrolled Students' Defined Plans (EMI Plan Total OR Class Fee)
+    // Pending = Total Receivables - Total Collected
+
+    let totalExpectedRevenue = 0;
+
+    enrolledStudents.forEach(student => {
+      // 1. Priority: specific EMI plan
+      if (emiPlanMap.has(student.id)) {
+        totalExpectedRevenue += emiPlanMap.get(student.id) || 0;
+      }
+      // 2. Fallback: Global fee structure
+      else {
+        const key = `${student.class}_${student.stream}`;
+        if (feeMap.has(key)) {
+          totalExpectedRevenue += feeMap.get(key) || 0;
+        }
+      }
+    });
+
+    // We also need to add any "additional_charge" payments to the Total Receivables.
+    // Why? Because if a parent pays ₹500 for a form, that was effectively a "Receivable" the moment it was charged.
+    // Logic: Total Receivables = (Base Fees) + (Extra Collected Fees)
+    // This allows Pending to correctly track Tuition Balance: (Base R + Extra R) - (Base C + Extra C) = (Base R - Base C).
+
+    // Get collected additional charges
+    const additionalChargesResult = await db
+      .select({ total: sql<number>`cast(coalesce(sum(${schema.feePayments.amount}), 0) as integer)` })
+      .from(schema.feePayments)
+      .where(
+        and(
+          organizationId ? eq(schema.feePayments.organizationId, organizationId) : sql`1=1`,
+          eq(schema.feePayments.paymentCategory, 'additional_charge')
+        )
+      );
+
+    const additionalCollected = additionalChargesResult[0]?.total || 0;
+    totalExpectedRevenue += additionalCollected;
+
+    // NOTE: 'totalCollectedAllTime' includes both fee_payment AND additional_charge.
+    // So Pending = (Base + Extra) - (Collected Base + Collected Extra)
+    // This correctly leaves the Pending amount as just the Base balance (e.g. 28,000).
+
+    const totalPending = Math.max(0, totalExpectedRevenue - totalCollectedAllTime);
+
+    // Collection rate: Collected / (Collected + Pending) which is effectively Collected / TotalExpected
+    // But we use the numbers we have.
+    const collectionRate = totalExpectedRevenue > 0
+      ? (totalCollectedAllTime / totalExpectedRevenue) * 100
+      : (totalCollectedAllTime > 0 ? 100 : 0);
+
+    const paidVsPending = [
+      { label: 'Collected', value: totalCollectedAllTime },
+      { label: 'Pending', value: totalPending }
+    ];
+
+
+    // Monthly Collection Trend (last 6 months)
+    const monthlyCollectionData = await db
+      .select({
+        month: sql<string>`to_char(${schema.feePayments.paymentDate}, 'Mon')`,
+        yearMonth: sql<string>`to_char(${schema.feePayments.paymentDate}, 'YYYY-MM')`,
+        collected: sql<number>`cast(coalesce(sum(${schema.feePayments.amount}), 0) as integer)`
+      })
+      .from(schema.feePayments)
+      .where(
+        and(
+          organizationId ? eq(schema.feePayments.organizationId, organizationId) : sql`1=1`,
+          gte(schema.feePayments.paymentDate, new Date(currentYear, currentMonth - 5, 1).toISOString().split('T')[0])
+        )
+      )
+      .groupBy(sql`to_char(${schema.feePayments.paymentDate}, 'Mon')`, sql`to_char(${schema.feePayments.paymentDate}, 'YYYY-MM')`)
+      .orderBy(sql`to_char(${schema.feePayments.paymentDate}, 'YYYY-MM')`);
+
+    const monthlyCollection = monthlyCollectionData.map(m => ({
+      month: m.month,
+      collected: m.collected + 0, // Placeholder for daycare revenue per month
+      pending: 0
+    }));
+
+
+    // --- STAFF ANALYTICS ---
+    const deptData = await db
+      .select({
+        department: schema.staff.department,
+        count: sql<number>`cast(count(*) as integer)`
+      })
+      .from(schema.staff)
+      .where(
+        and(
+          eq(schema.staff.isActive, true),
+          organizationId ? eq(schema.staff.organizationId, organizationId) : sql`1=1`
+        )
+      )
+      .groupBy(schema.staff.department);
+
+    const departmentDistribution = deptData.map(d => ({
+      label: d.department || 'Unassigned',
+      value: d.count
+    }));
+
+    const attendanceData = await db
+      .select({
+        totalDays: sql<number>`cast(count(*) as integer)`,
+        presentDays: sql<number>`cast(count(*) filter (where ${schema.attendance.status} = 'present') as integer)`
+      })
+      .from(schema.attendance)
+      .where(
+        and(
+          gte(schema.attendance.date, currentMonthStart.toISOString().split('T')[0]),
+          lte(schema.attendance.date, currentMonthEnd.toISOString().split('T')[0])
+        )
+      );
+
+    const attendanceRate = attendanceData[0]?.totalDays > 0
+      ? ((attendanceData[0].presentDays / attendanceData[0].totalDays) * 100)
+      : 0;
+
+
+    // --- EXPENSE ANALYTICS ---
+    // Category Breakdown
+    const categoryData = await db
+      .select({
+        category: schema.expenses.category,
+        total: sql<number>`cast(coalesce(sum(${schema.expenses.amount}), 0) as integer)`
+      })
+      .from(schema.expenses)
+      .where(organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`)
+      .groupBy(schema.expenses.category);
+
+    const categoryBreakdown = categoryData.map(c => ({
+      label: c.category || 'Other',
+      value: c.total
+    }));
+
+    const expenseTrendData = await db
+      .select({
+        month: sql<string>`to_char(${schema.expenses.date}, 'Mon')`,
+        yearMonth: sql<string>`to_char(${schema.expenses.date}, 'YYYY-MM')`,
+        amount: sql<number>`cast(coalesce(sum(${schema.expenses.amount}), 0) as integer)`
+      })
+      .from(schema.expenses)
+      .where(
+        and(
+          organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`,
+          gte(schema.expenses.date, new Date(currentYear, currentMonth - 5, 1).toISOString().split('T')[0])
+        )
+      )
+      .groupBy(sql`to_char(${schema.expenses.date}, 'Mon')`, sql`to_char(${schema.expenses.date}, 'YYYY-MM')`)
+      .orderBy(sql`to_char(${schema.expenses.date}, 'YYYY-MM')`);
+
+    // Monthly Payroll Trend
+    const payrollTrendData = await db
+      .select({
+        month: sql<string>`to_char(to_date(year || '-' || month || '-01', 'YYYY-MM-DD'), 'Mon')`,
+        yearMonth: sql<string>`year || '-' || lpad(month::text, 2, '0')`,
+        amount: sql<number>`cast(coalesce(sum(${schema.payroll.netSalary}), 0) as integer)`
+      })
+      .from(schema.payroll)
+      .where(
+        organizationId ? eq(schema.staff.organizationId, organizationId) : sql`1=1`
+      )
+      .leftJoin(schema.staff, eq(schema.payroll.staffId, schema.staff.id))
+      .groupBy(sql`to_char(to_date(year || '-' || month || '-01', 'YYYY-MM-DD'), 'Mon')`, sql`year || '-' || lpad(month::text, 2, '0')`)
+      .orderBy(sql`year || '-' || lpad(month::text, 2, '0')`);
+
+    // Merge General Expenses + Payroll for "Total Operating Expenses"
+    const monthlyTrend = expenseTrendData.map(e => {
+      const payroll = payrollTrendData.find(p => p.month === e.month);
+      return {
+        month: e.month,
+        amount: e.amount + (payroll ? payroll.amount : 0)
+      };
+    });
+
+
+    // ===== NEW ANALYTICS CALCULATIONS =====
+
+    // 1. RESPONSE TIME CALCULATION
+    const responseTimeData = await db
+      .select({
+        avgMinutes: sql<number>`
+          cast(
+            avg(
+              extract(epoch from (${schema.leads.lastContactedAt} - ${schema.leads.createdAt})) / 60
+            ) filter (where ${schema.leads.lastContactedAt} is not null)
+          as integer)
+        `
+      })
+      .from(schema.leads)
+      .where(organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`);
+
+    const avgResponseMinutes = responseTimeData[0]?.avgMinutes || 0;
+    const avgResponseHours = avgResponseMinutes > 0 ? (avgResponseMinutes / 60).toFixed(1) : "0.0";
+
+    // Previous period response time for trend
+    const prevResponseTimeData = await db
+      .select({
+        avgMinutes: sql<number>`
+          cast(
+            avg(
+              extract(epoch from (${schema.leads.lastContactedAt} - ${schema.leads.createdAt})) / 60
+            ) filter (where ${schema.leads.lastContactedAt} is not null)
+          as integer)
+        `
+      })
+      .from(schema.leads)
+      .where(
+        and(
+          organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`,
+          lt(schema.leads.createdAt, currentMonthStart)
+        )
+      );
+
+    const prevAvgResponseMinutes = prevResponseTimeData[0]?.avgMinutes || avgResponseMinutes;
+    const responseTimeChange = prevAvgResponseMinutes > 0
+      ? (((avgResponseMinutes - prevAvgResponseMinutes) / prevAvgResponseMinutes) * 100).toFixed(1)
+      : "0.0";
+
+    // 2. CONVERSION RATE KPI (All-Time Value, Monthly Trend)
+    // First, get ALL-TIME conversion data for the main KPI value
+    const allTimeConversionData = await db
+      .select({
+        total: sql<number>`cast(count(*) as integer)`,
+        enrolled: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'enrolled') as integer)`
+      })
+      .from(schema.leads)
+      .where(organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`);
+
+    // Next, get monthly data purely for the TREND calculation
+    const currentMonthConversionData = await db
+      .select({
+        total: sql<number>`cast(count(*) as integer)`,
+        enrolled: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'enrolled') as integer)`
+      })
+      .from(schema.leads)
+      .where(
+        and(
+          organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`,
+          gte(schema.leads.createdAt, currentMonthStart)
+        )
+      );
+
+    const prevMonthConversionData = await db
+      .select({
+        total: sql<number>`cast(count(*) as integer)`,
+        enrolled: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'enrolled') as integer)`
+      })
+      .from(schema.leads)
+      .where(
+        and(
+          organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`,
+          gte(schema.leads.createdAt, prevMonthStart),
+          lt(schema.leads.createdAt, currentMonthStart)
+        )
+      );
+
+    // Main KPI Value (All-Time)
+    const currentConversionRate = allTimeConversionData[0]?.total > 0
+      ? ((allTimeConversionData[0].enrolled / allTimeConversionData[0].total) * 100)
+      : 0;
+
+    // Trend Calculation (Month over Month)
+    const currentMonthRate = currentMonthConversionData[0]?.total > 0
+      ? ((currentMonthConversionData[0].enrolled / currentMonthConversionData[0].total) * 100)
+      : 0;
+
+    const prevMonthRate = prevMonthConversionData[0]?.total > 0
+      ? ((prevMonthConversionData[0].enrolled / prevMonthConversionData[0].total) * 100)
+      : 0;
+
+    const conversionRateChange = prevMonthRate > 0
+      ? (((currentMonthRate - prevMonthRate) / prevMonthRate) * 100).toFixed(1)
+      : currentMonthRate > 0 ? "100.0" : "0.0";
+
+    // 3. AVERAGE FEE COLLECTED (Per Enrolled Student - Student Fees Only)
+    const enrolledCount = enrolledStudents.length;
+    const avgFeeCollected = enrolledCount > 0
+      ? Math.round(totalCollectedAllTime / enrolledCount)
+      : 0;
+
+    // Previous period avg fee for trend
+    const prevPeriodCollected = await db
+      .select({ total: sql<number>`cast(coalesce(sum(${schema.feePayments.amount}), 0) as integer)` })
+      .from(schema.feePayments)
+      .where(
+        and(
+          organizationId ? eq(schema.feePayments.organizationId, organizationId) : sql`1=1`,
+          lt(schema.feePayments.paymentDate, currentMonthStart.toISOString().split('T')[0])
+        )
+      );
+
+    const prevPeriodEnrolledCount = await db
+      .select({ count: sql<number>`cast(count(*) as integer)` })
+      .from(schema.leads)
+      .where(
+        and(
+          eq(schema.leads.status, 'enrolled'),
+          organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`,
+          lt(schema.leads.createdAt, currentMonthStart)
+        )
+      );
+
+    const prevAvgFee = prevPeriodEnrolledCount[0]?.count > 0
+      ? Math.round((prevPeriodCollected[0]?.total || 0) / prevPeriodEnrolledCount[0].count)
+      : avgFeeCollected;
+
+    const avgFeeChange = prevAvgFee > 0
+      ? (((avgFeeCollected - prevAvgFee) / prevAvgFee) * 100).toFixed(1)
+      : "0.0";
+
+    // 4. DAYCARE REVENUE
+    // NOTE: 'daycareTransactions' table does not exist in schema yet.
+    // Using placeholder 0 to prevent crash. Re-enable query once table is created.
+    const monthlyDaycareRevenue = 0;
+    const prevMonthDaycareRevenue = 0;
+    const daycareRevenueChange = "0.0";
+
+    // 5. TOTAL REVENUE (Receivables + All Daycare)
+    const totalDaycareAllTime = 0;
+    const totalBusinessRevenue = totalExpectedRevenue + totalDaycareAllTime;
+
+    const currentTotalMonthlyCollection = monthlyRevenue + monthlyDaycareRevenue;
+    const prevTotalMonthlyCollection = prevRevenue + prevMonthDaycareRevenue;
+    const totalRevenueChange = prevTotalMonthlyCollection > 0
+      ? (((currentTotalMonthlyCollection - prevTotalMonthlyCollection) / prevTotalMonthlyCollection) * 100).toFixed(1)
+      : currentTotalMonthlyCollection > 0 ? "100.0" : "0.0";
+
+    // 4. ENGAGEMENT CURVE DATA (Last 30 days)
+    const engagementCurveData = await db
+      .select({
+        date: sql<string>`date(${schema.leads.createdAt})`,
+        impressions: sql<number>`cast(count(*) as integer)`,
+        conversions: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'enrolled') as integer)`
+      })
+      .from(schema.leads)
+      .where(
+        and(
+          organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`,
+          gte(schema.leads.createdAt, new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000))
+        )
+      )
+      .groupBy(sql`date(${schema.leads.createdAt})`)
+      .orderBy(sql`date(${schema.leads.createdAt})`);
+
+    const engagementCurve = engagementCurveData.map(d => ({
+      date: d.date,
+      impressions: d.impressions,
+      conversions: d.conversions
+    }));
+
+    // 5. FUNNEL PROGRESSION DATA (Monthly stages)
+    const funnelProgressionData = await db
+      .select({
+        month: sql<string>`to_char(${schema.leads.createdAt}, 'Mon')`,
+        yearMonth: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM')`,
+        captured: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'new') as integer)`,
+        engaged: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'contacted') as integer)`,
+        qualified: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'interested') as integer)`,
+        converted: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'enrolled') as integer)`
+      })
+      .from(schema.leads)
+      .where(
+        and(
+          organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`,
+          gte(schema.leads.createdAt, new Date(currentYear, currentMonth - 5, 1))
+        )
+      )
+      .groupBy(sql`to_char(${schema.leads.createdAt}, 'Mon')`, sql`to_char(${schema.leads.createdAt}, 'YYYY-MM')`)
+      .orderBy(sql`to_char(${schema.leads.createdAt}, 'YYYY-MM')`);
+
+    const funnelData = funnelProgressionData.map(f => ({
+      month: f.month,
+      captured: f.captured,
+      engaged: f.engaged,
+      qualified: f.qualified,
+      converted: f.converted
+    }));
+
+    // 6. RECENT ACTIVITY (Last 10 notifications)
+    const recentActivity = await db
+      .select()
+      .from(schema.notifications)
+      .orderBy(desc(schema.notifications.createdAt))
+      .limit(10);
+
+    // 7. RECENT LEADS (Last 10 leads)
+    const recentLeads = await db
+      .select()
+      .from(schema.leads)
+      .where(organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`)
+      .orderBy(desc(schema.leads.createdAt))
+      .limit(10);
+
+    // 9. TOTAL REVENUE (Student Fees + Daycare)
+    // As per user request: "Total Receivables" (School Potential) + "Total Daycare Revenue" (All Time Daycare)
+    // We already calculated this as 'totalBusinessRevenue' earlier.
+
+    const totalRevenue = totalBusinessRevenue;
+
+    // For change trend, we continue to use the collections trend calculated earlier as 'totalRevenueChange'.
+    // (Note: The variable 'totalRevenueChange' was already defined in step 5, so we don't redefine it here).
+    // To ensure TS safety if 'totalRevenueChange' isn't in scope due to block issues, we ensure it is available.
+    // Ideally, we should unify the definitions.
+
+    return {
+      kpis: {
+        leadManagement: {
+          value: totalLeads,
+          change: `${leadChange >= "0" ? '+' : ''}${leadChange}%`
+        },
+        studentFee: {
+          value: totalRevenue,
+          change: `${parseFloat(totalRevenueChange) >= 0 ? '+' : ''}${totalRevenueChange}%`
+        },
+        staffManagement: {
+          value: totalStaff,
+          change: `${staffChange >= "0" ? '+' : ''}${staffChange}%`
+        },
+        payroll: {
+          value: currentPayroll,
+          change: `${payrollChange >= "0" ? '+' : ''}${payrollChange}%`
+        },
+        expenses: {
+          value: totalExpensesAllTime,
+          change: `${parseFloat(expenseChange) >= 0 ? '+' : ''}${expenseChange}%`
+        },
+        totalReceivables: {
+          value: totalExpectedRevenue,
+          change: ""
+        },
+        conversionRate: {
+          value: Math.round(currentConversionRate * 100) / 100,
+          change: `${parseFloat(conversionRateChange) >= 0 ? '+' : ''}${conversionRateChange}%`
+        },
+        avgOrderValue: {
+          value: avgFeeCollected,
+          change: `${parseFloat(avgFeeChange) >= 0 ? '+' : ''}${avgFeeChange}%`
+        },
+        daycareRevenue: {
+          value: monthlyDaycareRevenue,
+          change: `${parseFloat(daycareRevenueChange) >= 0 ? '+' : ''}${daycareRevenueChange}%`
+        }
+      },
+      leadAnalytics: {
+        sourceDistribution,
+        monthlyTrends,
+        conversionRate: Math.round(conversionRate * 100) / 100,
+        bestPerformingSource,
+        engagementCurve,
+        funnelData
+      },
+      feeAnalytics: {
+        paidVsPending,
+        monthlyCollection,
+        collectionRate: Math.round(collectionRate * 100) / 100,
+        totalRevenue: totalCollectedAllTime,
+        totalPending: totalPending
+      },
+      staffAnalytics: {
+        departmentDistribution,
+        totalStaff,
+        attendanceRate: Math.round(attendanceRate * 100) / 100
+      },
+      expenseAnalytics: {
+        categoryBreakdown,
+        totalExpenses: totalExpensesAllTime,
+        monthlyTrend
+      },
+      recentLeads,
+      recentActivity
+    };
   }
 
   // Staff operations - simplified implementations to avoid errors

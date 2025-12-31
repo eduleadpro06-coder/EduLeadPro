@@ -84,6 +84,8 @@ interface FeePayment {
   status: string;
   createdAt?: string;
   updatedAt?: string;
+  paymentCategory?: 'fee_payment' | 'additional_charge';
+  chargeType?: string;
 }
 
 interface EMandate {
@@ -787,12 +789,25 @@ export default function StudentFees() {
     return payments.reduce((sum: number, payment: FeePayment) => sum + parseFloat(payment.amount), 0);
   };
 
+  const calculateTuitionPaidAmount = (payments: FeePayment[]) => {
+    return payments
+      .filter(p => !p.paymentCategory || p.paymentCategory === 'fee_payment')
+      .reduce((sum: number, payment: FeePayment) => sum + parseFloat(payment.amount), 0);
+  };
+
+  const calculateAdditionalPaidAmount = (payments: FeePayment[]) => {
+    return payments
+      .filter(p => p.paymentCategory === 'additional_charge')
+      .reduce((sum: number, payment: FeePayment) => sum + parseFloat(payment.amount), 0);
+  };
+
   const calculateOutstanding = (student: Student | CombinedStudent) => {
     const fees = getStudentFeesWithGlobal(student);
     const payments = getStudentPayments(student.id);
 
     const totalFees = calculateTotalFees(fees);
-    const totalPaid = calculatePaidAmount(payments);
+    // Only count tuition payments towards outstanding
+    const totalPaid = calculateTuitionPaidAmount(payments);
 
     // Calculate total discounts from payments
     const paymentDiscounts = payments.reduce((sum, p) => sum + (parseFloat(p.discount || "0") || 0), 0);
@@ -1667,16 +1682,23 @@ export default function StudentFees() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          <div><span className="font-semibold">Total Fees:</span> ₹{calculateTotalFees(getStudentFeesWithGlobal(selectedStudent)).toLocaleString()}</div>
-                          <div><span className="font-semibold">Paid Amount:</span> ₹{calculatePaidAmount(getStudentPayments(selectedStudent.id)).toLocaleString()}</div>
-                          <div><span className="font-semibold">Outstanding:</span> ₹{calculateOutstanding(selectedStudent).toLocaleString()}</div>
-                          <div><span className="font-semibold">Mandates:</span> {(() => {
+                          <div><span className="font-semibold text-gray-700">Tuition Fees:</span> ₹{calculateTotalFees(getStudentFeesWithGlobal(selectedStudent)).toLocaleString()}</div>
+                          <div><span className="font-semibold text-gray-700">Tuition Paid:</span> <span className="text-green-600">₹{calculateTuitionPaidAmount(getStudentPayments(selectedStudent.id)).toLocaleString()}</span></div>
+                          <div><span className="font-semibold text-gray-700">Outstanding:</span> <span className="text-red-500">₹{calculateOutstanding(selectedStudent).toLocaleString()}</span></div>
+
+                          <div className="my-2 border-t border-gray-100"></div>
+
+                          <div><span className="font-semibold text-gray-700">Additional Paid:</span> <span className="text-amber-600">₹{calculateAdditionalPaidAmount(getStudentPayments(selectedStudent.id)).toLocaleString()}</span></div>
+
+                          <div className="my-2 border-t border-gray-100"></div>
+
+                          <div><span className="font-semibold text-gray-700">Mandates:</span> {(() => {
                             const mandates = getStudentMandate(selectedStudent.id);
                             if (!mandates) return 'None';
                             if (Array.isArray(mandates)) return mandates.length;
                             return 1;
                           })()}</div>
-                          <div><span className="font-semibold">EMI Plans:</span> {emiPlans.filter(p => p.studentId === selectedStudent.id).length}</div>
+                          <div><span className="font-semibold text-gray-700">EMI Plans:</span> {emiPlans.filter(p => p.studentId === selectedStudent.id).length}</div>
                         </div>
                       </CardContent>
                     </Card>
@@ -1717,6 +1739,14 @@ export default function StudentFees() {
                             <TableCell>{payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}</TableCell>
                             <TableCell>
                               {(() => {
+                                // EMI Installments
+                                if (payment.installmentNumber && payment.installmentNumber > 0) {
+                                  return (
+                                    <Badge className="bg-blue-100 text-blue-800 border-none hover:bg-blue-100 font-normal">
+                                      EMI Installment #{payment.installmentNumber}
+                                    </Badge>
+                                  );
+                                }
                                 // Registration Fee (Installment 0)
                                 if (payment.installmentNumber === 0) {
                                   return (
@@ -2490,7 +2520,7 @@ export default function StudentFees() {
                                     emiAmount: '',
                                     registrationFee: '0',
                                     interestRate: '0',
-                                    startDate: new Date().toISOString().split('T')[0],
+                                    startDate: format(new Date(), 'yyyy-MM-dd'),
                                     frequency: 'monthly',
                                     processingFee: '0',
                                     lateFee: '0',
@@ -2916,7 +2946,7 @@ export default function StudentFees() {
                         id="paymentDate"
                         name="paymentDate"
                         type="date"
-                        defaultValue={new Date().toISOString().split('T')[0]}
+                        defaultValue={format(new Date(), 'yyyy-MM-dd')}
                         required
                       />
                     </div>
@@ -3024,11 +3054,11 @@ export default function StudentFees() {
                       </span>
                     ) : selectedPaymentForDetails.installmentNumber === 0 ? (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                        Down Payment
+                        Registration Fee
                       </span>
                     ) : selectedPaymentForDetails.installmentNumber > 0 ? (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                        EMI Installment
+                        EMI Installment #{selectedPaymentForDetails.installmentNumber}
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">

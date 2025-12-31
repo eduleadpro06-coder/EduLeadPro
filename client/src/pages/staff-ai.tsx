@@ -45,7 +45,9 @@ import {
   Filter as FilterIcon,
   UserPlus,
   Search as SearchIcon,
-  Pencil
+  Pencil,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { format } from "date-fns";
 import { Progress } from "@/components/ui/progress";
@@ -139,6 +141,7 @@ interface Payroll {
   netSalary: number;
   attendedDays?: number;
   status: string;
+  overtime?: number;
   generatedAt: string;
 }
 
@@ -1728,41 +1731,38 @@ export default function StaffAI() {
                   })}
                 </div>
                 {/* Pagination UI beside the filter buttons */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 py-1">
                   <button
-                    className={`px-3 py-1 rounded-full border text-sm font-medium ${page === 1 ? 'bg-[#643ae5] text-gray-800' : 'bg-gray-100 text-gray-800'} transition`}
+                    className={`h-8 w-8 flex items-center justify-center rounded-full border transition-all duration-200 ${page === 1 ? 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed' : 'bg-white text-[#643ae5] border-[#643ae5] hover:bg-[#643ae5] hover:text-white shadow-sm active:scale-95'}`}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    style={{ opacity: page === 1 ? 0.5 : 1 }}
                   >
-                    &lt;
+                    <ChevronLeft size={16} />
                   </button>
                   {Array.from({ length: Math.min(totalPages, maxVisiblePage) }, (_, i) => i + 1).map((p) => (
                     <button
                       key={p}
-                      className={`px-3 py-1 rounded-full border text-sm font-medium mx-0.5 ${page === p ? 'bg-[#643ae5] text-gray-800' : 'bg-gray-100 text-gray-800'} transition`}
+                      className={`h-8 w-8 flex items-center justify-center rounded-full border text-sm font-semibold transition-all duration-200 ${page === p ? 'bg-[#2f54eb] text-white border-[#2f54eb] shadow-md scale-105' : 'bg-white text-gray-600 border-gray-200 hover:border-[#643ae5] hover:text-[#643ae5] shadow-sm'}`}
                       onClick={() => setPage(p)}
                     >
                       {p}
                     </button>
                   ))}
                   {maxVisiblePage < totalPages && (
-                    <span className="px-2 text-gray-800">...</span>
+                    <span className="px-1 text-gray-400 font-bold">...</span>
                   )}
                   <button
-                    className={`px-3 py-1 rounded-full border text-sm font-medium ${page === totalPages ? 'bg-[#643ae5] text-gray-800' : 'bg-gray-100 text-gray-800'} transition`}
+                    className={`h-8 w-8 flex items-center justify-center rounded-full border transition-all duration-200 ${page === totalPages ? 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed' : 'bg-white text-[#643ae5] border-[#643ae5] hover:bg-[#643ae5] hover:text-white shadow-sm active:scale-95'}`}
                     onClick={() => {
                       const nextPage = Math.min(totalPages, page + 1);
                       setPage(nextPage);
-                      // Expand visible pages when user navigates beyond current maxVisiblePage
                       if (nextPage > maxVisiblePage) {
                         setMaxVisiblePage(nextPage);
                       }
                     }}
                     disabled={page === totalPages}
-                    style={{ opacity: page === totalPages ? 0.5 : 1 }}
                   >
-                    &gt;
+                    <ChevronRight size={16} />
                   </button>
                 </div>
               </div>
@@ -1814,24 +1814,24 @@ export default function StaffAI() {
                         </div>
                       </div>
                       {/* Edit and Delete buttons */}
-                      <div className="absolute top-0 right-0 flex gap-2">
+                      <div className="absolute top-0 right-0 flex gap-3">
                         <button
-                          className="bg-[#643ae5] hover:bg-purple-50 text-gray-800 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition-colors"
+                          className="bg-[#643ae5] hover:bg-[#552dbf] text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                           onClick={() => setIsEditStaffOpen(true)}
                           title="Edit Employee"
                         >
-                          <Pencil size={14} />
+                          <Pencil size={16} />
                           Edit
                         </button>
                         <button
-                          className="bg-red-600 hover:bg-red-700 text-gray-800 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition-colors"
+                          className="bg-[#ef4444] hover:bg-[#dc2626] text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                           onClick={() => {
                             setStaffToDelete(selectedStaff);
                             setDeleteDialogOpen(true);
                           }}
                           title="Delete Employee"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={16} />
                           Delete
                         </button>
                       </div>

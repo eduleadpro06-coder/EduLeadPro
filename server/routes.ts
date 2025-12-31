@@ -89,6 +89,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update settings" });
     }
   });
+
+  // Comprehensive Dashboard Analytics
+  app.get("/api/dashboard/analytics", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      const analytics = await storage.getDashboardAnalytics(organizationId);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Dashboard analytics error:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard analytics", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
       const leadStats = await storage.getLeadStats();
@@ -2483,8 +2496,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       res.json(stats);
     } catch (error) {
-      console.error("Get attendance stats error:", error);
       res.status(500).json({ message: "Failed to fetch attendance stats" });
+    }
+  });
+
+  // Expense Routes
+  app.get("/api/expenses", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+      // Note: getAllExpenses in storage needs to support orgId filtering or we filter here?
+      // Better to update getAllExpenses signature or add getExpensesByOrg
+      // For now, let's look at storage.getAllExpenses again.
+      // Validated: storage.getAllExpenses() does NOT take arguments currently.
+      // I should update storage.getAllExpenses to accept organizationId or add a new method.
+      // However, to avoid changing storage interface widely right now, I can just filter in memory if dataset is small, 
+      // OR better, update storage.ts first.
+
+      // actually, let's filter in storage.ts. I will update this route assuming storage.getAllExpenses takes orgId
+      // OR I will add getExpensesByOrganization to storage.
+
+      // Let's check storage.ts again. It's better to modify storage.ts
+      const expenses = await storage.getAllExpenses(organizationId);
+      res.json(expenses);
+    } catch (error) {
+      console.error("Get expenses error:", error);
+      res.status(500).json({ message: "Failed to fetch expenses" });
+    }
+  });
+
+  app.post("/api/expenses", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+      const expenseData = { ...req.body, organizationId };
+      const expense = await storage.createExpense(expenseData);
+      res.status(201).json(expense);
+    } catch (error) {
+      console.error("Create expense error:", error);
+      res.status(500).json({ message: "Failed to create expense" });
+    }
+  });
+
+  app.put("/api/expenses/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const expense = await storage.updateExpense(id, req.body);
+      if (!expense) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+      res.json(expense);
+    } catch (error) {
+      console.error("Update expense error:", error);
+      res.status(500).json({ message: "Failed to update expense" });
+    }
+  });
+
+  app.delete("/api/expenses/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteExpense(id);
+      if (!success) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+      res.sendStatus(204);
+    } catch (error) {
+      console.error("Delete expense error:", error);
+      res.status(500).json({ message: "Failed to delete expense" });
     }
   });
 
