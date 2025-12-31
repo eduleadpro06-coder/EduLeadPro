@@ -36,7 +36,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return user?.organizationId || undefined;
   };
 
-  // Dashboard stats
+
+  // Organization Settings Endpoints
+  app.get("/api/organization/settings", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+      const org = await storage.getOrganization(organizationId);
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+      // Return settings or empty object, ensuring academicYear defaults if missing
+      const settings = (org.settings as any) || {};
+      if (!settings.academicYear) {
+        settings.academicYear = "2026-27"; // Default if not set
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error("Failed to fetch organization settings:", error);
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
+  app.patch("/api/organization/settings", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const { settings } = req.body;
+      if (!settings) {
+        return res.status(400).json({ message: "Settings data is required" });
+      }
+
+      const org = await storage.getOrganization(organizationId);
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      const updatedSettings = {
+        ...(org.settings as object),
+        ...settings,
+      };
+
+      await storage.updateOrganization(organizationId, { settings: updatedSettings });
+      res.json(updatedSettings);
+    } catch (error) {
+      console.error("Failed to update organization settings:", error);
+      res.status(500).json({ message: "Failed to update settings" });
+    }
+  });
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
       const leadStats = await storage.getLeadStats();
@@ -1756,29 +1808,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const emiPlan = await storage.createEmiPlan(finalPlanData);
       console.log("EMI plan created successfully:", emiPlan);
 
-      // Handle Down Payment if present
-      let downPaymentData = null;
-      const { downPayment, paymentMode, transactionId } = req.body;
-      const downPaymentAmount = parseFloat(downPayment || "0");
+      // Handle Registration Fee if present
+      let registrationFeeData = null;
+      const { registrationFee, paymentMode, transactionId } = req.body;
+      const registrationFeeAmount = parseFloat(registrationFee || "0");
 
 
-      if (!isNaN(downPaymentAmount) && downPaymentAmount > 0) {
-        console.log("Processing down payment for EMI plan:", downPaymentAmount);
+      if (!isNaN(registrationFeeAmount) && registrationFeeAmount > 0) {
+        console.log("Processing registration fee for EMI plan:", registrationFeeAmount);
 
         const paymentData: InsertFeePayment = {
           leadId: parseInt(studentId),
-          amount: String(downPaymentAmount),
+          amount: String(registrationFeeAmount),
           paymentDate: startDate, // Use start date as payment date
           paymentMode: paymentMode || 'cash',
           receiptNumber: null, // System-generated
           transactionId: transactionId || null,
           status: 'completed',
-          installmentNumber: 0, // 0 indicates down payment
+          installmentNumber: 0, // 0 indicates registration fee
         };
 
         const payment = await storage.createFeePayment(paymentData);
-        console.log("Down payment recorded successfully:", payment);
-        downPaymentData = payment;
+        console.log("Registration fee recorded successfully:", payment);
+        registrationFeeData = payment;
 
         // Generate receipt number if not provided
         if (!payment.receiptNumber) {
@@ -1786,12 +1838,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const generatedReceiptNumber = `MEL/${academicYear}/${String(payment.id).padStart(6, '0')}`;
           const updatedPayment = await storage.updateFeePayment(payment.id, { receiptNumber: generatedReceiptNumber });
           if (updatedPayment) {
-            downPaymentData = updatedPayment;
+            registrationFeeData = updatedPayment;
           }
         }
       }
 
-      res.status(201).json({ emiPlan, downPayment: downPaymentData });
+      res.status(201).json({ emiPlan, registrationFee: registrationFeeData });
     } catch (error) {
       console.error("EMI plan creation error:", error);
       res.status(500).json({ message: "Failed to create EMI plan", error: error instanceof Error ? error.message : String(error) });
@@ -2344,7 +2396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid lead ID" });
       }
 
-      const lead = await storage.getLeadById(leadId);
+      const lead = await storage.getLead(leadId);
       if (!lead) {
         return res.status(404).json({ message: "Lead not found" });
       }

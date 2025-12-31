@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { CreditCard, Building, MessageSquare } from "lucide-react";
 import React from "react"; // Added for useEffect
 import MessageTemplatesManager from "@/components/settings/message-templates-manager";
+import { useOrganization } from "@/hooks/use-organization";
 
 // Define GlobalClassFee interface if not already imported
 interface GlobalClassFee {
@@ -56,9 +57,10 @@ export default function Settings() {
 
   // --- Global Fee Management State & Logic ---
   const queryClient = useQueryClient();
+  const { settings: organizationSettings, updateSettings, isLoading: isUpdatingSettings } = useOrganization();
   const [globalFeeModalOpen, setGlobalFeeModalOpen] = useState(false);
   const [editingGlobalFee, setEditingGlobalFee] = useState<GlobalClassFee | null>(null);
-  const [academicYear, setAcademicYear] = useState<string>("2024-25");
+  const [academicYear, setAcademicYear] = useState<string>("2026-27");
   const [viewTotalFeesModalOpen, setViewTotalFeesModalOpen] = useState(false);
   const [selectedClassForTotal, setSelectedClassForTotal] = useState<string>("");
   const { toast } = useToast();
@@ -454,6 +456,45 @@ export default function Settings() {
                 <Button onClick={handleSaveSystem}>Save Configuration</Button>
               </CardContent>
             </Card>
+
+            {/* Academic Year Configuration */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Academic Year</CardTitle>
+                <CardDescription>
+                  Set the current academic year for the entire system
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="academic-year">Current Academic Year</Label>
+                    <Select
+                      value={organizationSettings?.academicYear || "2024-25"}
+                      onValueChange={(value) => updateSettings({ academicYear: value })}
+                      disabled={isUpdatingSettings}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="2024-25">2024-25</SelectItem>
+                        <SelectItem value="2025-26">2025-26</SelectItem>
+                        <SelectItem value="2026-27">2026-27</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={() => updateSettings({ academicYear: organizationSettings?.academicYear || "2024-25" })}
+                    disabled={isUpdatingSettings}
+                    className="mt-6"
+                  >
+                    {isUpdatingSettings ? "Saving..." : "Save Year"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
           </TabsContent>
 
           <TabsContent value="payroll">
