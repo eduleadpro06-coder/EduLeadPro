@@ -1,0 +1,83 @@
+{
+  "imported": 168,
+  "duplicates": 8,
+  "errors": 19,
+  "errorDetails": [
+    {
+      "row": 19,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 21,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 26,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 32,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 95,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 175,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 177,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 178,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 179,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 180,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 182,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 183,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 184,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 185,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 186,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 190,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 191,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 192,
+      "reason": "Missing student name or mobile"
+    },
+    {
+      "row": 194,
+      "reason": "Missing student name or mobile"
+    }
+  ]
+}

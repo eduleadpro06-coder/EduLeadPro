@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   User,
   Phone,
@@ -24,11 +28,12 @@ import {
   CheckCircle2,
   Trash2
 } from "lucide-react";
-import { type LeadWithCounselor as BaseLeadWithCounselor, type User as UserType, type FollowUp, type GlobalClassFee } from "@shared/schema";
+import { type LeadWithCounselor as BaseLeadWithCounselor, type Staff, type FollowUp, type GlobalClassFee, extendedLeadSchema, type InsertLead } from "@shared/schema";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { useHashState } from "@/hooks/use-hash-state";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { z } from "zod";
 
 // Extend LeadWithCounselor to include followUps for local use
 type LeadWithCounselorAndFollowUps = BaseLeadWithCounselor & { followUps?: FollowUp[] };
@@ -50,8 +55,7 @@ interface FollowUpForm {
 export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDeleted, onLeadUpdated }: LeadDetailModalProps) {
   const [activeTab, setActiveTab] = useHashState("details");
   const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState<any>(lead || {});
-  const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
+  const [activePopoverId, setActivePopoverId] = useState<number | null>(null);
   const [followUpForm, setFollowUpForm] = useState<FollowUpForm>({
     scheduledAt: "",
     remarks: "",
@@ -60,67 +64,67 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Validation functions
-  const validatePhone = (phone: string): string | null => {
-    if (!phone || phone.trim() === "") {
-      return "Phone number is required";
+  // Initialize form with react-hook-form
+  const form = useForm<InsertLead>({
+    resolver: zodResolver(extendedLeadSchema),
+    mode: "onChange",
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      class: "",
+      stream: "",
+      status: "new",
+      source: "",
+      counselorId: undefined,
+      notes: "",
+      parentName: "",
+      address: "",
+      lastContactedAt: undefined, // Add default value
+    },
+  });
+
+  // Reset form when lead changes or modal opens
+  useEffect(() => {
+    if (lead) {
+      form.reset({
+        name: lead.name,
+        email: lead.email || "",
+        phone: lead.phone,
+        class: lead.class,
+        stream: lead.stream || "",
+        status: lead.status,
+        source: lead.source,
+        counselorId: lead.counselorId ?? undefined,
+        notes: lead.notes || "",
+        parentName: lead.parentName || "",
+        address: lead.address || "",
+        lastContactedAt: lead.lastContactedAt ? new Date(lead.lastContactedAt) : undefined, // Map to Date object or keep undefined
+      });
     }
+  }, [lead, form]);
 
-    // Check if contains only allowed characters
-    if (!/^[\d\s\-\+\(\)]+$/.test(phone)) {
-      return "Phone number can only contain digits, spaces, hyphens, plus signs, and parentheses";
-    }
+  // Watch class to toggle stream visibility
+  const selectedClass = form.watch("class");
+  const [showStream, setShowStream] = useState(false);
 
-    // Count only digits
-    const digitsOnly = phone.replace(/\D/g, '');
-    if (digitsOnly.length !== 10) {
-      return "Phone number must contain exactly 10 digits";
-    }
-
-    return null;
-  };
-
-  const validateEmail = (email: string): string | null => {
-    if (email && email.trim() !== "") {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return "Please enter a valid email address";
+  useEffect(() => {
+    if (selectedClass) {
+      const match = selectedClass.match(/(\d+)/);
+      if (match) {
+        const classNum = parseInt(match[0], 10);
+        const shouldShow = classNum > 10;
+        setShowStream(shouldShow);
+        // If not showing stream, clear it from form if currently editing?
+        // Actually, for editing existing data, we might want to keep it if it exists, but validate if changed.
+        // For now, let's just control visibility. Validation handles the requirement.
+      } else {
+        setShowStream(false);
       }
+    } else {
+      setShowStream(false);
     }
-    return null;
-  };
-
-  const validateForm = (): boolean => {
-    const errors: { [key: string]: string } = {};
-
-    // Validate phone
-    const phoneError = validatePhone(editForm.phone);
-    if (phoneError) {
-      errors.phone = phoneError;
-    }
-
-    // Validate email
-    const emailError = validateEmail(editForm.email);
-    if (emailError) {
-      errors.email = emailError;
-    }
-
-    // Validate required fields
-    if (!editForm.name || editForm.name.trim() === "") {
-      errors.name = "Student name is required";
-    }
-
-    if (!editForm.class || editForm.class.trim() === "") {
-      errors.class = "Class is required";
-    }
-
-    if (!editForm.source || editForm.source.trim() === "") {
-      errors.source = "Lead source is required";
-    }
-
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+  }, [selectedClass]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -130,16 +134,9 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
   useEffect(() => {
     if (!open) {
       setActiveTab("");
-      setValidationErrors({}); // Clear validation errors when modal closes
       setIsEditing(false); // Reset editing state
     }
   }, [open, setActiveTab]);
-
-  useEffect(() => {
-    if (open && lead) {
-      setEditForm(lead);
-    }
-  }, [open, lead]);
 
   useEffect(() => {
     if (open) {
@@ -147,8 +144,8 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
     }
   }, [open, setActiveTab]);
 
-  const { data: counselors } = useQuery<UserType[]>({
-    queryKey: ["/api/counselors"],
+  const { data: counselors } = useQuery<Staff[]>({
+    queryKey: ["/api/staff"],
   });
 
   const { data: globalFees } = useQuery<GlobalClassFee[]>({
@@ -189,10 +186,6 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
     onSuccess: (updatedLead) => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       setIsEditing(false);
-      setValidationErrors({}); // Clear validation errors on successful save
-
-      // Update the edit form with the latest data
-      setEditForm(updatedLead);
 
       // Notify parent component to update the selected lead
       if (onLeadUpdated) {
@@ -269,10 +262,11 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
   });
 
   const completeFollowUpMutation = useMutation({
-    mutationFn: async (followUpId: number) => {
+    mutationFn: async (data: { id: number; outcome: string }) => {
       try {
-        const response = await apiRequest("PATCH", `/follow-ups/${followUpId}`, {
-          completedAt: new Date().toISOString()
+        const response = await apiRequest("PATCH", `/follow-ups/${data.id}`, {
+          completedAt: new Date().toISOString(),
+          outcome: data.outcome
         });
 
         const contentType = response.headers.get("Content-Type");
@@ -290,6 +284,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/follow-ups"] });
       queryClient.invalidateQueries({ queryKey: ["/api/follow-ups/overdue"] });
+      setActivePopoverId(null);
       toast({
         title: "Follow-up Completed",
         description: "Follow-up has been marked as completed",
@@ -313,18 +308,23 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
   });
 
 
+  const onSave = (data: InsertLead) => {
+    // Sanitize data similar to create
+    const sanitizedData: Partial<InsertLead> = {};
+    Object.keys(data).forEach(key => {
+      const value = (data as any)[key];
+      // simplified check to allow falsy values like 0 or false if needed, but here mostly strings/dates
+      if (value !== undefined && value !== null && value !== '') {
+        (sanitizedData as any)[key] = value;
+      }
+    });
 
-  const saveChanges = () => {
-    if (!validateForm()) {
-      toast({
-        title: "Validation Error",
-        description: "Please fix the errors before saving.",
-        variant: "destructive"
-      });
-      return;
+    // Ensure lastContactedAt is treated correctly if cleared or set
+    if (data.lastContactedAt) {
+      sanitizedData.lastContactedAt = new Date(data.lastContactedAt);
     }
 
-    updateLeadMutation.mutate(editForm);
+    updateLeadMutation.mutate(sanitizedData);
   };
 
   const scheduleFollowUp = () => {
@@ -370,560 +370,552 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl h-[75vh] overflow-y-auto border-4">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <User size={24} />
-              <div>
-                <h2 className="text-xl font-bold">{lead.name}</h2>
-                <p className="text-sm text-gray-600">{lead.class} {lead.stream}</p>
+      <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <div className="p-6 border-b">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <User size={24} />
+                <div>
+                  <h2 className="text-xl font-bold">{lead.name}</h2>
+                  <p className="text-sm text-gray-600">{lead.class} {lead.stream}</p>
+                </div>
               </div>
+              <div className="flex items-center gap-2">
+                <Badge className={getStatusColor(lead.status)}>
+                  {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
+                </Badge>
+
+              </div>
+            </DialogTitle>
+            <DialogDescription>
+              Comprehensive information about {lead.name}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col">
+            <div className="px-6 pt-4 bg-gray-50 border-b">
+              <TabsList className="grid w-full grid-cols-2 bg-gray-100">
+                <TabsTrigger
+                  value="details"
+                  className="data-[state=active]:bg-[#643ae5] data-[state=active]:text-white"
+                >
+                  Details
+                </TabsTrigger>
+                <TabsTrigger
+                  value="followups"
+                  className="data-[state=active]:bg-[#643ae5] data-[state=active]:text-white"
+                >
+                  Follow-ups
+                </TabsTrigger>
+
+              </TabsList>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge className={getStatusColor(lead.status)}>
-                {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
-              </Badge>
 
-            </div>
-          </DialogTitle>
-          <DialogDescription>
-            Comprehensive information about {lead.name}
-          </DialogDescription>
-        </DialogHeader>
-
-        <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-2 bg-gray-100">
-            <TabsTrigger
-              value="details"
-              className="data-[state=active]:bg-[#643ae5] data-[state=active]:text-white"
-            >
-              Details
-            </TabsTrigger>
-            <TabsTrigger
-              value="followups"
-              className="data-[state=active]:bg-[#643ae5] data-[state=active]:text-white"
-            >
-              Follow-ups
-            </TabsTrigger>
-
-          </TabsList>
-
-          <TabsContent value="details" className="space-y-4">
-            <div className="h-[520px] flex flex-col gap-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-semibold text-lg">Lead Information</h3>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (isEditing) {
-                        // Clear validation errors when cancelling
-                        setValidationErrors({});
-                        // Reset form to original lead data
-                        setEditForm(lead);
-                      }
-                      setIsEditing(!isEditing);
-                    }}
-                    className="border-[#643ae5] text-[#643ae5] hover:bg-[#643ae5]/10"
-                  >
-                    <Edit size={16} className="mr-2" />
-                    <span>{isEditing ? "Cancel" : "Edit"}</span>
-                  </Button>
-                  {lead.status !== "deleted" && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm">
-                          <Trash2 size={16} className="mr-2" />
-                          Delete
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure you want to delete?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will remove the lead from the UI and move it to Recently Deleted in the database.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>No</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={async () => {
-                              console.log("Attempting to delete lead", lead?.id);
-                              try {
-                                const res = await fetch(`/api/leads/${lead.id}`, { method: "DELETE" });
-                                if (!res.ok) throw new Error('Failed to delete lead');
-
-                                // Invalidate queries to refresh data
-                                queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
-                                invalidateNotifications(queryClient);
-
-                                if (onLeadDeleted) onLeadDeleted();
-                                onOpenChange(false);
-                                toast({ title: 'Lead deleted', description: 'The lead was deleted.' });
-                              } catch (err) {
-                                toast({ title: 'Error', description: 'Failed to delete lead.' });
-                              }
-                            }}
-                          >
-                            Yes, Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-                  {lead.status === "deleted" && (
+            <TabsContent value="details" className="flex-1 overflow-y-auto p-6 m-0 space-y-4">
+              <div className="flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold text-lg">Lead Information</h3>
+                  <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={async () => {
-                        await fetch(`/api/leads/${lead.id}/restore`, { method: "PATCH" });
-                        onOpenChange(false);
+                      onClick={() => {
+                        if (isEditing) {
+                          form.reset(); // Cancel editing resets form to initial values
+                        }
+                        setIsEditing(!isEditing);
                       }}
+                      className="border-[#643ae5] text-[#643ae5] hover:bg-[#643ae5]/10"
                     >
-                      Restore
+                      <Edit size={16} className="mr-2" />
+                      <span>{isEditing ? "Cancel" : "Edit"}</span>
                     </Button>
-                  )}
-                </div>
-              </div>
+                    {lead.status !== "deleted" && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm">
+                            <Trash2 size={16} className="mr-2" />
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure you want to delete?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will remove the lead from the UI and move it to Recently Deleted in the database.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>No</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={async () => {
+                                console.log("Attempting to delete lead", lead?.id);
+                                try {
+                                  const res = await fetch(`/api/leads/${lead.id}`, { method: "DELETE" });
+                                  if (!res.ok) throw new Error('Failed to delete lead');
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Student Name
-                    </label>
-                    {isEditing ? (
-                      <div>
-                        <Input
-                          value={editForm.name}
-                          onChange={(e) => {
-                            const newValue = e.target.value;
-                            setEditForm((prev: typeof editForm) => ({ ...prev, name: newValue }));
+                                  // Invalidate queries to refresh data
+                                  queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
+                                  invalidateNotifications(queryClient);
 
-                            // Real-time validation
-                            const errors = { ...validationErrors };
-                            if (!newValue || newValue.trim() === "") {
-                              errors.name = "Student name is required";
-                            } else {
-                              delete errors.name;
-                            }
-                            setValidationErrors(errors);
-                          }}
-                          onBlur={() => {
-                            // Validate on blur as well
-                            const errors = { ...validationErrors };
-                            if (!editForm.name || editForm.name.trim() === "") {
-                              errors.name = "Student name is required";
-                            } else {
-                              delete errors.name;
-                            }
-                            setValidationErrors(errors);
-                          }}
-                          className={validationErrors.name ? "border-red-500" : ""}
-                        />
-                        {validationErrors.name && (
-                          <p className="text-red-500 text-sm mt-1">{validationErrors.name}</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <User size={16} className="text-gray-500" />
-                        <span>{lead.name}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number
-                    </label>
-                    {isEditing ? (
-                      <div>
-                        <Input
-                          value={editForm.phone}
-                          onChange={(e) => {
-                            const newValue = e.target.value;
-                            setEditForm((prev: typeof editForm) => ({ ...prev, phone: newValue }));
-
-                            // Real-time validation
-                            const errors = { ...validationErrors };
-                            const phoneError = validatePhone(newValue);
-                            if (phoneError) {
-                              errors.phone = phoneError;
-                            } else {
-                              delete errors.phone;
-                            }
-                            setValidationErrors(errors);
-                          }}
-                          onBlur={() => {
-                            // Validate on blur as well
-                            const errors = { ...validationErrors };
-                            const phoneError = validatePhone(editForm.phone);
-                            if (phoneError) {
-                              errors.phone = phoneError;
-                            } else {
-                              delete errors.phone;
-                            }
-                            setValidationErrors(errors);
-                          }}
-                          className={validationErrors.phone ? "border-red-500" : ""}
-                        />
-                        {validationErrors.phone && (
-                          <p className="text-red-500 text-sm mt-1">{validationErrors.phone}</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Phone size={16} className="text-gray-500" />
-                        <span>{lead.phone}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email
-                    </label>
-                    {isEditing ? (
-                      <div>
-                        <Input
-                          value={editForm.email || ""}
-                          onChange={(e) => {
-                            const newValue = e.target.value;
-                            setEditForm((prev: typeof editForm) => ({ ...prev, email: newValue }));
-
-                            // Real-time validation
-                            const errors = { ...validationErrors };
-                            const emailError = validateEmail(newValue);
-                            if (emailError) {
-                              errors.email = emailError;
-                            } else {
-                              delete errors.email;
-                            }
-                            setValidationErrors(errors);
-                          }}
-                          onBlur={() => {
-                            // Validate on blur as well
-                            const errors = { ...validationErrors };
-                            const emailError = validateEmail(editForm.email || "");
-                            if (emailError) {
-                              errors.email = emailError;
-                            } else {
-                              delete errors.email;
-                            }
-                            setValidationErrors(errors);
-                          }}
-                          className={validationErrors.email ? "border-red-500" : ""}
-                        />
-                        {validationErrors.email && (
-                          <p className="text-red-500 text-sm mt-1">{validationErrors.email}</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Mail size={16} className="text-gray-500" />
-                        <span>{lead.email || "Not provided"}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Address
-                    </label>
-                    {isEditing ? (
-                      <Input
-                        value={editForm.address || ""}
-                        onChange={(e) => setEditForm((prev: typeof editForm) => ({ ...prev, address: e.target.value }))}
-                      />
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <MapPin size={16} className="text-gray-500" />
-                        <span>{lead.address || "Not provided"}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Last Contact
-                    </label>
-                    {isEditing ? (
-                      <Input
-                        type="date"
-                        placeholder="Select date"
-                        value={editForm.lastContactedAt ? editForm.lastContactedAt.split('T')[0] : ''}
-                        onChange={(e) => setEditForm((prev: typeof editForm) => ({ ...prev, lastContactedAt: e.target.value }))}
-                      />
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Calendar size={16} className="text-gray-500" />
-                        <span>{lead.lastContactedAt ? formatDate(lead.lastContactedAt) : 'Select date'}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Class & Stream
-                    </label>
-                    {isEditing ? (
-                      <div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Select
-                            value={editForm.class}
-                            onValueChange={(value) => {
-                              setEditForm((prev: typeof editForm) => ({ ...prev, class: value }));
-                              // Real-time validation for class
-                              const errors = { ...validationErrors };
-                              if (!value || value.trim() === "") {
-                                errors.class = "Class is required";
-                              } else {
-                                delete errors.class;
-                              }
-                              setValidationErrors(errors);
-                            }}
-                          >
-                            <SelectTrigger className={validationErrors.class ? "border-red-500" : ""}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {classOptions.map((cls) => (
-                                <SelectItem key={cls} value={cls}>
-                                  {cls}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Select
-                            value={editForm.stream || ""}
-                            onValueChange={(value) => setEditForm((prev: typeof editForm) => ({ ...prev, stream: value }))}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Science">Science</SelectItem>
-                              <SelectItem value="Commerce">Commerce</SelectItem>
-                              <SelectItem value="Arts">Arts</SelectItem>
-                              <SelectItem value="N/A">N/A</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {validationErrors.class && (
-                          <p className="text-red-500 text-sm mt-1">{validationErrors.class}</p>
-                        )}
-                      </div>
-                    ) : (
-                      <span>{lead.class} {lead.stream}</span>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Status
-                    </label>
-                    {isEditing ? (
-                      <Select
-                        value={editForm.status}
-                        onValueChange={(value) => setEditForm((prev: typeof editForm) => ({ ...prev, status: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="new">New</SelectItem>
-                          <SelectItem value="contacted">Contacted</SelectItem>
-                          <SelectItem value="interested">Interested</SelectItem>
-                          <SelectItem value="enrolled">Enrolled</SelectItem>
-                          <SelectItem value="dropped">Dropped</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Badge className={getStatusColor(lead.status)}>
-                        {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Assigned Counselor
-                    </label>
-                    {isEditing ? (
-                      <Select
-                        value={editForm.counselorId?.toString() || ""}
-                        onValueChange={(value) => setEditForm((prev: typeof editForm) => ({ ...prev, counselorId: Number(value) }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {counselors?.map((counselor) => (
-                            <SelectItem key={counselor.id} value={counselor.id.toString()}>
-                              {counselor.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span>{lead.counselor?.name || "Unassigned"}</span>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Lead Source
-                    </label>
-                    <span className="capitalize">{lead.source.replace('_', ' ')}</span>
-                  </div>
-                </div>
-              </div>
-
-              {lead.notes && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Notes
-                  </label>
-                  {isEditing ? (
-                    <Textarea
-                      value={editForm.notes || ""}
-                      onChange={(e) => setEditForm((prev: typeof editForm) => ({ ...prev, notes: e.target.value }))}
-                      rows={3}
-                    />
-                  ) : (
-                    <p className="text-gray-700 bg-gray-50 p-3 rounded-lg">{lead.notes}</p>
-                  )}
-                </div>
-              )}
-
-              {isEditing && (
-                <div className="flex gap-2">
-                  <Button onClick={saveChanges} disabled={updateLeadMutation.isPending}>
-                    <Save size={16} className="mr-2" />
-                    {updateLeadMutation.isPending ? "Saving..." : "Save Changes"}
-                  </Button>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="followups" className="space-y-4">
-            <div className="h-[520px] flex flex-col gap-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-semibold text-lg">Follow-up History</h3>
-
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Schedule New Follow-up</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Date & Time
-                      </label>
-                      <Input
-                        type="datetime-local"
-                        value={followUpForm.scheduledAt}
-                        onChange={(e) => setFollowUpForm((prev: FollowUpForm) => ({ ...prev, scheduledAt: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Expected Outcome
-                      </label>
-                      <Select
-                        value={followUpForm.outcome}
-                        onValueChange={(value) => setFollowUpForm((prev: FollowUpForm) => ({ ...prev, outcome: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select outcome" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="call">Phone Call</SelectItem>
-                          <SelectItem value="visit">Campus Visit</SelectItem>
-                          <SelectItem value="document">Document Collection</SelectItem>
-                          <SelectItem value="meeting">In-person Meeting</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Remarks
-                    </label>
-                    <Textarea
-                      value={followUpForm.remarks}
-                      onChange={(e) => setFollowUpForm((prev: FollowUpForm) => ({ ...prev, remarks: e.target.value }))}
-                      placeholder="Add any notes for this follow-up..."
-                      rows={3}
-                    />
-                  </div>
-                  <Button onClick={scheduleFollowUp} disabled={createFollowUpMutation.isPending}>
-                    <Plus size={16} className="mr-2" />
-                    {createFollowUpMutation.isPending ? "Scheduling..." : "Schedule Follow-up"}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {followUps && followUps.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="font-medium text-gray-900">Previous Follow-ups</h4>
-                  {followUps.map((followUp: FollowUp) => (
-                    <div key={followUp.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Clock size={16} className="text-gray-500" />
-                          <span className="font-medium">
-                            {formatDate(followUp.scheduledAt)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={followUp.completedAt ? "default" : "outline"}>
-                            {followUp.completedAt ? "Completed" : "Pending"}
-                          </Badge>
-                          {!followUp.completedAt && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => completeFollowUpMutation.mutate(followUp.id)}
-                              disabled={completeFollowUpMutation.isPending}
-                              className="border-green-500 text-green-600 hover:bg-green-50"
+                                  if (onLeadDeleted) onLeadDeleted();
+                                  onOpenChange(false);
+                                  toast({ title: 'Lead deleted', description: 'The lead was deleted.' });
+                                } catch (err) {
+                                  toast({ title: 'Error', description: 'Failed to delete lead.' });
+                                }
+                              }}
                             >
-                              <CheckCircle2 size={14} className="mr-1" />
-                              {completeFollowUpMutation.isPending ? "Marking..." : "Mark as Completed"}
-                            </Button>
+                              Yes, Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                    {lead.status === "deleted" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          await fetch(`/api/leads/${lead.id}/restore`, { method: "PATCH" });
+                          onOpenChange(false);
+                        }}
+                      >
+                        Restore
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {
+                  isEditing ? (
+                    <Form {...form}>
+                      <form id="lead-edit-form" onSubmit={form.handleSubmit(onSave)} className="space-y-4 px-1">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Student Name */}
+                          <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Student Name</FormLabel>
+                                <FormControl>
+                                  <Input {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="parentName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Parent Name</FormLabel>
+                                <FormControl>
+                                  <Input {...field} value={field.value ?? ""} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Phone */}
+                          <FormField
+                            control={form.control}
+                            name="phone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Phone Number</FormLabel>
+                                <FormControl>
+                                  <Input {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Email */}
+                          <FormField
+                            control={form.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                  <Input {...field} value={field.value ?? ""} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Address */}
+                          <FormField
+                            control={form.control}
+                            name="address"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Address</FormLabel>
+                                <FormControl>
+                                  <Input {...field} value={field.value ?? ""} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Class and Stream */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <FormField
+                              control={form.control}
+                              name="class"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Class</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select Class" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {classOptions.map((cls) => (
+                                        <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="stream"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Stream</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select Stream" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="Science">Science</SelectItem>
+                                      <SelectItem value="Commerce">Commerce</SelectItem>
+                                      <SelectItem value="Arts">Arts</SelectItem>
+                                      <SelectItem value="N/A">N/A</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          {/* Last Contacted */}
+                          <FormField
+                            control={form.control}
+                            name="lastContactedAt"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Last Contacted</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="datetime-local"
+                                    {...field}
+                                    value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ""}
+                                    onChange={(e) => {
+                                      const dateVal = e.target.value ? new Date(e.target.value) : undefined;
+                                      field.onChange(dateVal);
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+
+                          {/* Status */}
+                          <FormField
+                            control={form.control}
+                            name="status"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Status</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="new">New</SelectItem>
+                                    <SelectItem value="contacted">Contacted</SelectItem>
+                                    <SelectItem value="interested">Interested</SelectItem>
+                                    <SelectItem value="enrolled">Enrolled</SelectItem>
+                                    <SelectItem value="dropped">Dropped</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Assign Counselor */}
+                          <FormField
+                            control={form.control}
+                            name="counselorId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Assigned Counselor</FormLabel>
+                                <Select onValueChange={(value) => field.onChange(value ? Number(value) : undefined)} value={field.value?.toString() || ""}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select Counselor" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {counselors?.filter(staff => staff.role === "Counselor").map((counselor) => (
+                                      <SelectItem key={counselor.id} value={counselor.id.toString()}>
+                                        {counselor.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        {/* Notes */}
+                        <FormField
+                          control={form.control}
+                          name="notes"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Notes</FormLabel>
+                              <FormControl>
+                                <Textarea {...field} value={field.value ?? ""} rows={3} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
                           )}
+                        />
+
+                      </form>
+                    </Form>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* View Only Mode Structure - largely same as before but cleaner */}
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
+                          <div className="flex items-center gap-2">
+                            <User size={16} className="text-gray-500" />
+                            <span>{lead.name}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Parent Name</label>
+                          <div className="flex items-center gap-2">
+                            <User size={16} className="text-gray-500" />
+                            <span>{lead.parentName || "Not provided"}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                          <div className="flex items-center gap-2">
+                            <Phone size={16} className="text-gray-500" />
+                            <span>{lead.phone}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                          <div className="flex items-center gap-2">
+                            <Mail size={16} className="text-gray-500" />
+                            <span>{lead.email || "Not provided"}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                          <div className="flex items-center gap-2">
+                            <MapPin size={16} className="text-gray-500" />
+                            <span>{lead.address || "Not provided"}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Last Contact</label>
+                          <div className="flex items-center gap-2">
+                            <Calendar size={16} className="text-gray-500" />
+                            <span>{lead.lastContactedAt ? formatDate(lead.lastContactedAt) : 'Not set'}</span>
+                          </div>
                         </div>
                       </div>
-                      {followUp.remarks && (
-                        <div className="mt-3 p-3 bg-gray-50 rounded-md border-l-4 border-gray-300">
-                          <p className="text-xs font-semibold text-gray-500 mb-1">Remarks/Notes:</p>
-                          <p className="text-sm text-gray-700">{followUp.remarks}</p>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Class & Stream</label>
+                          <span>{lead.class} {lead.stream}</span>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                          <Badge className={getStatusColor(lead.status)}>
+                            {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
+                          </Badge>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Counselor</label>
+                          <span>{lead.counselor?.name || "Unassigned"}</span>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Lead Source</label>
+                          <span className="capitalize">{lead.source?.replace('_', ' ')}</span>
+                        </div>
+                      </div>
+
+                      {lead.notes && (
+                        <div className="col-span-1 md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                          <p className="text-gray-700 bg-gray-50 p-3 rounded-lg">{lead.notes}</p>
                         </div>
                       )}
-                      {followUp.outcome && (
-                        <p className="text-sm text-blue-600 mt-2">
-                          <span className="font-medium">Outcome:</span> {followUp.outcome}
-                        </p>
-                      )}
                     </div>
-                  ))}
+                  )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="followups" className="flex-1 overflow-y-auto p-6 m-0 space-y-4">
+              {/* Follow-up content remains mostly the same, ensuring buttons are wired up */}
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Schedule Follow-up</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Date & Time</label>
+                        <Input
+                          type="datetime-local"
+                          value={followUpForm.scheduledAt}
+                          onChange={(e) => setFollowUpForm(prev => ({ ...prev, scheduledAt: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Remarks</label>
+                        <Textarea
+                          placeholder="Enter remarks..."
+                          value={followUpForm.remarks}
+                          onChange={(e) => setFollowUpForm(prev => ({ ...prev, remarks: e.target.value }))}
+                        />
+                      </div>
+                      <Button
+                        className="w-full bg-[#643ae5] hover:bg-[#643ae5]/90"
+                        onClick={scheduleFollowUp}
+                        disabled={createFollowUpMutation.isPending}
+                      >
+                        <Clock className="w-4 h-4 mr-2" />
+                        Schedule
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="md:row-span-2 overflow-hidden flex flex-col">
+                    <CardHeader>
+                      <CardTitle className="text-base">History</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-y-auto">
+                      {followUps.length === 0 ? (
+                        <div className="text-center text-gray-500 py-8">
+                          No follow-up history
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {followUps.map((fp) => (
+                            <div key={fp.id} className="border rounded-lg p-3 bg-gray-50">
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Calendar size={14} className="text-gray-500" />
+                                  <span className="text-sm font-medium">{new Date(fp.scheduledAt).toLocaleDateString()}</span>
+                                  <span className="text-xs text-gray-500">{new Date(fp.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                                {fp.completedAt ? (
+                                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Completed</Badge>
+                                ) : (
+                                  <Popover open={activePopoverId === fp.id} onOpenChange={(open) => setActivePopoverId(open ? fp.id : null)}>
+                                    <PopoverTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 text-xs text-blue-600 hover:text-blue-800"
+                                      >
+                                        <CheckCircle2 size={12} className="mr-1" />
+                                        Mark Done
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-80" align="end">
+                                      <div className="grid gap-4">
+                                        <div className="space-y-2">
+                                          <h4 className="font-medium leading-none">Complete Follow-up</h4>
+                                          <p className="text-sm text-muted-foreground">
+                                            Select an outcome for this follow-up.
+                                          </p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          {['Interested', 'Not Interested', 'No Answer', 'Call Again', 'Enrolled'].map((outcome) => (
+                                            <Button
+                                              key={outcome}
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => completeFollowUpMutation.mutate({ id: fp.id, outcome })}
+                                              disabled={completeFollowUpMutation.isPending}
+                                            >
+                                              {outcome}
+                                            </Button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-700">{fp.remarks}</p>
+                              <div className="mt-2 text-xs text-gray-400">
+                                Outcome: {fp.outcome || 'Pending'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
-              )}
-            </div>
-          </TabsContent>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
 
-
-        </Tabs>
+        {isEditing && activeTab === "details" && (
+          <div className="p-4 border-t bg-white flex justify-end gap-2 shrink-0">
+            <Button type="button" variant="outline" onClick={() => { setIsEditing(false); form.reset(); }}>
+              Cancel
+            </Button>
+            <Button type="submit" form="lead-edit-form" disabled={updateLeadMutation.isPending}>
+              {updateLeadMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        )
+        }
       </DialogContent>
-    </Dialog>
+    </Dialog >
   );
 }

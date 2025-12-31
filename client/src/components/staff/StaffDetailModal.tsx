@@ -17,6 +17,16 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
+const STAFF_ROLES = [
+  "Teacher",
+  "Counselor",
+  "Accountant",
+  "Care Giver",
+  "Security Guard",
+  "Peon/Office Assistant",
+  "Principal"
+] as const;
+
 interface Staff {
   id: number;
   name: string;
@@ -48,8 +58,8 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
 
   useEffect(() => {
     if (staff) {
-      setEditedStaff({ 
-        ...staff, 
+      setEditedStaff({
+        ...staff,
         salary: staff.salary,
         isActive: staff.isActive ?? true // Default to true if undefined
       });
@@ -72,10 +82,10 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
     onSuccess: async (updatedStaff, variables) => {
       await queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
       invalidateNotifications(queryClient);
-      
+
       setIsEditing(false);
       onOpenChange(false); // Close the modal after successful save
-      
+
       // If staff was made inactive, clear the selection to avoid showing moved contact
       if (updatedStaff && updatedStaff.isActive === false && staff?.isActive !== false) {
         // Staff was just made inactive - they'll be moved to the bottom
@@ -86,10 +96,10 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
       } else {
         if (onStaffUpdated) onStaffUpdated();
       }
-      
-      toast({ 
-        title: "Success", 
-        description: `Staff details updated successfully.${updatedStaff?.isActive === false ? ' Employee has been deactivated.' : ''}` 
+
+      toast({
+        title: "Success",
+        description: `Staff details updated successfully.${updatedStaff?.isActive === false ? ' Employee has been deactivated.' : ''}`
       });
     },
     onError: (error: any) => {
@@ -98,12 +108,12 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
   });
 
   const handleSave = () => {
-    let payload = { 
-      ...editedStaff, 
+    let payload = {
+      ...editedStaff,
       salary: Number(editedStaff.salary),
       isActive: Boolean(editedStaff.isActive) // Explicitly convert to boolean
     };
-    
+
     // Ensure dateOfJoining is always a string in 'YYYY-MM-DD' format
     if (payload.dateOfJoining && typeof payload.dateOfJoining !== 'string') {
       payload.dateOfJoining = (payload.dateOfJoining as Date).toISOString().split('T')[0];
@@ -114,11 +124,11 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
         payload.dateOfJoining = d.toISOString().split('T')[0];
       }
     }
-    
+
     console.log("Sending staff update payload:", payload); // Debug log
     updateStaffMutation.mutate(payload);
   };
-  
+
   const deleteStaffMutation = useMutation({
     mutationFn: async () => {
       if (!staff) throw new Error("No staff member selected");
@@ -132,7 +142,7 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
       if (fetchPayrollOverview) fetchPayrollOverview();
       toast({ title: "Success", description: "Staff member deleted." });
       onOpenChange(false);
-      if(onStaffUpdated) onStaffUpdated();
+      if (onStaffUpdated) onStaffUpdated();
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to delete staff member.", variant: "destructive" });
@@ -184,252 +194,259 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
               </div>
             </div>
             <div className="flex items-center gap-2">
-                {getStatusPill(Boolean(isEditing ? editedStaff.isActive : staff.isActive))}
+              {getStatusPill(Boolean(isEditing ? editedStaff.isActive : staff.isActive))}
             </div>
           </DialogTitle>
           <DialogDescription>
-              Comprehensive information about {staff.name}
+            Comprehensive information about {staff.name}
           </DialogDescription>
         </DialogHeader>
-        
-            <Tabs defaultValue="details">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="details">Details</TabsTrigger>
-                    <TabsTrigger value="performance">Performance</TabsTrigger>
-                    <TabsTrigger value="activity">Activity</TabsTrigger>
-                </TabsList>
 
-                <TabsContent value="details" className="py-6 h-[500px] overflow-y-auto">
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                          <h3 className="font-semibold text-lg">Employee Information</h3>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => setIsEditing(!isEditing)}>
-                                <Edit className="mr-2 h-4 w-4" /> {isEditing ? "Cancel" : "Edit"}
-                            </Button>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" size="sm">
-                                        <Trash2 size={16} className="mr-2" />
-                                        Delete
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you sure you want to delete?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        This will remove the employee from the UI and move it to Recently Deleted in the database.
-                                    </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => deleteStaffMutation.mutate()}>
-                                        Confirm
-                                    </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                                    {isEditing ? (
-                                        <Input value={editedStaff.name || ''} onChange={(e) => handleInputChange('name', e.target.value)} />
-                                    ) : (
-                                        <div className="flex items-center gap-2"><User size={16} className="text-gray-500" /><span>{staff.name}</span></div>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                                    {isEditing ? (
-                                        <Input value={editedStaff.phone || ''} onChange={(e) => handleInputChange('phone', e.target.value)} />
-                                    ) : (
-                                        <div className="flex items-center gap-2"><Phone size={16} className="text-gray-500" /><span>{staff.phone || 'N/A'}</span></div>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                                    {isEditing ? (
-                                        <Input value={editedStaff.email || ''} onChange={(e) => handleInputChange('email', e.target.value)} />
-                                    ) : (
-                                        <div className="flex items-center gap-2"><Mail size={16} className="text-gray-500" /><span>{staff.email || 'N/A'}</span></div>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Joining Date</label>
-                                    <div className="flex items-center gap-2"><Calendar size={16} className="text-gray-500" /><span>{staff.dateOfJoining ? format(new Date(staff.dateOfJoining), "MMM dd, yyyy") : "N/A"}</span></div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Salary</label>
-                                    {isEditing ? (
-                                        <Input type="number" value={editedStaff.salary || ''} onChange={(e) => handleInputChange('salary', e.target.value)} />
-                                    ) : (
-                                        <div className="flex items-center gap-2"><IndianRupee size={16} className="text-gray-500" /><span>₹ {Number(staff.salary).toLocaleString()}</span></div>
-                                    )}
-                                </div>
-                            </div>
-                                          
-                            <div className="space-y-4">
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">Employee ID</label>
-                                  <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-gray-500" /><span>{staff.employeeId}</span></div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
-                                    {isEditing ? (
-                                        <Select value={editedStaff.department} onValueChange={(val) => handleInputChange('department', val)}>
-                                            <SelectTrigger><SelectValue placeholder="Select Department" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="HR">HR</SelectItem>
-                                                <SelectItem value="IT">IT</SelectItem>
-                                                <SelectItem value="Finance">Finance</SelectItem>
-                                                <SelectItem value="Operations">Operations</SelectItem>
-                                                <SelectItem value="Marketing">Marketing</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    ) : (
-                                        <div className="flex items-center gap-2"><Building size={16} className="text-gray-500" /><span>{staff.department}</span></div>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                                    {isEditing ? (
-                                        <Input value={editedStaff.role || ''} onChange={(e) => handleInputChange('role', e.target.value)} />
-                                    ) : (
-                                        <div className="flex items-center gap-2"><Briefcase size={16} className="text-gray-500" /><span>{staff.role}</span></div>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
-                                    {isEditing ? (
-                                        <Textarea 
-                                            value={editedStaff.address || ''} 
-                                            onChange={(e) => handleInputChange('address', e.target.value)}
-                                            placeholder="Enter employee address"
-                                            rows={3}
-                                        />
-                                    ) : (
-                                        <div className="flex items-start gap-2">
-                                            <Building size={16} className="text-gray-500 mt-1 flex-shrink-0" />
-                                            <span className="text-sm">{staff.address || 'N/A'}</span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Qualifications</label>
-                                    {isEditing ? (
-                                        <Textarea 
-                                            value={editedStaff.qualifications || ''} 
-                                            onChange={(e) => handleInputChange('qualifications', e.target.value)}
-                                            placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
-                                            rows={3}
-                                        />
-                                    ) : (
-                                        <div className="flex items-start gap-2">
-                                            <ShieldCheck size={16} className="text-gray-500 mt-1 flex-shrink-0" />
-                                            <span className="text-sm">{staff.qualifications || 'N/A'}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
+        <Tabs defaultValue="details">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+          </TabsList>
 
-                         {isEditing && (
-                            <div className="flex justify-end pt-4">
-                                <Button onClick={handleSave} disabled={updateStaffMutation.isPending}>
-                                    <Save size={16} className="mr-2" />
-                                    {updateStaffMutation.isPending ? "Saving..." : "Save Changes"}
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                </TabsContent>
-                <TabsContent value="performance" className="py-6 h-[500px] overflow-y-auto">
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                          <h3 className="font-semibold text-lg">Performance Metrics</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                                <div className="p-4 border rounded-lg">
-                                    <h4 className="font-medium text-gray-900 mb-2">Attendance Rate</h4>
-                                    <p className="text-2xl font-bold text-green-600">95%</p>
-                                    <p className="text-sm text-gray-600">Last 30 days</p>
-                                </div>
-                                <div className="p-4 border rounded-lg">
-                                    <h4 className="font-medium text-gray-900 mb-2">Performance Score</h4>
-                                    <p className="text-2xl font-bold text-blue-600">8.5/10</p>
-                                    <p className="text-sm text-gray-600">Based on KPIs</p>
-                                </div>
-                            </div>
-                            <div className="space-y-4">
-                                <div className="p-4 border rounded-lg">
-                                    <h4 className="font-medium text-gray-900 mb-2">Projects Completed</h4>
-                                    <p className="text-2xl font-bold text-purple-600">12</p>
-                                    <p className="text-sm text-gray-600">This quarter</p>
-                                </div>
-                                <div className="p-4 border rounded-lg">
-                                    <h4 className="font-medium text-gray-900 mb-2">Client Satisfaction</h4>
-                                    <p className="text-2xl font-bold text-orange-600">4.8/5</p>
-                                    <p className="text-sm text-gray-600">Average rating</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-4 border rounded-lg">
-                            <h4 className="font-medium text-gray-900 mb-3">Recent Performance Notes</h4>
-                            <div className="space-y-2 text-sm text-gray-600">
-                                <p>• Excellent communication skills demonstrated in client meetings</p>
-                                <p>• Successfully completed project ahead of schedule</p>
-                                <p>• Shows strong leadership potential in team collaborations</p>
-                            </div>
-                        </div>
-                    </div>
-                </TabsContent>
-                <TabsContent value="activity" className="py-6 h-[500px] overflow-y-auto">
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                          <h3 className="font-semibold text-lg">Recent Activity</h3>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="flex items-start gap-3 p-4 border rounded-lg">
-                                <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
-                                <div className="flex-1">
-                                    <p className="font-medium text-gray-900">Updated employee information</p>
-                                    <p className="text-sm text-gray-600">Modified contact details and address</p>
-                                    <p className="text-xs text-gray-500">2 hours ago</p>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3 p-4 border rounded-lg">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                                <div className="flex-1">
-                                    <p className="font-medium text-gray-900">Completed training module</p>
-                                    <p className="text-sm text-gray-600">Finished "Advanced Communication Skills" course</p>
-                                    <p className="text-xs text-gray-500">1 day ago</p>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3 p-4 border rounded-lg">
-                                <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
-                                <div className="flex-1">
-                                    <p className="font-medium text-gray-900">Project milestone achieved</p>
-                                    <p className="text-sm text-gray-600">Successfully completed Phase 1 of client project</p>
-                                    <p className="text-xs text-gray-500">3 days ago</p>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3 p-4 border rounded-lg">
-                                <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
-                                <div className="flex-1">
-                                    <p className="font-medium text-gray-900">Team meeting attended</p>
-                                    <p className="text-sm text-gray-600">Participated in weekly department review</p>
-                                    <p className="text-xs text-gray-500">1 week ago</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </TabsContent>
-            </Tabs>
+          <TabsContent value="details" className="py-6 h-[500px] overflow-y-auto">
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-lg">Employee Information</h3>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setIsEditing(!isEditing)}>
+                    <Edit className="mr-2 h-4 w-4" /> {isEditing ? "Cancel" : "Edit"}
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 size={16} className="mr-2" />
+                        Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure you want to delete?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will remove the employee from the UI and move it to Recently Deleted in the database.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deleteStaffMutation.mutate()}>
+                          Confirm
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                    {isEditing ? (
+                      <Input value={editedStaff.name || ''} onChange={(e) => handleInputChange('name', e.target.value)} />
+                    ) : (
+                      <div className="flex items-center gap-2"><User size={16} className="text-gray-500" /><span>{staff.name}</span></div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                    {isEditing ? (
+                      <Input value={editedStaff.phone || ''} onChange={(e) => handleInputChange('phone', e.target.value)} />
+                    ) : (
+                      <div className="flex items-center gap-2"><Phone size={16} className="text-gray-500" /><span>{staff.phone || 'N/A'}</span></div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    {isEditing ? (
+                      <Input value={editedStaff.email || ''} onChange={(e) => handleInputChange('email', e.target.value)} />
+                    ) : (
+                      <div className="flex items-center gap-2"><Mail size={16} className="text-gray-500" /><span>{staff.email || 'N/A'}</span></div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Joining Date</label>
+                    <div className="flex items-center gap-2"><Calendar size={16} className="text-gray-500" /><span>{staff.dateOfJoining ? format(new Date(staff.dateOfJoining), "MMM dd, yyyy") : "N/A"}</span></div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Salary</label>
+                    {isEditing ? (
+                      <Input type="number" value={editedStaff.salary || ''} onChange={(e) => handleInputChange('salary', e.target.value)} />
+                    ) : (
+                      <div className="flex items-center gap-2"><IndianRupee size={16} className="text-gray-500" /><span>₹ {Number(staff.salary).toLocaleString()}</span></div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Employee ID</label>
+                    <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-gray-500" /><span>{staff.employeeId}</span></div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                    {isEditing ? (
+                      <Select value={editedStaff.department} onValueChange={(val) => handleInputChange('department', val)}>
+                        <SelectTrigger><SelectValue placeholder="Select Department" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="HR">HR</SelectItem>
+                          <SelectItem value="IT">IT</SelectItem>
+                          <SelectItem value="Finance">Finance</SelectItem>
+                          <SelectItem value="Operations">Operations</SelectItem>
+                          <SelectItem value="Marketing">Marketing</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex items-center gap-2"><Building size={16} className="text-gray-500" /><span>{staff.department}</span></div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                    {isEditing ? (
+                      <Select value={editedStaff.role} onValueChange={(val) => handleInputChange('role', val)}>
+                        <SelectTrigger><SelectValue placeholder="Select Role" /></SelectTrigger>
+                        <SelectContent>
+                          {STAFF_ROLES.map((role) => (
+                            <SelectItem key={role} value={role}>{role}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex items-center gap-2"><Briefcase size={16} className="text-gray-500" /><span>{staff.role}</span></div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                    {isEditing ? (
+                      <Textarea
+                        value={editedStaff.address || ''}
+                        onChange={(e) => handleInputChange('address', e.target.value)}
+                        placeholder="Enter employee address"
+                        rows={3}
+                      />
+                    ) : (
+                      <div className="flex items-start gap-2">
+                        <Building size={16} className="text-gray-500 mt-1 flex-shrink-0" />
+                        <span className="text-sm">{staff.address || 'N/A'}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Qualifications</label>
+                    {isEditing ? (
+                      <Textarea
+                        value={editedStaff.qualifications || ''}
+                        onChange={(e) => handleInputChange('qualifications', e.target.value)}
+                        placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
+                        rows={3}
+                      />
+                    ) : (
+                      <div className="flex items-start gap-2">
+                        <ShieldCheck size={16} className="text-gray-500 mt-1 flex-shrink-0" />
+                        <span className="text-sm">{staff.qualifications || 'N/A'}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {isEditing && (
+                <div className="flex justify-end pt-4">
+                  <Button onClick={handleSave} disabled={updateStaffMutation.isPending}>
+                    <Save size={16} className="mr-2" />
+                    {updateStaffMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+          <TabsContent value="performance" className="py-6 h-[500px] overflow-y-auto">
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-lg">Performance Metrics</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium text-gray-900 mb-2">Attendance Rate</h4>
+                    <p className="text-2xl font-bold text-green-600">95%</p>
+                    <p className="text-sm text-gray-600">Last 30 days</p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium text-gray-900 mb-2">Performance Score</h4>
+                    <p className="text-2xl font-bold text-blue-600">8.5/10</p>
+                    <p className="text-sm text-gray-600">Based on KPIs</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium text-gray-900 mb-2">Projects Completed</h4>
+                    <p className="text-2xl font-bold text-purple-600">12</p>
+                    <p className="text-sm text-gray-600">This quarter</p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium text-gray-900 mb-2">Client Satisfaction</h4>
+                    <p className="text-2xl font-bold text-orange-600">4.8/5</p>
+                    <p className="text-sm text-gray-600">Average rating</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <h4 className="font-medium text-gray-900 mb-3">Recent Performance Notes</h4>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p>• Excellent communication skills demonstrated in client meetings</p>
+                  <p>• Successfully completed project ahead of schedule</p>
+                  <p>• Shows strong leadership potential in team collaborations</p>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+          <TabsContent value="activity" className="py-6 h-[500px] overflow-y-auto">
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-lg">Recent Activity</h3>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-4 border rounded-lg">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">Updated employee information</p>
+                    <p className="text-sm text-gray-600">Modified contact details and address</p>
+                    <p className="text-xs text-gray-500">2 hours ago</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-4 border rounded-lg">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">Completed training module</p>
+                    <p className="text-sm text-gray-600">Finished "Advanced Communication Skills" course</p>
+                    <p className="text-xs text-gray-500">1 day ago</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-4 border rounded-lg">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">Project milestone achieved</p>
+                    <p className="text-sm text-gray-600">Successfully completed Phase 1 of client project</p>
+                    <p className="text-xs text-gray-500">3 days ago</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-4 border rounded-lg">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">Team meeting attended</p>
+                    <p className="text-sm text-gray-600">Participated in weekly department review</p>
+                    <p className="text-xs text-gray-500">1 week ago</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

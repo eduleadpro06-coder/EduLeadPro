@@ -80,6 +80,16 @@ import StaffActivityTab from "@/components/staff/staff-activity-tab";
 import { Textarea } from "@/components/ui/textarea";
 import PageHeader from "@/components/layout/page-header";
 
+const STAFF_ROLES = [
+  "Teacher",
+  "Counselor",
+  "Accountant",
+  "Care Giver",
+  "Security Guard",
+  "Peon/Office Assistant",
+  "Principal"
+] as const;
+
 interface Staff {
   id: number;
   name: string;
@@ -2595,411 +2605,428 @@ export default function StaffAI() {
                 </CardContent>
               </Card>
             </div>
-            <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Add New Employee</DialogTitle>
-                  <DialogDescription>Enter the details for the new Employee below</DialogDescription>
-                </DialogHeader>
-                <Form {...addStaffForm}>
-                  <form onSubmit={addStaffForm.handleSubmit(onAddStaffSubmit)} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <FormField control={addStaffForm.control} name="name" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Full Name</FormLabel>
-                            <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. John Doe" /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={addStaffForm.control} name="phone" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Phone</FormLabel>
-                            <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={addStaffForm.control} name="role" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Role</FormLabel>
-                            <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. Counselor" /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={addStaffForm.control} name="address" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Address</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                {...field}
-                                value={field.value ?? ''}
-                                placeholder="Enter employee address"
-                                rows={3}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={addStaffForm.control} name="salary" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Salary (₹)</FormLabel>
-                            <FormControl><Input {...field} type="number" value={field.value ?? ''} required min={0} placeholder="e.g. 50000" /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={addStaffForm.control} name="bankAccountNumber" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Bank Account Number</FormLabel>
-                            <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                      </div>
-                      <div className="space-y-4">
-                        <FormField control={addStaffForm.control} name="email" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl><Input {...field} type="email" value={field.value ?? ''} placeholder="john.doe@example.com" /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={addStaffForm.control} name="dateOfJoining" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Date of Joining</FormLabel>
-                            <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={addStaffForm.control} name="department" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Department</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select a department" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="HR">HR</SelectItem>
-                                <SelectItem value="IT">IT</SelectItem>
-                                <SelectItem value="Finance">Finance</SelectItem>
-                                <SelectItem value="Operations">Operations</SelectItem>
-                                <SelectItem value="Marketing">Marketing</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={addStaffForm.control} name="qualifications" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Qualifications</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                {...field}
-                                value={field.value ?? ''}
-                                placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
-                                rows={3}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={addStaffForm.control} name="ifscCode" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>IFSC Code</FormLabel>
-                            <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={addStaffForm.control} name="panNumber" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>PAN Number</FormLabel>
-                            <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter PAN number" /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                      </div>
-                    </div>
+          </div>
+        )}
 
-                    <DialogFooter>
-                      <Button type="button" variant="secondary" onClick={() => setIsAddStaffOpen(false)}>Cancel</Button>
-                      <Button type="submit" disabled={addStaffForm.formState.isSubmitting}>
-                        {addStaffForm.formState.isSubmitting ? "Adding..." : "Add Staff"}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-
-            {/* WhatsApp Modal */}
-            <Dialog open={whatsappModal.open} onOpenChange={(open) => setWhatsappModal({ ...whatsappModal, open })}>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Send WhatsApp Notification</DialogTitle>
-                  <DialogDescription>
-                    Send salary credited notification to {whatsappModal.staff?.name}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="p-4 bg-green-50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <MessageSquare className="h-5 w-5 text-green-600" />
-                      <span className="font-medium text-green-800">Message Preview</span>
-                    </div>
-                    <div className="text-sm text-green-700 whitespace-pre-line">
-                      {whatsappModal.staff && getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary)}
-                    </div>
+        <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add New Employee</DialogTitle>
+              <DialogDescription>Enter the details for the new Employee below</DialogDescription>
+            </DialogHeader>
+            <Form {...addStaffForm}>
+              <form onSubmit={addStaffForm.handleSubmit(onAddStaffSubmit)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <FormField control={addStaffForm.control} name="name" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. John Doe" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={addStaffForm.control} name="phone" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone</FormLabel>
+                        <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={addStaffForm.control} name="role" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Role</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a role" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {STAFF_ROLES.map((role) => (
+                              <SelectItem key={role} value={role}>{role}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={addStaffForm.control} name="address" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Address</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            value={field.value ?? ''}
+                            placeholder="Enter employee address"
+                            rows={3}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={addStaffForm.control} name="salary" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Salary (₹)</FormLabel>
+                        <FormControl><Input {...field} type="number" value={field.value ?? ''} required min={0} placeholder="e.g. 50000" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={addStaffForm.control} name="bankAccountNumber" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bank Account Number</FormLabel>
+                        <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
                   </div>
-                  <div className="text-sm text-gray-600">
-                    <p>Phone: {whatsappModal.staff?.phone || 'No phone number available'}</p>
-                    <p>Net Salary: ₹{whatsappModal.netSalary.toLocaleString()}</p>
+                  <div className="space-y-4">
+                    <FormField control={addStaffForm.control} name="email" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl><Input {...field} type="email" value={field.value ?? ''} placeholder="john.doe@example.com" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={addStaffForm.control} name="dateOfJoining" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date of Joining</FormLabel>
+                        <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={addStaffForm.control} name="department" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Department</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a department" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="HR">HR</SelectItem>
+                            <SelectItem value="IT">IT</SelectItem>
+                            <SelectItem value="Finance">Finance</SelectItem>
+                            <SelectItem value="Operations">Operations</SelectItem>
+                            <SelectItem value="Marketing">Marketing</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={addStaffForm.control} name="qualifications" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Qualifications</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            value={field.value ?? ''}
+                            placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
+                            rows={3}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={addStaffForm.control} name="ifscCode" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>IFSC Code</FormLabel>
+                        <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={addStaffForm.control} name="panNumber" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>PAN Number</FormLabel>
+                        <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter PAN number" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
                   </div>
                 </div>
+
                 <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setWhatsappModal({ open: false, staff: null, netSalary: 0 })}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      if (whatsappModal.staff?.phone) {
-                        const message = getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary);
-                        const whatsappUrl = `https://wa.me/${whatsappModal.staff.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-                        window.open(whatsappUrl, '_blank');
-                        setWhatsappModal({ open: false, staff: null, netSalary: 0 });
-                        toast({
-                          title: "WhatsApp Opened",
-                          description: "WhatsApp has been opened with the salary notification message.",
-                        });
-                      } else {
-                        toast({
-                          title: "No Phone Number",
-                          description: "This employee doesn't have a phone number registered.",
-                          variant: "destructive"
-                        });
-                      }
-                    }}
-                    disabled={!whatsappModal.staff?.phone}
-                  >
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Open WhatsApp
+                  <Button type="button" variant="secondary" onClick={() => setIsAddStaffOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={addStaffForm.formState.isSubmitting}>
+                    {addStaffForm.formState.isSubmitting ? "Adding..." : "Add Staff"}
                   </Button>
                 </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            {/* Edit Modal */}
-            {
-              selectedStaff && (
-                <Dialog open={isEditStaffOpen} onOpenChange={setIsEditStaffOpen}>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Edit Employee</DialogTitle>
-                      <DialogDescription>Edit the details for this employee below</DialogDescription>
-                    </DialogHeader>
-                    <Form {...editStaffForm}>
-                      <form onSubmit={editStaffForm.handleSubmit((data) => {
-                        if (!selectedStaff) return;
-                        const payload = { ...data, id: selectedStaff.id };
-                        editStaffMutation.mutate(payload);
-                      })} className="space-y-6">
-                        {/* Active/Inactive Toggle */}
-                        <FormField control={editStaffForm.control} name="isActive" render={({ field }) => (
-                          <div className="flex items-center gap-4 mb-2">
-                            <Label htmlFor="isActive-toggle" className="text-base font-medium">
-                              {field.value ? "Active" : "Inactive"}
-                            </Label>
-                            <Switch
-                              id="isActive-toggle"
-                              checked={field.value || false}
-                              onCheckedChange={checked => {
-                                console.log("Toggle changed to:", checked);
-                                field.onChange(checked);
-                              }}
-                            />
-                          </div>
-                        )} />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-4">
-                            <FormField control={editStaffForm.control} name="name" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Full Name</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. John Doe" /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={editStaffForm.control} name="phone" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Phone</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={editStaffForm.control} name="role" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Role</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. Counselor" /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={editStaffForm.control} name="address" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Address</FormLabel>
-                                <FormControl>
-                                  <Textarea
-                                    {...field}
-                                    value={field.value ?? ''}
-                                    placeholder="Enter employee address"
-                                    rows={3}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={editStaffForm.control} name="salary" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Salary (₹)</FormLabel>
-                                <FormControl><Input {...field} type="number" value={field.value ?? ''} required min={0} placeholder="e.g. 50000" /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={editStaffForm.control} name="bankAccountNumber" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Bank Account Number</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                          </div>
-                          <div className="space-y-4">
-                            <FormField control={editStaffForm.control} name="email" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Email</FormLabel>
-                                <FormControl><Input {...field} type="email" value={field.value ?? ''} required placeholder="e.g. john.doe@example.com" /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={editStaffForm.control} name="dateOfJoining" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Date of Joining</FormLabel>
-                                <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={editStaffForm.control} name="department" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Department</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined} value={field.value ?? undefined}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select a department" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="HR">HR</SelectItem>
-                                    <SelectItem value="IT">IT</SelectItem>
-                                    <SelectItem value="Finance">Finance</SelectItem>
-                                    <SelectItem value="Operations">Operations</SelectItem>
-                                    <SelectItem value="Marketing">Marketing</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={editStaffForm.control} name="qualifications" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Qualifications</FormLabel>
-                                <FormControl>
-                                  <Textarea
-                                    {...field}
-                                    value={field.value ?? ''}
-                                    placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
-                                    rows={3}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={editStaffForm.control} name="ifscCode" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>IFSC Code</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={editStaffForm.control} name="panNumber" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>PAN Number</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter PAN number" /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button type="button" variant="secondary" onClick={() => setIsEditStaffOpen(false)}>Cancel</Button>
-                          <Button type="submit" disabled={addStaffForm.formState.isSubmitting}>
-                            {addStaffForm.formState.isSubmitting ? "Saving..." : "Save Changes"}
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </Form>
-                  </DialogContent>
-                </Dialog>
-              )
-            }
-            {/* Delete Confirmation Dialog */}
-            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Employee</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete {staffToDelete?.name}? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-[#643ae5] text-white hover:bg-[#7a7ca0]"
-                    onClick={async () => {
-                      if (staffToDelete) {
-                        await deleteStaffMutation.mutateAsync(staffToDelete.id);
-                        setDeleteDialogOpen(false);
-                        setStaffToDelete(null);
-                      }
-                    }}
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
 
-            {/* CSV Import Modal */}
-            {
-              isCSVImportOpen && (
-                <Dialog open={isCSVImportOpen} onOpenChange={setIsCSVImportOpen}>
-                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-                    <DialogHeader>
-                      <DialogTitle>Import Staff Data</DialogTitle>
-                      <DialogDescription>
-                        Import staff members from a CSV file
-                      </DialogDescription>
-                    </DialogHeader>
-                    <StaffCSVImport
-                      onSuccess={() => {
-                        setIsCSVImportOpen(false);
-                        queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
-                      }}
-                      onClose={() => setIsCSVImportOpen(false)}
-                    />
-                  </DialogContent>
-                </Dialog>
-              )
-            }
-          </div>
+        {/* WhatsApp Modal */}
+        <Dialog open={whatsappModal.open} onOpenChange={(open) => setWhatsappModal({ ...whatsappModal, open })}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Send WhatsApp Notification</DialogTitle>
+              <DialogDescription>
+                Send salary credited notification to {whatsappModal.staff?.name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-4 bg-green-50 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <MessageSquare className="h-5 w-5 text-green-600" />
+                  <span className="font-medium text-green-800">Message Preview</span>
+                </div>
+                <div className="text-sm text-green-700 whitespace-pre-line">
+                  {whatsappModal.staff && getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary)}
+                </div>
+              </div>
+              <div className="text-sm text-gray-600">
+                <p>Phone: {whatsappModal.staff?.phone || 'No phone number available'}</p>
+                <p>Net Salary: ₹{whatsappModal.netSalary.toLocaleString()}</p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setWhatsappModal({ open: false, staff: null, netSalary: 0 })}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (whatsappModal.staff?.phone) {
+                    const message = getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary);
+                    const whatsappUrl = `https://wa.me/${whatsappModal.staff.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+                    window.open(whatsappUrl, '_blank');
+                    setWhatsappModal({ open: false, staff: null, netSalary: 0 });
+                    toast({
+                      title: "WhatsApp Opened",
+                      description: "WhatsApp has been opened with the salary notification message.",
+                    });
+                  } else {
+                    toast({
+                      title: "No Phone Number",
+                      description: "This employee doesn't have a phone number registered.",
+                      variant: "destructive"
+                    });
+                  }
+                }}
+                disabled={!whatsappModal.staff?.phone}
+              >
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Open WhatsApp
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Modal */}
+        {selectedStaff && (
+          <Dialog open={isEditStaffOpen} onOpenChange={setIsEditStaffOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Edit Employee</DialogTitle>
+                <DialogDescription>Edit the details for this employee below</DialogDescription>
+              </DialogHeader>
+              <Form {...editStaffForm}>
+                <form onSubmit={editStaffForm.handleSubmit((data) => {
+                  if (!selectedStaff) return;
+                  const payload = { ...data, id: selectedStaff.id };
+                  editStaffMutation.mutate(payload);
+                })} className="space-y-6">
+                  <FormField control={editStaffForm.control} name="isActive" render={({ field }) => (
+                    <div className="flex items-center gap-4 mb-2">
+                      <Label htmlFor="isActive-toggle" className="text-base font-medium">
+                        {field.value ? "Active" : "Inactive"}
+                      </Label>
+                      <Switch
+                        id="isActive-toggle"
+                        checked={field.value || false}
+                        onCheckedChange={field.onChange}
+                      />
+                    </div>
+                  )} />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <FormField control={editStaffForm.control} name="name" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full Name</FormLabel>
+                          <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. John Doe" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={editStaffForm.control} name="phone" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone</FormLabel>
+                          <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={editStaffForm.control} name="role" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Role</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined} value={field.value ?? undefined}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a role" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {STAFF_ROLES.map((role) => (
+                                <SelectItem key={role} value={role}>{role}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={editStaffForm.control} name="address" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Address</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              value={field.value ?? ''}
+                              placeholder="Enter employee address"
+                              rows={3}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={editStaffForm.control} name="salary" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Salary (₹)</FormLabel>
+                          <FormControl><Input {...field} type="number" value={field.value ?? ''} required min={0} placeholder="e.g. 50000" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={editStaffForm.control} name="bankAccountNumber" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bank Account Number</FormLabel>
+                          <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+                    <div className="space-y-4">
+                      <FormField control={editStaffForm.control} name="email" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl><Input {...field} type="email" value={field.value ?? ''} required placeholder="e.g. john.doe@example.com" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={editStaffForm.control} name="dateOfJoining" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Date of Joining</FormLabel>
+                          <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={editStaffForm.control} name="department" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Department</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined} value={field.value ?? undefined}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a department" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="HR">HR</SelectItem>
+                              <SelectItem value="IT">IT</SelectItem>
+                              <SelectItem value="Finance">Finance</SelectItem>
+                              <SelectItem value="Operations">Operations</SelectItem>
+                              <SelectItem value="Marketing">Marketing</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={editStaffForm.control} name="qualifications" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Qualifications</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              value={field.value ?? ''}
+                              placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
+                              rows={3}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={editStaffForm.control} name="ifscCode" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>IFSC Code</FormLabel>
+                          <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={editStaffForm.control} name="panNumber" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>PAN Number</FormLabel>
+                          <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter PAN number" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="secondary" onClick={() => setIsEditStaffOpen(false)}>Cancel</Button>
+                    <Button type="submit" disabled={editStaffMutation.isPending}>
+                      {editStaffMutation.isPending ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {staffToDelete?.name}? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-[#643ae5] text-white hover:bg-[#7a7ca0]"
+                onClick={async () => {
+                  if (staffToDelete) {
+                    await deleteStaffMutation.mutateAsync(staffToDelete.id);
+                    setDeleteDialogOpen(false);
+                    setStaffToDelete(null);
+                  }
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* CSV Import Modal */}
+        {isCSVImportOpen && (
+          <Dialog open={isCSVImportOpen} onOpenChange={setIsCSVImportOpen}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+              <DialogHeader>
+                <DialogTitle>Import Staff Data</DialogTitle>
+                <DialogDescription>
+                  Import staff members from a CSV file
+                </DialogDescription>
+              </DialogHeader>
+              <StaffCSVImport
+                onSuccess={() => {
+                  setIsCSVImportOpen(false);
+                  queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+                }}
+                onClose={() => setIsCSVImportOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     </div>

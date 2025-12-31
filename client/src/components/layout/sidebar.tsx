@@ -20,11 +20,10 @@ import { useAuth } from "@/contexts/AuthContext";
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
   { name: "Lead Management", href: "/leads", icon: Users },
-  { name: "Employee Management", href: "/staff-ai", icon: UserCheck },
   { name: "Student, Fees & EMI", href: "/student-fees", icon: IndianRupee },
   { name: "Daycare Management", href: "/daycare", icon: Baby },
+  { name: "Employee Management", href: "/staff-ai", icon: UserCheck },
   { name: "Expenses", href: "/expenses", icon: Wallet },
-  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export default function Sidebar() {
@@ -93,7 +92,7 @@ export default function Sidebar() {
             {navigation.map((item, idx) => {
               const isActive = location === item.href;
               const Icon = item.icon;
-              // Add divider after Student, Fees & EMI (index 3)
+              // Add divider after Daycare Management (index 3)
               const dividerAfter = idx === 3;
               return (
                 <>

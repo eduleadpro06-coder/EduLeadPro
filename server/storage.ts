@@ -14,7 +14,7 @@ import type {
 
 // Type definitions for complex queries
 export type LeadWithCounselor = Lead & {
-  counselor?: User;
+  counselor?: Staff;
 };
 
 export type ExpenseWithApprover = Expense & {
@@ -54,7 +54,7 @@ export interface IStorage {
   getLeadsByDateRange(startDate: Date, endDate: Date): Promise<LeadWithCounselor[]>;
   createLead(lead: InsertLead): Promise<Lead>;
   checkDuplicateLead(phone: string, email?: string): Promise<LeadWithCounselor | null>;
-  updateLead(id: number, updates: Partial<Lead>): Promise<Lead | undefined>;
+  updateLead(id: number, updates: Partial<Lead>): Promise<LeadWithCounselor | undefined>;
   getRecentLeads(limit?: number): Promise<LeadWithCounselor[]>;
   getLeadsRequiringFollowUp(): Promise<LeadWithCounselor[]>;
   restoreLead(id: number): Promise<Lead | undefined>;
@@ -412,19 +412,11 @@ export class DatabaseStorage implements IStorage {
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
-        counselor: {
-          id: schema.users.id,
-          name: schema.users.name,
-          username: schema.users.username,
-          email: schema.users.email,
-          password: schema.users.password,
-          role: schema.users.role,
-          createdAt: schema.users.createdAt,
-          updatedAt: schema.users.updatedAt
-        }
+        organizationId: schema.leads.organizationId,
+        counselor: schema.staff
       })
       .from(schema.leads)
-      .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id))
+      .leftJoin(schema.staff, eq(schema.leads.counselorId, schema.staff.id))
       .where(eq(schema.leads.id, id));
 
     return (result[0] ? {
@@ -460,19 +452,10 @@ export class DatabaseStorage implements IStorage {
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
         organizationId: schema.leads.organizationId,
-        counselor: {
-          id: schema.users.id,
-          name: schema.users.name,
-          username: schema.users.username,
-          email: schema.users.email,
-          password: schema.users.password,
-          role: schema.users.role,
-          createdAt: schema.users.createdAt,
-          updatedAt: schema.users.updatedAt
-        }
+        counselor: schema.staff
       })
       .from(schema.leads)
-      .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id));
+      .leftJoin(schema.staff, eq(schema.leads.counselorId, schema.staff.id));
 
     // Build WHERE conditions
     const conditions = [];
@@ -525,22 +508,16 @@ export class DatabaseStorage implements IStorage {
         createdAt: schema.leads.createdAt,
         updatedAt: schema.leads.updatedAt,
         lastContactedAt: schema.leads.lastContactedAt,
+        parentName: schema.leads.parentName,
+        parentPhone: schema.leads.parentPhone,
 
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
-        counselor: {
-          id: schema.users.id,
-          name: schema.users.name,
-          username: schema.users.username,
-          email: schema.users.email,
-          password: schema.users.password,
-          role: schema.users.role,
-          createdAt: schema.users.createdAt,
-          updatedAt: schema.users.updatedAt
-        }
+        organizationId: schema.leads.organizationId,
+        counselor: schema.staff
       })
       .from(schema.leads)
-      .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id))
+      .leftJoin(schema.staff, eq(schema.leads.counselorId, schema.staff.id))
       .where(eq(schema.leads.status, status))
       .orderBy(desc(schema.leads.createdAt));
 
@@ -573,19 +550,11 @@ export class DatabaseStorage implements IStorage {
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
-        counselor: {
-          id: schema.users.id,
-          name: schema.users.name,
-          username: schema.users.username,
-          email: schema.users.email,
-          password: schema.users.password,
-          role: schema.users.role,
-          createdAt: schema.users.createdAt,
-          updatedAt: schema.users.updatedAt
-        }
+        organizationId: schema.leads.organizationId,
+        counselor: schema.staff
       })
       .from(schema.leads)
-      .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id))
+      .leftJoin(schema.staff, eq(schema.leads.counselorId, schema.staff.id))
       .where(eq(schema.leads.counselorId, counselorId))
       .orderBy(desc(schema.leads.createdAt));
 
@@ -618,19 +587,11 @@ export class DatabaseStorage implements IStorage {
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
-        counselor: {
-          id: schema.users.id,
-          name: schema.users.name,
-          username: schema.users.username,
-          email: schema.users.email,
-          password: schema.users.password,
-          role: schema.users.role,
-          createdAt: schema.users.createdAt,
-          updatedAt: schema.users.updatedAt
-        }
+        organizationId: schema.leads.organizationId,
+        counselor: schema.staff
       })
       .from(schema.leads)
-      .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id))
+      .leftJoin(schema.staff, eq(schema.leads.counselorId, schema.staff.id))
       .where(and(
         gte(schema.leads.createdAt, startDate),
         lte(schema.leads.createdAt, endDate)
@@ -644,18 +605,64 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createLead(insertLead: InsertLead): Promise<Lead> {
-    const result = await db.insert(schema.leads).values(insertLead).returning();
-    const lead = result[0];
-    await this.notifyChange(
-      'lead',
-      'Lead Created',
-      `New lead ${lead.name} (${lead.phone}) added`,
-      'medium',
-      'view_lead',
-      lead.id.toString()
-    );
-    return lead;
+    try {
+      // Auto-assign counselor if only one counselor exists in staff table
+      let leadData = { ...insertLead };
+
+      if (!leadData.counselorId && leadData.organizationId) {
+        try {
+          // Get all counselors and filter by organization
+          const allCounselors = await this.getStaffByRole("Counselor");
+          const counselors = allCounselors.filter(c => c.organizationId === leadData.organizationId);
+
+          if (counselors.length === 1) {
+            leadData.counselorId = counselors[0].id;
+            leadData.assignedAt = new Date();
+          }
+        } catch (counselorError) {
+          console.error("Error auto-assigning counselor:", counselorError);
+          // Continue without auto-assignment if there's an error
+        }
+      }
+
+      // CRITICAL: Only include fields with actual values (not undefined, null, or empty strings)
+      // This prevents the UNDEFINED_VALUE error from postgres
+      const sanitizedData: any = {};
+      Object.entries(leadData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          sanitizedData[key] = value;
+        }
+      });
+
+      console.log("Inserting lead with fields:", Object.keys(sanitizedData));
+      // console.log("Lead data:", JSON.stringify(sanitizedData, null, 2));
+
+      const result = await db.insert(schema.leads).values(sanitizedData).returning();
+      const lead = result[0];
+
+      // Try to create notification, but don't fail if it doesn't work
+      try {
+        await this.notifyChange(
+          'lead',
+          'Lead Created',
+          `New lead ${lead.name} (${lead.phone}) added${lead.counselorId ? ' and auto-assigned to counselor' : ''}`,
+          'medium',
+          'view_lead',
+          lead.id.toString()
+        );
+      } catch (notifyError) {
+        console.error("Failed to create notification for new lead:", notifyError);
+        // Don't fail the lead creation just because notification failed
+      }
+
+      return lead;
+    } catch (error) {
+      console.error("Error in createLead:", error);
+      throw error;
+    }
   }
+
+
 
   async checkDuplicateLead(phone: string, email?: string): Promise<LeadWithCounselor | null> {
     // First check by phone number (required field)
@@ -688,7 +695,7 @@ export class DatabaseStorage implements IStorage {
     return null;
   }
 
-  async updateLead(id: number, updates: Partial<Lead>): Promise<Lead | undefined> {
+  async updateLead(id: number, updates: Partial<Lead>): Promise<LeadWithCounselor | undefined> {
     const result = await db.update(schema.leads).set({
       ...updates,
       updatedAt: new Date()
@@ -703,18 +710,20 @@ export class DatabaseStorage implements IStorage {
         'view_lead',
         lead.id.toString()
       );
+      // Return the full lead with counselor details
+      return await this.getLead(id);
     }
-    return lead;
+    return undefined;
   }
 
   async getRecentLeads(limit: number = 10): Promise<LeadWithCounselor[]> {
     const result = await db
       .select({
         lead: schema.leads,
-        counselor: schema.users
+        counselor: schema.staff
       })
       .from(schema.leads)
-      .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id))
+      .leftJoin(schema.staff, eq(schema.leads.counselorId, schema.staff.id))
       .orderBy(desc(schema.leads.createdAt))
       .limit(limit);
 
@@ -747,19 +756,11 @@ export class DatabaseStorage implements IStorage {
         parentPhone: schema.leads.parentPhone,
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
-        counselor: {
-          id: schema.users.id,
-          name: schema.users.name,
-          username: schema.users.username,
-          email: schema.users.email,
-          password: schema.users.password,
-          role: schema.users.role,
-          createdAt: schema.users.createdAt,
-          updatedAt: schema.users.updatedAt
-        }
+        organizationId: schema.leads.organizationId,
+        counselor: schema.staff
       })
       .from(schema.leads)
-      .leftJoin(schema.users, eq(schema.leads.counselorId, schema.users.id))
+      .leftJoin(schema.staff, eq(schema.leads.counselorId, schema.staff.id))
       .where(eq(schema.leads.status, "interested"))
       .orderBy(desc(schema.leads.createdAt));
 
@@ -1807,7 +1808,7 @@ export class DatabaseStorage implements IStorage {
   }> {
     let query = db
       .select({
-        totalSalaries: sql<number>`sum(CAST(${schema.payroll.baseSalary} AS DECIMAL))`,
+        totalSalaries: sql<number>`sum(CAST(${schema.payroll.basicSalary} AS DECIMAL))`,
         totalDeductions: sql<number>`sum(CAST(${schema.payroll.deductions} AS DECIMAL))`,
         totalAllowances: sql<number>`sum(CAST(${schema.payroll.allowances} AS DECIMAL))`,
         netPayroll: sql<number>`sum(CAST(${schema.payroll.netSalary} AS DECIMAL))`
@@ -3326,16 +3327,25 @@ export class DatabaseStorage implements IStorage {
     actionId?: string
   ): Promise<void> {
     try {
-      await this.createNotification({
-        userId: 1,
+      // Get a system user (first available user) since we don't have a dedicated system user
+      // This prevents foreign key errors if user with ID 1 does not exist
+      const systemUser = await db.select().from(schema.users).limit(1);
+      const userId = systemUser.length > 0 ? systemUser[0].id : 1;
+
+      // Create notification object with explicit undefined checks
+      const notificationData: any = {
+        userId,
         type,
         title,
         message,
         priority,
-        actionType,
-        actionId,
         metadata: JSON.stringify({ systemGenerated: true })
-      });
+      };
+
+      if (actionType) notificationData.actionType = actionType;
+      if (actionId) notificationData.actionId = actionId;
+
+      await this.createNotification(notificationData);
     } catch (err) {
       console.error('Failed to create notification', err);
     }

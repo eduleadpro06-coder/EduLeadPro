@@ -62,7 +62,7 @@ export default function LeadManagement() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
 
-  const [sortKey, setSortKey] = useState<string>("student");
+  const [sortKey, setSortKey] = useState<string>("default");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const { toast } = useToast();
@@ -140,7 +140,16 @@ export default function LeadManagement() {
   let sortedLeads = [...filteredLeads];
   sortedLeads.sort((a, b) => {
     let aValue, bValue;
-    if (sortKey === "student") {
+    if (sortKey === "default") {
+      const aEnrolled = a.status === 'enrolled';
+      const bEnrolled = b.status === 'enrolled';
+
+      if (aEnrolled && !bEnrolled) return 1;
+      if (!aEnrolled && bEnrolled) return -1;
+
+      // Secondary sort by ID descending (newest first)
+      return b.id - a.id;
+    } else if (sortKey === "student") {
       aValue = a.name.toLowerCase();
       bValue = b.name.toLowerCase();
     } else if (sortKey === "lastContact") {
@@ -149,6 +158,12 @@ export default function LeadManagement() {
     } else if (sortKey === "class") {
       aValue = a.class || "";
       bValue = b.class || "";
+    } else if (sortKey === "status") {
+      aValue = a.status || "";
+      bValue = b.status || "";
+    } else if (sortKey === "source") {
+      aValue = a.source || "";
+      bValue = b.source || "";
     } else {
       return 0;
     }
@@ -159,7 +174,7 @@ export default function LeadManagement() {
 
   // Add state for pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const leadsPerPage = 8;
+  const leadsPerPage = 9;
   const totalPages = Math.ceil(sortedLeads.length / leadsPerPage);
   const paginatedLeads = sortedLeads.slice((currentPage - 1) * leadsPerPage, currentPage * leadsPerPage);
 
@@ -390,20 +405,64 @@ export default function LeadManagement() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">
                     Contact Info
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">
-                    Class/Stream
+                  <th
+                    onClick={() => {
+                      setSortKey("class");
+                      setSortOrder(sortKey === "class" && sortOrder === "asc" ? "desc" : "asc");
+                    }}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1">
+                      Class/Stream
+                      {sortKey === "class" ? (
+                        sortOrder === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                      ) : null}
+                    </span>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">
-                    Status
+                  <th
+                    onClick={() => {
+                      setSortKey("status");
+                      setSortOrder(sortKey === "status" && sortOrder === "asc" ? "desc" : "asc");
+                    }}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1">
+                      Status
+                      {sortKey === "status" ? (
+                        sortOrder === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                      ) : null}
+                    </span>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">
-                    Source
+                  <th
+                    onClick={() => {
+                      setSortKey("source");
+                      setSortOrder(sortKey === "source" && sortOrder === "asc" ? "desc" : "asc");
+                    }}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1">
+                      Source
+                      {sortKey === "source" ? (
+                        sortOrder === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                      ) : null}
+                    </span>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">
                     Counselor
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">
-                    Last Contacted
+                  <th
+                    onClick={() => {
+                      setSortKey("lastContact");
+                      setSortOrder(sortKey === "lastContact" && sortOrder === "asc" ? "desc" : "asc");
+                    }}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1">
+                      Last Contacted
+                      {sortKey === "lastContact" ? (
+                        sortOrder === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                      ) : null}
+                    </span>
                   </th>
 
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">
@@ -504,6 +563,48 @@ export default function LeadManagement() {
               </tbody>
             </table>
           </div> {/* <-- This closes the .overflow-x-auto div */}
+
+          {/* Compact Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-3 border-t bg-white">
+              <div className="text-sm text-gray-600">
+                {((currentPage - 1) * leadsPerPage) + 1}-{Math.min(currentPage * leadsPerPage, sortedLeads.length)} of {sortedLeads.length}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 px-3"
+                >
+                  Previous
+                </Button>
+                <Select value={currentPage.toString()} onValueChange={(value) => setCurrentPage(Number(value))}>
+                  <SelectTrigger className="h-8 w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <SelectItem key={page} value={page.toString()}>
+                        {page}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-600">of {totalPages}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 px-3"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div> {/* <-- This closes the .border rounded-xl ... div */}
       </div>
 

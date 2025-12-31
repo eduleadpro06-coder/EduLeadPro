@@ -82,7 +82,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.post("/api/daycare/children", async (req, res) => {
         try {
-            const child = await daycareStorage.createDaycareChild(req.body);
+            const organizationId = await requireOrganizationId(req);
+            const child = await daycareStorage.createDaycareChild({ ...req.body, organizationId });
             res.status(201).json(child);
         } catch (error) {
             console.error("Error creating daycare child:", error);
@@ -159,7 +160,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.post("/api/daycare/inquiries", async (req, res) => {
         try {
-            const inquiry = await daycareStorage.createDaycareInquiry(req.body);
+            const organizationId = await requireOrganizationId(req);
+            const inquiry = await daycareStorage.createDaycareInquiry({ ...req.body, organizationId });
             res.status(201).json(inquiry);
         } catch (error) {
             console.error("Error creating daycare inquiry:", error);
@@ -242,7 +244,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.post("/api/daycare/followups", async (req, res) => {
         try {
-            const followup = await daycareStorage.createInquiryFollowup(req.body);
+            const organizationId = await requireOrganizationId(req);
+            const followup = await daycareStorage.createInquiryFollowup({ ...req.body, organizationId });
             res.status(201).json(followup);
         } catch (error) {
             console.error("Error creating followup:", error);
@@ -310,7 +313,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.post("/api/daycare/enrollments", async (req, res) => {
         try {
-            const enrollment = await daycareStorage.createEnrollment(req.body);
+            const organizationId = await requireOrganizationId(req);
+            const enrollment = await daycareStorage.createEnrollment({ ...req.body, organizationId });
             res.status(201).json(enrollment);
         } catch (error) {
             console.error("Error creating enrollment:", error);
@@ -520,7 +524,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.post("/api/daycare/payments", async (req, res) => {
         try {
-            const payment = await daycareStorage.createDaycarePayment(req.body);
+            const organizationId = await requireOrganizationId(req);
+            const payment = await daycareStorage.createDaycarePayment({ ...req.body, organizationId });
             res.status(201).json(payment);
         } catch (error) {
             console.error("Error creating payment:", error);
@@ -601,7 +606,8 @@ export function registerDaycareRoutes(app: Express): void {
 
     app.post("/api/daycare/billing-config", async (req, res) => {
         try {
-            const config = await daycareStorage.createBillingConfig(req.body);
+            const organizationId = await requireOrganizationId(req);
+            const config = await daycareStorage.createBillingConfig({ ...req.body, organizationId });
             res.status(201).json(config);
         } catch (error) {
             console.error("Error creating billing config:", error);

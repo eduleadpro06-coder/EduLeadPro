@@ -10,13 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { insertLeadSchema } from "@shared/schema";
-import type { InsertLead, User, GlobalClassFee } from "@shared/schema";
+import type { InsertLead, User, GlobalClassFee, Lead } from "@shared/schema";
 
 interface LeadFormProps {
   onSuccess?: () => void;
+  initialData?: Lead;
 }
 
-export function LeadForm({ onSuccess }: LeadFormProps) {
+export function LeadForm({ onSuccess, initialData }: LeadFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -35,22 +36,22 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
   const form = useForm<InsertLead>({
     resolver: zodResolver(insertLeadSchema),
     defaultValues: {
-      name: "",
-      parentName: "",
-      phone: "",
-      email: "",
-      class: "",
-      status: "New",
-      source: "",
-      counselorId: undefined,
-      notes: "",
+      name: initialData?.name || "",
+      parentName: initialData?.parentName || "",
+      phone: initialData?.phone || "",
+      email: initialData?.email || "",
+      class: initialData?.class || "",
+      status: initialData?.status || "New",
+      source: initialData?.source || "",
+      counselorId: initialData?.counselorId || undefined,
+      notes: initialData?.notes || "",
     },
   });
 
   const createLeadMutation = useMutation({
     mutationFn: async (data: InsertLead) => {
       try {
-        const response = await apiRequest("POST", "/leads", data);
+        const response = await apiRequest("POST", "/api/leads", data);
 
         // Check content type to ensure we're receiving JSON
         const contentType = response.headers.get("Content-Type");
@@ -90,8 +91,29 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
     },
   });
 
+  const updateLeadMutation = useMutation({
+    mutationFn: async (data: InsertLead) => {
+      if (!initialData) return;
+      const response = await apiRequest("PATCH", `/api/leads/${initialData.id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
+      invalidateNotifications(queryClient);
+      toast({ title: "Lead updated successfully!" });
+      onSuccess?.();
+    },
+    onError: () => {
+      toast({ title: "Failed to update lead", variant: "destructive" });
+    },
+  });
+
   const onSubmit = (data: InsertLead) => {
-    createLeadMutation.mutate(data);
+    if (initialData) {
+      updateLeadMutation.mutate(data);
+    } else {
+      createLeadMutation.mutate(data);
+    }
   };
 
   return (
@@ -282,8 +304,10 @@ export function LeadForm({ onSuccess }: LeadFormProps) {
           <Button type="button" variant="outline" onClick={onSuccess}>
             Cancel
           </Button>
-          <Button type="submit" disabled={createLeadMutation.isPending}>
-            {createLeadMutation.isPending ? "Creating..." : "Create Lead"}
+          <Button type="submit" disabled={createLeadMutation.isPending || updateLeadMutation.isPending}>
+            {createLeadMutation.isPending || updateLeadMutation.isPending
+              ? (initialData ? "Updating..." : "Creating...")
+              : (initialData ? "Update Lead" : "Create Lead")}
           </Button>
         </div>
       </form>

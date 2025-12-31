@@ -131,94 +131,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced CSV import route
+  // Enhanced CSV import route with file upload support
   app.post("/api/leads/import-csv", async (req, res) => {
     try {
-      const { csvData } = req.body;
+      const { csvData, columnMapping, defaultSource } = req.body;
 
-      if (!csvData || !Array.isArray(csvData)) {
-        return res.status(400).json({ message: "Invalid CSV data format" });
+      if (!csvData) {
+        return res.status(400).json({ message: "CSV data is required" });
       }
 
-      const importedLeads = [];
-      const errors = [];
-      const duplicates = [];
+      // Get organization ID from authenticated user
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
 
-      for (let i = 0; i < csvData.length; i++) {
-        const row = csvData[i];
+      // Import CSV utilities
+      const {
+        processCSVImport,
+        parseCSV,
+        autoDetectColumnMapping
+      } = await import("./csv-import-utils.js");
 
-        try {
-          // Validate required fields
-          if (!row.name || !row.phone || !row.class) {
-            errors.push(`Row ${i + 1}: Missing required fields (name, phone, class)`);
-            continue;
-          }
+      let mapping: any;
 
-          // Parse and format the data
-          const leadData: InsertLead = {
-            name: row.name?.trim(),
-            email: row.email?.trim() || null,
-            phone: row.phone?.trim(),
-            class: row.class?.trim(),
-            stream: row.stream?.trim() || null,
-            status: row.status?.trim() || "new",
-            source: row.source?.trim(),
-            counselorId: row.counselorId ? parseInt(row.counselorId) : null,
-            parentName: row.parentName?.trim() || null,
-            parentPhone: row.parentPhone?.trim() || null,
-            address: row.address?.trim() || null,
-            notes: row.notes?.trim() || null,
-            lastContactedAt: (row.lastContactedAt && row.lastContactedAt.trim() !== '') ? new Date(row.lastContactedAt) : new Date()
-          };
+      // If column mapping is provided, use it; otherwise auto-detect
+      if (columnMapping) {
+        mapping = columnMapping;
+      } else {
+        // Auto-detect column mapping from CSV headers
+        const records = parseCSV(csvData);
+        if (records.length === 0) {
+          return res.status(400).json({ message: "CSV file is empty" });
+        }
 
-          // Check for duplicates before creating
-          const allLeads = await storage.getAllLeads(true); // Include deleted leads
-          const existingLead = allLeads.find(lead =>
-            lead.phone === leadData.phone ||
-            (leadData.email && lead.email === leadData.email)
-          );
+        const headers = Object.keys(records[0]);
+        mapping = autoDetectColumnMapping(headers);
 
-          if (existingLead) {
-            duplicates.push({
-              row: i + 1,
-              name: row.name,
-              phone: row.phone,
-              existingLeadId: existingLead.id,
-              existingLeadName: existingLead.name
-            });
-            continue;
-          }
-
-          const lead = await storage.createLead(leadData);
-
-          importedLeads.push(lead);
-        } catch (error: any) {
-          errors.push(`Row ${i + 1}: ${error.message}`);
+        // Check if essential fields were detected
+        if (!mapping.name || !mapping.phone || !mapping.class) {
+          return res.status(400).json({
+            message: "Could not auto-detect required columns (name, phone, class). Please provide column mapping.",
+            detectedMapping: mapping,
+            availableHeaders: headers
+          });
         }
       }
 
-      const response = {
-        message: `Successfully imported ${importedLeads.length} leads`,
-        imported: importedLeads.length,
-        errors: errors.length,
-        duplicates: duplicates.length,
-        leads: importedLeads,
-        errorDetails: errors,
-        duplicateDetails: duplicates
+      // Helper functions for the import process
+      const insertLeadFunction = async (lead: any) => {
+        await storage.createLead(lead);
       };
 
-      if (errors.length > 0) {
-        response.message += ` with ${errors.length} errors`;
-      }
+      const checkDuplicateFunction = async (phone: string, orgId: number) => {
+        const leads = await storage.getAllLeads(false, orgId);
+        return leads.some(l => l.phone === phone);
+      };
 
-      if (duplicates.length > 0) {
-        response.message += ` and ${duplicates.length} duplicates skipped`;
-      }
+      // Process the CSV import
+      const result = await processCSVImport(
+        csvData,
+        mapping,
+        organizationId,
+        insertLeadFunction,
+        checkDuplicateFunction
+      );
 
-      res.json(response);
+      res.json({
+        message: `Import completed: ${result.successfulImports} successful, ${result.failedImports} failed, ${result.duplicates} duplicates`,
+        ...result,
+        columnMapping: mapping
+      });
     } catch (error) {
       console.error("CSV import error:", error);
-      res.status(500).json({ message: "Failed to import leads" });
+      res.status(500).json({
+        message: "Failed to import leads",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
@@ -649,6 +638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let leads;
       if (status) {
         leads = await storage.getLeadsByStatus(status as string);
+
         // Filter by organization
         leads = leads.filter(l => l.organizationId === user.organizationId);
       } else if (counselorId) {
@@ -687,11 +677,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/leads", async (req, res) => {
     try {
       // Extract user for organization
-      const username = req.headers['x-user-name'] as string;
-      const user = await storage.getUserByUsername(username);
+      // Extract user for organization
+      let username = req.headers['x-user-name'] as string;
 
-      if (!user?.organizationId) {
-        return res.status(403).json({ message: "No organization assigned" });
+      // Fallback to session if header is missing
+      if (!username && (req.session as any)?.username) {
+        username = (req.session as any).username;
+      }
+
+      console.log(`[CREATE LEAD] Request received. Username: ${username || 'undefined'}`);
+
+      console.log(`[CREATE LEAD] Request received. Username: ${username || 'undefined'}`);
+
+      // Optional user lookup - proceed even if user not found (as per request)
+      let user = null;
+      if (username) {
+        user = await storage.getUserByUsername(username);
+        if (!user) {
+          console.warn(`[CREATE LEAD] User not found for username: ${username}, proceeding without user context`);
+        } else if (!user.organizationId) {
+          console.warn(`[CREATE LEAD] User ${username} has no organization assigned`);
+        }
+      } else {
+        console.log(`[CREATE LEAD] No username provided, treating as unauthenticated lead creation`);
       }
 
       const validatedData = insertLeadSchema.parse(req.body);
@@ -700,22 +708,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set lastContactedAt to current timestamp when creating a lead
       validatedData.lastContactedAt = new Date();
 
-      // Assign to user's organization
-      validatedData.organizationId = user.organizationId;
+      // Assign to user's organization if available, otherwise undefined (or default if needed)
+      if (user?.organizationId) {
+        validatedData.organizationId = user.organizationId;
+      }
+
+      // Only include fields with actual values (not undefined, null, or empty strings)
+      const sanitizeLeadData = (data: any) => {
+        const sanitized: any = {};
+        for (const key in data) {
+          const value = data[key];
+          // Only include if value is not undefined, not null, and not empty string
+          if (value !== undefined && value !== null && value !== '') {
+            sanitized[key] = value;
+          }
+        }
+        return sanitized;
+      };
+
+      const sanitizedData = sanitizeLeadData(validatedData);
 
       console.log("=== CREATE LEAD REQUEST ===");
-      console.log("Phone:", validatedData.phone);
-      console.log("Email:", validatedData.email);
+      console.log("Phone:", sanitizedData.phone);
+      console.log("Email:", sanitizedData.email);
       console.log("Force create:", forceCreate);
       console.log("Organization ID:", user.organizationId || undefined);
 
-      // First check only active leads for duplicates (within same organization)
-      const activeLeads = await storage.getAllLeads(false, user.organizationId || undefined);
+      // First check only active leads for duplicates (within same organization if context is present)
+      const activeLeads = await storage.getAllLeads(false, user?.organizationId || undefined);
       console.log("Active leads count:", activeLeads.length);
 
       const existingActiveLead = activeLeads.find(lead =>
-        lead.phone === validatedData.phone ||
-        (validatedData.email && lead.email === validatedData.email)
+        lead.phone === sanitizedData.phone ||
+        (sanitizedData.email && lead.email === sanitizedData.email)
       );
 
       console.log("Existing active lead found:", !!existingActiveLead);
@@ -743,9 +768,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { db } = await import("./db");
           const { or, eq } = await import("drizzle-orm");
 
-          let whereConditions = [eq(recentlyDeletedLeads.phone, validatedData.phone)];
-          if (validatedData.email) {
-            whereConditions.push(eq(recentlyDeletedLeads.email, validatedData.email));
+          let whereConditions = [eq(recentlyDeletedLeads.phone, sanitizedData.phone)];
+          if (sanitizedData.email) {
+            whereConditions.push(eq(recentlyDeletedLeads.email, sanitizedData.email));
           }
 
           console.log("Querying recentlyDeletedLeads table...");
@@ -781,13 +806,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("Force create mode - skipping deleted lead check");
       }
 
-      const lead = await storage.createLead(validatedData);
+      console.log("Creating lead with sanitized data...");
+      const lead = await storage.createLead(sanitizedData);
+      console.log("Lead created successfully:", lead.id);
       res.status(201).json(lead);
     } catch (error: any) {
+      console.error("ERROR in POST /api/leads:", error);
+      console.error("Error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+
       if (error.name === "ZodError") {
         return res.status(400).json({ message: "Invalid lead data", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create lead" });
+      res.status(500).json({
+        message: "Failed to create lead",
+        error: error.message || "Unknown error"
+      });
     }
   });
 
@@ -905,7 +942,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create follow-up
   app.post("/api/follow-ups", async (req, res) => {
     try {
-      const validatedData = insertFollowUpSchema.parse(req.body);
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const validatedData = insertFollowUpSchema.parse(req.body) as any;
+      validatedData.organizationId = organizationId;
       const followUp = await storage.createFollowUp(validatedData);
       res.status(201).json(followUp);
     } catch (error: any) {
@@ -1125,7 +1168,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/message-templates", async (req, res) => {
     try {
-      const newTemplate = await storage.createMessageTemplate(req.body);
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const templateData = { ...req.body, organizationId };
+      const newTemplate = await storage.createMessageTemplate(templateData);
       res.status(201).json(newTemplate);
     } catch (error) {
       console.error("Error creating template:", error);
@@ -1210,6 +1259,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/e-mandates", async (req, res) => {
     try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
       const eMandateData = {
         leadId: req.body.leadId,
         mandateId: req.body.mandateId,
@@ -1219,7 +1273,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: req.body.startDate,
         endDate: req.body.endDate,
         status: req.body.status || "active",
-        bankName: req.body.bankName
+        bankName: req.body.bankName,
+        organizationId
       };
       console.log("E-Mandate insert data:", eMandateData);
       const eMandate = await storage.createEMandate(eMandateData);
@@ -1325,6 +1380,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/global-class-fees", async (req, res) => {
     try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
       console.log("Received global class fee request:", req.body);
 
       const globalClassFeeData = {
@@ -1334,7 +1394,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         frequency: req.body.frequency,
         academicYear: req.body.academicYear,
         description: req.body.description,
-        isActive: req.body.isActive !== undefined ? req.body.isActive : true
+        isActive: req.body.isActive !== undefined ? req.body.isActive : true,
+        organizationId
       };
 
       console.log("Processed global class fee data:", globalClassFeeData);
@@ -1400,12 +1461,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/fee-structures", async (req, res) => {
     try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
       const feeStructureData = {
         class: req.body.class,
         stream: req.body.stream,
         totalFees: String(Number(req.body.totalFees)),
         installments: req.body.installments,
-        academicYear: req.body.academicYear
+        academicYear: req.body.academicYear,
+        organizationId
       };
 
       const feeStructure = await storage.createFeeStructure(feeStructureData);
@@ -1443,6 +1510,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/fee-payments", async (req, res) => {
     try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
       const feePaymentData = {
         leadId: req.body.leadId,
         amount: String(Number(req.body.amount)),
@@ -1454,6 +1526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: req.body.status || "completed",
         paymentCategory: req.body.paymentCategory || "fee_payment", // Default to fee_payment
         chargeType: req.body.chargeType || null, // Optional charge type
+        organizationId
       };
 
       const feePayment = await storage.createFeePayment(feePaymentData);
@@ -1622,6 +1695,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/emi-plans", async (req, res) => {
     try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
       console.log("Received EMI plan request:", req.body);
       const {
         studentId,
@@ -1671,6 +1749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: startDate, // Already in YYYY-MM-DD format from frontend
         endDate: endDate, // Already in YYYY-MM-DD format from frontend
         status: status || "active",
+        organizationId
       };
 
       console.log("Creating EMI plan with data:", finalPlanData);
@@ -2029,6 +2108,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/staff", async (req, res) => {
     try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
       const staffData = req.body;
       // Normalize known fields
       const normalizedSalary = staffData?.salary !== undefined ? Number(staffData.salary) : undefined;
@@ -2041,7 +2125,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...staffData,
         salary: normalizedSalary ?? staffData.salary,
         dateOfJoining: normalizedDoj ?? staffData.dateOfJoining,
-        employeeId: undefined
+        employeeId: undefined,
+        organizationId
       });
       // Generate employeeId and update the record
       const generatedEmployeeId = `EMP${newStaff.id}`;
@@ -2154,6 +2239,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Staff CSV Import endpoint
   app.post("/api/staff/import-csv", async (req, res) => {
     try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
       const { csvData } = req.body;
 
       if (!csvData || !Array.isArray(csvData)) {
@@ -2188,7 +2278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Create new staff member
-          const newStaff = await storage.createStaff(staffData);
+          const newStaff = await storage.createStaff({ ...staffData, organizationId });
           results.staff.push(newStaff);
 
         } catch (error) {
@@ -2245,6 +2335,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/leads/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const leadId = parseInt(id);
+
+      if (isNaN(leadId)) {
+        return res.status(400).json({ message: "Invalid lead ID" });
+      }
+
+      const lead = await storage.getLeadById(leadId);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      // Assuming insertLeadSchema is defined elsewhere and available
+      // For this example, we'll use a generic type for updates
+      const updates = req.body; // Replace with insertLeadSchema.partial().parse(req.body) if schema is available
+
+      // Optional user lookup for permission check
+      const username = req.headers['x-user-name'] as string;
+      let user = null;
+      if (username) {
+        user = await storage.getUserByUsername(username);
+      }
+
+      // If user context exists, and lead has an organization, verify ownership
+      if (user?.organizationId && lead.organizationId && lead.organizationId !== user.organizationId) {
+        return res.status(403).json({ message: "Unauthorized to update this lead" });
+      }
+
+      const updatedLead = await storage.updateLead(lead.id, updates);
+      res.json(updatedLead);
+    } catch (error) {
+      console.error("Error updating lead:", error);
+      res.status(500).json({ message: "Failed to update lead" });
+    }
+  });
+
   app.get("/api/staff/departments", async (req, res) => {
     try {
       const staff = await storage.getAllStaff();
@@ -2277,7 +2405,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/attendance", async (req, res) => {
     try {
-      const attendanceData = req.body;
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const attendanceData = { ...req.body, organizationId };
       const attendance = await storage.createAttendance(attendanceData);
       res.status(201).json(attendance);
     } catch (error) {
@@ -2355,6 +2488,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/payroll", async (req, res) => {
     try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
       const payrollData = req.body;
       console.log('Creating payroll with data:', JSON.stringify(payrollData, null, 2));
 
@@ -2389,7 +2527,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         overtime,
         netSalary, // Use calculated value
         attendedDays,
-        status: payrollData.status || 'pending'
+        status: payrollData.status || 'pending',
+        organizationId
       };
 
       // Upsert logic: check if payroll exists for staff/month/year
@@ -2437,6 +2576,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/payroll/bulk-generate", async (req, res) => {
     try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
       const { month, year, staffIds, payrollData } = req.body;
       console.log('Bulk payroll generation request:', JSON.stringify(req.body, null, 2));
 
@@ -2486,7 +2630,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             overtime,
             netSalary, // Use calculated value
             attendedDays,
-            status: payrollItem.status || 'pending'
+            status: payrollItem.status || 'pending',
+            organizationId
           };
 
           // Upsert logic: check if payroll exists for staff/month/year

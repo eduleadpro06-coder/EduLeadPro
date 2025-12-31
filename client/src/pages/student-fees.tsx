@@ -500,11 +500,26 @@ export default function StudentFees() {
   const { data: globalClassFees = [], refetch: refetchGlobalFees } = useQuery<GlobalClassFee[]>({ queryKey: ["/api/global-class-fees"] });
   const { data: emiPlans = [], refetch: refetchEmiPlans } = useQuery<EmiPlan[]>({ queryKey: ["/api/emi-plans"] });
 
+
   // Fetch enrolled leads
   const { data: enrolledLeads = [], refetch: refetchLeads } = useQuery<LeadWithCounselor[]>({
     queryKey: ["/api/leads", "enrolled"],
     queryFn: async () => {
-      const response = await fetch("/api/leads?status=enrolled");
+      // Import getAuthHeaders from queryClient or implement logic inline if import fails (safe bet: inline logic or use apiRequest but apiRequest throws)
+      // Since I just exported it, I should import it. But for safety/speed and to avoid top-level import conflicts in this snippet, I can just get it from localStorage directly here or assume import works.
+      // Let's rely on importing it at top of file, but I need to do that with a separate edit or use inline logic.
+      // Inline logic is safer for a single replace block without context of imports.
+
+      const userStr = localStorage.getItem('auth_user');
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user.email) headers['x-user-name'] = user.email;
+        } catch (e) { console.error("Error parsing auth", e); }
+      }
+
+      const response = await fetch("/api/leads?status=enrolled", { headers });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data : [];
@@ -852,6 +867,10 @@ export default function StudentFees() {
   const allStudents: CombinedStudent[] = [
     ...displayStudents.map(student => ({
       ...student,
+      class: student.class,
+      parentName: student.parentName,
+      parentPhone: student.parentPhone,
+      address: student.address,
       type: 'student' as const,
       source: 'student_record',
       email: (student as any).email,
@@ -877,7 +896,8 @@ export default function StudentFees() {
       stream: lead.stream,
       status: lead.status,
       createdAt: lead.createdAt,
-      lastContactedAt: lead.lastContactedAt
+      lastContactedAt: lead.lastContactedAt,
+      address: lead.address,
     }))
   ];
 
@@ -1593,45 +1613,6 @@ export default function StudentFees() {
                     <span className="text-sm text-gray-500 font-medium">{selectedStudent.class}</span>
                   </div>
                 </div>
-                {/* Edit and Delete buttons */}
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-[#643ae5] text-gray-800 hover:bg-[#643ae5]/10"
-                    onClick={() => {
-                      console.log("Edit button clicked, selectedStudent:", selectedStudent);
-                      setEditedStudent({ ...selectedStudent });
-                      setFormErrors({});
-                      setIsEditModalOpen(true);
-                    }}
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="sm">
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure you want to delete?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will remove the student from the system. This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => deleteStudentMutation.mutate()}>
-                          Confirm
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
               </div>
               {/* Tabs for student details */}
               <div className="border-b border-gray-200 mb-4">
@@ -1659,7 +1640,7 @@ export default function StudentFees() {
                       <CardContent>
                         <div className="space-y-2">
                           <div><span className="font-semibold">Full Name:</span> {selectedStudent.name}</div>
-                          <div><span className="font-semibold">Phone:</span> {selectedStudent.parentPhone || '-'}</div>
+                          <div><span className="font-semibold">Phone:</span> {selectedStudent.parentPhone || (selectedStudent as any).phone || '-'}</div>
                           <div><span className="font-semibold">Email:</span> {(selectedStudent as any).email || '-'}</div>
                           <div><span className="font-semibold">Class:</span> {selectedStudent.class}</div>
                           <div><span className="font-semibold">Parent:</span> {selectedStudent.parentName || '-'}</div>

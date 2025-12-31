@@ -18,7 +18,7 @@ async function throwIfResNotOk(res: Response) {
 }
 
 // Helper to get auth headers
-const getAuthHeaders = (): Record<string, string> => {
+export const getAuthHeaders = (): Record<string, string> => {
   try {
     const userStr = localStorage.getItem('auth_user');
     if (userStr) {

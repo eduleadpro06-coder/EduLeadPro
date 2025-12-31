@@ -34,7 +34,7 @@ export const leads = pgTable("leads", {
   stream: text("stream"), // Science, Commerce, Arts
   status: text("status").notNull().default("new"), // new, contacted, interested, enrolled, dropped
   source: text("source").notNull(), // facebook, google_ads, website, referral, etc.
-  counselorId: integer("counselor_id").references(() => users.id),
+  counselorId: integer("counselor_id").references(() => staff.id), // Changed to reference staff instead of users
   assignedAt: timestamp("assigned_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -53,7 +53,7 @@ export const leads = pgTable("leads", {
 export const followUps = pgTable("follow_ups", {
   id: serial("id").primaryKey(),
   leadId: integer("lead_id").notNull(), // Removed foreign key reference to allow independent existence
-  counselorId: integer("counselor_id").references(() => users.id).notNull(),
+  counselorId: integer("counselor_id").references(() => staff.id).notNull(),
   scheduledAt: timestamp("scheduled_at").notNull(),
   completedAt: timestamp("completed_at"),
   remarks: text("remarks"),
@@ -477,6 +477,29 @@ export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, creat
       .optional()
       .or(z.literal("")),
   });
+
+// Extended schema for client-side validation (Add/Edit forms)
+export const extendedLeadSchema = insertLeadSchema.superRefine((data, ctx) => {
+  // Check if class is greater than 10
+  const classString = data.class || "";
+  const match = classString.match(/(\d+)/);
+
+  if (match) {
+    const classNum = parseInt(match[0], 10);
+    // If class > 10, Stream is required
+    if (classNum > 10) {
+      if (!data.stream || data.stream.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Stream is required for Class 11 and above",
+          path: ["stream"],
+        });
+      }
+    }
+  }
+});
+
+export type ExtendedLead = z.infer<typeof extendedLeadSchema>;
 export const insertFollowUpSchema = createInsertSchema(followUps)
   .omit({ id: true, createdAt: true })
   .extend({
@@ -586,7 +609,7 @@ export type InsertCoursePricing = z.infer<typeof insertCoursePricingSchema>;
 
 // Complex types for joins
 export type LeadWithCounselor = Lead & {
-  counselor?: User;
+  counselor?: Staff; // Changed from User to Staff
 };
 
 export type StaffWithDetails = Staff & {

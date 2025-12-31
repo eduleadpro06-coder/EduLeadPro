@@ -9,36 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { insertLeadSchema, type InsertLead, type User, type GlobalClassFee } from "@shared/schema";
+import { extendedLeadSchema, type InsertLead, type Staff, type GlobalClassFee } from "@shared/schema";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import { z } from "zod";
 
 interface AddLeadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-// Extends the base schema with refined validation
-const formSchema = insertLeadSchema.superRefine((data, ctx) => {
-  // Check if class is greater than 10
-  const classString = data.class || "";
-  const match = classString.match(/(\d+)/);
-
-  if (match) {
-    const classNum = parseInt(match[0], 10);
-    // If class > 10, Stream is required
-    if (classNum > 10) {
-      if (!data.stream || data.stream.trim() === "") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Stream is required for Class 11 and above",
-          path: ["stream"],
-        });
-      }
-    }
-  }
-});
 
 export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) {
   const { toast } = useToast();
@@ -46,13 +24,13 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
   const [deletedLeadData, setDeletedLeadData] = useState<any>(null);
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
 
-  const { data: counselors } = useQuery<User[]>({
-    queryKey: ["/api/counselors"],
+  const { data: counselors } = useQuery<Staff[]>({
+    queryKey: ["/api/staff"],
   });
 
   const form = useForm<InsertLead>({
-    resolver: zodResolver(formSchema),
-    mode: "onChange", // Enable real-time validation
+    resolver: zodResolver(extendedLeadSchema),
+    mode: "onChange",
     defaultValues: {
       name: "",
       email: "",
@@ -136,16 +114,12 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
       try {
         const url = forceCreate ? "/leads?force=true" : "/leads";
         const response = await apiRequest("POST", url, data);
-        console.log("Response status:", response.status);
 
         // Check content type to ensure we're receiving JSON
         const contentType = response.headers.get("Content-Type");
-        console.log("Response Content-Type:", contentType);
-
         if (contentType && contentType.includes("application/json")) {
           return await response.json();
         } else {
-          // Get the actual response text for debugging
           const responseText = await response.text();
           console.error("Non-JSON response received:", responseText);
           throw new Error("Received non-JSON response from server");
@@ -156,7 +130,6 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
       }
     },
     onSuccess: () => {
-      console.log("Lead created successfully");
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/leads"] });
@@ -170,7 +143,6 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
     },
     onError: (error: any) => {
       console.log("Error in createLeadMutation:", error);
-      // ... (error handling code remains same as before) ...
       const isDuplicateError = error.status === 409 ||
         (error.message && (
           error.message.includes("already exists") ||
@@ -187,31 +159,20 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
         } else {
           // Handle normal duplicate (active lead)
           const formData = form.getValues();
+          let errorDescription = "A lead with this contact information already exists.";
 
-          // Create a more detailed error message
-          let errorDescription = "A lead with this contact information already exists in the system.";
-
-          if (formData.phone && formData.email) {
-            errorDescription = `A lead with phone number "${formData.phone}" and email "${formData.email}" already exists in the system.`;
-          } else if (formData.phone) {
-            errorDescription = `A lead with phone number "${formData.phone}" already exists in the system.`;
-          } else if (formData.email) {
-            errorDescription = `A lead with email "${formData.email}" already exists in the system.`;
+          if (formData.phone) {
+            errorDescription = `A lead with phone number "${formData.phone}" already exists.`;
           }
 
-          // Show the server's error message to the user
           toast({
             title: "⚠️ Duplicate Lead Warning",
             description: errorDescription,
             variant: "destructive",
           });
         }
-
-        // DO NOT close the modal - let user modify the form and try again
-        // DO NOT reset the form - let user see what they entered
       } else {
         let errorMessage = "Something went wrong while creating the lead";
-
         if (error.errorData?.message) {
           errorMessage = error.errorData.message;
         } else if (error.message) {
@@ -223,14 +184,21 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
           description: errorMessage,
           variant: "destructive",
         });
-
-        // For other errors, also keep the modal open
       }
     },
   });
 
   const onSubmit = (data: InsertLead) => {
-    createLeadMutation.mutate({ data });
+    // Sanitize data: Only include fields with actual values
+    const sanitizedData: Partial<InsertLead> = {};
+    Object.keys(data).forEach(key => {
+      const value = (data as any)[key];
+      if (value !== undefined && value !== null && value !== '') {
+        (sanitizedData as any)[key] = value;
+      }
+    });
+
+    createLeadMutation.mutate({ data: sanitizedData as InsertLead });
   };
 
   const { data: globalFees } = useQuery<GlobalClassFee[]>({
@@ -392,7 +360,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {counselors?.map((counselor) => (
+                        {counselors?.filter(staff => staff.role === "Counselor").map((counselor) => (
                           <SelectItem key={counselor.id} value={counselor.id.toString()}>
                             {counselor.name}
                           </SelectItem>
