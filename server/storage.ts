@@ -373,62 +373,14 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getAllCounselors(): Promise<User[]> {
-    try {
-      // Sync Staff -> Users (role=Counselor) to ensure they appear in the dropdown
-      const potentialCounselors = await db.select().from(schema.staff)
-        .where(or(
-          eq(schema.staff.role, "Counselor"),
-          eq(schema.staff.role, "counselor"),
-          eq(schema.staff.role, "COUNSELOR")
-        ));
+  async getAllCounselors(organizationId?: number): Promise<User[]> {
+    let query = db.select().from(schema.users).where(eq(schema.users.role, "counselor"));
 
-      console.log(`[Auto-Sync] Found ${potentialCounselors.length} potential counselors in staff table`);
-
-      for (const staffMember of potentialCounselors) {
-        if (!staffMember.email) {
-          console.log(`[Auto-Sync] Skipping staff ${staffMember.name} (no email)`);
-          continue;
-        }
-
-        const existingUsers = await db.select().from(schema.users)
-          .where(eq(schema.users.email, staffMember.email));
-
-        if (existingUsers.length === 0) {
-          console.log(`[Auto-Sync] Creating user for staff: ${staffMember.name} (${staffMember.email})`);
-          try {
-            await this.createUser({
-              username: staffMember.email,
-              password: "password123",
-              role: "counselor",
-              email: staffMember.email,
-              name: staffMember.name,
-              organizationId: staffMember.organizationId
-            } as InsertUser);
-          } catch (err) {
-            console.error(`[Auto-Sync] Failed to create user for ${staffMember.email}:`, err);
-          }
-        } else {
-          const user = existingUsers[0];
-          // Ensure role is counselor if they are in the staff table as such
-          if (user.role !== "counselor") {
-            console.log(`[Auto-Sync] Updating role to counselor for ${user.username}`);
-            await db.update(schema.users).set({ role: "counselor" }).where(eq(schema.users.id, user.id));
-          }
-          // Update organizationId if missing
-          if (!user.organizationId && staffMember.organizationId) {
-            console.log(`[Auto-Sync] Updating organizationId for ${user.username}`);
-            await db.update(schema.users).set({ organizationId: staffMember.organizationId }).where(eq(schema.users.id, user.id));
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error in counselor sync:", error);
+    if (organizationId) {
+      query = query.where(and(eq(schema.users.role, "counselor"), eq(schema.users.organizationId, organizationId))) as any;
     }
 
-    // Return users, aliasing username as name if name is missing (for frontend)
-    const users = await db.select().from(schema.users).where(eq(schema.users.role, "counselor"));
-    console.log(`[Auto-Sync] Returning ${users.length} counselors from users table`);
+    const users = await query;
     return users.map(u => ({
       ...u,
       name: u.name || u.username
