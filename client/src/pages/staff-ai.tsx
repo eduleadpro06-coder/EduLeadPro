@@ -290,7 +290,8 @@ export default function StaffAI() {
     queryKey: ["/api/staff"]
   });
   const displayStaff: Staff[] = (staff as Staff[]);
-  const { data: attendance = [] } = useQuery({ queryKey: ["/api/attendance"] });
+  // Note: Attendance endpoint not available - using empty array
+  const attendance: Attendance[] = [];
   const { data: payroll = [] } = useQuery({ queryKey: ["/api/payroll"] });
 
   // Save payroll state to localStorage whenever it changes

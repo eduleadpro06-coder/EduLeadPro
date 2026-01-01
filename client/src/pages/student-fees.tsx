@@ -509,7 +509,7 @@ export default function StudentFees() {
   const { data: feePayments = [] } = useQuery<FeePayment[]>({ queryKey: ["/api/fee-payments"] });
   const { data: eMandates = [], refetch: refetchEMandates } = useQuery<EMandate[]>({ queryKey: ["/api/e-mandates"] });
   const { data: feeStats } = useQuery<FeeStats>({ queryKey: ["/api/fee-stats"] });
-  const { data: classFeeStructures = [] } = useQuery<ClassFeeStructure[]>({ queryKey: ["/api/class-fee-structures"] });
+  // Note: class-fee-structures removed - endpoint not in use
   const { data: globalClassFees = [], refetch: refetchGlobalFees } = useQuery<GlobalClassFee[]>({ queryKey: ["/api/global-class-fees"] });
   const { data: emiPlans = [], refetch: refetchEmiPlans } = useQuery<EmiPlan[]>({ queryKey: ["/api/emi-plans"] });
 
@@ -539,30 +539,7 @@ export default function StudentFees() {
     },
   });
 
-  // Add class fee structure mutation
-  const addClassFeeMutation = useMutation({
-    mutationFn: async (data: Partial<ClassFeeStructure> & { studentIds?: number[] }) => {
-      const response = await fetch("/api/class-fee-structures", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        throw new Error("Failed to add class fee structure");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/class-fee-structures"] });
-      setAddClassFeeOpen(false);
-      toast({
-        title: "Success",
-        description: "Class fee structure added successfully",
-      });
-    },
-  });
+  // Note: addClassFeeMutation removed - endpoint /api/class-fee-structures not in use
 
   // Global class fee mutation
   const globalClassFeeMutation = useMutation({
@@ -832,17 +809,13 @@ export default function StudentFees() {
 
   const handleAddClassFee = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const classFeeData: Partial<ClassFeeStructure> & { studentIds?: number[] } = {
-      className: formData.get("className")?.toString() || "",
-      feeType: formData.get("feeType")?.toString() || "",
-      amount: formData.get("amount")?.toString() || "",
-      frequency: formData.get("frequency")?.toString() || "",
-      dueDate: formData.get("dueDate")?.toString() || "",
-      description: formData.get("description")?.toString() || "",
-      studentIds: selectedStudentIds,
-    };
-    addClassFeeMutation.mutate(classFeeData);
+    // Note: This feature is currently disabled - API endpoint not implemented
+    toast({
+      title: "Feature Unavailable",
+      description: "Class fee structure endpoint is not currently available",
+      variant: "destructive"
+    });
+    setAddClassFeeOpen(false);
   };
 
   const handleGlobalClassFee = (event: React.FormEvent<HTMLFormElement>) => {

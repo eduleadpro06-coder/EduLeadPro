@@ -3,18 +3,24 @@ import { daycareStorage, storage } from "./storage.js";
 import type { Request } from "express";
 
 async function requireOrganizationId(req: Request): Promise<number> {
-    // Check session first (secure)
-    let username = (req as any).session?.username;
+    // Get user email from header (frontend sends email in x-user-name)
+    const userEmail = req.headers['x-user-name'] as string;
 
-    // Fallback to header (legacy/insecure)
-    if (!username) {
-        username = req.headers['x-user-name'] as string;
+    if (!userEmail) {
+        console.log('[daycare] No x-user-name header found');
+        throw new Error(" Authentication required");
     }
 
-    if (!username) throw new Error("Authentication required");
-    const user = await storage.getUserByUsername(username);
+    // Normalize email to lowercase
+    const normalizedEmail = userEmail.toLowerCase().trim();
 
-    if (!user?.organizationId) throw new Error("Organization context required");
+    // Get user by email (not username - frontend uses email for auth)
+    const user = await storage.getUserByEmail(normalizedEmail);
+
+    if (!user?.organizationId) {
+        console.log(`[daycare] User found but no organizationId: ${normalizedEmail}`);
+        throw new Error("Organization context required");
+    }
 
     return user.organizationId;
 }

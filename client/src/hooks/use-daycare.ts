@@ -1,5 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
+// Helper to get auth headers from localStorage
+const getAuthHeaders = (): HeadersInit => {
+    try {
+        const userStr = localStorage.getItem('auth_user');
+        if (userStr) {
+            const user = JSON.parse(userStr);
+            if (user.email) {
+                return {
+                    'Content-Type': 'application/json',
+                    'x-user-name': user.email
+                };
+            }
+        }
+    } catch (e) {
+        console.error("Error parsing auth user for headers:", e);
+    }
+    return { 'Content-Type': 'application/json' };
+};
+
 // ============================================
 // STATS & ANALYTICS
 // ============================================
@@ -8,7 +27,7 @@ export function useDaycareStats() {
     return useQuery({
         queryKey: ["/api/daycare/stats"],
         queryFn: async () => {
-            const response = await fetch("/api/daycare/stats");
+            const response = await fetch("/api/daycare/stats", { headers: getAuthHeaders() });
             if (!response.ok) throw new Error("Failed to fetch daycare stats");
             return response.json();
         },
@@ -24,7 +43,7 @@ export function useDaycareChildren(includeDeleted = false) {
         queryKey: ["/api/daycare/children", includeDeleted],
         queryFn: async () => {
             const url = `/api/daycare/children${includeDeleted ? '?includeDeleted=true' : ''}`;
-            const response = await fetch(url);
+            const response = await fetch(url, { headers: getAuthHeaders() });
             if (!response.ok) throw new Error("Failed to fetch children");
             return response.json();
         },
@@ -35,7 +54,7 @@ export function useActiveDaycareChildren() {
     return useQuery({
         queryKey: ["/api/daycare/children/active"],
         queryFn: async () => {
-            const response = await fetch("/api/daycare/children/active");
+            const response = await fetch("/api/daycare/children/active", { headers: getAuthHeaders() });
             if (!response.ok) throw new Error("Failed to fetch active children");
             return response.json();
         },
@@ -49,7 +68,7 @@ export function useCreateDaycareChild() {
         mutationFn: async (childData: any) => {
             const response = await fetch("/api/daycare/children", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(childData),
             });
             if (!response.ok) throw new Error("Failed to create child");
@@ -69,7 +88,7 @@ export function useUpdateDaycareChild() {
         mutationFn: async ({ id, updates }: { id: number; updates: any }) => {
             const response = await fetch(`/api/daycare/children/${id}`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(updates),
             });
             if (!response.ok) throw new Error("Failed to update child");
@@ -90,7 +109,7 @@ export function useDaycareInquiries(status?: string) {
         queryKey: ["/api/daycare/inquiries", status],
         queryFn: async () => {
             const url = status ? `/api/daycare/inquiries?status=${status}` : "/api/daycare/inquiries";
-            const response = await fetch(url);
+            const response = await fetch(url, { headers: getAuthHeaders() });
             if (!response.ok) throw new Error("Failed to fetch inquiries");
             return response.json();
         },
@@ -104,7 +123,7 @@ export function useCreateDaycareInquiry() {
         mutationFn: async (inquiryData: any) => {
             const response = await fetch("/api/daycare/inquiries", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(inquiryData),
             });
             if (!response.ok) throw new Error("Failed to create inquiry");
@@ -125,7 +144,7 @@ export function useTodayAttendance() {
     return useQuery({
         queryKey: ["/api/daycare/attendance/today"],
         queryFn: async () => {
-            const response = await fetch("/api/daycare/attendance/today");
+            const response = await fetch("/api/daycare/attendance/today", { headers: getAuthHeaders() });
             if (!response.ok) throw new Error("Failed to fetch today's attendance");
             return response.json();
         },
@@ -137,7 +156,7 @@ export function useCurrentlyCheckedIn() {
     return useQuery({
         queryKey: ["/api/daycare/attendance/checked-in"],
         queryFn: async () => {
-            const response = await fetch("/api/daycare/attendance/checked-in");
+            const response = await fetch("/api/daycare/attendance/checked-in", { headers: getAuthHeaders() });
             if (!response.ok) throw new Error("Failed to fetch checked-in children");
             return response.json();
         },
@@ -152,7 +171,7 @@ export function useCheckInChild() {
         mutationFn: async (checkInData: any) => {
             const response = await fetch("/api/daycare/attendance/check-in", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(checkInData),
             });
             if (!response.ok) throw new Error("Failed to check in child");
@@ -174,7 +193,7 @@ export function useCheckOutChild() {
         mutationFn: async ({ id, checkOutTime, userId }: { id: number; checkOutTime: string; userId: number }) => {
             const response = await fetch(`/api/daycare/attendance/${id}/check-out`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({ checkOutTime, userId }),
             });
             if (!response.ok) throw new Error("Failed to check out child");
@@ -198,7 +217,7 @@ export function useDaycareEnrollments(includeInactive = false) {
         queryKey: ["/api/daycare/enrollments", includeInactive],
         queryFn: async () => {
             const url = `/api/daycare/enrollments${includeInactive ? '?includeInactive=true' : ''}`;
-            const response = await fetch(url);
+            const response = await fetch(url, { headers: getAuthHeaders() });
             if (!response.ok) throw new Error("Failed to fetch enrollments");
             return response.json();
         },
@@ -212,7 +231,7 @@ export function useCreateEnrollment() {
         mutationFn: async (enrollmentData: any) => {
             const response = await fetch("/api/daycare/enrollments", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(enrollmentData),
             });
             if (!response.ok) throw new Error("Failed to create enrollment");
@@ -233,7 +252,7 @@ export function useDaycarePayments() {
     return useQuery({
         queryKey: ["/api/daycare/payments"],
         queryFn: async () => {
-            const response = await fetch("/api/daycare/payments");
+            const response = await fetch("/api/daycare/payments", { headers: getAuthHeaders() });
             if (!response.ok) throw new Error("Failed to fetch payments");
             return response.json();
         },
@@ -247,7 +266,7 @@ export function useRecordPayment() {
         mutationFn: async (paymentData: any) => {
             const response = await fetch("/api/daycare/payments/record", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(paymentData),
             });
             if (!response.ok) throw new Error("Failed to record payment");
@@ -268,7 +287,7 @@ export function useActiveBillingConfig() {
     return useQuery({
         queryKey: ["/api/daycare/billing-config/active"],
         queryFn: async () => {
-            const response = await fetch("/api/daycare/billing-config/active");
+            const response = await fetch("/api/daycare/billing-config/active", { headers: getAuthHeaders() });
             if (!response.ok) throw new Error("Failed to fetch active billing config");
             return response.json();
         },
@@ -279,7 +298,7 @@ export function useBillingConfigs() {
     return useQuery({
         queryKey: ["/api/daycare/billing-config"],
         queryFn: async () => {
-            const response = await fetch("/api/daycare/billing-config");
+            const response = await fetch("/api/daycare/billing-config", { headers: getAuthHeaders() });
             if (!response.ok) throw new Error("Failed to fetch billing configs");
             return response.json();
         },
@@ -293,7 +312,7 @@ export function useCreateBillingConfig() {
         mutationFn: async (configData: any) => {
             const response = await fetch("/api/daycare/billing-config", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(configData),
             });
             if (!response.ok) throw new Error("Failed to create billing config");
@@ -312,7 +331,7 @@ export function useUpdateBillingConfig() {
         mutationFn: async ({ id, updates }: { id: number; updates: any }) => {
             const response = await fetch(`/api/daycare/billing-config/${id}`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(updates),
             });
             if (!response.ok) throw new Error("Failed to update billing config");
