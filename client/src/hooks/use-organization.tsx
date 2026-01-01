@@ -1,6 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthHeaders } from "@/lib/queryClient";
 
 export function useOrganization() {
     const { toast } = useToast();
@@ -9,7 +10,12 @@ export function useOrganization() {
     const { data: settings, isLoading } = useQuery({
         queryKey: ["/api/organization/settings"],
         queryFn: async () => {
-            const response = await fetch("/api/organization/settings");
+            const response = await fetch("/api/organization/settings", {
+                headers: {
+                    ...getAuthHeaders(), // Add auth headers
+                },
+                credentials: "include",
+            });
             if (!response.ok) {
                 throw new Error("Failed to fetch organization settings");
             }
@@ -24,7 +30,9 @@ export function useOrganization() {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
+                    ...getAuthHeaders(), // Add auth headers
                 },
+                credentials: "include",
                 body: JSON.stringify({ settings: newSettings }),
             });
 
