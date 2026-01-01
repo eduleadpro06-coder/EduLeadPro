@@ -33,11 +33,28 @@ export async function apiRequest(
   const baseURL = "/api";
   const url = path.startsWith("/api") ? path : `${baseURL}${path}`;
 
+  // Get auth headers from localStorage
+  const getAuthHeaders = (): Record<string, string> => {
+    try {
+      const userStr = localStorage.getItem('auth_user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        if (user.email) {
+          return { 'x-user-name': user.email };
+        }
+      }
+    } catch (e) {
+      console.error("Error parsing auth user for headers:", e);
+    }
+    return {};
+  };
+
   const options: RequestInit = {
     method,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(), // Add auth headers
     },
   };
 

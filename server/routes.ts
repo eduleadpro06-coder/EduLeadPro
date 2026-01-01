@@ -3823,6 +3823,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // EXPENSE MANAGEMENT ROUTES
+  // ============================================
+
+  // Get all expenses (filtered by organization)
+  app.get("/api/expenses", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const expenses = await storage.getAllExpenses(organizationId);
+      res.json(expenses);
+    } catch (error) {
+      console.error("Failed to fetch expenses:", error);
+      res.status(500).json({ message: "Failed to fetch expenses" });
+    }
+  });
+
+  // Create new expense
+  app.post("/api/expenses", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const { description, amount, category, date } = req.body;
+
+      if (!description || !amount || !category || !date) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const expense = await storage.createExpense({
+        description,
+        amount,
+        category,
+        date,
+        organizationId,
+        status: "pending"
+      });
+
+      res.status(201).json(expense);
+    } catch (error) {
+      console.error("Failed to create expense:", error);
+      res.status(500).json({ message: "Failed to create expense" });
+    }
+  });
+
+  // Update expense
+  app.put("/api/expenses/:id", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const expenseId = parseInt(req.params.id);
+      const { description, amount, category, date } = req.body;
+
+      // Verify expense belongs to organization
+      const existingExpense = await storage.getExpense(expenseId);
+      if (!existingExpense) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+      if (existingExpense.organizationId !== organizationId) {
+        return res.status(403).json({ message: "Unauthorized to update this expense" });
+      }
+
+      const expense = await storage.updateExpense(expenseId, {
+        description,
+        amount,
+        category,
+        date
+      });
+
+      res.json(expense);
+    } catch (error) {
+      console.error("Failed to update expense:", error);
+      res.status(500).json({ message: "Failed to update expense" });
+    }
+  });
+
+  // Delete expense
+  app.delete("/api/expenses/:id", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const expenseId = parseInt(req.params.id);
+
+      // Verify expense belongs to organization
+      const existingExpense = await storage.getExpense(expenseId);
+      if (!existingExpense) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+      if (existingExpense.organizationId !== organizationId) {
+        return res.status(403).json({ message: "Unauthorized to delete this expense" });
+      }
+
+      const success = await storage.deleteExpense(expenseId);
+      if (success) {
+        res.json({ message: "Expense deleted successfully" });
+      } else {
+        res.status(404).json({ message: "Expense not found" });
+      }
+    } catch (error) {
+      console.error("Failed to delete expense:", error);
+      res.status(500).json({ message: "Failed to delete expense" });
+    }
+  });
+
+  // ============================================
   // DAYCARE MANAGEMENT ROUTES
   // ============================================
   registerDaycareRoutes(app);
