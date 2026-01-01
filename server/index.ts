@@ -1,4 +1,3 @@
-// Force restart
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
@@ -7,6 +6,7 @@ import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import logger from './config/logger';
 import { StructuredLogger, LogCategory } from './utils/structuredLogger';
+import compression from 'compression'; // Performance: Response compression
 
 const app = express();
 
@@ -28,6 +28,17 @@ app.use(session({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Performance: Enable gzip/deflate compression for all responses
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6 // Compression level (0-9, 6 is default balance)
+}));
 
 app.use((req, res, next) => {
   const start = Date.now();

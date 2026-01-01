@@ -11,6 +11,7 @@ import aiComprehensiveRouter from "./api/ai-comprehensive.js";
 import { sql } from "drizzle-orm";
 import { registerDaycareRoutes } from "./daycareRoutes.js";
 import express from "express"; // Added for express.Request type
+import { cacheService } from "./cache-service.js"; // Performance optimization: caching layer
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("🚀 Starting route registration...");
@@ -109,11 +110,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Comprehensive Dashboard Analytics
+  // Comprehensive Dashboard Analytics (WITH CACHING)
   app.get("/api/dashboard/analytics", async (req, res) => {
     try {
       const organizationId = await getOrganizationId(req);
+
+      // Check cache first
+      const cacheKey = cacheService.dashboardKey(organizationId);
+      const cachedData = cacheService.get<any>(cacheKey);
+
+      if (cachedData) {
+        console.log(`[Cache HIT] Dashboard analytics for org ${organizationId || 'global'}`);
+        return res.json(cachedData);
+      }
+
+      // Cache miss - fetch from database
+      console.log(`[Cache MISS] Dashboard analytics for org ${organizationId || 'global'} - fetching from DB...`);
       const analytics = await storage.getDashboardAnalytics(organizationId);
+
+      // Cache the result for 5 minutes (300 seconds)
+      cacheService.set(cacheKey, analytics, 300);
+
       res.json(analytics);
     } catch (error) {
       console.error("Dashboard analytics error:", error);

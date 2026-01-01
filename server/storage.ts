@@ -639,6 +639,13 @@ export class DatabaseStorage implements IStorage {
       const result = await db.insert(schema.leads).values(sanitizedData).returning();
       const lead = result[0];
 
+      // Performance: Invalidate relevant caches
+      if (lead.organizationId) {
+        cacheService.invalidateOrganization(lead.organizationId);
+      }
+      cacheService.invalidate('dashboard:*');
+      cacheService.invalidate('leads:*');
+
       // Try to create notification, but don't fail if it doesn't work
       try {
         await this.notifyChange(
