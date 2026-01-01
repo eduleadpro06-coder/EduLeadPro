@@ -32,7 +32,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     if (!username) return undefined;
 
-    const user = await storage.getUserByUsername(username);
+    // Try lookup by username
+    let user = await storage.getUserByUsername(username);
+
+    // Fallback: try lookup by email if username lookup failed (common if x-user-name is an email)
+    if (!user) {
+      user = await storage.getUserByEmail(username);
+    }
+
     return user?.organizationId || undefined;
   };
 
@@ -3551,19 +3558,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Active payroll total error:", error);
       res.status(500).json({ message: "Failed to fetch active staff payroll total" });
-    }
-  });
-
-  // Add this after existing expense routes
-
-  app.get("/api/expenses", async (req, res) => {
-    try {
-      const organizationId = await getOrganizationId(req);
-      const expenses = await storage.getAllExpenses(organizationId);
-      res.json(expenses);
-    } catch (error) {
-      console.error("Get expenses error:", error);
-      res.status(500).json({ message: "Failed to fetch expenses" });
     }
   });
 

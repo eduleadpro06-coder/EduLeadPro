@@ -18,7 +18,7 @@ export type LeadWithCounselor = Lead & {
 };
 
 export type ExpenseWithApprover = Expense & {
-  approver?: User;
+  approver?: any; // Decoupled from User type to avoid dependency
 };
 
 export type StaffWithDetails = Staff;
@@ -42,6 +42,7 @@ export interface IStorage {
   // Users
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, updates: Partial<User>): Promise<User | undefined>;
   getAllCounselors(): Promise<User[]>;
@@ -344,6 +345,21 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db.select({
+      id: schema.users.id,
+      username: schema.users.username,
+      password: schema.users.password,
+      role: schema.users.role,
+      name: schema.users.name,
+      email: schema.users.email,
+      organizationId: schema.users.organizationId,
+      createdAt: schema.users.createdAt,
+      updatedAt: schema.users.updatedAt
+    }).from(schema.users).where(eq(schema.users.email, email));
+    return result[0];
+  }
+
   async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
     const result = await db.update(schema.users).set({
       ...updates,
@@ -386,7 +402,8 @@ export class DatabaseStorage implements IStorage {
               password: "password123",
               role: "counselor",
               email: staffMember.email,
-              name: staffMember.name
+              name: staffMember.name,
+              organizationId: staffMember.organizationId
             } as InsertUser);
           } catch (err) {
             console.error(`[Auto-Sync] Failed to create user for ${staffMember.email}:`, err);
@@ -398,10 +415,10 @@ export class DatabaseStorage implements IStorage {
             console.log(`[Auto-Sync] Updating role to counselor for ${user.username}`);
             await db.update(schema.users).set({ role: "counselor" }).where(eq(schema.users.id, user.id));
           }
-          // Update name if missing
-          if (!user.name && staffMember.name) {
-            console.log(`[Auto-Sync] Updating name for ${user.username} to ${staffMember.name}`);
-            await db.update(schema.users).set({ name: staffMember.name }).where(eq(schema.users.id, user.id));
+          // Update organizationId if missing
+          if (!user.organizationId && staffMember.organizationId) {
+            console.log(`[Auto-Sync] Updating organizationId for ${user.username}`);
+            await db.update(schema.users).set({ organizationId: staffMember.organizationId }).where(eq(schema.users.id, user.id));
           }
         }
       }
@@ -1876,64 +1893,18 @@ export class DatabaseStorage implements IStorage {
 
   async getAllExpenses(organizationId?: number): Promise<ExpenseWithApprover[]> {
     let query = db
-      .select({
-        id: schema.expenses.id,
-        description: schema.expenses.description,
-        amount: schema.expenses.amount,
-        category: schema.expenses.category,
-        date: schema.expenses.date,
-        status: schema.expenses.status,
-        receiptUrl: schema.expenses.receiptUrl,
-        submittedBy: schema.expenses.submittedBy,
-        approvedBy: schema.expenses.approvedBy,
-        createdAt: schema.expenses.createdAt,
-        updatedAt: schema.expenses.updatedAt,
-        organizationId: schema.expenses.organizationId,
-        approverId: schema.users.id,
-        approverName: schema.users.name,
-        approverEmail: schema.users.email,
-        approverUsername: schema.users.username,
-        approverPassword: schema.users.password,
-        approverRole: schema.users.role,
-        approverCreatedAt: schema.users.createdAt,
-        approverUpdatedAt: schema.users.updatedAt,
-        approverOrganizationId: schema.users.organizationId
-      })
-      .from(schema.expenses)
-      .leftJoin(schema.users, eq(schema.expenses.approvedBy, schema.users.id));
+      .select()
+      .from(schema.expenses);
 
     if (organizationId) {
-      // TypeScript might complain about 'where' on a join result if not cast, or if method chaining is strict
-      // Using 'as any' for query builder flexibility if needed, or proper chaining
       query = query.where(eq(schema.expenses.organizationId, organizationId)) as any;
     }
 
     const result = await query.orderBy(desc(schema.expenses.date));
 
     return result.map(row => ({
-      id: row.id,
-      description: row.description,
-      amount: row.amount,
-      category: row.category,
-      date: row.date,
-      status: row.status,
-      receiptUrl: row.receiptUrl,
-      submittedBy: row.submittedBy,
-      approvedBy: row.approvedBy,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      organizationId: row.organizationId,
-      approver: row.approverId ? {
-        id: row.approverId,
-        name: row.approverName,
-        email: row.approverEmail,
-        username: row.approverUsername!,
-        password: row.approverPassword!,
-        role: row.approverRole!,
-        createdAt: row.approverCreatedAt!,
-        updatedAt: row.approverUpdatedAt!,
-        organizationId: row.approverOrganizationId
-      } : undefined
+      ...row,
+      approver: undefined // No longer joining with users table
     }));
   }
 

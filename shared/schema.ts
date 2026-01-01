@@ -126,8 +126,8 @@ export const expenses = pgTable("expenses", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   category: varchar("category", { length: 100 }).notNull(),
   date: date("date").notNull(),
-  submittedBy: integer("submitted_by").references(() => users.id),
-  approvedBy: integer("approved_by").references(() => users.id),
+  submittedBy: integer("submitted_by"),
+  approvedBy: integer("approved_by"),
   receiptUrl: varchar("receipt_url", { length: 500 }),
   status: varchar("status", { length: 20 }).default("pending"), // pending, approved, rejected
   organizationId: integer("organization_id").references(() => organizations.id),
