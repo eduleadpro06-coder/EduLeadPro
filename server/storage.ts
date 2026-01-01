@@ -1,4 +1,4 @@
-import { eq, and, ne, gte, lte, lt, sql, desc, or, isNull, isNotNull, not, asc } from "drizzle-orm";
+import { eq, and, ne, gte, lte, lt, sql, desc, or, isNull, isNotNull, not, asc, ilike } from "drizzle-orm";
 import { db } from "./db.js";
 import * as schema from "../shared/schema.js";
 import type {
@@ -341,7 +341,7 @@ export class DatabaseStorage implements IStorage {
       organizationId: schema.users.organizationId,
       createdAt: schema.users.createdAt,
       updatedAt: schema.users.updatedAt
-    }).from(schema.users).where(eq(schema.users.username, username));
+    }).from(schema.users).where(ilike(schema.users.username, username));
     return result[0];
   }
 
@@ -356,7 +356,7 @@ export class DatabaseStorage implements IStorage {
       organizationId: schema.users.organizationId,
       createdAt: schema.users.createdAt,
       updatedAt: schema.users.updatedAt
-    }).from(schema.users).where(eq(schema.users.email, email));
+    }).from(schema.users).where(ilike(schema.users.email, email));
     return result[0];
   }
 
@@ -374,13 +374,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllCounselors(organizationId?: number): Promise<User[]> {
-    let query = db.select().from(schema.users).where(eq(schema.users.role, "counselor"));
-
+    let conditions = [eq(schema.users.role, "counselor")];
     if (organizationId) {
-      query = query.where(and(eq(schema.users.role, "counselor"), eq(schema.users.organizationId, organizationId))) as any;
+      conditions.push(eq(schema.users.organizationId, organizationId));
     }
 
-    const users = await query;
+    const users = await db.select().from(schema.users).where(and(...conditions));
     return users.map(u => ({
       ...u,
       name: u.name || u.username

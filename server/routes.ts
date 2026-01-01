@@ -32,15 +32,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     if (!username) return undefined;
 
-    // Try lookup by username
-    let user = await storage.getUserByUsername(username);
+    // Normalization: trim whitespace
+    const identifier = username.trim();
+
+    // Try lookup by username (case-insensitive via ilike in storage)
+    let user = await storage.getUserByUsername(identifier);
 
     // Fallback: try lookup by email if username lookup failed (common if x-user-name is an email)
     if (!user) {
-      user = await storage.getUserByEmail(username);
+      user = await storage.getUserByEmail(identifier);
     }
 
-    return user?.organizationId || undefined;
+    if (!user) {
+      console.warn(`[Auth] No user found for identifier: "${identifier}"`);
+      return undefined;
+    }
+
+    if (!user.organizationId) {
+      console.warn(`[Auth] User "${identifier}" found (ID: ${user.id}) but has no organizationId assigned.`);
+    }
+
+    return user.organizationId || undefined;
   };
 
 
@@ -544,19 +556,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email required" });
       }
 
-      // Check if user already exists in our custom backend
-      let user = await storage.getUserByUsername(email);
+      // Normalization: trim and lower case for consistency
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Check if user already exists in our custom backend (check both columns)
+      let user = await storage.getUserByUsername(normalizedEmail);
+      if (!user) {
+        user = await storage.getUserByEmail(normalizedEmail);
+      }
 
       if (user && user.organizationId) {
         // User exists with organization
-        const org = await storage.getOrganization(user.organizationId || undefined);
+        const organizationId: number = user.organizationId;
+        const org = await storage.getOrganization(organizationId);
         // Set session
         (req.session as any).userId = user.id;
         (req.session as any).username = user.username;
 
         return res.json({
           userId: user.id,
-          organizationId: user.organizationId,
+          organizationId: organizationId,
           organizationName: org?.name || 'My Organization'
         });
       }
@@ -580,6 +599,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         slug: orgSlug,
         settings: {}
       });
+
+      const organizationId: number = newOrg.id; // Define organizationId here
 
       if (!user) {
         // Create user in custom backend
