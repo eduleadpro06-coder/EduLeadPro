@@ -4201,6 +4201,408 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
+  // =====================================================
+  // INVENTORY/STOCK MANAGEMENT FUNCTIONS
+  // =====================================================
+
+  // Inventory Categories
+  async getInventoryCategories(organizationId: number) {
+    return await db.select()
+      .from(schema.inventoryCategories)
+      .where(eq(schema.inventoryCategories.organizationId, organizationId))
+      .orderBy(schema.inventoryCategories.name);
+  }
+
+  async createInventoryCategory(category: schema.InsertInventoryCategory) {
+    const result = await db.insert(schema.inventoryCategories).values(category).returning();
+    return result[0];
+  }
+
+  async updateInventoryCategory(id: number, updates: Partial<schema.InventoryCategory>) {
+    const result = await db.update(schema.inventoryCategories)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.inventoryCategories.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteInventoryCategory(id: number) {
+    await db.delete(schema.inventoryCategories).where(eq(schema.inventoryCategories.id, id));
+    return true;
+  }
+
+  // Inventory Suppliers
+  async getInventorySuppliers(organizationId: number) {
+    return await db.select()
+      .from(schema.inventorySuppliers)
+      .where(eq(schema.inventorySuppliers.organizationId, organizationId))
+      .orderBy(schema.inventorySuppliers.name);
+  }
+
+  async createInventorySupplier(supplier: schema.InsertInventorySupplier) {
+    const result = await db.insert(schema.inventorySuppliers).values(supplier).returning();
+    return result[0];
+  }
+
+  async updateInventorySupplier(id: number, updates: Partial<schema.InventorySupplier>) {
+    const result = await db.update(schema.inventorySuppliers)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.inventorySuppliers.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteInventorySupplier(id: number) {
+    await db.delete(schema.inventorySuppliers).where(eq(schema.inventorySuppliers.id, id));
+    return true;
+  }
+
+  // Inventory Items - Main CRUD operations
+  async getInventoryItems(organizationId: number, filters?: {
+    categoryId?: number;
+    supplierId?: number;
+    searchTerm?: string;
+    isActive?: boolean;
+  }) {
+    let query = db.select({
+      item: schema.inventoryItems,
+      category: schema.inventoryCategories,
+      supplier: schema.inventorySuppliers
+    })
+      .from(schema.inventoryItems)
+      .leftJoin(schema.inventoryCategories, eq(schema.inventoryItems.categoryId, schema.inventoryCategories.id))
+      .leftJoin(schema.inventorySuppliers, eq(schema.inventoryItems.supplierId, schema.inventorySuppliers.id))
+      .where(eq(schema.inventoryItems.organizationId, organizationId));
+
+    // Apply filters
+    const conditions = [eq(schema.inventoryItems.organizationId, organizationId)];
+
+    if (filters?.categoryId) {
+      conditions.push(eq(schema.inventoryItems.categoryId, filters.categoryId));
+    }
+    if (filters?.supplierId) {
+      conditions.push(eq(schema.inventoryItems.supplierId, filters.supplierId));
+    }
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(schema.inventoryItems.isActive, filters.isActive));
+    }
+    if (filters?.searchTerm) {
+      conditions.push(
+        or(
+          ilike(schema.inventoryItems.name, `%${filters.searchTerm}%`),
+          ilike(schema.inventoryItems.itemCode, `%${filters.searchTerm}%`)
+        )
+      );
+    }
+
+    query = query.where(and(...conditions)) as any;
+    const results = await query.orderBy(schema.inventoryItems.name);
+
+    return results.map(({ item, category, supplier }) => ({
+      ...item,
+      category,
+      supplier
+    }));
+  }
+
+  async getInventoryItem(id: number, organizationId: number) {
+    const result = await db.select({
+      item: schema.inventoryItems,
+      category: schema.inventoryCategories,
+      supplier: schema.inventorySuppliers
+    })
+      .from(schema.inventoryItems)
+      .leftJoin(schema.inventoryCategories, eq(schema.inventoryItems.categoryId, schema.inventoryCategories.id))
+      .leftJoin(schema.inventorySuppliers, eq(schema.inventoryItems.supplierId, schema.inventorySuppliers.id))
+      .where(and(
+        eq(schema.inventoryItems.id, id),
+        eq(schema.inventoryItems.organizationId, organizationId)
+      ));
+
+    if (result.length === 0) return undefined;
+
+    const { item, category, supplier } = result[0];
+    return { ...item, category, supplier };
+  }
+
+  async createInventoryItem(item: schema.InsertInventoryItem) {
+    const result = await db.insert(schema.inventoryItems).values(item).returning();
+    return result[0];
+  }
+
+  async updateInventoryItem(id: number, updates: Partial<schema.InventoryItem>) {
+    const result = await db.update(schema.inventoryItems)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.inventoryItems.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteInventoryItem(id: number) {
+    await db.update(schema.inventoryItems)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(schema.inventoryItems.id, id));
+    return true;
+  }
+
+  // Stock Transactions - Complete audit trail
+  async createInventoryTransaction(transaction: schema.InsertInventoryTransaction & { createExpense?: boolean; expenseCategory?: string }) {
+    const { createExpense, expenseCategory, ...txData } = transaction;
+
+    // Start a transaction to ensure atomic operations
+    const result = await db.transaction(async (tx) => {
+      // Create the inventory transaction
+      const [inventoryTx] = await tx.insert(schema.inventoryTransactions).values(txData).returning();
+
+      // Update item stock level
+      await tx.update(schema.inventoryItems)
+        .set({
+          currentStock: inventoryTx.stockAfter,
+          updatedAt: new Date()
+        })
+        .where(eq(schema.inventoryItems.id, inventoryTx.itemId));
+
+      // Check for low stock and create alert if necessary
+      const [item] = await tx.select()
+        .from(schema.inventoryItems)
+        .where(eq(schema.inventoryItems.id, inventoryTx.itemId));
+
+      if (item && item.minimumStock && inventoryTx.stockAfter < item.minimumStock) {
+        // Check if there's already an unresolved alert
+        const existingAlerts = await tx.select()
+          .from(schema.lowStockAlerts)
+          .where(and(
+            eq(schema.lowStockAlerts.itemId, item.id),
+            eq(schema.lowStockAlerts.isResolved, false)
+          ));
+
+        if (existingAlerts.length === 0) {
+          await tx.insert(schema.lowStockAlerts).values({
+            itemId: item.id,
+            currentStock: inventoryTx.stockAfter,
+            minimumStock: item.minimumStock
+          });
+        }
+      }
+
+      // Create expense record if requested (for purchases)
+      if (createExpense && inventoryTx.transactionType === 'in' && inventoryTx.totalCost) {
+        const [expense] = await tx.insert(schema.expenses).values({
+          description: `Purchase: ${item?.name || inventoryTx.reference || 'Inventory Item'}`,
+          amount: inventoryTx.totalCost,
+          category: expenseCategory || 'School Supplies',
+          date: new Date().toISOString().split('T')[0],
+          status: 'pending',
+          inventoryItemId: inventoryTx.itemId,
+          organizationId: item?.organizationId
+        }).returning();
+
+        // Link expense to transaction
+        await tx.update(schema.inventoryTransactions)
+          .set({ expenseId: expense.id })
+          .where(eq(schema.inventoryTransactions.id, inventoryTx.id));
+
+        return { ...inventoryTx, expenseId: expense.id };
+      }
+
+      return inventoryTx;
+    });
+
+    return result;
+  }
+
+  async getInventoryTransactions(organizationId: number, filters?: {
+    itemId?: number;
+    transactionType?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }) {
+    let conditions = [];
+
+    // We need to filter by organization through the item
+    const query = db.select({
+      transaction: schema.inventoryTransactions,
+      item: schema.inventoryItems,
+      user: schema.users
+    })
+      .from(schema.inventoryTransactions)
+      .innerJoin(schema.inventoryItems, eq(schema.inventoryTransactions.itemId, schema.inventoryItems.id))
+      .leftJoin(schema.users, eq(schema.inventoryTransactions.userId, schema.users.id))
+      .where(eq(schema.inventoryItems.organizationId, organizationId));
+
+    if (filters?.itemId) {
+      conditions.push(eq(schema.inventoryTransactions.itemId, filters.itemId));
+    }
+    if (filters?.transactionType) {
+      conditions.push(eq(schema.inventoryTransactions.transactionType, filters.transactionType));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(schema.inventoryTransactions.transactionDate, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(schema.inventoryTransactions.transactionDate, filters.endDate));
+    }
+
+    const finalQuery = conditions.length > 0
+      ? query.where(and(eq(schema.inventoryItems.organizationId, organizationId), ...conditions))
+      : query;
+
+    const results = await finalQuery.orderBy(desc(schema.inventoryTransactions.transactionDate));
+
+    return results.map(({ transaction, item, user }) => ({
+      ...transaction,
+      item,
+      user
+    }));
+  }
+
+  async getItemTransactionHistory(itemId: number, organizationId: number) {
+    const results = await db.select({
+      transaction: schema.inventoryTransactions,
+      user: schema.users
+    })
+      .from(schema.inventoryTransactions)
+      .innerJoin(schema.inventoryItems, eq(schema.inventoryTransactions.itemId, schema.inventoryItems.id))
+      .leftJoin(schema.users, eq(schema.inventoryTransactions.userId, schema.users.id))
+      .where(and(
+        eq(schema.inventoryTransactions.itemId, itemId),
+        eq(schema.inventoryItems.organizationId, organizationId)
+      ))
+      .orderBy(desc(schema.inventoryTransactions.transactionDate));
+
+    return results.map(({ transaction, user }) => ({ ...transaction, user }));
+  }
+
+  // Low Stock Management
+  async getLowStockItems(organizationId: number) {
+    const results = await db.select({
+      item: schema.inventoryItems,
+      category: schema.inventoryCategories,
+      supplier: schema.inventorySuppliers,
+      alert: schema.lowStockAlerts
+    })
+      .from(schema.inventoryItems)
+      .innerJoin(schema.lowStockAlerts, eq(schema.inventoryItems.id, schema.lowStockAlerts.itemId))
+      .leftJoin(schema.inventoryCategories, eq(schema.inventoryItems.categoryId, schema.inventoryCategories.id))
+      .leftJoin(schema.inventorySuppliers, eq(schema.inventoryItems.supplierId, schema.inventorySuppliers.id))
+      .where(and(
+        eq(schema.inventoryItems.organizationId, organizationId),
+        eq(schema.lowStockAlerts.isResolved, false)
+      ))
+      .orderBy(schema.inventoryItems.name);
+
+    return results.map(({ item, category, supplier, alert }) => ({
+      ...item,
+      category,
+      supplier,
+      alert
+    }));
+  }
+
+  async resolveLowStockAlert(itemId: number) {
+    await db.update(schema.lowStockAlerts)
+      .set({ isResolved: true, resolvedAt: new Date() })
+      .where(eq(schema.lowStockAlerts.itemId, itemId));
+    return true;
+  }
+
+  // Expense Integration Functions
+  async getExpensesByInventoryItem(itemId: number, organizationId: number) {
+    return await db.select()
+      .from(schema.expenses)
+      .where(and(
+        eq(schema.expenses.inventoryItemId, itemId),
+        eq(schema.expenses.organizationId, organizationId)
+      ))
+      .orderBy(desc(schema.expenses.date));
+  }
+
+  async getInventoryRelatedExpenses(organizationId: number) {
+    return await db.select({
+      expense: schema.expenses,
+      item: schema.inventoryItems
+    })
+      .from(schema.expenses)
+      .leftJoin(schema.inventoryItems, eq(schema.expenses.inventoryItemId, schema.inventoryItems.id))
+      .where(and(
+        eq(schema.expenses.organizationId, organizationId),
+        isNotNull(schema.expenses.inventoryItemId)
+      ))
+      .orderBy(desc(schema.expenses.date));
+  }
+
+  // Analytics & Statistics
+  async getInventoryStats(organizationId: number) {
+    // Get all items
+    const items = await db.select()
+      .from(schema.inventoryItems)
+      .where(and(
+        eq(schema.inventoryItems.organizationId, organizationId),
+        eq(schema.inventoryItems.isActive, true)
+      ));
+
+    // Calculate total items
+    const totalItems = items.length;
+
+    // Calculate low stock count
+    const lowStockCount = items.filter(item =>
+      item.minimumStock && item.currentStock < item.minimumStock
+    ).length;
+
+    // Calculate total stock value
+    const totalValue = items.reduce((sum, item) => {
+      const cost = parseFloat(item.costPrice?.toString() || '0');
+      const stock = item.currentStock || 0;
+      return sum + (cost * stock);
+    }, 0);
+
+    // Get recent transactions count (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentTransactions = await db.select()
+      .from(schema.inventoryTransactions)
+      .innerJoin(schema.inventoryItems, eq(schema.inventoryTransactions.itemId, schema.inventoryItems.id))
+      .where(and(
+        eq(schema.inventoryItems.organizationId, organizationId),
+        gte(schema.inventoryTransactions.transactionDate, thirtyDaysAgo)
+      ));
+
+    return {
+      totalItems,
+      lowStockCount,
+      totalValue: totalValue.toFixed(2),
+      recentTransactionsCount: recentTransactions.length,
+      categories: await this.getInventoryCategories(organizationId),
+      suppliers: await this.getInventorySuppliers(organizationId)
+    };
+  }
+
+  async getStockValuation(organizationId: number) {
+    const items = await db.select()
+      .from(schema.inventoryItems)
+      .where(and(
+        eq(schema.inventoryItems.organizationId, organizationId),
+        eq(schema.inventoryItems.isActive, true)
+      ));
+
+    const valuation = items.map(item => ({
+      itemId: item.id,
+      itemName: item.name,
+      currentStock: item.currentStock,
+      costPrice: parseFloat(item.costPrice?.toString() || '0'),
+      totalValue: (item.currentStock || 0) * parseFloat(item.costPrice?.toString() || '0')
+    }));
+
+    const totalValue = valuation.reduce((sum, item) => sum + item.totalValue, 0);
+
+    return {
+      items: valuation,
+      totalValue: totalValue.toFixed(2),
+      generatedAt: new Date().toISOString()
+    };
+  }
+
 }
 
 // Initialize database with admin user and CSV data

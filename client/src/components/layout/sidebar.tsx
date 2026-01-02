@@ -12,6 +12,7 @@ import {
   Sparkles,
   Clock,
   Baby,
+  Package,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getActiveAIFeatures, getComingSoonFeatures, isAIFeaturePath } from "@/config/aiFeatures";
@@ -23,6 +24,7 @@ const navigation = [
   { name: "Student, Fees & EMI", href: "/student-fees", icon: IndianRupee },
   { name: "Daycare Management", href: "/daycare", icon: Baby },
   { name: "Employee Management", href: "/staff-ai", icon: UserCheck },
+  { name: "Stock Management", href: "/inventory", icon: Package },
   { name: "Expenses", href: "/expenses", icon: Wallet },
 ];
 

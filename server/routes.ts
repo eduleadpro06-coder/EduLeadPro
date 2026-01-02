@@ -3955,6 +3955,374 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // INVENTORY/STOCK MANAGEMENT ROUTES
+  // ============================================
+
+  // Get all inventory items with filters
+  app.get("/api/inventory/items", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const { categoryId, supplierId, search, isActive } = req.query;
+      const filters: any = {};
+
+      if (categoryId) filters.categoryId = Number(categoryId);
+      if (supplierId) filters.supplierId = Number(supplierId);
+      if (search) filters.searchTerm = search as string;
+      if (isActive !== undefined) filters.isActive = isActive === 'true';
+
+      const items = await storage.getInventoryItems(organizationId, filters);
+      res.json(items);
+    } catch (error) {
+      console.error("Failed to fetch inventory items:", error);
+      res.status(500).json({ message: "Failed to fetch inventory items" });
+    }
+  });
+
+  // Get single inventory item
+  app.get("/api/inventory/items/:id", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const item = await storage.getInventoryItem(Number(req.params.id), organizationId);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      console.error("Failed to fetch inventory item:", error);
+      res.status(500).json({ message: "Failed to fetch inventory item" });
+    }
+  });
+
+  // Create inventory item
+  app.post("/api/inventory/items", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const item = await storage.createInventoryItem({
+        ...req.body,
+        organizationId
+      });
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Failed to create inventory item:", error);
+      res.status(500).json({ message: "Failed to create inventory item" });
+    }
+  });
+
+  // Update inventory item
+  app.put("/api/inventory/items/:id", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const item = await storage.updateInventoryItem(Number(req.params.id), req.body);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      console.error("Failed to update inventory item:", error);
+      res.status(500).json({ message: "Failed to update inventory item" });
+    }
+  });
+
+  // Delete inventory item (soft delete)
+  app.delete("/api/inventory/items/:id", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      await storage.deleteInventoryItem(Number(req.params.id));
+      res.json({ message: "Item deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete inventory item:", error);
+      res.status(500).json({ message: "Failed to delete inventory item" });
+    }
+  });
+
+  // Get inventory categories
+  app.get("/api/inventory/categories", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const categories = await storage.getInventoryCategories(organizationId);
+      res.json(categories);
+    } catch (error) {
+      console.error("Failed to fetch categories:", error);
+      res.status(500).json({ message: "Failed to fetch categories" });
+    }
+  });
+
+  // Create inventory category
+  app.post("/api/inventory/categories", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const category = await storage.createInventoryCategory({
+        ...req.body,
+        organizationId
+      });
+      res.status(201).json(category);
+    } catch (error) {
+      console.error("Failed to create category:", error);
+      res.status(500).json({ message: "Failed to create category" });
+    }
+  });
+
+  // Update inventory category
+  app.put("/api/inventory/categories/:id", async (req, res) => {
+    try {
+      const category = await storage.updateInventoryCategory(Number(req.params.id), req.body);
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error("Failed to update category:", error);
+      res.status(500).json({ message: "Failed to update category" });
+    }
+  });
+
+  // Delete inventory category
+  app.delete("/api/inventory/categories/:id", async (req, res) => {
+    try {
+      await storage.deleteInventoryCategory(Number(req.params.id));
+      res.json({ message: "Category deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete category:", error);
+      res.status(500).json({ message: "Failed to delete category" });
+    }
+  });
+
+  // Get inventory suppliers
+  app.get("/api/inventory/suppliers", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const suppliers = await storage.getInventorySuppliers(organizationId);
+      res.json(suppliers);
+    } catch (error) {
+      console.error("Failed to fetch suppliers:", error);
+      res.status(500).json({ message: "Failed to fetch suppliers" });
+    }
+  });
+
+  // Create inventory supplier
+  app.post("/api/inventory/suppliers", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const supplier = await storage.createInventorySupplier({
+        ...req.body,
+        organizationId
+      });
+      res.status(201).json(supplier);
+    } catch (error) {
+      console.error("Failed to create supplier:", error);
+      res.status(500).json({ message: "Failed to create supplier" });
+    }
+  });
+
+  // Update inventory supplier
+  app.put("/api/inventory/suppliers/:id", async (req, res) => {
+    try {
+      const supplier = await storage.updateInventorySupplier(Number(req.params.id), req.body);
+      if (!supplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+      res.json(supplier);
+    } catch (error) {
+      console.error("Failed to update supplier:", error);
+      res.status(500).json({ message: "Failed to update supplier" });
+    }
+  });
+
+  // Delete inventory supplier
+  app.delete("/api/inventory/suppliers/:id", async (req, res) => {
+    try {
+      await storage.deleteInventorySupplier(Number(req.params.id));
+      res.json({ message: "Supplier deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete supplier:", error);
+      res.status(500).json({ message: "Failed to delete supplier" });
+    }
+  });
+
+  // Get inventory transactions
+  app.get("/api/inventory/transactions", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const { itemId, type, startDate, endDate } = req.query;
+      const filters: any = {};
+
+      if (itemId) filters.itemId = Number(itemId);
+      if (type) filters.transactionType = type as string;
+      if (startDate) filters.startDate = new Date(startDate as string);
+      if (endDate) filters.endDate = new Date(endDate as string);
+
+      const transactions = await storage.getInventoryTransactions(organizationId, filters);
+      res.json(transactions);
+    } catch (error) {
+      console.error("Failed to fetch transactions:", error);
+      res.status(500).json({ message: "Failed to fetch transactions" });
+    }
+  });
+
+  // Create inventory transaction (stock in/out)
+  app.post("/api/inventory/transactions", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      // Get current user for userId
+      const username = req.headers['x-user-name'] as string || (req.session as any)?.username;
+      let userId;
+      if (username) {
+        const user = await storage.getUserByUsername(username) || await storage.getUserByEmail(username);
+        userId = user?.id;
+      }
+
+      const transaction = await storage.createInventoryTransaction({
+        ...req.body,
+        userId
+      });
+      res.status(201).json(transaction);
+    } catch (error) {
+      console.error("Failed to create transaction:", error);
+      res.status(500).json({ message: "Failed to create transaction" });
+    }
+  });
+
+  // Get transaction history for specific item
+  app.get("/api/inventory/items/:id/transactions", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const transactions = await storage.getItemTransactionHistory(Number(req.params.id), organizationId);
+      res.json(transactions);
+    } catch (error) {
+      console.error("Failed to fetch item transactions:", error);
+      res.status(500).json({ message: "Failed to fetch item transactions" });
+    }
+  });
+
+  // Get low stock items
+  app.get("/api/inventory/low-stock", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const items = await storage.getLowStockItems(organizationId);
+      res.json(items);
+    } catch (error) {
+      console.error("Failed to fetch low stock items:", error);
+      res.status(500).json({ message: "Failed to fetch low stock items" });
+    }
+  });
+
+  // Get inventory statistics
+  app.get("/api/inventory/stats", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const stats = await storage.getInventoryStats(organizationId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Failed to fetch inventory stats:", error);
+      res.status(500).json({ message: "Failed to fetch inventory stats" });
+    }
+  });
+
+  // Get stock valuation report
+  app.get("/api/inventory/valuation", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const valuation = await storage.getStockValuation(organizationId);
+      res.json(valuation);
+    } catch (error) {
+      console.error("Failed to fetch stock valuation:", error);
+      res.status(500).json({ message: "Failed to fetch stock valuation" });
+    }
+  });
+
+  // Get expenses for specific inventory item
+  app.get("/api/inventory/items/:id/expenses", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const expenses = await storage.getExpensesByInventoryItem(Number(req.params.id), organizationId);
+      res.json(expenses);
+    } catch (error) {
+      console.error("Failed to fetch item expenses:", error);
+      res.status(500).json({ message: "Failed to fetch item expenses" });
+    }
+  });
+
+  // Get all inventory-related expenses
+  app.get("/api/inventory/expenses", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const expenses = await storage.getInventoryRelatedExpenses(organizationId);
+      res.json(expenses);
+    } catch (error) {
+      console.error("Failed to fetch inventory expenses:", error);
+      res.status(500).json({ message: "Failed to fetch inventory expenses" });
+    }
+  });
+
+  // ============================================
   // DAYCARE MANAGEMENT ROUTES
   // ============================================
   registerDaycareRoutes(app);

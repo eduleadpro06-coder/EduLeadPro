@@ -130,6 +130,7 @@ export const expenses = pgTable("expenses", {
   approvedBy: integer("approved_by"),
   receiptUrl: varchar("receipt_url", { length: 500 }),
   status: varchar("status", { length: 20 }).default("pending"), // pending, approved, rejected
+  inventoryItemId: integer("inventory_item_id"), // Link to inventory purchases - will add reference after inventory tables are defined
   organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -912,3 +913,144 @@ export type DaycareInquiryWithFollowups = DaycareInquiry & {
   assignedUser?: User;
 };
 
+// =====================================================
+// INVENTORY/STOCK MANAGEMENT SYSTEM
+// =====================================================
+
+// 1. Inventory Categories - Organize items by categories
+export const inventoryCategories = pgTable("inventory_categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 20 }), // For UI color coding (e.g., "#8b5cf6")
+  organizationId: integer("organization_id").references(() => organizations.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 2. Inventory Suppliers - Vendor/Supplier information
+export const inventorySuppliers = pgTable("inventory_suppliers", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  contactPerson: varchar("contact_person", { length: 100 }),
+  email: varchar("email", { length: 255 }),
+  phone: varchar("phone", { length: 20 }),
+  address: text("address"),
+  notes: text("notes"),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 3. Inventory Items - Main inventory items table
+export const inventoryItems = pgTable("inventory_items", {
+  id: serial("id").primaryKey(),
+  itemCode: varchar("item_code", { length: 50 }), // SKU/Barcode
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  categoryId: integer("category_id").references(() => inventoryCategories.id),
+
+  // Stock information
+  currentStock: integer("current_stock").default(0).notNull(),
+  minimumStock: integer("minimum_stock").default(0), // For low stock alerts
+  unit: varchar("unit", { length: 50 }), // kg, pieces, liters, boxes, etc.
+
+  // Pricing
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }), // Purchase/cost price
+  sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }), // Optional selling price
+
+  // Supplier
+  supplierId: integer("supplier_id").references(() => inventorySuppliers.id),
+
+  // Additional fields
+  location: varchar("location", { length: 100 }), // Storage location/shelf
+  imageUrl: text("image_url"),
+  notes: text("notes"),
+
+  // Status
+  isActive: boolean("is_active").default(true),
+
+  // Multi-tenant
+  organizationId: integer("organization_id").references(() => organizations.id),
+
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 4. Inventory Transactions - Track all stock movements (audit trail)
+export const inventoryTransactions = pgTable("inventory_transactions", {
+  id: serial("id").primaryKey(),
+  itemId: integer("item_id").references(() => inventoryItems.id).notNull(),
+  transactionType: varchar("transaction_type", { length: 20 }).notNull(), // 'in' or 'out'
+  quantity: integer("quantity").notNull(),
+
+  // Before and after stock levels for audit trail
+  stockBefore: integer("stock_before").notNull(),
+  stockAfter: integer("stock_after").notNull(),
+
+  // Transaction details
+  reason: varchar("reason", { length: 100 }), // purchase, sale, damage, adjustment, return, etc.
+  reference: varchar("reference", { length: 100 }), // Bill no, order no, etc.
+  notes: text("notes"),
+
+  // Pricing for this transaction
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }),
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }),
+
+  // Expense integration - link to expense record
+  expenseId: integer("expense_id").references(() => expenses.id),
+  leadId: integer("lead_id").references(() => leads.id), // Link to lead for sales (e.g., selling books to parents)
+
+  // User tracking
+  userId: integer("user_id").references(() => users.id),
+
+  // Timestamp
+  transactionDate: timestamp("transaction_date").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 5. Low Stock Alerts - Track when items fall below minimum stock
+export const lowStockAlerts = pgTable("low_stock_alerts", {
+  id: serial("id").primaryKey(),
+  itemId: integer("item_id").references(() => inventoryItems.id).notNull(),
+  alertDate: timestamp("alert_date").defaultNow().notNull(),
+  currentStock: integer("current_stock").notNull(),
+  minimumStock: integer("minimum_stock").notNull(),
+  isResolved: boolean("is_resolved").default(false),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Insert Schemas for Inventory
+export const insertInventoryCategorySchema = createInsertSchema(inventoryCategories).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInventorySupplierSchema = createInsertSchema(inventorySuppliers).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInventoryItemSchema = createInsertSchema(inventoryItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInventoryTransactionSchema = createInsertSchema(inventoryTransactions).omit({ id: true, createdAt: true });
+export const insertLowStockAlertSchema = createInsertSchema(lowStockAlerts).omit({ id: true, createdAt: true });
+
+// Types for Inventory
+export type InventoryCategory = typeof inventoryCategories.$inferSelect;
+export type InventorySupplier = typeof inventorySuppliers.$inferSelect;
+export type InventoryItem = typeof inventoryItems.$inferSelect;
+export type InventoryTransaction = typeof inventoryTransactions.$inferSelect;
+export type LowStockAlert = typeof lowStockAlerts.$inferSelect;
+
+export type InsertInventoryCategory = z.infer<typeof insertInventoryCategorySchema>;
+export type InsertInventorySupplier = z.infer<typeof insertInventorySupplierSchema>;
+export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
+export type InsertInventoryTransaction = z.infer<typeof insertInventoryTransactionSchema>;
+export type InsertLowStockAlert = z.infer<typeof insertLowStockAlertSchema>;
+
+// Complex types for joins
+export type InventoryItemWithDetails = InventoryItem & {
+  category?: InventoryCategory;
+  supplier?: InventorySupplier;
+  transactions?: InventoryTransaction[];
+  totalExpenses?: number;
+};
+
+export type InventoryTransactionWithItem = InventoryTransaction & {
+  item: InventoryItem;
+  user?: User;
+};
