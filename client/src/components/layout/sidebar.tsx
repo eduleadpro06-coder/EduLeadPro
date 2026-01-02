@@ -60,6 +60,28 @@ export default function Sidebar() {
     }
   }, [location]);
 
+  // Feature flag for AI features
+  const [showAIFeatures, setShowAIFeatures] = useState(() => {
+    return localStorage.getItem("showAIFeatures") === "true";
+  });
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Ctrl + Shift + A
+      if (event.ctrlKey && event.shiftKey && (event.key === 'a' || event.key === 'A')) {
+        event.preventDefault();
+        setShowAIFeatures(prev => {
+          const newValue = !prev;
+          localStorage.setItem("showAIFeatures", String(newValue));
+          return newValue;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem("user");
     window.location.href = "/landing";
@@ -123,91 +145,93 @@ export default function Sidebar() {
             })}
 
             {/* AI Features Section */}
-            <div className="mt-4">
-              <div
-                onClick={() => setIsAIExpanded(!isAIExpanded)}
-                className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer group hover:bg-gray-100`}
-              >
-                <div className="flex items-center space-x-3">
+            {showAIFeatures && (
+              <div className="mt-4">
+                <div
+                  onClick={() => setIsAIExpanded(!isAIExpanded)}
+                  className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer group hover:bg-gray-100`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="text-gray-500 group-hover:text-purple-600">
+                      <Sparkles size={18} />
+                    </span>
+                    <span className="font-medium text-sm text-gray-600 group-hover:text-purple-600">
+                      AI Features
+                    </span>
+                  </div>
                   <span className="text-gray-500 group-hover:text-purple-600">
-                    <Sparkles size={18} />
-                  </span>
-                  <span className="font-medium text-sm text-gray-600 group-hover:text-purple-600">
-                    AI Features
+                    {isAIExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   </span>
                 </div>
-                <span className="text-gray-500 group-hover:text-purple-600">
-                  {isAIExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                </span>
-              </div>
 
-              {/* AI Features Submenu */}
-              <div className={`overflow-hidden transition-all duration-300 ${isAIExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                <div className="ml-6 mt-2 space-y-1">
-                  {/* Active AI Features */}
-                  {activeAIFeatures.map((feature) => {
-                    const isActive = location === feature.href;
-                    const Icon = feature.icon;
-                    return (
-                      <Link key={feature.id} href={feature.href}>
-                        <div
-                          className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer relative group
-                            ${isActive ? 'bg-purple-50 border-l-4 border-[#a259ff]' : 'hover:bg-gray-100 hover:text-purple-600'}
-                          `}
-                        >
-                          <span className={isActive ? 'text-[#a259ff]' : 'text-gray-500 group-hover:text-purple-600'}>
-                            <Icon size={16} />
-                          </span>
-                          <div className="flex-1">
-                            <span className={`font-medium text-sm ${isActive ? 'text-[#a259ff]' : 'text-gray-600 group-hover:text-purple-600'}`}>
-                              {feature.name}
-                            </span>
-                            <div className={`text-xs ${isActive ? 'text-[#a259ff]/70' : 'text-gray-500 group-hover:text-purple-600/70'}`}>
-                              {feature.description}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-
-                  {/* Coming Soon Features */}
-                  {comingSoonFeatures.length > 0 && (
-                    <>
-                      <div className="px-3 py-2 mt-3">
-                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Coming Soon
-                        </div>
-                      </div>
-                      {comingSoonFeatures.map((feature) => {
-                        const Icon = feature.icon;
-                        return (
+                {/* AI Features Submenu */}
+                <div className={`overflow-hidden transition-all duration-300 ${isAIExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="ml-6 mt-2 space-y-1">
+                    {/* Active AI Features */}
+                    {activeAIFeatures.map((feature) => {
+                      const isActive = location === feature.href;
+                      const Icon = feature.icon;
+                      return (
+                        <Link key={feature.id} href={feature.href}>
                           <div
-                            key={feature.id}
-                            className="flex items-center space-x-3 px-3 py-2 rounded-lg opacity-60 cursor-not-allowed"
+                            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer relative group
+                              ${isActive ? 'bg-purple-50 border-l-4 border-[#a259ff]' : 'hover:bg-gray-100 hover:text-purple-600'}
+                            `}
                           >
-                            <span className="text-gray-400">
+                            <span className={isActive ? 'text-[#a259ff]' : 'text-gray-500 group-hover:text-purple-600'}>
                               <Icon size={16} />
                             </span>
                             <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-sm text-gray-400">
-                                  {feature.name}
-                                </span>
-                                <Clock size={12} className="text-gray-400" />
-                              </div>
-                              <div className="text-xs text-gray-400">
+                              <span className={`font-medium text-sm ${isActive ? 'text-[#a259ff]' : 'text-gray-600 group-hover:text-purple-600'}`}>
+                                {feature.name}
+                              </span>
+                              <div className={`text-xs ${isActive ? 'text-[#a259ff]/70' : 'text-gray-500 group-hover:text-purple-600/70'}`}>
                                 {feature.description}
                               </div>
                             </div>
                           </div>
-                        );
-                      })}
-                    </>
-                  )}
+                        </Link>
+                      );
+                    })}
+
+                    {/* Coming Soon Features */}
+                    {comingSoonFeatures.length > 0 && (
+                      <>
+                        <div className="px-3 py-2 mt-3">
+                          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Coming Soon
+                          </div>
+                        </div>
+                        {comingSoonFeatures.map((feature) => {
+                          const Icon = feature.icon;
+                          return (
+                            <div
+                              key={feature.id}
+                              className="flex items-center space-x-3 px-3 py-2 rounded-lg opacity-60 cursor-not-allowed"
+                            >
+                              <span className="text-gray-400">
+                                <Icon size={16} />
+                              </span>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-sm text-gray-400">
+                                    {feature.name}
+                                  </span>
+                                  <Clock size={12} className="text-gray-400" />
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  {feature.description}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Divider after AI Features */}
             <div className="my-2 border-t border-gray-200 mx-2"></div>
