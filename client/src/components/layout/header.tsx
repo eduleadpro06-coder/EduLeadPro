@@ -74,7 +74,6 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
                       {user?.organizationName && (
                         <p className="text-xs text-purple-600 font-medium">{user.organizationName}</p>
                       )}
-                      <p className="text-xs text-muted-foreground">{user?.id?.slice(0, 8)}</p>
                     </div>
                   </div>
                 </div>
@@ -90,18 +89,6 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
                   >
                     <User size={14} className="mr-2" />
                     Profile Settings
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      setLocation("/settings");
-                      setShowProfileDropdown(false);
-                    }}
-                  >
-                    <Settings size={14} className="mr-2" />
-                    Account Settings
                   </Button>
                   <div className="border-t border-gray-200 my-1"></div>
                   <Button

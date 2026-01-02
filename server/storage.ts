@@ -45,7 +45,9 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, updates: Partial<User>): Promise<User | undefined>;
+  updateUserNotificationPreferences(id: number, preferences: any): Promise<User | undefined>;
   getAllCounselors(): Promise<User[]>;
+
 
   // Leads
   getLead(id: number): Promise<LeadWithCounselor | undefined>;
@@ -370,6 +372,14 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const result = await db.insert(schema.users).values(insertUser).returning();
+    return result[0];
+  }
+
+  async updateUserNotificationPreferences(id: number, preferences: any): Promise<User | undefined> {
+    const result = await db.update(schema.users).set({
+      notificationPreferences: preferences,
+      updatedAt: new Date()
+    }).where(eq(schema.users.id, id)).returning();
     return result[0];
   }
 

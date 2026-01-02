@@ -9,6 +9,7 @@ export type AuthUser = {
   avatarUrl?: string | null
   organizationId?: number | null
   organizationName?: string | null
+  role?: string | null
 }
 
 type AuthContextValue = {
@@ -144,7 +145,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   displayName: sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || sessionUser.user_metadata?.display_name || sessionUser.user_metadata?.preferred_username || null,
                   avatarUrl: sessionUser.user_metadata?.avatar_url || null,
                   organizationId: userData.organizationId,
-                  organizationName: userData.organizationName
+                  organizationName: userData.organizationName,
+                  role: userData.role || null
                 });
 
                 // Store in localStorage
@@ -153,7 +155,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   email: sessionUser.email,
                   displayName: sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name,
                   organizationId: userData.organizationId,
-                  organizationName: userData.organizationName
+                  organizationName: userData.organizationName,
+                  role: userData.role
                 }));
 
                 console.log('Successfully set user with organization:', userData.organizationName);
@@ -268,7 +271,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: data.user.email,
             displayName: data.user.username,
             organizationId: data.user.organizationId,
-            organizationName: data.user.organizationName
+            organizationName: data.user.organizationName,
+            role: data.user.role
           };
 
           localStorage.setItem('auth_user', JSON.stringify(userData));
@@ -375,7 +379,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: data.user.email,
             displayName: data.user.username,
             organizationId: data.user.organizationId,
-            organizationName: data.user.organizationName
+            organizationName: data.user.organizationName,
+            role: data.user.role
           };
 
           localStorage.setItem('auth_user', JSON.stringify(userData));

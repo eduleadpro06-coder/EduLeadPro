@@ -215,28 +215,28 @@ export default function MessageTemplatesManager() {
 
     return (
         <div className="space-y-6">
-            <Card>
+            <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <div>
-                        <CardTitle>Message Templates</CardTitle>
+                        <CardTitle className="text-2xl">Message Templates</CardTitle>
                         <CardDescription>
                             Manage templates for WhatsApp, Email, and SMS communications
                         </CardDescription>
                     </div>
-                    <Button onClick={() => handleOpenModal()}>
+                    <Button onClick={() => handleOpenModal()} className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 shadow-lg">
                         <Plus className="mr-2 h-4 w-4" /> Add Template
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-md border">
+                    <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                         <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Display Name</TableHead>
-                                    <TableHead>Category</TableHead>
-                                    <TableHead>Content Preview</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                            <TableHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                                <TableRow className="hover:bg-transparent">
+                                    <TableHead className="font-semibold">Display Name</TableHead>
+                                    <TableHead className="font-semibold">Category</TableHead>
+                                    <TableHead className="font-semibold">Content Preview</TableHead>
+                                    <TableHead className="font-semibold">Status</TableHead>
+                                    <TableHead className="text-right font-semibold">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -254,11 +254,20 @@ export default function MessageTemplatesManager() {
                                     </TableRow>
                                 ) : (
                                     templates.map((template) => (
-                                        <TableRow key={template.id}>
+                                        <TableRow key={template.id} className="hover:bg-blue-50/50 transition-colors duration-200">
                                             <TableCell className="font-medium">{template.displayName}</TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className="capitalize">
-                                                    {template.category}
+                                                <Badge
+                                                    variant="outline"
+                                                    className={
+                                                        template.category === 'whatsapp'
+                                                            ? 'bg-green-50 text-green-700 border-green-200 font-medium'
+                                                            : template.category === 'email'
+                                                                ? 'bg-blue-50 text-blue-700 border-blue-200 font-medium'
+                                                                : 'bg-purple-50 text-purple-700 border-purple-200 font-medium'
+                                                    }
+                                                >
+                                                    {template.category === 'whatsapp' ? 'WhatsApp' : template.category === 'email' ? 'Email' : 'SMS'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="max-w-xs truncate" title={template.content}>
@@ -267,7 +276,7 @@ export default function MessageTemplatesManager() {
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
                                                     {template.isActive ? (
-                                                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                                                        <Badge className="bg-green-500 hover:bg-green-600">
                                                             Active
                                                         </Badge>
                                                     ) : (
@@ -281,6 +290,7 @@ export default function MessageTemplatesManager() {
                                                         variant="ghost"
                                                         size="icon"
                                                         onClick={() => handleOpenModal(template)}
+                                                        className="hover:bg-blue-100 transition-colors"
                                                     >
                                                         <Edit className="h-4 w-4" />
                                                     </Button>
@@ -289,6 +299,7 @@ export default function MessageTemplatesManager() {
                                                         size="icon"
                                                         title="Send Message using this template"
                                                         onClick={() => handleSendClick(template)}
+                                                        className="hover:bg-indigo-100 transition-colors"
                                                     >
                                                         <Send className="h-4 w-4" />
                                                     </Button>
@@ -296,7 +307,7 @@ export default function MessageTemplatesManager() {
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                            className="text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
                                                             onClick={() => handleDeleteClick(template)}
                                                         >
                                                             <Trash2 className="h-4 w-4" />

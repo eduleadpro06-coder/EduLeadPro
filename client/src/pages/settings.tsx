@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings as SettingsIcon, Bell, User, Shield, Database, Calculator, IndianRupee } from "lucide-react";
+import { Settings as SettingsIcon, Bell, User, Database, Calculator, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -19,6 +19,7 @@ import { CreditCard, Building, MessageSquare } from "lucide-react";
 import React from "react"; // Added for useEffect
 import MessageTemplatesManager from "@/components/settings/message-templates-manager";
 import { useOrganization } from "@/hooks/use-organization";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Define GlobalClassFee interface if not already imported
 interface GlobalClassFee {
@@ -33,27 +34,28 @@ interface GlobalClassFee {
 }
 
 export default function Settings() {
-  const [notifications, setNotifications] = useState({
-    emailAlerts: true,
-    overdueFollowups: true,
-    newLeads: false,
-    dailyReports: true,
-  });
+  const { user } = useAuth();
 
   const [profile, setProfile] = useState({
-    name: "Sarah Johnson",
-    email: "sarah.johnson@school.edu",
-    phone: "+1 (555) 123-4567",
-    role: "Admissions Head",
+    name: user?.displayName || "",
+    email: user?.email || "",
+    phone: "",
+    role: user?.role || "",
   });
 
-  const [systemSettings, setSystemSettings] = useState({
-    autoAssignment: true,
-    followupReminders: "24",
-    leadTimeout: "30",
-    workingHours: "9:00 AM - 6:00 PM",
-    customInstituteName: "",
-  });
+  // Update profile when user changes
+  React.useEffect(() => {
+    if (user) {
+      setProfile(prev => ({
+        ...prev,
+        name: user.displayName || prev.name,
+        email: user.email || prev.email,
+        role: user.role || prev.role,
+      }));
+    }
+  }, [user]);
+
+
 
   // --- Global Fee Management State & Logic ---
   const queryClient = useQueryClient();
@@ -190,195 +192,223 @@ export default function Settings() {
     window.location.hash = value;
   };
 
-  const handleSaveProfile = () => {
-    toast({
-      title: "Profile updated",
-      description: "Your profile settings have been saved successfully.",
-    });
+  const handleSaveProfile = async () => {
+    try {
+      // TODO: Implement profile update API endpoint
+      // For now, just show success toast
+      toast({
+        title: "Profile updated",
+        description: "Your profile settings have been saved successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update profile",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleSaveNotifications = () => {
-    toast({
-      title: "Notifications updated",
-      description: "Your notification preferences have been saved.",
-    });
-  };
+  // Query for notification preferences
+  const { data: notifications, isLoading: notificationsLoading } = useQuery({
+    queryKey: ["/api/user/notification-preferences"],
+    enabled: !!user,
+  });
 
-  const handleSaveSystem = () => {
-    // Save custom institute name to localStorage
-    localStorage.setItem("customInstituteName", systemSettings.customInstituteName);
+  // Mutation for updating notification preferences
+  const notificationMutation = useMutation({
+    mutationFn: async (prefs: any) => {
+      const response = await fetch("/api/user/notification-preferences", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-name": user?.email || "",
+        },
+        body: JSON.stringify({ preferences: prefs }),
+      });
+      if (!response.ok) throw new Error("Failed to update preferences");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/notification-preferences"] });
+      toast({
+        title: "Notifications updated",
+        description: "Your notification preferences have been saved.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update notification preferences",
+        variant: "destructive",
+      });
+    },
+  });
 
-    toast({
-      title: "System settings updated",
-      description: "System configuration has been saved successfully.",
-    });
-  };
+
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <Header />
 
-      <main className="p-6">
-        <Tabs value={selectedTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="profile" className="flex items-center gap-2">
+      <main className="p-6 max-w-7xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+          <p className="text-gray-600 mt-1">Manage your system configuration and preferences</p>
+        </div>
+
+        <Tabs value={selectedTab} onValueChange={handleTabChange} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm p-1.5 rounded-xl shadow-lg border border-gray-200/50">
+            <TabsTrigger value="profile" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white transition-all duration-300">
               <User className="h-4 w-4" />
               Profile
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <TabsTrigger value="notifications" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white transition-all duration-300">
               <Bell className="h-4 w-4" />
               Notifications
             </TabsTrigger>
-            <TabsTrigger value="system" className="flex items-center gap-2">
+            <TabsTrigger value="system" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white transition-all duration-300">
               <Database className="h-4 w-4" />
               System
             </TabsTrigger>
-            <TabsTrigger value="payroll" className="flex items-center gap-2">
-              <IndianRupee className="h-4 w-4" />
-              Payroll
-            </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Security
-            </TabsTrigger>
-            <TabsTrigger value="global-fees" className="flex items-center gap-2">
+
+
+            <TabsTrigger value="global-fees" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white transition-all duration-300">
               <Calculator className="h-4 w-4" />
               Global Fees
             </TabsTrigger>
-            <TabsTrigger value="templates" className="flex items-center gap-2">
+            <TabsTrigger value="templates" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white transition-all duration-300">
               <MessageSquare className="h-4 w-4" />
               Templates
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="profile">
-            <Card>
+          <TabsContent value="profile" className="animate-in fade-in-50 duration-300">
+            <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
               <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
+                <CardTitle className="text-2xl">Profile Information</CardTitle>
                 <CardDescription>
                   Update your personal information and contact details
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
+                    <Label htmlFor="name" className="text-sm font-semibold">Full Name</Label>
                     <Input
                       id="name"
                       value={profile.name}
                       onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                      className="transition-all focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email" className="text-sm font-semibold">Email</Label>
                     <Input
                       id="email"
                       type="email"
                       value={profile.email}
                       onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                      className="transition-all focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
+                    <Label htmlFor="phone" className="text-sm font-semibold">Phone</Label>
                     <Input
                       id="phone"
                       value={profile.phone}
                       onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                      className="transition-all focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="role">Role</Label>
+                    <Label htmlFor="role" className="text-sm font-semibold">Role</Label>
                     <Input
                       id="role"
                       value={profile.role}
                       disabled
+                      className="bg-gray-100"
                     />
                   </div>
                 </div>
-                <Button onClick={handleSaveProfile}>Save Profile</Button>
+                <Button onClick={handleSaveProfile} className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 transition-all duration-300">
+                  Save Profile
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="notifications">
-            <Card>
+
+          <TabsContent value="notifications" className="animate-in fade-in-50 duration-300">
+            <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
               <CardHeader>
-                <CardTitle>Notification Preferences</CardTitle>
+                <CardTitle className="text-2xl">Notification Preferences</CardTitle>
                 <CardDescription>
                   Configure how you want to receive notifications
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>Email Alerts</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive important updates via email
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.emailAlerts}
-                    onCheckedChange={(checked) =>
-                      setNotifications({ ...notifications, emailAlerts: checked })
-                    }
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>Overdue Follow-ups</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified about overdue follow-up tasks
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.overdueFollowups}
-                    onCheckedChange={(checked) =>
-                      setNotifications({ ...notifications, overdueFollowups: checked })
-                    }
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>New Lead Notifications</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Instant notifications for new leads
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.newLeads}
-                    onCheckedChange={(checked) =>
-                      setNotifications({ ...notifications, newLeads: checked })
-                    }
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>Daily Reports</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive daily summary reports
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.dailyReports}
-                    onCheckedChange={(checked) =>
-                      setNotifications({ ...notifications, dailyReports: checked })
-                    }
-                  />
-                </div>
-                <Button onClick={handleSaveNotifications}>Save Preferences</Button>
+                {notificationsLoading ? (
+                  <div className="text-center py-4">Loading preferences...</div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-300">
+                      <div className="space-y-1">
+                        <Label className="text-base font-semibold">Overdue Follow-ups</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Get notified about overdue follow-up tasks
+                        </p>
+                      </div>
+                      <Switch
+                        checked={notifications?.overdueFollowups ?? true}
+                        onCheckedChange={(checked) =>
+                          notificationMutation.mutate({ ...(notifications || {}), overdueFollowups: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-300">
+                      <div className="space-y-1">
+                        <Label className="text-base font-semibold">New Lead Notifications</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Instant notifications for new leads
+                        </p>
+                      </div>
+                      <Switch
+                        checked={notifications?.newLeads ?? false}
+                        onCheckedChange={(checked) =>
+                          notificationMutation.mutate({ ...(notifications || {}), newLeads: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-300">
+                      <div className="space-y-1">
+                        <Label className="text-base font-semibold">Daily Reports</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Receive daily summary reports
+                        </p>
+                      </div>
+                      <Switch
+                        checked={notifications?.dailyReports ?? true}
+                        onCheckedChange={(checked) =>
+                          notificationMutation.mutate({ ...(notifications || {}), dailyReports: checked })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="system">
-            <Card>
+          <TabsContent value="system" className="space-y-6 animate-in fade-in-50 duration-300">
+            <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
               <CardHeader>
-                <CardTitle>System Configuration</CardTitle>
+                <CardTitle className="text-2xl">System Configuration</CardTitle>
                 <CardDescription>
                   Configure system-wide settings and automation
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <Label>Auto-assign New Leads</Label>
@@ -387,19 +417,21 @@ export default function Settings() {
                     </p>
                   </div>
                   <Switch
-                    checked={systemSettings.autoAssignment}
+                    checked={organizationSettings?.autoAssignment ?? true}
                     onCheckedChange={(checked) =>
-                      setSystemSettings({ ...systemSettings, autoAssignment: checked })
+                      updateSettings({ ...organizationSettings, autoAssignment: checked })
                     }
+                    disabled={isUpdatingSettings}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="followup-reminder">Follow-up Reminder (hours)</Label>
                   <Select
-                    value={systemSettings.followupReminders}
+                    value={organizationSettings?.followupReminders || "24"}
                     onValueChange={(value) =>
-                      setSystemSettings({ ...systemSettings, followupReminders: value })
+                      updateSettings({ ...organizationSettings, followupReminders: value })
                     }
+                    disabled={isUpdatingSettings}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -415,10 +447,11 @@ export default function Settings() {
                 <div className="space-y-2">
                   <Label htmlFor="lead-timeout">Lead Timeout (days)</Label>
                   <Select
-                    value={systemSettings.leadTimeout}
+                    value={organizationSettings?.leadTimeout || "30"}
                     onValueChange={(value) =>
-                      setSystemSettings({ ...systemSettings, leadTimeout: value })
+                      updateSettings({ ...organizationSettings, leadTimeout: value })
                     }
+                    disabled={isUpdatingSettings}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -435,32 +468,20 @@ export default function Settings() {
                   <Label htmlFor="working-hours">Working Hours</Label>
                   <Input
                     id="working-hours"
-                    value={systemSettings.workingHours}
+                    value={organizationSettings?.workingHours || "9:00 AM - 6:00 PM"}
                     onChange={(e) =>
-                      setSystemSettings({ ...systemSettings, workingHours: e.target.value })
+                      updateSettings({ ...organizationSettings, workingHours: e.target.value })
                     }
+                    disabled={isUpdatingSettings}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="custom-institute-name" className="text-base font-semibold">Institute Name</Label>
-                  <Input
-                    id="custom-institute-name"
-                    placeholder="Enter your institute name"
-                    value={systemSettings.customInstituteName}
-                    onChange={(e) =>
-                      setSystemSettings({ ...systemSettings, customInstituteName: e.target.value })
-                    }
-                    className="text-lg"
-                  />
-                </div>
-                <Button onClick={handleSaveSystem}>Save Configuration</Button>
               </CardContent>
             </Card>
 
             {/* Academic Year Configuration */}
-            <Card className="mt-6">
+            <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
               <CardHeader>
-                <CardTitle>Academic Year</CardTitle>
+                <CardTitle className="text-2xl">Academic Year</CardTitle>
                 <CardDescription>
                   Set the current academic year for the entire system
                 </CardDescription>
@@ -497,158 +518,14 @@ export default function Settings() {
 
           </TabsContent>
 
-          <TabsContent value="payroll">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payroll Settings</CardTitle>
-                  <CardDescription>Configure payroll calculation parameters</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Default Payment Method</Label>
-                      <Select defaultValue="bank">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select payment method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="bank">Bank Transfer</SelectItem>
-                          <SelectItem value="cheque">Cheque</SelectItem>
-                          <SelectItem value="cash">Cash</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Payment Day</Label>
-                      <Select defaultValue="25">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select payment day" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 28 }, (_, i) => (
-                            <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Working Days per Month</Label>
-                      <Input
-                        type="number"
-                        defaultValue="30"
-                        placeholder="Enter working days"
-                        min="1"
-                        max="31"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Daily Rate Calculation</Label>
-                      <Select defaultValue="30">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select calculation method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="30">Salary ÷ 30 days</SelectItem>
-                          <SelectItem value="26">Salary ÷ 26 days</SelectItem>
-                          <SelectItem value="22">Salary ÷ 22 days</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Allowance Settings</CardTitle>
-                  <CardDescription>Configure salary allowances and benefits</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>HRA Percentage</Label>
-                      <Input
-                        type="number"
-                        defaultValue="0"
-                        placeholder="Enter HRA percentage"
-                        min="0"
-                        max="100"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>PF Percentage</Label>
-                      <Input
-                        type="number"
-                        defaultValue="0"
-                        placeholder="Enter PF percentage"
-                        min="0"
-                        max="100"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Transport Allowance</Label>
-                      <Input
-                        type="number"
-                        defaultValue="0"
-                        placeholder="Enter transport allowance"
-                        min="0"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Medical Allowance</Label>
-                      <Input
-                        type="number"
-                        defaultValue="0"
-                        placeholder="Enter medical allowance"
-                        min="0"
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
 
-          <TabsContent value="security">
-            <Card>
-              <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
-                <CardDescription>
-                  Manage your account security and access controls
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="current-password">Current Password</Label>
-                  <Input id="current-password" type="password" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input id="new-password" type="password" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm New Password</Label>
-                  <Input id="confirm-password" type="password" />
-                </div>
-                <Button>Change Password</Button>
 
-                <div className="pt-4 border-t">
-                  <h3 className="text-lg font-medium mb-2">Session Management</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Manage active sessions and login history
-                  </p>
-                  <Button variant="outline">View Active Sessions</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="global-fees">
-            <Card className="hover:shadow-xl transition-all duration-300 backdrop-blur-sm bg-opacity-90">
+          <TabsContent value="global-fees" className="animate-in fade-in-50 duration-300">
+            <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
               <CardHeader>
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="flex flex-col gap-1">
-                    <CardTitle>Global Class Fee Management</CardTitle>
+                    <CardTitle className="text-2xl">Global Class Fee Management</CardTitle>
                     <CardDescription>
                       Set and manage fee structures for different classes that can be used for calculations and automatically assigned to students
                     </CardDescription>
@@ -658,24 +535,29 @@ export default function Settings() {
                       setEditingGlobalFee(null);
                       setGlobalFeeModalOpen(true);
                     }}
-                    className="bg-primary hover:bg-primary/90"
+                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 shadow-lg"
                   >
-                    + Add Global Fee
+                    <Calculator className="mr-2 h-4 w-4" />
+                    Add Global Fee
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex flex-wrap gap-2">
-                    <select
-                      value={academicYear}
-                      onChange={(e) => setAcademicYear(e.target.value)}
-                      className="border rounded px-3 py-2 text-sm"
-                    >
-                      <option value="2024-25">2024-25</option>
-                      <option value="2025-26">2025-26</option>
-                      <option value="2026-27">2026-27</option>
-                    </select>
+                  <div className="flex flex-wrap gap-3 items-center">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-semibold">Academic Year:</Label>
+                      <Select value={academicYear} onValueChange={setAcademicYear}>
+                        <SelectTrigger className="w-[140px] bg-white shadow-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="2024-25">2024-25</SelectItem>
+                          <SelectItem value="2025-26">2025-26</SelectItem>
+                          <SelectItem value="2026-27">2026-27</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
@@ -684,66 +566,76 @@ export default function Settings() {
                       Reset Filter
                     </Button>
                   </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Class</TableHead>
-                        <TableHead>Fee Type</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Frequency</TableHead>
-                        <TableHead>Academic Year</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {globalClassFees
-                        .filter(fee => fee.academicYear === academicYear)
-                        .map((fee) => (
-                          <TableRow key={fee.id} className="hover:bg-gray-50">
-                            <TableCell className="font-medium">{fee.className}</TableCell>
-                            <TableCell className="capitalize">{fee.feeType}</TableCell>
-                            <TableCell>₹{parseFloat(fee.amount).toLocaleString()}</TableCell>
-                            <TableCell className="capitalize">{fee.frequency}</TableCell>
-                            <TableCell>{fee.academicYear}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={fee.isActive ? "default" : "secondary"}
-                                className={fee.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
-                              >
-                                {fee.isActive ? "Active" : "Inactive"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex space-x-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditingGlobalFee(fee);
-                                    setGlobalFeeModalOpen(true);
-                                  }}
+                  <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                    <Table>
+                      <TableHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="font-semibold">Class</TableHead>
+                          <TableHead className="font-semibold">Fee Type</TableHead>
+                          <TableHead className="font-semibold">Amount</TableHead>
+                          <TableHead className="font-semibold">Frequency</TableHead>
+                          <TableHead className="font-semibold">Academic Year</TableHead>
+                          <TableHead className="font-semibold">Status</TableHead>
+                          <TableHead className="font-semibold">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {globalClassFees
+                          .filter(fee => fee.academicYear === academicYear)
+                          .map((fee) => (
+                            <TableRow key={fee.id} className="hover:bg-blue-50/50 transition-colors duration-200">
+                              <TableCell className="font-medium">{fee.className}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="capitalize font-medium">
+                                  {fee.feeType}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-semibold text-green-600">₹{parseFloat(fee.amount).toLocaleString()}</TableCell>
+                              <TableCell className="capitalize text-sm">{fee.frequency}</TableCell>
+                              <TableCell className="text-sm font-medium">{fee.academicYear}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={fee.isActive ? "default" : "secondary"}
+                                  className={fee.isActive ? "bg-green-500 hover:bg-green-600" : "bg-gray-400 hover:bg-gray-500"}
                                 >
-                                  Edit
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleViewTotalFees(fee.className)}
-                                >
-                                  View Total
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
+                                  {fee.isActive ? "Active" : "Inactive"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex space-x-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingGlobalFee(fee);
+                                      setGlobalFeeModalOpen(true);
+                                    }}
+                                    className="hover:bg-blue-50 hover:border-blue-300 transition-all"
+                                  >
+                                    <Edit className="h-3.5 w-3.5 mr-1" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleViewTotalFees(fee.className)}
+                                    className="hover:bg-indigo-50 hover:border-indigo-300 transition-all"
+                                  >
+                                    <Calculator className="h-3.5 w-3.5 mr-1" />
+                                    View Total
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                   {globalClassFees.filter(fee => fee.academicYear === academicYear).length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <span className="mx-auto h-12 w-12 mb-4 opacity-50">₹</span>
-                      <p>No global fees configured for {academicYear}</p>
-                      <p className="text-sm">Click "Add Global Fee" to get started</p>
+                    <div className="text-center py-12 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl">
+                      <Calculator className="mx-auto h-16 w-16 text-blue-300 mb-4" />
+                      <p className="text-lg font-semibold text-gray-700">No global fees configured for {academicYear}</p>
+                      <p className="text-sm text-gray-500 mt-2">Click "Add Global Fee" to get started</p>
                     </div>
                   )}
                 </div>

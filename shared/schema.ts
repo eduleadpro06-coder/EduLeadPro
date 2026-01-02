@@ -21,6 +21,7 @@ export const users = pgTable("users", {
   name: text("name"),
   email: text("email"),
   organizationId: integer("organization_id").references(() => organizations.id),
+  notificationPreferences: jsonb("notification_preferences"), // JSON for notification settings
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -726,6 +726,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get notification preferences
+  app.get("/api/user/notification-preferences", async (req, res) => {
+    try {
+      const username = req.headers['x-user-name'] as string;
+      if (!username) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Return preferences or defaults
+      const preferences = (user.notificationPreferences as any) || {
+        overdueFollowups: true,
+        newLeads: false,
+        dailyReports: true
+      };
+
+      res.json(preferences);
+    } catch (error) {
+      console.error("Failed to fetch notification preferences:", error);
+      res.status(500).json({ message: "Failed to fetch notification preferences" });
+    }
+  });
+
+  // Update notification preferences
+  app.patch("/api/user/notification-preferences", async (req, res) => {
+    try {
+      const username = req.headers['x-user-name'] as string;
+      if (!username) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { preferences } = req.body;
+      if (!preferences) {
+        return res.status(400).json({ message: "Preferences data is required" });
+      }
+
+      // Update user's notification preferences
+      await storage.updateUserNotificationPreferences(user.id, preferences);
+
+      res.json({ message: "Notification preferences updated successfully", preferences });
+    } catch (error) {
+      console.error("Failed to update notification preferences:", error);
+      res.status(500).json({ message: "Failed to update notification preferences" });
+    }
+  });
+
   // All leads - WITH ORGANIZATION FILTERING
   app.get("/api/leads", async (req, res) => {
     try {
