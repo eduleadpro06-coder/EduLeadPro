@@ -67,8 +67,8 @@ export default function Sidebar() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Check for Ctrl + Shift + A
-      if (event.ctrlKey && event.shiftKey && (event.key === 'a' || event.key === 'A')) {
+      // Check for Ctrl + Alt + M
+      if (event.ctrlKey && event.altKey && (event.key === 'v' || event.key === 'V')) {
         event.preventDefault();
         setShowAIFeatures(prev => {
           const newValue = !prev;
