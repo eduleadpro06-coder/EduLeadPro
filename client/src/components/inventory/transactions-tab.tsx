@@ -104,8 +104,7 @@ export function TransactionsTab() {
                                     <th className="px-6 py-4 text-left font-medium text-gray-500">Stock Change</th>
                                     <th className="px-6 py-4 text-left font-medium text-gray-500">Reason</th>
                                     <th className="px-6 py-4 text-left font-medium text-gray-500">Reference</th>
-                                    <th className="px-6 py-4 text-left font-medium text-gray-500">Cost</th>
-                                    <th className="px-6 py-4 text-left font-medium text-gray-500">User</th>
+                                    <th className="px-6 py-4 text-left font-medium text-gray-500">Customer/Lead</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -169,22 +168,12 @@ export function TransactionsTab() {
                                                 )}
                                             </td>
                                             <td className="px-6 py-4">
-                                                {tx.totalCost ? (
-                                                    <div className="text-sm">
-                                                        <p className="font-semibold">₹{Number(tx.totalCost).toLocaleString()}</p>
-                                                        {tx.unitCost && (
-                                                            <p className="text-xs text-gray-500">@₹{Number(tx.unitCost).toFixed(2)}/unit</p>
+                                                {tx.lead ? (
+                                                    <div>
+                                                        <p className="font-medium text-gray-900">{tx.lead.studentName}</p>
+                                                        {tx.lead.parentName && (
+                                                            <p className="text-xs text-gray-500">{tx.lead.parentName}</p>
                                                         )}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-gray-400">-</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {tx.user ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <User className="h-4 w-4 text-gray-400" />
-                                                        <span className="text-xs text-gray-600">{tx.user.username}</span>
                                                     </div>
                                                 ) : (
                                                     <span className="text-gray-400">-</span>

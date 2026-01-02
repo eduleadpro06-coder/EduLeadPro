@@ -4423,11 +4423,13 @@ export class DatabaseStorage implements IStorage {
     const query = db.select({
       transaction: schema.inventoryTransactions,
       item: schema.inventoryItems,
-      user: schema.users
+      user: schema.users,
+      lead: schema.leads
     })
       .from(schema.inventoryTransactions)
       .innerJoin(schema.inventoryItems, eq(schema.inventoryTransactions.itemId, schema.inventoryItems.id))
       .leftJoin(schema.users, eq(schema.inventoryTransactions.userId, schema.users.id))
+      .leftJoin(schema.leads, eq(schema.inventoryTransactions.leadId, schema.leads.id))
       .where(eq(schema.inventoryItems.organizationId, organizationId));
 
     if (filters?.itemId) {
@@ -4449,10 +4451,11 @@ export class DatabaseStorage implements IStorage {
 
     const results = await finalQuery.orderBy(desc(schema.inventoryTransactions.transactionDate));
 
-    return results.map(({ transaction, item, user }) => ({
+    return results.map(({ transaction, item, user, lead }) => ({
       ...transaction,
       item,
-      user
+      user,
+      lead
     }));
   }
 
