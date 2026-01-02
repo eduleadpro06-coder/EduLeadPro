@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import Header from "@/components/layout/header";
+import SidebarPageHeader from "@/components/layout/sidebar-page-header";
 import {
   CreditCard,
   TrendingUp,
@@ -24,8 +25,8 @@ import {
   Download,
   Upload,
   Eye,
-  Settings,
   Search,
+  Settings,
   Phone,
   Mail,
   Calculator,
@@ -36,8 +37,11 @@ import {
   Info,
   Trash2,
   Edit,
-  Printer
+  Printer,
+  GraduationCap,
+  ListFilter
 } from "lucide-react";
+import { SearchInput } from "@/components/ui/search-input";
 import { generateMelonsFeeReceipt, type FeeReceiptData } from "@/lib/receipt-generator";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
@@ -1448,69 +1452,68 @@ export default function StudentFees() {
 
   return (
     <>
-      <Header className="py-4 bg-white border-b border-gray-200" />
+      <Header title="Student Fees" subtitle="Manage student fees, payments, and financial records" />
       {/* Custom header row with search, filters, and pagination */}
       {/* Custom header row with search, filters, and pagination */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 bg-white border-b border-gray-100 gap-4">
-        {/* Search bar */}
-        <div className="flex-1 w-full sm:max-w-xl">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Search students..."
-              className="pl-9 h-10 w-full bg-gray-50 border-gray-200 focus:bg-white transition-colors"
-              value={studentSearch}
-              onChange={e => setStudentSearch(e.target.value)}
-            />
+      <SidebarPageHeader
+        searchPlaceholder="Search students..."
+        searchValue={studentSearch}
+        onSearchChange={setStudentSearch}
+        filters={
+          <div className="flex items-center gap-3">
+            <Select value={classFilter} onValueChange={setClassFilter}>
+              <SelectTrigger className="w-[140px] bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
+                <div className="flex items-center gap-2 truncate">
+                  <GraduationCap className="h-4 w-4 text-gray-400 shrink-0" />
+                  <SelectValue placeholder="All Classes" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="bg-white border-gray-200 shadow-lg">
+                <SelectItem value="all">All Classes</SelectItem>
+                {Array.from(new Set([
+                  ...allStudents.map(s => s.class),
+                  ...globalClassFees.map(f => f.className)
+                ])).filter(Boolean).sort().map(cls => (
+                  <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px] bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
+                <div className="flex items-center gap-2 truncate">
+                  <ListFilter className="h-4 w-4 text-gray-400 shrink-0" />
+                  <SelectValue placeholder="All Statuses" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="bg-white border-gray-200 shadow-lg">
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="E-Mandate Active">E-Mandate Active</SelectItem>
+                <SelectItem value="No E-Mandate">No E-Mandate</SelectItem>
+                <SelectItem value="enrolled">Enrolled</SelectItem>
+                <SelectItem value="interested">Interested</SelectItem>
+                <SelectItem value="contacted">Contacted</SelectItem>
+                <SelectItem value="new">New</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={studentPaymentStatusFilter} onValueChange={setStudentPaymentStatusFilter}>
+              <SelectTrigger className="w-[180px] bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
+                <div className="flex items-center gap-2 truncate">
+                  <CreditCard className="h-4 w-4 text-gray-400 shrink-0" />
+                  <SelectValue placeholder="Payment Status" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="bg-white border-gray-200 shadow-lg">
+                <SelectItem value="all">All Payment Statuses</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          {/* Dropdowns */}
-          <Select value={classFilter} onValueChange={setClassFilter}>
-            <SelectTrigger className="w-[140px] h-10 bg-white border-gray-200">
-              <SelectValue placeholder="All Classes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Classes</SelectItem>
-              {Array.from(new Set([
-                ...allStudents.map(s => s.class),
-                ...globalClassFees.map(f => f.className)
-              ])).filter(Boolean).sort().map(cls => (
-                <SelectItem key={cls} value={cls}>{cls}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px] h-10 bg-white border-gray-200">
-              <SelectValue placeholder="All Statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="E-Mandate Active">E-Mandate Active</SelectItem>
-              <SelectItem value="No E-Mandate">No E-Mandate</SelectItem>
-              <SelectItem value="enrolled">Enrolled</SelectItem>
-              <SelectItem value="interested">Interested</SelectItem>
-              <SelectItem value="contacted">Contacted</SelectItem>
-              <SelectItem value="new">New</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={studentPaymentStatusFilter} onValueChange={setStudentPaymentStatusFilter}>
-            <SelectTrigger className="w-[180px] h-10 bg-white border-gray-200">
-              <SelectValue placeholder="Payment Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Payment Statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Buttons */}
-          <div className="flex items-center gap-2">
+        }
+        primaryActions={
+          <div className="flex items-center gap-3">
             <input
               type="file"
               accept=".csv"
@@ -1522,24 +1525,24 @@ export default function StudentFees() {
               <Button
                 variant="outline"
                 type="button"
-                className="flex items-center gap-2 px-4 h-10 border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer"
+                className="h-10 px-4 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-lg flex items-center gap-2 cursor-pointer"
                 onClick={() => document.getElementById('csv-import')?.click()}
               >
-                <Download className="w-4 h-4" />
-                Import
+                <Download className="h-4 w-4" />
+                <span>Import</span>
               </Button>
             </label>
 
             <Button
               onClick={exportToCSV}
-              className="flex items-center gap-2 px-4 h-10 bg-[#643ae5] text-white hover:bg-[#552dbf] shadow-sm"
+              className="bg-[#643ae5] hover:bg-[#552dbf] text-white shadow-sm h-10 px-4 rounded-lg flex items-center gap-2 transition-all active:scale-95"
             >
-              <Upload className="w-4 h-4" />
-              Export
+              <Upload className="h-4 w-4" />
+              <span>Export</span>
             </Button>
           </div>
-        </div>
-      </div>
+        }
+      />
       <div className="flex min-h-screen bg-gray-50 p-6">
         {/* Sidebar: Student List */}
         <aside className="w-[320px] bg-white rounded-2xl border border-gray-200 shadow h-fit mr-6 flex flex-col">
@@ -1695,12 +1698,12 @@ export default function StudentFees() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Mode</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Payment Type</TableHead>
-                          <TableHead className="w-auto">Actions</TableHead>
+                          <TableHead className="table-header">Date</TableHead>
+                          <TableHead className="table-header">Amount</TableHead>
+                          <TableHead className="table-header">Mode</TableHead>
+                          <TableHead className="table-header">Status</TableHead>
+                          <TableHead className="table-header">Payment Type</TableHead>
+                          <TableHead className="table-header w-auto">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1888,11 +1891,11 @@ export default function StudentFees() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Mandate ID</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Bank</TableHead>
-                          <TableHead>Max Amount</TableHead>
-                          <TableHead>Actions</TableHead>
+                          <TableHead className="table-header">Mandate ID</TableHead>
+                          <TableHead className="table-header">Status</TableHead>
+                          <TableHead className="table-header">Bank</TableHead>
+                          <TableHead className="table-header">Max Amount</TableHead>
+                          <TableHead className="table-header">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -2017,12 +2020,12 @@ export default function StudentFees() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Plan Type</TableHead>
-                              <TableHead>Total Amount</TableHead>
-                              <TableHead>EMI Details</TableHead>
-                              <TableHead>Start Date</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Actions</TableHead>
+                              <TableHead className="table-header">Plan Type</TableHead>
+                              <TableHead className="table-header">Total Amount</TableHead>
+                              <TableHead className="table-header">EMI Details</TableHead>
+                              <TableHead className="table-header">Start Date</TableHead>
+                              <TableHead className="table-header">Status</TableHead>
+                              <TableHead className="table-header">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -2419,7 +2422,7 @@ export default function StudentFees() {
                             {/* Payment Summary */}
                             <Card className="bg-gray-50">
                               <CardHeader className="pb-3">
-                                <CardTitle className="text-lg flex items-center gap-2">
+                                <CardTitle className="text-h3 flex items-center gap-2">
                                   Payment Summary
                                 </CardTitle>
                               </CardHeader>

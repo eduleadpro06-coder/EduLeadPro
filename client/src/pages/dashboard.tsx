@@ -58,7 +58,7 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <>
-        <Header />
+        <Header title="Dashboard" subtitle="Overview of your school's performance" />
         <div className="min-h-screen w-full bg-gray-50 text-gray-900 px-4 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -72,7 +72,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <>
-        <Header />
+        <Header title="Dashboard" subtitle="Overview of your school's performance" />
         <div className="min-h-screen w-full bg-gray-50 text-gray-900 px-4 flex items-center justify-center">
           <div className="text-center">
             <div className="text-red-500 mb-4">
@@ -91,7 +91,7 @@ export default function Dashboard() {
   if (!analytics) {
     return (
       <>
-        <Header />
+        <Header title="Dashboard" subtitle="Overview of your school's performance" />
         <div className="min-h-screen w-full bg-gray-50 text-gray-900 px-4 flex items-center justify-center">
           <p className="text-gray-600">No analytics data available</p>
         </div>
@@ -109,7 +109,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <Header />
+      <Header title="Dashboard" subtitle="Overview of your school's performance" />
       <div className="min-h-screen w-full bg-gray-50 text-gray-900 px-4 pb-8">
 
         {/* KPI Cards - 8 Total */}
@@ -193,11 +193,11 @@ export default function Dashboard() {
 
 
         {/* Intelligence Grid - 3 Columns (Moved to Top) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 component-gap mb-6">
           {/* Lead Funnel Progression */}
-          <Card className="bg-white/90 backdrop-blur-md border border-gray-100/50 shadow-lg rounded-2xl p-4">
+          <Card style={{ borderRadius: 'var(--radius-xl)', padding: 'var(--card-padding)', boxShadow: 'var(--shadow-lg)' }} className="bg-white/90 backdrop-blur-md border border-gray-100/50">
             <CardHeader className="px-0 pt-0 pb-3">
-              <CardTitle className="text-[18px] font-bold text-gray-900 flex items-center gap-2">
+              <CardTitle className="text-h3 flex items-center gap-2">
                 <Users className="h-4 w-4 text-blue-600" />
                 Lead Funnel
               </CardTitle>
@@ -223,11 +223,11 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 gap-2 mt-4 w-full">
                 <div className="text-center py-1.5 bg-blue-50/50 rounded-lg">
-                  <p className="text-[12px] text-gray-500 uppercase font-bold tracking-tight">New</p>
+                  <p className="text-caption uppercase font-bold tracking-tight">New</p>
                   <p className="text-sm font-bold text-blue-600">{analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.captured || 0}</p>
                 </div>
                 <div className="text-center py-1.5 bg-green-50/50 rounded-lg">
-                  <p className="text-[12px] text-gray-500 uppercase font-bold tracking-tight">Enrolled</p>
+                  <p className="text-caption uppercase font-bold tracking-tight">Enrolled</p>
                   <p className="text-sm font-bold text-green-600">{analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.converted || 0}</p>
                 </div>
               </div>
@@ -235,9 +235,9 @@ export default function Dashboard() {
           </Card>
 
           {/* Lead Source Distribution */}
-          <Card className="bg-white/90 backdrop-blur-md border border-gray-100/50 shadow-lg rounded-2xl p-4">
+          <Card style={{ borderRadius: 'var(--radius-xl)', padding: 'var(--card-padding)', boxShadow: 'var(--shadow-lg)' }} className="bg-white/90 backdrop-blur-md border border-gray-100/50">
             <CardHeader className="px-0 pt-0 pb-3">
-              <CardTitle className="text-[18px] font-bold text-gray-900 flex items-center gap-2">
+              <CardTitle className="text-h3 flex items-center gap-2">
                 <Users className="h-4 w-4 text-purple-600" />
                 Lead Sources
               </CardTitle>
@@ -254,7 +254,7 @@ export default function Dashboard() {
                 />
               </div>
               <div className="mt-4 text-center">
-                <p className="text-[12px] text-gray-500 uppercase tracking-wider font-bold">Best Source</p>
+                <p className="text-caption uppercase tracking-wider font-bold">Best Source</p>
                 <p className="text-sm font-bold text-indigo-600">
                   {(analytics.leadAnalytics.bestPerformingSource || "N/A").split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                 </p>
@@ -263,9 +263,9 @@ export default function Dashboard() {
           </Card>
 
           {/* Expense Category Analysis */}
-          <Card className="bg-white/90 backdrop-blur-md border border-gray-100/50 shadow-lg rounded-2xl p-4">
+          <Card style={{ borderRadius: 'var(--radius-xl)', padding: 'var(--card-padding)', boxShadow: 'var(--shadow-lg)' }} className="bg-white/90 backdrop-blur-md border border-gray-100/50">
             <CardHeader className="px-0 pt-0 pb-3">
-              <CardTitle className="text-[18px] font-bold text-gray-900 flex items-center gap-2">
+              <CardTitle className="text-h3 flex items-center gap-2">
                 <CreditCard className="h-4 w-4 text-rose-600" />
                 Expense Analysis
               </CardTitle>
@@ -291,15 +291,15 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Performance Row - Financial Performance & Expense Trend Side-by-Side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        {/* Charts Section - 2 Columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 component-gap mb-6">
           <Card className="bg-white/90 backdrop-blur-md border border-gray-100/50 shadow-lg rounded-2xl p-4 flex flex-col min-h-[300px]">
             <CardHeader className="px-0 pt-0 pb-3">
-              <CardTitle className="text-[18px] font-bold text-gray-900 flex items-center gap-2">
+              <CardTitle className="text-h3 flex items-center gap-2">
                 <IndianRupee className="h-4 w-4 text-green-600" />
                 Financial Performance
               </CardTitle>
-              <p className="text-[12px] text-gray-500">Total Revenue vs Total Operating Expense</p>
+              <p className="text-caption">Total Revenue vs Total Operating Expense</p>
             </CardHeader>
             <CardContent className="flex-1 w-full min-h-[220px] px-0">
               <ResponsiveContainer width="100%" height="100%">
@@ -332,11 +332,11 @@ export default function Dashboard() {
 
           <Card className="bg-white/90 backdrop-blur-md border border-gray-100/50 shadow-lg rounded-2xl p-4 flex flex-col min-h-[300px]">
             <CardHeader className="px-0 pt-0 pb-3">
-              <CardTitle className="text-[18px] font-bold text-gray-900 flex items-center gap-2">
+              <CardTitle className="text-h3 flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-orange-600" />
                 Monthly Expense Trend
               </CardTitle>
-              <p className="text-[12px] text-gray-500">Monthly Operating Expense trajectory</p>
+              <p className="text-caption">Total Monthly Spending Across All Categories</p>
             </CardHeader>
             <CardContent className="flex-1 w-full min-h-[220px] px-0">
               <ResponsiveContainer width="100%" height="100%">

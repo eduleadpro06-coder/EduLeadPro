@@ -231,15 +231,11 @@ export default function Expenses() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-8">
-      <Header />
+      <Header title="Expenses" subtitle="Manage and track your school's financial outflows." />
 
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <main className="w-full px-6 py-8 space-y-8">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Expenses</h1>
-            <p className="text-gray-500 mt-1">Manage and track your school's financial outflows.</p>
-          </div>
+        <div className="flex flex-col md:flex-row md:items-center justify-end gap-4">
 
           <div className="flex items-center gap-3 bg-white p-1.5 rounded-lg border shadow-sm">
             <div className="flex items-center gap-2 px-2">
@@ -337,11 +333,11 @@ export default function Expenses() {
           {/* Left Column: Expense List */}
           <div className="w-full space-y-6">
             <Card className="shadow-sm h-full border-none ring-1 ring-gray-200">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 border-b px-6 pt-6">
+              <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle>Transactions</CardTitle>
-                  <CardDescription className="mt-1">
-                    {format(new Date(parseInt(selectedYear), parseInt(selectedMonth)), "MMMM yyyy")}
+                  <CardTitle className="text-h3">Recent Expenses</CardTitle>
+                  <CardDescription className="text-body text-gray-500">
+                    Manage and track your recent expenditure
                   </CardDescription>
                 </div>
                 <Button onClick={openAddModal} className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm gap-2">
@@ -352,13 +348,13 @@ export default function Expenses() {
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50/50 text-gray-500 font-medium border-b">
+                    <thead className="bg-gray-50/50">
                       <tr>
-                        <th className="px-6 py-4">Date</th>
-                        <th className="px-6 py-4">Description</th>
-                        <th className="px-6 py-4">Category</th>
-                        <th className="px-6 py-4">Amount</th>
-                        <th className="px-6 py-4 text-right">Actions</th>
+                        <th className="table-header px-6 py-3 text-left">Date</th>
+                        <th className="table-header px-6 py-3 text-left">Description</th>
+                        <th className="table-header px-6 py-3 text-left">Category</th>
+                        <th className="table-header px-6 py-3 text-left">Amount</th>
+                        <th className="table-header px-6 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -449,7 +445,7 @@ export default function Expenses() {
                     name="category"
                     value={form.category}
                     onChange={handleChange}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="input-standard w-full"
                   >
                     {categories.map((cat) => (
                       <option key={cat} value={cat}>{cat}</option>
@@ -557,10 +553,10 @@ export default function Expenses() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">Utilization</span>
-                          <span className="text-sm font-medium">{catUtilization.toFixed(1)}%</span>
-                        </div>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-caption">Total Expenses</CardTitle>
+                          <Wallet className="h-4 w-4 text-gray-500" />
+                        </CardHeader>
                         <Progress value={catUtilization} className="h-2" />
                         <div className="text-xs text-gray-500">Spent: ₹{catExpense.toLocaleString()} / ₹{catBudget.toLocaleString()}</div>
                       </div>

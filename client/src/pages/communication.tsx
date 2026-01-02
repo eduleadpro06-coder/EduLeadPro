@@ -230,11 +230,11 @@ export default function Communication() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Messages Sent Today</CardTitle>
+            <CardTitle className="text-caption font-medium text-gray-500">Messages Sent Today</CardTitle>
             <Send className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-h3">
               {communicationLogs.filter((log: CommunicationLog) =>
                 format(new Date(log.sentAt), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
               ).length}
@@ -243,29 +243,29 @@ export default function Communication() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Delivery Rate</CardTitle>
+            <CardTitle className="text-caption font-medium text-gray-500">Delivery Rate</CardTitle>
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">98.5%</div>
+            <div className="text-h3">98.5%</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Templates</CardTitle>
+            <CardTitle className="text-caption font-medium text-gray-500">Templates</CardTitle>
             <Filter className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{templates.length}</div>
+            <div className="text-h3">{templates.length}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Failed Messages</CardTitle>
+            <CardTitle className="text-caption font-medium text-gray-500">Failed Messages</CardTitle>
             <Phone className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-h3">
               {communicationLogs.filter((log: CommunicationLog) => log.status === "failed").length}
             </div>
           </CardContent>
@@ -491,7 +491,7 @@ export default function Communication() {
         <TabsContent value="logs" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Communications</CardTitle>
+              <CardTitle className="text-h3">Recent Communications</CardTitle>
               <CardDescription>
                 Track all sent messages and their delivery status
               </CardDescription>
@@ -500,11 +500,11 @@ export default function Communication() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Recipient</TableHead>
-                    <TableHead>Subject/Message</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Sent At</TableHead>
+                    <TableHead className="table-header">Type</TableHead>
+                    <TableHead className="table-header">Recipient</TableHead>
+                    <TableHead className="table-header">Subject/Message</TableHead>
+                    <TableHead className="table-header">Status</TableHead>
+                    <TableHead className="table-header">Sent At</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -545,7 +545,7 @@ export default function Communication() {
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="text-lg">{template.name}</CardTitle>
+                      <CardTitle className="text-body font-semibold">{template.name}</CardTitle>
                       <CardDescription>{template.category.replace("_", " ")}</CardDescription>
                     </div>
                     <Badge variant={template.isActive ? "default" : "secondary"}>
@@ -586,7 +586,7 @@ export default function Communication() {
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Message Type Distribution</CardTitle>
+                <CardTitle className="text-h3">Message Type Distribution</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -615,7 +615,7 @@ export default function Communication() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Delivery Status</CardTitle>
+                <CardTitle className="text-h3">Delivery Status</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">

@@ -4,7 +4,8 @@ import { apiRequest } from "@/lib/utils";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Package, TrendingDown, AlertTriangle, DollarSign, Search, Download, Settings, List, History, Pencil, Trash2 } from "lucide-react";
+import { Plus, Package, TrendingDown, AlertTriangle, DollarSign, Download, Settings, List, History, Pencil, Trash2 } from "lucide-react";
+import { SearchInput } from "@/components/ui/search-input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -132,17 +133,36 @@ export default function Inventory() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-            <Header />
+            <Header
+                title="Stock Management"
+                subtitle="Manage your inventory, track stock levels, and monitor expenses"
+            />
 
             <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Stock Management</h1>
-                        <p className="text-gray-500 mt-1">Manage your inventory, track stock levels, and monitor expenses</p>
+                {/* Header & Navigation Combined */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b">
+                    {/* Tab Navigation */}
+                    <div className="flex gap-2 -mb-px">
+                        <Button
+                            variant={activeTab === "items" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("items")}
+                            className="rounded-b-none"
+                        >
+                            <List className="h-4 w-4 mr-2" />
+                            Items & Inventory
+                        </Button>
+                        <Button
+                            variant={activeTab === "transactions" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("transactions")}
+                            className="rounded-b-none"
+                        >
+                            <History className="h-4 w-4 mr-2" />
+                            Transaction History
+                        </Button>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-3 mb-1">
                         <Button variant="outline" onClick={() => setManagerModalOpen(true)}>
                             <Settings className="h-4 w-4 mr-2" />
                             Manage
@@ -158,26 +178,6 @@ export default function Inventory() {
                     </div>
                 </div>
 
-                {/* Tab Navigation */}
-                <div className="flex gap-2 border-b">
-                    <Button
-                        variant={activeTab === "items" ? "default" : "ghost"}
-                        onClick={() => setActiveTab("items")}
-                        className="rounded-b-none"
-                    >
-                        <List className="h-4 w-4 mr-2" />
-                        Items & Inventory
-                    </Button>
-                    <Button
-                        variant={activeTab === "transactions" ? "default" : "ghost"}
-                        onClick={() => setActiveTab("transactions")}
-                        className="rounded-b-none"
-                    >
-                        <History className="h-4 w-4 mr-2" />
-                        Transaction History
-                    </Button>
-                </div>
-
                 {/* Items Tab Content */}
                 {activeTab === "items" && (
                     <>
@@ -187,8 +187,8 @@ export default function Inventory() {
                                 <CardContent className="p-6">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="text-sm font-medium text-gray-500">Total Items</p>
-                                            <h3 className="text-2xl font-bold text-gray-900 mt-2">
+                                            <p className="text-caption font-medium text-gray-500">Total Items</p>
+                                            <h3 className="text-h3 mt-2">
                                                 {statsLoading ? "..." : stats?.totalItems || 0}
                                             </h3>
                                         </div>
@@ -204,8 +204,8 @@ export default function Inventory() {
                                 <CardContent className="p-6">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="text-sm font-medium text-gray-500">Low Stock Alerts</p>
-                                            <h3 className="text-2xl font-bold text-gray-900 mt-2">
+                                            <p className="text-caption font-medium text-gray-500">Low Stock Alerts</p>
+                                            <h3 className="text-h3 mt-2">
                                                 {statsLoading ? "..." : stats?.lowStockCount || 0}
                                             </h3>
                                         </div>
@@ -221,8 +221,8 @@ export default function Inventory() {
                                 <CardContent className="p-6">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="text-sm font-medium text-gray-500">Stock Value</p>
-                                            <h3 className="text-2xl font-bold text-gray-900 mt-2">
+                                            <p className="text-caption font-medium text-gray-500">Stock Value</p>
+                                            <h3 className="text-h3 mt-2">
                                                 ₹{statsLoading ? "..." : Number(stats?.totalValue || 0).toLocaleString()}
                                             </h3>
                                         </div>
@@ -238,8 +238,8 @@ export default function Inventory() {
                                 <CardContent className="p-6">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="text-sm font-medium text-gray-500">Recent Activity</p>
-                                            <h3 className="text-2xl font-bold text-gray-900 mt-2">
+                                            <p className="text-caption font-medium text-gray-500">Recent Activity</p>
+                                            <h3 className="text-h3 mt-2">
                                                 {statsLoading ? "..." : stats?.recentTransactionsCount || 0}
                                             </h3>
                                         </div>
@@ -258,7 +258,7 @@ export default function Inventory() {
                                 <CardHeader>
                                     <div className="flex items-center gap-2">
                                         <AlertTriangle className="h-5 w-5 text-red-600" />
-                                        <CardTitle>Low Stock Alerts</CardTitle>
+                                        <CardTitle className="text-h3">Low Stock Alerts</CardTitle>
                                     </div>
                                     <CardDescription>{lowStockItems.length} items need restocking</CardDescription>
                                 </CardHeader>
@@ -287,15 +287,12 @@ export default function Inventory() {
                         <Card className="shadow-sm">
                             <CardContent className="p-6">
                                 <div className="flex flex-col md:flex-row gap-3">
-                                    <div className="relative flex-1">
-                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                        <Input
-                                            placeholder="Search items by name or code..."
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="pl-10"
-                                        />
-                                    </div>
+                                    <SearchInput
+                                        placeholder="Search items by name or code..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        wrapperClassName="flex-1"
+                                    />
 
                                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                                         <SelectTrigger className="w-full md:w-[200px]">
@@ -338,7 +335,7 @@ export default function Inventory() {
                         {/* Inventory Items Table */}
                         <Card className="shadow-sm">
                             <CardHeader>
-                                <CardTitle>Inventory Items</CardTitle>
+                                <CardTitle className="text-h3">Inventory Items</CardTitle>
                                 <CardDescription>{items.length} items found</CardDescription>
                             </CardHeader>
                             <CardContent className="p-0">
@@ -346,13 +343,13 @@ export default function Inventory() {
                                     <table className="w-full text-sm">
                                         <thead className="bg-gray-50/50 border-b">
                                             <tr>
-                                                <th className="px-6 py-4 text-left font-medium text-gray-500">Item Code</th>
-                                                <th className="px-6 py-4 text-left font-medium text-gray-500">Name</th>
-                                                <th className="px-6 py-4 text-left font-medium text-gray-500">Category</th>
-                                                <th className="px-6 py-4 text-left font-medium text-gray-500">Stock</th>
-                                                <th className="px-6 py-4 text-left font-medium text-gray-500">Cost Price</th>
-                                                <th className="px-6 py-4 text-left font-medium text-gray-500">Status</th>
-                                                <th className="px-6 py-4 text-right font-medium text-gray-500">Actions</th>
+                                                <th className="table-header px-6 py-4 text-left">Item Code</th>
+                                                <th className="table-header px-6 py-4 text-left">Name</th>
+                                                <th className="table-header px-6 py-4 text-left">Category</th>
+                                                <th className="table-header px-6 py-4 text-left">Stock</th>
+                                                <th className="table-header px-6 py-4 text-left">Cost Price</th>
+                                                <th className="table-header px-6 py-4 text-left">Status</th>
+                                                <th className="table-header px-6 py-4 text-right">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">

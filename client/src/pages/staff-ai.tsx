@@ -34,21 +34,21 @@ import {
   MessageSquare,
   Clock,
   Trash2,
-  Search,
   Upload,
   X,
   Mail,
   Phone,
-  ShieldCheck,
+  Building2,
   Briefcase,
-  Building,
-  Filter as FilterIcon,
   UserPlus,
-  Search as SearchIcon,
-  Pencil,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Filter,
+  ShieldCheck,
+  Building,
+  Pencil,
 } from "lucide-react";
+import { SearchInput } from "@/components/ui/search-input";
 import { format } from "date-fns";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -195,19 +195,7 @@ interface PayrollDetails {
   netSalary: number;
 }
 
-// Custom Tabs component for employee management
-interface EmployeeTabsProps {
-  activeTab: "overview" | "payroll";
-  setActiveTab: (tab: "overview" | "payroll") => void;
-}
-const EmployeeTabs: React.FC<EmployeeTabsProps> = ({ activeTab, setActiveTab }) => {
-  return (
-    <div className="w-full bg-white relative">
-      <div className="flex space-x-4 text-base font-medium relative ml-8 -mt-10">
-      </div>
-    </div>
-  );
-};
+
 
 export default function StaffAI() {
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
@@ -1646,25 +1634,26 @@ export default function StaffAI() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
+    <div className="min-h-screen app-bg-gradient">
+      <Header title="Staff Management" subtitle="Manage your team members and their information" />
       <div className="max-w-[120rem] mx-auto">
-        <EmployeeTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+
         {activeTab === "overview" && (
-          <div className="min-h-screen h-screen bg-gray-50 font-sans overflow-hidden">
+          <div className="min-h-screen font-sans pb-8">
             <PageHeader
-              title="Staff Management"
-              subtitle="Manage your team members and their information"
-              searchPlaceholder="Search contacts by name, email, or company..."
+              searchPlaceholder="Search contacts..."
               searchValue={searchQuery}
               onSearchChange={setSearchQuery}
               filters={
-                <>
+                <div className="flex items-center gap-3">
                   <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                    <SelectTrigger className="w-40 bg-white border-[#643ae5] text-gray-800">
-                      <SelectValue placeholder="All Departments" />
+                    <SelectTrigger className="w-44 bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
+                      <div className="flex items-center gap-2 truncate">
+                        <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
+                        <SelectValue placeholder="All Departments" />
+                      </div>
                     </SelectTrigger>
-                    <SelectContent className="bg-white border-[#643ae5] text-gray-800">
+                    <SelectContent className="bg-white border-gray-200 shadow-lg">
                       <SelectItem value="all">All Departments</SelectItem>
                       {Array.from(new Set(displayStaff.map(s => s.department).filter(Boolean))).map(dept => (
                         <SelectItem key={dept} value={dept}>{dept}</SelectItem>
@@ -1672,107 +1661,148 @@ export default function StaffAI() {
                     </SelectContent>
                   </Select>
                   <Select value={roleFilter} onValueChange={setRoleFilter}>
-                    <SelectTrigger className="w-32 bg-white border-[#643ae5] text-gray-800">
-                      <SelectValue placeholder="All Roles" />
+                    <SelectTrigger className="w-40 bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
+                      <div className="flex items-center gap-2 truncate">
+                        <Briefcase className="h-4 w-4 text-gray-400 shrink-0" />
+                        <SelectValue placeholder="All Roles" />
+                      </div>
                     </SelectTrigger>
-                    <SelectContent className="bg-white border-[#643ae5] text-gray-800">
+                    <SelectContent className="bg-white border-gray-200 shadow-lg">
                       <SelectItem value="all">All Roles</SelectItem>
                       {Array.from(new Set(displayStaff.map(s => s.role).filter(Boolean))).map(role => (
                         <SelectItem key={role} value={role}>{role}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </>
+                </div>
               }
               primaryActions={
-                <>
-                  <Button variant="outline"
-                    className="rounded-lg border border-[#643ae5] bg-white border border-purple-500 text-gray-800 font-medium hover:bg-purple-50 hover:border-[#a084fa] flex items-center gap-2" onClick={() => setIsAddStaffOpen(true)}>
-                    <UserPlus className="mr-2 h-4 w-4" /> Add New Employee
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={() => setIsAddStaffOpen(true)}
+                    className="bg-[#643ae5] hover:bg-[#552dbf] text-white shadow-sm h-10 px-4 rounded-lg flex items-center gap-2 transition-all active:scale-95"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    <span>Add Employee</span>
                   </Button>
+                  <div className="h-6 w-px bg-gray-200 mx-1"></div>
                   <Button
                     variant="outline"
-                    className="rounded-lg border border-[#643ae5] bg-white border border-purple-500 text-gray-800 font-medium hover:bg-purple-50 hover:border-[#a084fa] flex items-center gap-2"
+                    className="h-10 px-4 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-lg flex items-center gap-2"
                     onClick={() => setIsCSVImportOpen(true)}
                   >
-                    <Download className="mr-2 h-4 w-4 text-gray-800" /> Import
+                    <Download className="h-4 w-4" />
+                    <span>Import</span>
                   </Button>
                   <Button
                     variant="outline"
-                    className="rounded-lg border border-[#643ae5] bg-white border border-purple-500 text-gray-800 font-medium hover:bg-purple-50 hover:border-[#a084fa] flex items-center gap-2"
+                    className="h-10 px-4 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-lg flex items-center gap-2"
                     onClick={exportStaff}
                   >
-                    <Upload className="mr-2 h-4 w-4 text-gray-800" /> Export
+                    <Upload className="h-4 w-4" />
+                    <span>Export</span>
                   </Button>
-                </>
+                </div>
               }
             />
-            {/* Tabs */}
-            <div className="w-full px-8 mb-4">
-              <div className="flex gap-6 border-b border-[#E0E0E0] items-center justify-between">
-                <div className="flex gap-6">
+            {/* Toolbar: Tabs & Pagination */}
+            <div className="w-full px-6 mb-4">
+              <div className="flex flex-col sm:flex-row gap-4 border-b border-gray-200 justify-between items-end sm:items-center pb-2">
+                {/* Tabs */}
+                <div className="flex gap-6 relative top-[1px]">
                   {['All Employees', 'Active', 'Inactive'].map(tab => {
                     let count = 0;
                     if (tab === 'All Employees') count = sortedStaff.length;
                     else if (tab === 'Active') count = sortedStaff.filter(s => s.isActive !== false).length;
                     else if (tab === 'Inactive') count = sortedStaff.filter(s => s.isActive === false).length;
 
+                    const isActive = selectedTab === tab;
+
                     return (
                       <button
                         key={tab}
-                        className={`pb-3 px-1 text-base font-medium transition-colors duration-200 relative ${selectedTab === tab ? 'text-[#2F54EB]' : 'text-[#8C8C8C] hover:text-[#2F54EB]'}`}
+                        className={`pb-3 px-1 text-sm font-medium transition-all duration-200 relative ${isActive ? 'text-[#643ae5]' : 'text-gray-500 hover:text-gray-900'}`}
                         onClick={() => setSelectedTab(tab)}
                       >
-                        {tab} ({count})
-                        {selectedTab === tab && (
-                          <span className="absolute left-0 right-0 -bottom-0.5 h-0.5 bg-[#2F54EB] rounded transition-all duration-300" />
+                        {tab} <span className={`ml-1 text-xs ${isActive ? "text-[#643ae5]/80" : "text-gray-400"}`}>({count})</span>
+                        {isActive && (
+                          <span className="absolute left-0 right-0 -bottom-0.5 h-[2px] bg-[#643ae5] rounded-full transition-all duration-300" />
                         )}
                       </button>
                     );
                   })}
                 </div>
-                {/* Pagination UI beside the filter buttons */}
-                <div className="flex items-center gap-1.5 py-1">
-                  <button
-                    className={`h-8 w-8 flex items-center justify-center rounded-full border transition-all duration-200 ${page === 1 ? 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed' : 'bg-white text-[#643ae5] border-[#643ae5] hover:bg-[#643ae5] hover:text-white shadow-sm active:scale-95'}`}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  {Array.from({ length: Math.min(totalPages, maxVisiblePage) }, (_, i) => i + 1).map((p) => (
+
+                {/* Pagination */}
+                <div className="flex items-center gap-2 py-1">
+                  <span className="text-xs text-gray-500 mr-2 hidden md:inline-block">
+                    Page {page} of {totalPages}
+                  </span>
+                  <div className="flex items-center space-x-1">
                     <button
-                      key={p}
-                      className={`h-8 w-8 flex items-center justify-center rounded-full border text-sm font-semibold transition-all duration-200 ${page === p ? 'bg-[#2f54eb] text-white border-[#2f54eb] shadow-md scale-105' : 'bg-white text-gray-600 border-gray-200 hover:border-[#643ae5] hover:text-[#643ae5] shadow-sm'}`}
-                      onClick={() => setPage(p)}
+                      className={`h-8 w-8 flex items-center justify-center rounded-md border transition-all duration-200 ${page === 1
+                        ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:translate-y-0.5'
+                        }`}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
                     >
-                      {p}
+                      <ChevronLeft size={16} />
                     </button>
-                  ))}
-                  {maxVisiblePage < totalPages && (
-                    <span className="px-1 text-gray-400 font-bold">...</span>
-                  )}
-                  <button
-                    className={`h-8 w-8 flex items-center justify-center rounded-full border transition-all duration-200 ${page === totalPages ? 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed' : 'bg-white text-[#643ae5] border-[#643ae5] hover:bg-[#643ae5] hover:text-white shadow-sm active:scale-95'}`}
-                    onClick={() => {
-                      const nextPage = Math.min(totalPages, page + 1);
-                      setPage(nextPage);
-                      if (nextPage > maxVisiblePage) {
-                        setMaxVisiblePage(nextPage);
-                      }
-                    }}
-                    disabled={page === totalPages}
-                  >
-                    <ChevronRight size={16} />
-                  </button>
+
+                    {/* Compact Page Numbers */}
+                    <div className="hidden sm:flex space-x-1">
+                      {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                        // Logic to show a window of pages can be complex, simplifying for now to show first few or surrounding
+                        // For simplicity in this constrained view:
+                        let pNum = i + 1;
+                        if (totalPages > 5 && page > 3) {
+                          pNum = page - 2 + i;
+                          if (pNum > totalPages) pNum = i + (totalPages - 4); // Clamp to end
+                        }
+                        // Simplified range logic for safety in this snippet
+                        if (totalPages <= 5) pNum = i + 1;
+
+                        return (pNum <= totalPages) ? (
+                          <button
+                            key={pNum}
+                            className={`h-8 w-8 flex items-center justify-center rounded-md text-xs font-medium transition-all duration-200 ${page === pNum
+                              ? 'bg-[#643ae5] text-white border-transparent shadow-sm'
+                              : 'bg-white text-gray-600 border border-gray-200 hover:border-[#643ae5] hover:text-[#643ae5]'
+                              }`}
+                            onClick={() => setPage(pNum)}
+                          >
+                            {pNum}
+                          </button>
+                        ) : null;
+                      })}
+                    </div>
+
+                    <button
+                      className={`h-8 w-8 flex items-center justify-center rounded-md border transition-all duration-200 ${page === totalPages
+                        ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:translate-y-0.5'
+                        }`}
+                      onClick={() => {
+                        const nextPage = Math.min(totalPages, page + 1);
+                        setPage(nextPage);
+                        if (nextPage > maxVisiblePage) {
+                          setMaxVisiblePage(nextPage);
+                        }
+                      }}
+                      disabled={page === totalPages}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
             {/* Main Content: Two Column Layout */}
-            <div className="flex gap-6 px-8 pb-8">
+            <div className="flex items-start gap-6 px-8 pb-8">
               {/* Sidebar: Contact List */}
-              <aside className="w-[320px] glass-card rounded-lg border bg-card text-card-foreground shadow-lg" style={{ height: 'fit-content' }}>
-                <div className="px-6 pt-6 pb-2 text-base font-semibold">{staffTabFiltered.length} contacts</div>
+              <aside className="w-[320px] glass-card rounded-lg border bg-card text-card-foreground shadow-lg flex flex-col max-h-[calc(100vh-250px)] sticky top-4">
+                <div className="px-6 pt-6 pb-2 text-base font-semibold border-b shrink-0">{staffTabFiltered.length} contacts</div>
                 <div className="flex-1 overflow-y-auto">
                   <ul className="divide-y divide-gray-200">
                     {paginatedStaff.map((member) => (
@@ -1800,7 +1830,7 @@ export default function StaffAI() {
               {/* Details Panel */}
               <main className="flex-1">
                 {selectedStaff ? (
-                  <div className="w-full glass-card rounded-lg border bg-card text-card-foreground shadow-lg p-8" style={{ minHeight: '600px' }}>
+                  <div className="w-full glass-card rounded-lg border bg-card text-card-foreground shadow-lg p-6" style={{ minHeight: '600px' }}>
                     <div className="flex items-center gap-6 mb-6 relative">
                       <div className="relative">
                         <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
@@ -1953,14 +1983,14 @@ export default function StaffAI() {
                         <table className="w-full text-card-foreground shadow-lg">
                           <thead>
                             <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Days Worked</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Basic Salary</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Allowances</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Deductions</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Overtime</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Net Salary</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
-                              <th className="px-8 py-3 text-left text-xs font-medium uppercase tracking-wider">Actions</th>
+                              <th className="table-header px-6 py-3 text-left">Days Worked</th>
+                              <th className="table-header px-6 py-3 text-left">Basic Salary</th>
+                              <th className="table-header px-6 py-3 text-left">Allowances</th>
+                              <th className="table-header px-6 py-3 text-left">Deductions</th>
+                              <th className="table-header px-6 py-3 text-left">Overtime</th>
+                              <th className="table-header px-6 py-3 text-left">Net Salary</th>
+                              <th className="table-header px-6 py-3 text-left">Status</th>
+                              <th className="table-header px-8 py-3 text-left">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2188,21 +2218,18 @@ export default function StaffAI() {
                     <TabsContent value="current" className="space-y-4">
                       <Card>
                         <CardHeader>
-                          <CardTitle>Current Month Payroll</CardTitle>
+                          <CardTitle className="text-h3">Current Month Payroll</CardTitle>
                         </CardHeader>
                         <CardContent>
                           {/* Payroll Controls */}
                           <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-6">
                             <div className="flex gap-4 flex-1">
-                              <div className="relative flex-1 max-w-md">
-                                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                                <Input
-                                  placeholder="Search staff by name or ID..."
-                                  value={searchQuery}
-                                  onChange={e => setSearchQuery(e.target.value)}
-                                  className="pl-10"
-                                />
-                              </div>
+                              <SearchInput
+                                placeholder="Search staff by name or ID..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                wrapperClassName="relative flex-1 max-w-xl"
+                              />
                             </div>
                             <div className="flex gap-2 items-center">
                               <Button
@@ -2275,15 +2302,15 @@ export default function StaffAI() {
                                           onChange={e => setSelectedPayrollStaff(e.target.checked ? staffTabFiltered.map(s => s.id) : [])}
                                         />
                                       </th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days Worked</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Basic Salary</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Allowances</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deductions</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overtime</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Net Salary</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                      <th className="px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                      <th className="table-header px-6 py-3 text-left">Employee</th>
+                                      <th className="table-header px-6 py-3 text-left">Days Worked</th>
+                                      <th className="table-header px-6 py-3 text-left">Basic Salary</th>
+                                      <th className="table-header px-6 py-3 text-left">Allowances</th>
+                                      <th className="table-header px-6 py-3 text-left">Deductions</th>
+                                      <th className="table-header px-6 py-3 text-left">Overtime</th>
+                                      <th className="table-header px-6 py-3 text-left">Net Salary</th>
+                                      <th className="table-header px-6 py-3 text-left">Status</th>
+                                      <th className="table-header px-8 py-3 text-left">Actions</th>
                                     </tr>
                                   </thead>
                                   <tbody className="bg-white divide-y divide-gray-100 text-sm font-normal">
@@ -2426,7 +2453,7 @@ export default function StaffAI() {
                     <TabsContent value="history" className="space-y-4">
                       <Card>
                         <CardHeader>
-                          <CardTitle>Payment History</CardTitle>
+                          <CardTitle className="text-h3">Payment History</CardTitle>
                           <CardDescription>Complete payroll history for all staff members</CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -2525,14 +2552,14 @@ export default function StaffAI() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>Employee</TableHead>
-                                <TableHead>Month</TableHead>
-                                <TableHead>Basic Salary</TableHead>
-                                <TableHead>Allowances</TableHead>
-                                <TableHead>Deductions</TableHead>
-                                <TableHead>Net Salary</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Payment Date</TableHead>
+                                <TableHead className="table-header">Employee</TableHead>
+                                <TableHead className="table-header">Month</TableHead>
+                                <TableHead className="table-header">Basic Salary</TableHead>
+                                <TableHead className="table-header">Allowances</TableHead>
+                                <TableHead className="table-header">Deductions</TableHead>
+                                <TableHead className="table-header">Net Salary</TableHead>
+                                <TableHead className="table-header">Status</TableHead>
+                                <TableHead className="table-header">Payment Date</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>

@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { 
-  FileText, 
-  Download, 
-  TrendingUp, 
-  Users, 
-  Target, 
+import {
+  FileText,
+  Download,
+  TrendingUp,
+  Users,
+  Target,
   Calendar,
   Filter,
   BarChart3,
@@ -50,14 +50,14 @@ export default function Reports() {
     const totalLeads = leads.length;
     const conversions = leads.filter(lead => lead.status === "enrolled").length;
     const conversionRate = totalLeads > 0 ? (conversions / totalLeads) * 100 : 0;
-    
+
     // Counselor performance
     const counselorStats = counselors?.map(counselor => {
       const counselorLeads = leads.filter(lead => lead.counselorId === counselor.id);
       const counselorConversions = counselorLeads.filter(lead => lead.status === "enrolled").length;
-      const counselorConversionRate = counselorLeads.length > 0 ? 
+      const counselorConversionRate = counselorLeads.length > 0 ?
         (counselorConversions / counselorLeads.length) * 100 : 0;
-      
+
       return {
         ...counselor,
         totalLeads: counselorLeads.length,
@@ -79,7 +79,7 @@ export default function Reports() {
     const sourceStats = leadSources?.map(source => ({
       ...source,
       conversionRate: source.totalLeads > 0 ? (source.conversions / source.totalLeads) * 100 : 0,
-      costPerLead: source.totalLeads > 0 && source.cost ? 
+      costPerLead: source.totalLeads > 0 && source.cost ?
         (Number(source.cost) / source.totalLeads) : 0
     })) || [];
 
@@ -98,7 +98,7 @@ export default function Reports() {
   const exportReport = (format: string) => {
     // In a real implementation, this would generate and download the report
     console.log(`Exporting ${reportType} report in ${format} format for last ${dateRange} days`);
-    
+
     // Mock data for export
     const reportData = {
       generatedAt: new Date().toISOString(),
@@ -108,14 +108,14 @@ export default function Reports() {
     };
 
     // Create a blob and download it
-    const dataStr = format === 'json' ? 
-      JSON.stringify(reportData, null, 2) : 
+    const dataStr = format === 'json' ?
+      JSON.stringify(reportData, null, 2) :
       convertToCSV(reportData);
-    
-    const dataBlob = new Blob([dataStr], { 
-      type: format === 'json' ? 'application/json' : 'text/csv' 
+
+    const dataBlob = new Blob([dataStr], {
+      type: format === 'json' ? 'application/json' : 'text/csv'
     });
-    
+
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
@@ -128,23 +128,23 @@ export default function Reports() {
 
   const convertToCSV = (data: any) => {
     if (!metrics) return "";
-    
+
     let csv = "Lead Report\n";
     csv += `Generated: ${new Date().toLocaleDateString()}\n`;
     csv += `Date Range: Last ${dateRange} days\n\n`;
-    
+
     csv += "Overall Metrics\n";
     csv += "Metric,Value\n";
     csv += `Total Leads,${metrics.totalLeads}\n`;
     csv += `Conversions,${metrics.conversions}\n`;
     csv += `Conversion Rate,${metrics.conversionRate.toFixed(2)}%\n\n`;
-    
+
     csv += "Status Distribution\n";
     csv += "Status,Count\n";
     Object.entries(metrics.statusDistribution).forEach(([status, count]) => {
       csv += `${status},${count}\n`;
     });
-    
+
     return csv;
   };
 
@@ -168,12 +168,12 @@ export default function Reports() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header className="py-4" />
-      
+
       <main className="p-6 space-y-6">
         {/* Report Controls */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
+            <CardTitle className="text-h3 flex items-center">
               <FileText className="mr-3 text-blue-600" size={24} />
               Report Configuration
             </CardTitle>
@@ -195,7 +195,7 @@ export default function Reports() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <Filter className="text-gray-500" size={16} />
                   <Select value={reportType} onValueChange={setReportType}>
@@ -232,8 +232,8 @@ export default function Reports() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Leads</p>
-                  <p className="text-3xl font-bold text-gray-900">{metrics.totalLeads}</p>
+                  <p className="text-caption font-medium text-gray-600">Total Leads</p>
+                  <p className="text-h1 font-bold text-gray-900">{metrics.totalLeads}</p>
                   <p className="text-sm text-blue-600 mt-1 flex items-center">
                     <TrendingUp className="mr-1" size={12} />
                     Last {dateRange} days
@@ -250,8 +250,8 @@ export default function Reports() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Conversions</p>
-                  <p className="text-3xl font-bold text-gray-900">{metrics.conversions}</p>
+                  <p className="text-caption font-medium text-gray-600">Conversions</p>
+                  <p className="text-h1 font-bold text-gray-900">{metrics.conversions}</p>
                   <p className="text-sm text-green-600 mt-1">
                     {metrics.conversionRate.toFixed(1)}% rate
                   </p>
@@ -267,8 +267,8 @@ export default function Reports() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Active Pipeline</p>
-                  <p className="text-3xl font-bold text-gray-900">
+                  <p className="text-caption font-medium text-gray-600">Active Pipeline</p>
+                  <p className="text-h1 font-bold text-gray-900">
                     {metrics.statusDistribution.contacted + metrics.statusDistribution.interested}
                   </p>
                   <p className="text-sm text-orange-600 mt-1">Requires follow-up</p>
@@ -284,8 +284,8 @@ export default function Reports() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Revenue Impact</p>
-                  <p className="text-3xl font-bold text-gray-900">
+                  <p className="text-caption font-medium text-gray-600">Revenue Impact</p>
+                  <p className="text-h1 font-bold text-gray-900">
                     ₹{((metrics.conversions * 80000) / 100000).toFixed(1)}L
                   </p>
                   <p className="text-sm text-purple-600 mt-1">Estimated value</p>
@@ -301,13 +301,13 @@ export default function Reports() {
         {/* Status Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle>Lead Status Distribution</CardTitle>
+            <CardTitle className="text-h3">Lead Status Distribution</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               {Object.entries(metrics.statusDistribution).map(([status, count]) => (
                 <div key={status} className="text-center p-4 bg-gray-50 rounded-lg">
-                  <div className="text-2xl font-bold text-gray-900">{count}</div>
+                  <div className="text-h2 font-bold text-gray-900">{count}</div>
                   <div className="text-sm text-gray-600 capitalize">{status}</div>
                   <div className="text-xs text-gray-500 mt-1">
                     {((count / metrics.totalLeads) * 100).toFixed(1)}%
@@ -322,7 +322,7 @@ export default function Reports() {
           {/* Source Performance */}
           <Card>
             <CardHeader>
-              <CardTitle>Lead Source Performance</CardTitle>
+              <CardTitle className="text-h3">Lead Source Performance</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -337,11 +337,10 @@ export default function Reports() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <Badge className={`${
-                        source.conversionRate >= 20 ? 'bg-green-100 text-green-800' :
-                        source.conversionRate >= 10 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
+                      <Badge className={`${source.conversionRate >= 20 ? 'bg-green-100 text-green-800' :
+                          source.conversionRate >= 10 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                        }`}>
                         {source.conversionRate.toFixed(1)}%
                       </Badge>
                       {source.costPerLead > 0 && (
@@ -359,7 +358,7 @@ export default function Reports() {
           {/* Counselor Performance */}
           <Card>
             <CardHeader>
-              <CardTitle>Counselor Performance</CardTitle>
+              <CardTitle className="text-h3">Counselor Performance</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -375,11 +374,10 @@ export default function Reports() {
                       <div className="text-lg font-bold text-gray-900">
                         {counselor.conversions}
                       </div>
-                      <Badge className={`${
-                        counselor.conversionRate >= 20 ? 'bg-green-100 text-green-800' :
-                        counselor.conversionRate >= 10 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
+                      <Badge className={`${counselor.conversionRate >= 20 ? 'bg-green-100 text-green-800' :
+                          counselor.conversionRate >= 10 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                        }`}>
                         {counselor.conversionRate.toFixed(1)}%
                       </Badge>
                     </div>
@@ -398,17 +396,17 @@ export default function Reports() {
         {/* Monthly Trend Analysis */}
         <Card>
           <CardHeader>
-            <CardTitle>Enrollment Trend Analysis</CardTitle>
+            <CardTitle className="text-h3">Enrollment Trend Analysis</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="relative h-64 bg-gradient-to-t from-blue-50 to-transparent rounded-lg flex items-end justify-between p-4">
               {enrollmentTrend?.map((data, index) => {
                 const maxEnrollments = Math.max(...(enrollmentTrend?.map(t => t.enrollments) || [1]));
                 const height = (data.enrollments / maxEnrollments) * 200;
-                
+
                 return (
                   <div key={data.month} className="flex flex-col items-center">
-                    <div 
+                    <div
                       className="w-12 bg-blue-500 rounded-t transition-all hover:bg-blue-600"
                       style={{ height: `${Math.max(height, 20)}px` }}
                     ></div>
@@ -427,12 +425,12 @@ export default function Reports() {
         {/* Report Summary */}
         <Card>
           <CardHeader>
-            <CardTitle>Report Summary & Insights</CardTitle>
+            <CardTitle className="text-h3">Report Summary & Insights</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h4 className="font-medium text-gray-900 mb-3">Key Findings</h4>
+                <h4 className="text-body font-semibold text-gray-900 mb-3">Key Findings</h4>
                 <div className="space-y-2">
                   <div className="flex items-start space-x-2">
                     <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
@@ -454,9 +452,9 @@ export default function Reports() {
                   </div>
                 </div>
               </div>
-              
+
               <div>
-                <h4 className="font-medium text-gray-900 mb-3">Recommendations</h4>
+                <h4 className="text-body font-semibold text-gray-900 mb-3">Recommendations</h4>
                 <div className="space-y-2">
                   <div className="flex items-start space-x-2">
                     <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>

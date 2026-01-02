@@ -21,9 +21,11 @@ import {
   Upload,
   Download,
   //BookOpen, // for Class/Stream
-  ChevronUp,
   ChevronDown,
-  GraduationCap
+  ChevronUp,
+  GraduationCap,
+  ListFilter,
+  Globe
 } from "lucide-react";
 import AddLeadModal from "@/components/leads/add-lead-modal";
 import LeadDetailModal from "@/components/leads/lead-detail-modal";
@@ -315,21 +317,25 @@ export default function LeadManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <SidebarPageHeader
+    <div className="min-h-screen app-bg-gradient">
+      <Header
         title="Lead Management"
         subtitle="Manage and track your leads"
+      />
+      <SidebarPageHeader
         searchPlaceholder="Search leads by name, phone, or email..."
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
         filters={
-          <>
+          <div className="flex items-center gap-3">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40 bg-white border-[#643ae5]">
-                <SelectValue placeholder="All Status" />
+              <SelectTrigger className="w-40 bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
+                <div className="flex items-center gap-2 truncate">
+                  <ListFilter className="h-4 w-4 text-gray-400 shrink-0" />
+                  <SelectValue placeholder="All Status" />
+                </div>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white border-gray-200 shadow-lg">
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="new">New</SelectItem>
                 <SelectItem value="contacted">Contacted</SelectItem>
@@ -339,10 +345,13 @@ export default function LeadManagement() {
               </SelectContent>
             </Select>
             <Select value={sourceFilter} onValueChange={setSourceFilter}>
-              <SelectTrigger className="w-40 bg-white border-[#643ae5]">
-                <SelectValue placeholder="All Sources" />
+              <SelectTrigger className="w-40 bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
+                <div className="flex items-center gap-2 truncate">
+                  <Globe className="h-4 w-4 text-gray-400 shrink-0" />
+                  <SelectValue placeholder="All Sources" />
+                </div>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white border-gray-200 shadow-lg">
                 <SelectItem value="all">All Sources</SelectItem>
                 <SelectItem value="website">Website</SelectItem>
                 <SelectItem value="google_ads">Google Ads</SelectItem>
@@ -352,34 +361,35 @@ export default function LeadManagement() {
                 <SelectItem value="csv_import">CSV Import</SelectItem>
               </SelectContent>
             </Select>
-          </>
+          </div>
         }
         primaryActions={
-          <>
+          <div className="flex items-center gap-3">
             <Button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 bg-[#643ae5] hover:bg-[#643ae5]/90 text-white"
+              className="bg-[#643ae5] hover:bg-[#552dbf] text-white shadow-sm h-10 px-4 rounded-lg flex items-center gap-2 transition-all active:scale-95"
             >
-              <UserPlus size={16} />
-              Add New Lead
+              <UserPlus className="h-4 w-4" />
+              <span>Add New Lead</span>
             </Button>
+            <div className="h-6 w-px bg-gray-200 mx-1"></div>
             <Button
               variant="outline"
+              className="h-10 px-4 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-lg flex items-center gap-2"
               onClick={() => setIsCSVImportOpen(true)}
-              className="flex items-center gap-2 border-[#643ae5] text-gray-800"
             >
-              <Download size={16} />
-              Import
+              <Download className="h-4 w-4" />
+              <span>Import</span>
             </Button>
             <Button
               variant="outline"
+              className="h-10 px-4 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-lg flex items-center gap-2"
               onClick={exportLeads}
-              className="flex items-center gap-2 border-[#643ae5] text-gray-800"
             >
-              <Upload size={16} />
-              Export
+              <Upload className="h-4 w-4" />
+              <span>Export</span>
             </Button>
-          </>
+          </div>
         }
       />
       <div className="px-6 pb-6">
@@ -393,7 +403,7 @@ export default function LeadManagement() {
                       setSortKey("student");
                       setSortOrder(sortKey === "student" && sortOrder === "asc" ? "desc" : "asc");
                     }}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider cursor-pointer"
+                    className="px-6 py-3 text-left table-header tracking-wider cursor-pointer"
                   >
                     <span className="flex items-center gap-1">
                       Student Details
@@ -402,7 +412,7 @@ export default function LeadManagement() {
                       ) : null}
                     </span>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left table-header tracking-wider">
                     Contact Info
                   </th>
                   <th
@@ -410,7 +420,7 @@ export default function LeadManagement() {
                       setSortKey("class");
                       setSortOrder(sortKey === "class" && sortOrder === "asc" ? "desc" : "asc");
                     }}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider cursor-pointer"
+                    className="px-6 py-3 text-left table-header tracking-wider cursor-pointer"
                   >
                     <span className="flex items-center gap-1">
                       Class/Stream
@@ -438,7 +448,7 @@ export default function LeadManagement() {
                       setSortKey("source");
                       setSortOrder(sortKey === "source" && sortOrder === "asc" ? "desc" : "asc");
                     }}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider cursor-pointer"
+                    className="px-6 py-3 text-left table-header tracking-wider cursor-pointer"
                   >
                     <span className="flex items-center gap-1">
                       Source
@@ -447,7 +457,7 @@ export default function LeadManagement() {
                       ) : null}
                     </span>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left table-header tracking-wider">
                     Counselor
                   </th>
                   <th
@@ -455,7 +465,7 @@ export default function LeadManagement() {
                       setSortKey("lastContact");
                       setSortOrder(sortKey === "lastContact" && sortOrder === "asc" ? "desc" : "asc");
                     }}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider cursor-pointer"
+                    className="px-6 py-3 text-left table-header tracking-wider cursor-pointer"
                   >
                     <span className="flex items-center gap-1">
                       Last Contacted
@@ -465,7 +475,7 @@ export default function LeadManagement() {
                     </span>
                   </th>
 
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left table-header tracking-wider">
                     Actions
                   </th>
                 </tr>

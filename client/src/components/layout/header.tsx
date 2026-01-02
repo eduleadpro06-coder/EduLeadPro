@@ -22,7 +22,10 @@ export default function Header({ title, subtitle, className }: HeaderProps) {
   return (
     <header className={`bg-white shadow-sm border-b border-gray-200 px-6 py-4 ${className || ''}`}>
       <div className="flex items-center justify-between pl-2">
-        <div />
+        <div className="flex flex-col">
+          {title && <h1 className="text-xl font-bold text-gray-900">{title}</h1>}
+          {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
+        </div>
         <div className="flex items-center space-x-4">
           <NotificationCenter />
           {/* Profile Dropdown */}

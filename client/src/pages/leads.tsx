@@ -10,7 +10,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Filter, Phone, Mail, Calendar, Edit } from "lucide-react";
+import { Plus, Filter, Phone, Mail, Calendar, Edit } from "lucide-react";
+import { SearchInput } from "@/components/ui/search-input";
+import Header from "@/components/layout/header";
 import type { Lead, LeadWithCounselor } from "@shared/schema";
 
 export default function Leads() {
@@ -94,13 +96,10 @@ export default function Leads() {
 
   return (
     <>
+      <Header title="Lead Management" subtitle="Track and manage your prospective students" />
       <div className="space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Lead Management</h1>
-            <p className="text-gray-600 mt-2">Track and manage your prospective students</p>
-          </div>
+        <div className="flex items-center justify-end mb-2">
           <Dialog open={isAddLeadOpen} onOpenChange={setIsAddLeadOpen}>
             <DialogTrigger asChild>
               <Button className="h-11 px-6">
@@ -121,17 +120,14 @@ export default function Leads() {
         <Card>
           <CardContent className="p-8">
             <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search by student name, parent name, or phone..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-11"
-                />
-              </div>
+              <SearchInput
+                placeholder="Search by student name, parent name, or phone..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                wrapperClassName="flex-1"
+              />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-48 h-11">
+                <SelectTrigger className="w-full md:w-48 h-10">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>

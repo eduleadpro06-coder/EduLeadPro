@@ -2,8 +2,6 @@ import React from 'react';
 import { Search as SearchIcon } from 'lucide-react';
 
 interface PageHeaderProps {
-    title: string;
-    subtitle?: string;
     searchPlaceholder?: string;
     searchValue?: string;
     onSearchChange?: (value: string) => void;
@@ -13,8 +11,6 @@ interface PageHeaderProps {
 }
 
 export default function PageHeader({
-    title,
-    subtitle,
     searchPlaceholder = "Search...",
     searchValue = "",
     onSearchChange,
@@ -23,7 +19,7 @@ export default function PageHeader({
     showSearch = true,
 }: PageHeaderProps) {
     return (
-        <div className="w-full px-8 pt-8 pb-4 flex flex-col gap-2">
+        <div className="w-full px-6 pt-4 pb-4 flex flex-col gap-2">
             {/* Search and Actions Row */}
             <div className="flex flex-wrap items-center gap-4 w-full justify-between">
                 {/* Search Bar and Filters */}

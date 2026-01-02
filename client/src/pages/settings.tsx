@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -249,44 +248,58 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <Header />
+      <Header title="Settings" subtitle="Manage your system configuration and preferences" />
 
-      <main className="p-6 max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-600 mt-1">Manage your system configuration and preferences</p>
+      <main className="w-full px-6 py-6 space-y-6">
+
+        <div className="flex gap-2 -mb-px w-full border-b">
+          <Button
+            variant={selectedTab === "profile" ? "default" : "ghost"}
+            onClick={() => handleTabChange("profile")}
+            className="rounded-b-none flex-1"
+          >
+            <User className="mr-2 h-4 w-4" />
+            Profile
+          </Button>
+          <Button
+            variant={selectedTab === "notifications" ? "default" : "ghost"}
+            onClick={() => handleTabChange("notifications")}
+            className="rounded-b-none flex-1"
+          >
+            <Bell className="mr-2 h-4 w-4" />
+            Notifications
+          </Button>
+          <Button
+            variant={selectedTab === "system" ? "default" : "ghost"}
+            onClick={() => handleTabChange("system")}
+            className="rounded-b-none flex-1"
+          >
+            <Database className="mr-2 h-4 w-4" />
+            System
+          </Button>
+          <Button
+            variant={selectedTab === "global-fees" ? "default" : "ghost"}
+            onClick={() => handleTabChange("global-fees")}
+            className="rounded-b-none flex-1"
+          >
+            <Calculator className="mr-2 h-4 w-4" />
+            Global Fees
+          </Button>
+          <Button
+            variant={selectedTab === "templates" ? "default" : "ghost"}
+            onClick={() => handleTabChange("templates")}
+            className="rounded-b-none flex-1"
+          >
+            <MessageSquare className="mr-2 h-4 w-4" />
+            Templates
+          </Button>
         </div>
 
-        <Tabs value={selectedTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm p-1.5 rounded-xl shadow-lg border border-gray-200/50">
-            <TabsTrigger value="profile" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white transition-all duration-300">
-              <User className="h-4 w-4" />
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white transition-all duration-300">
-              <Bell className="h-4 w-4" />
-              Notifications
-            </TabsTrigger>
-            <TabsTrigger value="system" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white transition-all duration-300">
-              <Database className="h-4 w-4" />
-              System
-            </TabsTrigger>
-
-
-            <TabsTrigger value="global-fees" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white transition-all duration-300">
-              <Calculator className="h-4 w-4" />
-              Global Fees
-            </TabsTrigger>
-            <TabsTrigger value="templates" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white transition-all duration-300">
-              <MessageSquare className="h-4 w-4" />
-              Templates
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="profile" className="animate-in fade-in-50 duration-300">
+        {selectedTab === "profile" && (
+          <div className="animate-in fade-in-50 duration-300">
             <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
               <CardHeader>
-                <CardTitle className="text-2xl">Profile Information</CardTitle>
+                <CardTitle className="text-h3">Profile Information</CardTitle>
                 <CardDescription>
                   Update your personal information and contact details
                 </CardDescription>
@@ -336,13 +349,14 @@ export default function Settings() {
                 </Button>
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-
-          <TabsContent value="notifications" className="animate-in fade-in-50 duration-300">
+        {selectedTab === "notifications" && (
+          <div className="animate-in fade-in-50 duration-300">
             <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
               <CardHeader>
-                <CardTitle className="text-2xl">Notification Preferences</CardTitle>
+                <CardTitle className="text-h3">Notification Preferences</CardTitle>
                 <CardDescription>
                   Configure how you want to receive notifications
                 </CardDescription>
@@ -398,12 +412,14 @@ export default function Settings() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="system" className="space-y-6 animate-in fade-in-50 duration-300">
+        {selectedTab === "system" && (
+          <div className="space-y-6 animate-in fade-in-50 duration-300">
             <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
               <CardHeader>
-                <CardTitle className="text-2xl">System Configuration</CardTitle>
+                <CardTitle className="text-h3">System Configuration</CardTitle>
                 <CardDescription>
                   Configure system-wide settings and automation
                 </CardDescription>
@@ -481,7 +497,7 @@ export default function Settings() {
             {/* Academic Year Configuration */}
             <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
               <CardHeader>
-                <CardTitle className="text-2xl">Academic Year</CardTitle>
+                <CardTitle className="text-h3">Academic Year</CardTitle>
                 <CardDescription>
                   Set the current academic year for the entire system
                 </CardDescription>
@@ -515,17 +531,16 @@ export default function Settings() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+        )}
 
-          </TabsContent>
-
-
-
-          <TabsContent value="global-fees" className="animate-in fade-in-50 duration-300">
+        {selectedTab === "global-fees" && (
+          <div className="animate-in fade-in-50 duration-300">
             <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
               <CardHeader>
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="flex flex-col gap-1">
-                    <CardTitle className="text-2xl">Global Class Fee Management</CardTitle>
+                    <CardTitle className="text-h3">Global Class Fee Management</CardTitle>
                     <CardDescription>
                       Set and manage fee structures for different classes that can be used for calculations and automatically assigned to students
                     </CardDescription>
@@ -570,13 +585,13 @@ export default function Settings() {
                     <Table>
                       <TableHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
                         <TableRow className="hover:bg-transparent">
-                          <TableHead className="font-semibold">Class</TableHead>
-                          <TableHead className="font-semibold">Fee Type</TableHead>
-                          <TableHead className="font-semibold">Amount</TableHead>
-                          <TableHead className="font-semibold">Frequency</TableHead>
-                          <TableHead className="font-semibold">Academic Year</TableHead>
-                          <TableHead className="font-semibold">Status</TableHead>
-                          <TableHead className="font-semibold">Actions</TableHead>
+                          <TableHead className="table-header font-semibold">Class</TableHead>
+                          <TableHead className="table-header font-semibold">Fee Type</TableHead>
+                          <TableHead className="table-header font-semibold">Amount</TableHead>
+                          <TableHead className="table-header font-semibold">Frequency</TableHead>
+                          <TableHead className="table-header font-semibold">Academic Year</TableHead>
+                          <TableHead className="table-header font-semibold">Status</TableHead>
+                          <TableHead className="table-header font-semibold">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -805,27 +820,33 @@ export default function Settings() {
                     <TableBody>
                       {getClassFeeBreakdown(selectedClassForTotal, academicYear).map(fee => (
                         <TableRow key={fee.id}>
-                          <TableCell>{fee.feeType}</TableCell>
+                          <TableCell className="capitalize">{fee.feeType}</TableCell>
                           <TableCell>₹{parseFloat(fee.amount).toLocaleString()}</TableCell>
                           <TableCell className="capitalize">{fee.frequency}</TableCell>
-                          <TableCell>{fee.description || '-'}</TableCell>
+                          <TableCell>{fee.description || "-"}</TableCell>
                         </TableRow>
                       ))}
+                      <TableRow className="bg-muted font-semibold">
+                        <TableCell>Total</TableCell>
+                        <TableCell>₹{calculateClassTotalFees(selectedClassForTotal, academicYear).toLocaleString()}</TableCell>
+                        <TableCell>-</TableCell>
+                        <TableCell>-</TableCell>
+                      </TableRow>
                     </TableBody>
                   </Table>
-                  <div className="text-right font-bold text-lg">
-                    Total: ₹{calculateClassTotalFees(selectedClassForTotal, academicYear).toLocaleString()}
-                  </div>
                 </div>
               </DialogContent>
             </Dialog>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="templates">
+        {selectedTab === "templates" && (
+          <div className="animate-in fade-in-50 duration-300">
             <MessageTemplatesManager />
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
+
       </main>
-    </div>
+    </div >
   );
 }

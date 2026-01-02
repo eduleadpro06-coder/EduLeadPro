@@ -2,8 +2,6 @@ import React from 'react';
 import { Search as SearchIcon } from 'lucide-react';
 
 interface SidebarPageHeaderProps {
-    title: string;
-    subtitle?: string;
     searchPlaceholder?: string;
     searchValue?: string;
     onSearchChange?: (value: string) => void;
@@ -17,8 +15,6 @@ interface SidebarPageHeaderProps {
  * (e.g., Student Fees, Lead Management with sidebar + detail panel)
  */
 export default function SidebarPageHeader({
-    title,
-    subtitle,
     searchPlaceholder = "Search...",
     searchValue = "",
     onSearchChange,

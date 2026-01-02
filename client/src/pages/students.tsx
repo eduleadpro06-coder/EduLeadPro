@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, CreditCard, Receipt, AlertCircle, CheckCircle, Clock, Filter, Download, User, Phone, Mail, Trash2, Edit } from "lucide-react";
+import { Plus, CreditCard, Receipt, AlertCircle, CheckCircle, Clock, Filter, Download, User, Phone, Mail, Trash2, Edit, ChevronDown, ChevronUp, GraduationCap } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { invalidateNotifications } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -346,8 +346,8 @@ export default function Students() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
+    <div className="min-h-screen app-bg-gradient">
+      <Header title="Student Management" subtitle="Manage specific student details and enrollments" />
 
       {/* Fee Statistics Cards */}
       {feeStats && (
@@ -394,10 +394,13 @@ export default function Students() {
       <div className="flex justify-between items-center">
         <div className="flex gap-4">
           <Select value={filterClass} onValueChange={setFilterClass}>
-            <SelectTrigger className="w-48 bg-white text-gray-900 border-white">
-              <SelectValue placeholder="Filter by class" />
+            <SelectTrigger className="w-56 bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
+              <div className="flex items-center gap-2 truncate">
+                <GraduationCap className="h-4 w-4 text-gray-400 shrink-0" />
+                <SelectValue placeholder="Filter by class" />
+              </div>
             </SelectTrigger>
-            <SelectContent className="bg-white text-gray-900">
+            <SelectContent className="bg-white border-gray-200 shadow-lg">
               <SelectItem value="all">All Classes</SelectItem>
               {classOptions.map((cls) => (
                 <SelectItem key={cls} value={cls}>
@@ -410,8 +413,10 @@ export default function Students() {
 
         <Dialog open={addStudentOpen} onOpenChange={setAddStudentOpen}>
           <DialogTrigger asChild>
-            <Button variant="purple">
-              <Plus className="mr-2 h-4 w-4" />
+            <Button
+              className="bg-[#643ae5] hover:bg-[#552dbf] text-white shadow-sm h-10 px-4 rounded-lg flex items-center gap-2 transition-all active:scale-95"
+            >
+              <Plus className="h-4 w-4" />
               Add Student
             </Button>
           </DialogTrigger>
@@ -521,8 +526,8 @@ export default function Students() {
                   <CardHeader className="pb-2 bg-white text-gray-900">
                     <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle className="text-lg text-gray-800">{student.name}</CardTitle>
-                        <CardDescription className="text-sm text-gray-800">
+                        <CardTitle className="text-h3 text-gray-800">{student.name}</CardTitle>
+                        <CardDescription className="text-body text-gray-800">
                           {student.rollNumber} • {student.class} {student.stream}
                         </CardDescription>
                       </div>
@@ -607,12 +612,12 @@ export default function Students() {
             <Table className="bg-white text-gray-900">
               <TableHeader className="bg-white text-gray-900">
                 <TableRow className="bg-white text-gray-900">
-                  <TableHead className="text-gray-800">Student</TableHead>
-                  <TableHead className="text-gray-800">Fee Type</TableHead>
-                  <TableHead className="text-gray-800">Amount</TableHead>
-                  <TableHead className="text-gray-800">Due Date</TableHead>
-                  <TableHead className="text-gray-800">Status</TableHead>
-                  <TableHead className="text-gray-800">Installment</TableHead>
+                  <TableHead className="table-header text-gray-800">Student</TableHead>
+                  <TableHead className="table-header text-gray-800">Fee Type</TableHead>
+                  <TableHead className="table-header text-gray-800">Amount</TableHead>
+                  <TableHead className="table-header text-gray-800">Due Date</TableHead>
+                  <TableHead className="table-header text-gray-800">Status</TableHead>
+                  <TableHead className="table-header text-gray-800">Installment</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody className="bg-white text-gray-900">
@@ -655,13 +660,13 @@ export default function Students() {
             <Table className="bg-white text-gray-900">
               <TableHeader className="bg-white text-gray-900">
                 <TableRow className="bg-white text-gray-900">
-                  <TableHead className="text-gray-800">Student</TableHead>
-                  <TableHead className="text-gray-800">Amount</TableHead>
-                  <TableHead className="text-gray-800">Discount</TableHead>
-                  <TableHead className="text-gray-800">Payment Date</TableHead>
-                  <TableHead className="text-gray-800">Method</TableHead>
-                  <TableHead className="text-gray-800">Receipt</TableHead>
-                  <TableHead className="text-gray-800">Transaction ID</TableHead>
+                  <TableHead className="table-header text-gray-800">Student</TableHead>
+                  <TableHead className="table-header text-gray-800">Amount</TableHead>
+                  <TableHead className="table-header text-gray-800">Discount</TableHead>
+                  <TableHead className="table-header text-gray-800">Payment Date</TableHead>
+                  <TableHead className="table-header text-gray-800">Method</TableHead>
+                  <TableHead className="table-header text-gray-800">Receipt</TableHead>
+                  <TableHead className="table-header text-gray-800">Transaction ID</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody className="bg-white text-gray-900">
