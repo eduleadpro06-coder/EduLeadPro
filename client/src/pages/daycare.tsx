@@ -815,6 +815,7 @@ export default function Daycare() {
                                             createEnrollmentMutation.mutate({
                                                 childId,
                                                 startDate: formData.get('startDate'),
+                                                endDate: formData.get('endDate'),
                                                 status: 'active',
                                                 customHourlyRate: enrollmentRate,
                                                 customMonthlyRate: (rate * days).toString() // Explicit formula: Hourly Rate * Total Hours
@@ -872,6 +873,13 @@ export default function Daycare() {
                                                 <div>
                                                     <Label htmlFor="startDate">Start Date *</Label>
                                                     <Input id="startDate" name="startDate" type="date" required />
+                                                </div>
+
+                                                {/* End Date */}
+                                                <div>
+                                                    <Label htmlFor="endDate">End Date *</Label>
+                                                    <Input id="endDate" name="endDate" type="date" required />
+                                                    <p className="text-xs text-gray-500 mt-1">Enrollment will expire on this date. Parent will be notified 1 day before expiration.</p>
                                                 </div>
 
                                                 {/* Billing Details Section */}

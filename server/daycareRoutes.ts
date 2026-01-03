@@ -382,6 +382,22 @@ export function registerDaycareRoutes(app: Express): void {
         }
     });
 
+    // NEW: Check enrollment expirations
+    app.post("/api/daycare/enrollments/check-expirations", async (req, res) => {
+        try {
+            const organizationId = await requireOrganizationId(req);
+            const result = await daycareStorage.checkEnrollmentExpirations(organizationId);
+            res.json({
+                success: true,
+                message: `Found ${result.expiring} expiring and ${result.expired} expired enrollments. Created ${result.notifications} notifications.`,
+                ...result
+            });
+        } catch (error) {
+            console.error("Error checking enrollment expirations:", error);
+            res.status(500).json({ error: "Failed to check expirations" });
+        }
+    });
+
     // ============================================
     // ATTENDANCE MANAGEMENT
     // ============================================

@@ -355,6 +355,10 @@ export class DaycareStorage {
         });
     }
 
+    async deactivateEnrollment(id: number): Promise<DaycareEnrollment | undefined> {
+        return this.updateEnrollment(id, { status: "cancelled" });
+    }
+
     async cancelEnrollment(id: number, reason: string): Promise<DaycareEnrollment | undefined> {
         return await this.updateEnrollment(id, {
             status: "cancelled",
@@ -363,7 +367,115 @@ export class DaycareStorage {
         });
     }
 
-    // ==========================================
+    // NEW: Get enrollments expiring within specified days
+    async getExpiringEnrollments(daysAhead: number = 30, organizationId?: number): Promise<DaycareEnrollment[]> {
+        const today = new Date();
+        const futureDate = new Date();
+        futureDate.setDate(today.getDate() + daysAhead);
+
+        const todayStr = today.toISOString().split('T')[0];
+        const futureDateStr = futureDate.toISOString().split('T')[0];
+
+        const conditions: SQL[] = [
+            isNull(schema.daycareEnrollments.deletedAt),
+            eq(schema.daycareEnrollments.status, "active"),
+            gte(schema.daycareEnrollments.endDate, todayStr),
+            lte(schema.daycareEnrollments.endDate, futureDateStr)
+        ];
+
+        if (organizationId) {
+            conditions.push(eq(schema.daycareEnrollments.organizationId, organizationId));
+        }
+
+        return await db.select()
+            .from(schema.daycareEnrollments)
+            .where(and(...conditions))
+            .orderBy(asc(schema.daycareEnrollments.endDate));
+    }
+
+    // NEW: Get enrollments that have expired (past end date)
+    async getExpiredEnrollments(organizationId?: number): Promise<DaycareEnrollment[]> {
+        const today = new Date().toISOString().split('T')[0];
+
+        const conditions: SQL[] = [
+            isNull(schema.daycareEnrollments.deletedAt),
+            eq(schema.daycareEnrollments.status, "active"),
+            lte(schema.daycareEnrollments.endDate, today)
+        ];
+
+        if (organizationId) {
+            conditions.push(eq(schema.daycareEnrollments.organizationId, organizationId));
+        }
+
+        return await db.select()
+            .from(schema.daycareEnrollments)
+            .where(and(...conditions))
+            .orderBy(desc(schema.daycareEnrollments.endDate));
+    }
+
+    // NEW: Check enrollment expirations and create notifications
+    async checkEnrollmentExpirations(organizationId?: number): Promise<{
+        expiring: number;
+        expired: number;
+        notifications: number;
+    }> {
+        // Get expiring enrollments (1 day ahead)
+        const expiringEnrollments = await this.getExpiringEnrollments(1, organizationId);
+
+        // Get expired enrollments
+        const expiredEnrollments = await this.getExpiredEnrollments(organizationId);
+
+        // Auto-update expired enrollments to "expired" status
+        for (const enrollment of expiredEnrollments) {
+            await this.updateEnrollment(enrollment.id, { status: "expired" });
+        }
+
+        // Create notifications for expiring enrollments (within 30 days)
+        let notificationCount = 0;
+        for (const enrollment of expiringEnrollments) {
+            const child = await this.getDaycareChild(enrollment.childId);
+            if (child) {
+                const daysUntilExpiry = Math.ceil(
+                    (new Date(enrollment.endDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+                );
+
+                await db.insert(schema.notifications).values({
+                    userId: 1, // System user
+                    type: 'daycare',
+                    title: `Daycare Enrollment Expiring Tomorrow`,
+                    message: `${child.childName}'s enrollment will expire tomorrow on ${new Date(enrollment.endDate!).toLocaleDateString()}. Please request parent to re-enroll urgently.`,
+                    priority: 'high',
+                    actionType: 'view_daycare',
+                    actionId: enrollment.id.toString()
+                });
+                notificationCount++;
+            }
+        }
+
+        // Create notifications for newly expired enrollments
+        for (const enrollment of expiredEnrollments) {
+            const child = await this.getDaycareChild(enrollment.childId);
+            if (child) {
+                await db.insert(schema.notifications).values({
+                    userId: 1, // System user
+                    type: 'daycare',
+                    title: `Daycare Enrollment Expired`,
+                    message: `${child.childName}'s enrollment has expired. Status changed to "Expired". Please contact parent for re-enrollment.`,
+                    priority: 'high',
+                    actionType: 'view_daycare',
+                    actionId: enrollment.id.toString()
+                });
+                notificationCount++;
+            }
+        }
+
+        return {
+            expiring: expiringEnrollments.length,
+            expired: expiredEnrollments.length,
+            notifications: notificationCount
+        };
+    }
+
     // ATTENDANCE MANAGEMENT
     // ==========================================
 
@@ -384,7 +496,6 @@ export class DaycareStorage {
     async checkOutChild(attendanceId: number, checkOutTime: Date, userId: number): Promise<DaycareAttendance | undefined> {
         // Get attendance record
         const attendance = await db.select().from(schema.daycareAttendance)
-            .where(eq(schema.daycareAttendance.id, attendanceId));
 
         if (!attendance[0]) return undefined;
 

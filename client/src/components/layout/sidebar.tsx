@@ -13,6 +13,7 @@ import {
   Clock,
   Baby,
   Package,
+  FileText,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getActiveAIFeatures, getComingSoonFeatures, isAIFeaturePath } from "@/config/aiFeatures";

@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import logger from './config/logger';
 import { StructuredLogger, LogCategory } from './utils/structuredLogger';
 import compression from 'compression'; // Performance: Response compression
+import { initializeDaycareCronJobs } from './daycareCron.js';
 
 const app = express();
 
@@ -72,6 +73,9 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
+
+  // Initialize daycare cron jobs for automated tasks
+  initializeDaycareCronJobs();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
