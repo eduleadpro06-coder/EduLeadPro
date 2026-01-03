@@ -27,6 +27,7 @@ const navigation = [
   { name: "Employee Management", href: "/staff-ai", icon: UserCheck },
   { name: "Stock Management", href: "/inventory", icon: Package },
   { name: "Expenses", href: "/expenses", icon: Wallet },
+  { name: "Reports", href: "/reports", icon: FileText },
 ];
 
 export default function Sidebar() {
