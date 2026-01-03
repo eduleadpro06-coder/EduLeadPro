@@ -39,6 +39,18 @@ This aligns with the existing local cron job schedule.
 
 ## Testing the Cron Job
 
+### Local Testing (Development)
+
+The endpoint works locally via Express route at `/api/cron`.
+
+**Important:** After adding `CRON_SECRET` to `.env`, **restart your dev server** to load the new environment variable.
+
+**PowerShell (Windows):**
+```powershell
+# Test with authorization
+Invoke-WebRequest -Uri "http://localhost:5000/api/cron" -Headers @{"Authorization"="Bearer cron_secret_7a8f9d2e6b4c1a5f3e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6"} | Select-Object -ExpandProperty Content
+```
+
 ### Manual Trigger (Vercel Dashboard)
 
 1. Go to **Settings** → **Cron Jobs**

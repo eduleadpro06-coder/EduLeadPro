@@ -6,6 +6,10 @@
       "dest": "/api/health.ts"
     },
     {
+      "src": "/api/cron",
+      "dest": "/api/cron/route.ts"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/index.ts"
     },
