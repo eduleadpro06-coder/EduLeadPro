@@ -2169,6 +2169,235 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  //Payment Due Report - Detailed student payment information
+  app.get("/api/reports/payment-due", async (req, res) => {
+    try {
+      const { program, status } = req.query;
+      const orgId = await getOrganizationId(req);
+
+      console.log('[PAYMENT-DUE] Request received:', { program, status, orgId });
+
+      // Get all enrolled leads (students with fee payments)
+      let leads = await storage.getAllLeads();
+      console.log('[PAYMENT-DUE] Total leads from DB:', leads.length);
+
+      // Filter by organization and enrolled status
+      if (orgId) {
+        leads = leads.filter(l => l.organizationId === orgId && l.status === "enrolled");
+        console.log('[PAYMENT-DUE] Enrolled leads after org filter:', leads.length);
+      } else {
+        console.log('[PAYMENT-DUE] WARNING: No organization ID found');
+        leads = leads.filter(l => l.status === "enrolled");
+      }
+
+      // Filter by program/class
+      if (program && program !== 'all') {
+        leads = leads.filter(l => {
+          const leadClass = l.class?.toLowerCase() || '';
+          const leadStream = l.stream?.toLowerCase() || '';
+          const programLower = (program as string).toLowerCase();
+
+          // Match by class or class + stream
+          return leadClass === programLower ||
+            `${leadClass} ${leadStream}` === programLower;
+        });
+      }
+
+      // Fetch active global class fees
+      const globalFeesResult = await db
+        .select()
+        .from(schema.globalClassFees)
+        .where(sql`${schema.globalClassFees.isActive} = true`);
+
+      // Fetch fee payments and EMI plans for all enrolled leads
+      const paymentPromises = leads.map(async (lead) => {
+        // Get all fee payments for this lead
+        const feePaymentsResult = await db
+          .select()
+          .from(schema.feePayments)
+          .where(sql`${schema.feePayments.leadId} = ${lead.id}`);
+
+        // Get EMI plans
+        const emiPlansResult = await db
+          .select()
+          .from(schema.emiPlans)
+          .where(sql`${schema.emiPlans.studentId} = ${lead.id}`);
+
+        // Get EMI schedule items
+        const emiScheduleResult = await db
+          .select()
+          .from(schema.emiSchedule)
+          .where(sql`${schema.emiSchedule.studentId} = ${lead.id}`);
+
+        // Calculate totals
+        let totalAdmissionFee = 0;
+        let totalRegistrationFee = 0;
+        let totalEmiPaid = 0;
+        let totalOtherFees = 0;
+
+        let collectedTuition = 0;
+        let additionalPaid = 0;
+        const additionalPaidReasons = new Set<string>();
+
+        let totalDiscount = 0;
+        let lastPaymentDate: Date | null = null;
+        const paymentModesMap: Record<string, number> = {};
+
+        feePaymentsResult.forEach((payment: any) => {
+          const amount = parseFloat(payment.amount || '0');
+          const feeType = payment.feeType || '';
+          const mode = payment.paymentMode || 'unknown';
+          const category = payment.paymentCategory || 'fee_payment';
+
+          // Track discount
+          totalDiscount += parseFloat(payment.discount || '0');
+
+          // Track last payment date
+          const pDate = new Date(payment.paymentDate);
+          if (!lastPaymentDate || pDate > lastPaymentDate) {
+            lastPaymentDate = pDate;
+          }
+
+          // Aggregate payment modes
+          paymentModesMap[mode] = (paymentModesMap[mode] || 0) + amount;
+
+          // Categorize payments (Tuition vs Additional)
+          if (category === 'additional_charge') {
+            additionalPaid += amount;
+            if (payment.chargeType) {
+              additionalPaidReasons.add(payment.chargeType.replace(/_/g, ' '));
+            }
+          } else {
+            collectedTuition += amount;
+          }
+
+          // Legacy tracking
+          if (feeType === 'admission' || feeType === 'registration') {
+            totalRegistrationFee += amount;
+          } else if (feeType === 'emi') {
+            totalEmiPaid += amount;
+          } else {
+            totalOtherFees += amount;
+          }
+        });
+
+        // Format payment modes summary
+        const paymentModesSummary = Object.entries(paymentModesMap)
+          .map(([mode, amount]) => `${mode.charAt(0).toUpperCase() + mode.slice(1)}: ₹${amount.toLocaleString()}`)
+          .join(' | ');
+
+        // Calculate EMI dues and next due date
+        let totalEmiDue = 0;
+        let overdueCount = 0;
+        let nextDueDate: Date | null = null;
+        const today = new Date();
+
+        // Sort EMIs by due date to find the next due date correctly
+        emiScheduleResult.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
+        emiScheduleResult.forEach((emi: any) => {
+          if (emi.status !== 'paid') {
+            const dueAmount = parseFloat(emi.amount || '0');
+            totalEmiDue += dueAmount;
+
+            const dueDate = new Date(emi.dueDate);
+
+            // Find earliest unpaid due date
+            if (!nextDueDate) {
+              nextDueDate = dueDate;
+            }
+
+            if (dueDate < today) {
+              overdueCount++;
+            }
+          }
+        });
+
+        // Calculate total fees expected (Tuition)
+        const leadClass = lead.class;
+
+        let tuitionFeeExpected = 0;
+
+        // Add global fees if applicable
+        if (leadClass) {
+          const applicableGlobalFees = globalFeesResult.filter((gf: any) =>
+            gf.className === leadClass &&
+            gf.isActive
+          );
+          tuitionFeeExpected += applicableGlobalFees.reduce((sum: number, fee: any) => sum + parseFloat(fee.amount || '0'), 0);
+        }
+
+        // Fallback calculation if global fees yield 0
+        if (tuitionFeeExpected === 0) {
+          tuitionFeeExpected = parseFloat((lead as any).totalFee || '0') ||
+            emiPlansResult.reduce((sum: number, plan: any) =>
+              sum + parseFloat(plan.totalAmount || '0'), 0);
+        }
+
+        const totalCollected = collectedTuition + additionalPaid;
+        // Total Due based on Tuition Fee - Tuition Paid
+        const totalDue = Math.max(0, tuitionFeeExpected - collectedTuition);
+
+        // Determine payment status
+        let paymentStatus = 'pending';
+        // Logic refinement: if anything is collected, distinct from 'not_paid'
+        if (collectedTuition === 0 && additionalPaid === 0) {
+          paymentStatus = 'not_paid';
+        } else if (totalDue === 0) {
+          paymentStatus = 'fully_paid';
+        } else if (overdueCount > 0) {
+          paymentStatus = 'overdue';
+        } else if (collectedTuition > 0 && totalDue > 0) {
+          paymentStatus = 'partially_paid';
+        }
+
+        return {
+          id: lead.id,
+          studentName: lead.name || '',
+          studentPhone: lead.phone || '',
+          fatherName: lead.parentName || '',
+          parentPhone: lead.parentPhone || '',
+          program: `${lead.class || ''} ${lead.stream || ''}`.trim(),
+          class: lead.class || '',
+          stream: lead.stream || '',
+          invoiceNumber: `INV-${lead.id}`,
+          admissionDate: lead.createdAt,
+          invoiceAmount: tuitionFeeExpected,
+          collectedRegistration: totalRegistrationFee,
+          collectedEmi: totalEmiPaid,
+          collectedOther: totalOtherFees,
+          collectedTuition, // NEW: Explicit Tuition Paid
+          additionalPaid,   // NEW: Additional Paid
+          additionalPaidReasons: Array.from(additionalPaidReasons).join(', '), // NEW: Reasons
+          totalCollected,
+          totalDiscount,
+          paymentModes: paymentModesSummary,
+          lastPaymentDate: lastPaymentDate,
+          nextDueDate: nextDueDate,
+          dueAmount: totalEmiDue,
+          totalDue,
+          paymentStatus,
+          overdueCount
+        };
+      });
+
+      let paymentsData = await Promise.all(paymentPromises);
+
+      // Filter by payment status
+      if (status && status !== 'all') {
+        paymentsData = paymentsData.filter(p => p.paymentStatus === status);
+      }
+
+      // Sort by total due (descending)
+      paymentsData.sort((a, b) => b.totalDue - a.totalDue);
+
+      res.json(paymentsData);
+    } catch (error) {
+      console.error("Payment due report error:", error);
+      res.status(500).json({ message: "Failed to fetch payment due report", error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   app.get("/api/students/:id", async (req, res) => {
     try {
       const { id } = req.params;

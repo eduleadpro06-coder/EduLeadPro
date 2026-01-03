@@ -230,7 +230,7 @@ export class DaycareStorage {
         const now = new Date();
         const conditions: SQL[] = [
             eq(schema.daycareInquiryFollowups.status, "pending"),
-            sql`${schema.daycareInquiryFollowups.scheduledAt} < ${now}`
+            sql`${schema.daycareInquiryFollowups.scheduledAt} < ${now.toISOString()}`
         ];
 
         if (organizationId) {
