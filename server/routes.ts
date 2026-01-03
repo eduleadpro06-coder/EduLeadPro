@@ -1967,7 +1967,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         installmentAmount,
         startDate,
         endDate,
-        status
+        status,
+        installments
       } = req.body;
 
       // Validate required fields
@@ -2012,7 +2013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       console.log("Creating EMI plan with data:", finalPlanData);
-      const emiPlan = await storage.createEmiPlan(finalPlanData);
+      const emiPlan = await storage.createEmiPlan(finalPlanData, installments);
       console.log("EMI plan created successfully:", emiPlan);
 
       // Handle Registration Fee if present
@@ -2166,6 +2167,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get students error:", error);
       res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+
+  // Invoice Data Endpoint
+  app.get("/api/students/:id/invoice-data", async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.id);
+
+      // 1. Get Student/Lead Details
+      const student = await storage.getStudent(studentId);
+      // If found in students table, it might still be a lead, but verify
+      // For now assume studentId maps to leads.id if using lead-based system or use getLead if not found?
+      // existing routes use storage.getStudent() which primarily looks at 'students' table but 'emiPlans' links to 'leads.id'.
+      // Wait, 'emiPlans' uses 'leads.id' (studentId column references leads.id).
+      // But 'students' table might not be fully populated? 
+      // Safe bet: fetch student. If not found, try getLead?
+      // Actually, let's use getStudent as primary.
+
+      const lead = await storage.getLead(studentId); // EMI plans link to leads.id
+
+      if (!student && !lead) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      const studentData = student || lead;
+
+      // 2. Get Active EMI Plan
+      const activePlan = await storage.getEmiPlanByStudentId(studentId);
+
+      // 3. Get EMI Schedule & Payments
+      let emiSchedule = [];
+      let payments = [];
+
+      if (activePlan) {
+        emiSchedule = await storage.getEmiPlanSchedule(activePlan.id);
+        payments = await storage.getEmiPlanPayments(activePlan.id);
+      } else {
+        // Maybe just get regular fee payments
+        payments = await storage.getFeePaymentsByStudent(studentId);
+      }
+
+      // 4. Get Regular Fee Structure (if any)
+      const feeStructure = await storage.getFeeStructureByStudent(studentId);
+
+      res.json({
+        student: studentData,
+        emiPlan: activePlan,
+        emiSchedule,
+        payments,
+        feeStructure
+      });
+
+    } catch (error) {
+      console.error("Error fetching invoice data:", error);
+      res.status(500).json({ message: "Failed to fetch invoice data", error: error instanceof Error ? error.message : String(error) });
     }
   });
 

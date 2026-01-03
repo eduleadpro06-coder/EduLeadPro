@@ -220,7 +220,8 @@ export const eMandates = pgTable("e_mandates", {
 
 export const emiSchedule = pgTable("emi_schedule", {
   id: serial("id").primaryKey(),
-  studentId: integer("student_id").references(() => students.id).notNull(),
+  studentId: integer("student_id").references(() => leads.id).notNull(), // Changed to leads to match emiPlans
+  emiPlanId: integer("emi_plan_id").references(() => emiPlans.id), // Link to parent plan
   eMandateId: integer("e_mandate_id").references(() => eMandates.id),
   installmentNumber: integer("installment_number").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),

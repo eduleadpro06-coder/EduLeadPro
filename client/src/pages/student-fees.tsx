@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import { generateMelonsFeeReceipt, type FeeReceiptData } from "@/lib/receipt-generator";
+import { generateInvoicePDF } from "@/lib/invoice-generator";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { useHashState } from "@/hooks/use-hash-state";
@@ -286,7 +287,8 @@ export default function StudentFees() {
   const [globalFeeModalOpen, setGlobalFeeModalOpen] = useState(false);
   const [editingGlobalFee, setEditingGlobalFee] = useState<GlobalClassFee | null>(null);
   // Global Organization Settings
-  const { academicYear: globalAcademicYear } = useOrganization();
+  // Global Organization Settings
+  const { academicYear: globalAcademicYear, settings } = useOrganization();
   const [academicYear, setAcademicYear] = useState(globalAcademicYear || "2026-27");
 
   // Sync with global academic year when it changes
@@ -504,7 +506,8 @@ export default function StudentFees() {
     receiptNumber: '',
     discount: '',
     paymentMode: '',
-    transactionId: ''
+    transactionId: '',
+    installments: [] as { amount: string, dueDate: string }[]
   });
 
   // Fetch data
@@ -603,6 +606,7 @@ export default function StudentFees() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-user-name": JSON.parse(localStorage.getItem('auth_user') || '{}').email
         },
         body: JSON.stringify(data),
       });
@@ -643,6 +647,7 @@ export default function StudentFees() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-user-name": JSON.parse(localStorage.getItem('auth_user') || '{}').email
         },
         body: JSON.stringify(data),
       });
@@ -691,6 +696,7 @@ export default function StudentFees() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-user-name": JSON.parse(localStorage.getItem('auth_user') || '{}').email
         },
         body: JSON.stringify(data),
       });
@@ -1159,7 +1165,8 @@ export default function StudentFees() {
       receiptNumber: '',
       discount: '',
       paymentMode: '',
-      transactionId: ''
+      transactionId: '',
+      installments: []
     });
     setPaymentType('emi');
     setSelectedStudentForEMI(null);
@@ -1234,7 +1241,7 @@ export default function StudentFees() {
       // Set default values
       setEmiPaymentFormData(prev => ({
         ...prev,
-        amount: selectedEmiPlan.emiAmount,
+        amount: selectedEmiPlan.installmentAmount,
         installmentNumber: 1
       }));
 
@@ -1269,6 +1276,65 @@ export default function StudentFees() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStudentForEMI, globalClassFees, academicYear]);
+
+  // Calculate installments when form data changes
+  useEffect(() => {
+    if (paymentType === 'emi' && emiFormData.totalAmount && emiFormData.emiPeriod && emiFormData.startDate) {
+      const count = parseInt(emiFormData.emiPeriod);
+      const total = parseFloat(emiFormData.totalAmount);
+      const regFee = parseFloat(emiFormData.registrationFee) || 0;
+      const disc = parseFloat(emiFormData.discount) || 0;
+
+      const payableAmount = Math.max(0, total - regFee - disc);
+
+      if (count > 0 && payableAmount > 0) {
+        // Calculate base EMI amount
+        const baseAmount = Math.floor(payableAmount / count);
+        const remainder = payableAmount - (baseAmount * count);
+
+        const newInstallments: { installmentNumber: number, amount: string, dueDate: string }[] = [];
+        const start = new Date(emiFormData.startDate);
+
+        for (let i = 0; i < count; i++) {
+          // Add remainder to first installment or distribute? Usually added to first.
+          const amount = i === 0 ? baseAmount + remainder : baseAmount;
+
+          const dueDate = new Date(start);
+          // Standard monthly calculation
+          dueDate.setMonth(dueDate.getMonth() + i);
+
+          newInstallments.push({
+            installmentNumber: i + 1,
+            amount: amount.toFixed(2),
+            dueDate: dueDate.toISOString().split('T')[0]
+          });
+        }
+
+        // Only update if critical params changed to avoid infinite loop or losing edits
+        // But for simplicity/reactivity, we'll update if the generated count/amounts differ significantly
+        // or if successful generation is needed and current installments structure doesn't match
+
+        setEmiFormData(prev => {
+          // Simple check: if length differs or total differs, replace. 
+          // Ideally we want to preserve custom dates if only amount changed, but amount change invalidates everything usually.
+          // We'll just overwrite for now as "Reset" behavior.
+          // To prevent infinite loop, check if values already match 'default' calculation? No, just check if we are already in sync.
+
+          // Check if current installments match the parameters (count)
+          if (prev.installments.length === count) {
+            // Determine if we should overwrite. 
+            // If the calculated total matches the sum of current installments, don't overwrite (assume user edits valid).
+            const currentSum = prev.installments.reduce((sum, inst) => sum + parseFloat(inst.amount), 0);
+            if (Math.abs(currentSum - payableAmount) < 1) {
+              return prev; // Don't overwrite if totals match (preserves edits)
+            }
+          }
+
+          return { ...prev, installments: newInstallments };
+        });
+      }
+    }
+  }, [emiFormData.totalAmount, emiFormData.emiPeriod, emiFormData.startDate, emiFormData.registrationFee, emiFormData.discount, paymentType]);
 
   // Update state when data changes
   useEffect(() => {
@@ -1450,6 +1516,48 @@ export default function StudentFees() {
     }
   });
 
+  const handleDownloadInvoice = async () => {
+    if (!selectedStudent) return;
+
+    try {
+      toast({
+        title: "Generating Invoice...",
+        description: "Please wait while we fetch the latest data.",
+      });
+
+      const res = await fetch(`/api/students/${selectedStudent.id}/invoice-data`);
+      if (!res.ok) throw new Error("Failed to fetch invoice data");
+
+      const data = await res.json();
+
+      const user = JSON.parse(localStorage.getItem('auth_user') || '{}');
+      // Try to get dynamic organization info, fallback to defaults
+      const orgName = settings?.organizationName || settings?.name || user?.organizationName || "EduLead Pro Institute";
+
+      generateInvoicePDF({
+        ...data,
+        organization: {
+          name: orgName,
+          address: settings?.address || "123 Education Lane, Knowledge City, 500081",
+          email: settings?.email || settings?.contactEmail || "accounts@edulead.pro",
+          phone: settings?.phone || settings?.contactPhone || "(555) 123-4567"
+        }
+      });
+
+      toast({
+        title: "Success",
+        description: "Invoice downloaded successfully.",
+      });
+    } catch (error: any) {
+      console.error("Invoice generation error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate invoice. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <>
       <Header title="Student Fees" subtitle="Manage student fees, payments, and financial records" />
@@ -1620,11 +1728,11 @@ export default function StudentFees() {
               {/* Tabs for student details */}
               <div className="border-b border-gray-200 mb-4">
                 <div className="flex gap-4">
-                  {['Overview', 'Payments', 'Mandates', 'EMI'].map(tab => (
+                  {['Overview', 'Payments', 'EMI', 'Mandates'].map(tab => (
                     <button
                       key={tab}
                       className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${studentDetailsTab === tab ? 'bg-[#643ae5] text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
-                      onClick={() => setStudentDetailsTab(tab as 'Overview' | 'Payments' | 'Mandates' | 'EMI')}
+                      onClick={() => setStudentDetailsTab(tab as 'Overview' | 'Payments' | 'EMI' | 'Mandates')}
                     >
                       {tab}
                     </button>
@@ -1649,6 +1757,7 @@ export default function StudentFees() {
                           <div><span className="font-semibold">Parent:</span> {selectedStudent.parentName || '-'}</div>
                           <div><span className="font-semibold">Address:</span> {(selectedStudent as any).address || '-'}</div>
                         </div>
+
                       </CardContent>
                     </Card>
                     {/* Fee Information Card */}
@@ -1675,6 +1784,18 @@ export default function StudentFees() {
                             return 1;
                           })()}</div>
                           <div><span className="font-semibold text-gray-700">EMI Plans:</span> {emiPlans.filter(p => p.studentId === selectedStudent.id).length}</div>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 border-[#643ae5] text-[#643ae5] hover:bg-purple-50"
+                            onClick={handleDownloadInvoice}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download Invoice
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -2227,7 +2348,8 @@ export default function StudentFees() {
                                 registrationFee: emiFormData.registrationFee,
                                 paymentMode: emiFormData.paymentMode,
                                 transactionId: emiFormData.transactionId,
-                                discount: emiFormData.discount
+                                discount: emiFormData.discount,
+                                installments: emiFormData.installments
                               });
                             }
                           }} className="space-y-6">
@@ -2310,7 +2432,7 @@ export default function StudentFees() {
                                       ...prev,
                                       discount,
                                       emiAmount: prev.totalAmount && prev.emiPeriod
-                                        ? ((parseFloat(prev.totalAmount) - (parseFloat(prev.downPayment) || 0) - (parseFloat(discount) || 0)) / parseInt(prev.emiPeriod)).toFixed(2)
+                                        ? ((parseFloat(prev.totalAmount) - (parseFloat(prev.registrationFee) || 0) - (parseFloat(discount) || 0)) / parseInt(prev.emiPeriod)).toFixed(2)
                                         : ''
                                     }));
                                   }}
@@ -2348,7 +2470,7 @@ export default function StudentFees() {
                                     <Select
                                       value={emiFormData.paymentMode}
                                       onValueChange={(value) => setEmiFormData(prev => ({ ...prev, paymentMode: value }))}
-                                      disabled={!parseFloat(emiFormData.downPayment || "0")}
+                                      disabled={!parseFloat(emiFormData.registrationFee || "0")}
                                     >
                                       <SelectTrigger>
                                         <SelectValue placeholder="Select mode" />
@@ -2419,6 +2541,49 @@ export default function StudentFees() {
                                 />
                               </div>
                             </div>
+
+                            {/* Installment Schedule (Editable) */}
+                            {paymentType === 'emi' && emiFormData.installments.length > 0 && (
+                              <div className="mt-4">
+                                <Label className="block mb-2 text-base font-medium">Installment Schedule</Label>
+                                <div className="border rounded-md overflow-hidden bg-white">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="bg-gray-50">
+                                        <TableHead className="w-[80px]">#</TableHead>
+                                        <TableHead>Expected Date</TableHead>
+                                        <TableHead className="text-right">Amount (₹)</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {emiFormData.installments.map((inst, idx) => (
+                                        <TableRow key={idx}>
+                                          <TableCell>{idx + 1}</TableCell>
+                                          <TableCell>
+                                            <Input
+                                              type="date"
+                                              value={inst.dueDate}
+                                              onChange={(e) => {
+                                                const newDate = e.target.value;
+                                                setEmiFormData(prev => {
+                                                  const newInstallments = [...prev.installments];
+                                                  newInstallments[idx] = { ...newInstallments[idx], dueDate: newDate };
+                                                  return { ...prev, installments: newInstallments };
+                                                });
+                                              }}
+                                              className="h-8 w-full"
+                                            />
+                                          </TableCell>
+                                          <TableCell className="text-right font-medium">
+                                            ₹{parseFloat(inst.amount).toLocaleString()}
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </div>
+                            )}
                             {/* Payment Summary */}
                             <Card className="bg-gray-50">
                               <CardHeader className="pb-3">
@@ -2503,7 +2668,8 @@ export default function StudentFees() {
                                     receiptNumber: '',
                                     discount: '',
                                     paymentMode: '',
-                                    transactionId: ''
+                                    transactionId: '',
+                                    installments: []
                                   });
                                 }}
                               >

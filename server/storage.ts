@@ -239,12 +239,13 @@ export interface IStorage {
   getEmiPlan(id: number): Promise<EmiPlan | undefined>;
   getEmiPlansByStudent(studentId: number): Promise<EmiPlan[]>;
   getAllEmiPlans(): Promise<EmiPlan[]>;
-  createEmiPlan(emiPlan: InsertEmiPlan): Promise<EmiPlan>;
+  createEmiPlan(emiPlan: InsertEmiPlan, installments?: { amount: string, dueDate: string }[]): Promise<EmiPlan>;
   updateEmiPlan(id: number, updates: Partial<EmiPlan>): Promise<EmiPlan | undefined>;
   deleteEmiPlan(id: number): Promise<boolean>;
 
   // EMI Payment tracking operations
   getPendingEmisForPlan(emiPlanId: number): Promise<any[]>;
+  getEmiPlanSchedule(emiPlanId: number): Promise<any[]>;
   getEmiPaymentProgress(emiPlanId: number): Promise<any>;
   checkEmiPlanCompletion(emiPlanId: number): Promise<boolean>;
 
@@ -3406,10 +3407,15 @@ export class DatabaseStorage implements IStorage {
   async createFeePayment(insertFeePayment: InsertFeePayment): Promise<FeePayment> {
     const result = await db.insert(schema.feePayments).values(insertFeePayment).returning();
     const payment = result[0];
+
+    // Get student details for notification
+    const lead = await this.getLead(payment.leadId);
+    const studentName = lead ? lead.name : `Student ${payment.leadId}`;
+
     await this.notifyChange(
       'fee',
       'Fee Payment Recorded',
-      `Payment of ₹${payment.amount} received`,
+      `Payment of ₹${payment.amount} received from ${studentName}`,
       'medium',
       'view_payment',
       payment.id.toString()
@@ -3636,13 +3642,32 @@ export class DatabaseStorage implements IStorage {
     return uniqueInstallments.size;
   }
 
-  async createEmiPlan(insertEmiPlan: InsertEmiPlan): Promise<EmiPlan> {
+  async createEmiPlan(insertEmiPlan: InsertEmiPlan, installments?: { amount: string, dueDate: string }[]): Promise<EmiPlan> {
     const result = await db.insert(schema.emiPlans).values(insertEmiPlan).returning();
     const plan = result[0];
+
+    // If custom installments provided, create schedule
+    if (installments && installments.length > 0) {
+      for (let i = 0; i < installments.length; i++) {
+        await db.insert(schema.emiSchedule).values({
+          studentId: plan.studentId,
+          emiPlanId: plan.id,
+          installmentNumber: i + 1,
+          amount: installments[i].amount,
+          dueDate: installments[i].dueDate,
+          status: 'pending'
+        });
+      }
+    }
+
+    // Get student/lead details for the notification
+    const lead = await this.getLead(plan.studentId);
+    const studentName = lead ? lead.name : `Student ${plan.studentId}`;
+
     await this.notifyChange(
       'emi',
       'EMI Plan Created',
-      `EMI plan for student ${plan.studentId} created`,
+      `EMI plan for ${studentName} created`,
       'medium',
       'view_emi_plan',
       plan.id.toString()
@@ -3657,10 +3682,14 @@ export class DatabaseStorage implements IStorage {
     }).where(eq(schema.emiPlans.id, id)).returning();
     const plan = result[0];
     if (plan) {
+      // Get student/lead details for the notification
+      const lead = await this.getLead(plan.studentId);
+      const studentName = lead ? lead.name : `Student ${plan.studentId}`;
+
       await this.notifyChange(
         'emi',
         'EMI Plan Updated',
-        `EMI plan ID ${plan.id} updated`,
+        `EMI plan for ${studentName} updated`,
         'medium',
         'view_emi_plan',
         plan.id.toString()
@@ -3670,11 +3699,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteEmiPlan(id: number): Promise<boolean> {
+    // Get plan details before deletion for the notification
+    const plan = await this.getEmiPlanById(id);
+    let studentName = `Student (Plan ${id})`;
+
+    if (plan) {
+      const lead = await this.getLead(plan.studentId);
+      if (lead) {
+        studentName = lead.name;
+      }
+    }
+
+    // Delete associated schedule first
+    await db.delete(schema.emiSchedule).where(eq(schema.emiSchedule.emiPlanId, id));
+
     await db.delete(schema.emiPlans).where(eq(schema.emiPlans.id, id));
+
     await this.notifyChange(
       'emi',
       'EMI Plan Deleted',
-      `EMI plan ID ${id} deleted`,
+      `EMI plan for ${studentName} deleted`,
       'medium',
       'emi_plan_deleted',
       id.toString()
@@ -3690,29 +3734,107 @@ export class DatabaseStorage implements IStorage {
         throw new Error("EMI plan not found");
       }
 
+      // Check for stored schedule first
+      const storedSchedule = await db.select().from(schema.emiSchedule)
+        .where(eq(schema.emiSchedule.emiPlanId, emiPlanId))
+        .orderBy(schema.emiSchedule.installmentNumber);
+
       // Get all payments for this EMI plan
       const payments = await db.select().from(schema.feePayments)
         .where(eq(schema.feePayments.leadId, emiPlan.studentId))
         .orderBy(schema.feePayments.installmentNumber);
 
-      // Calculate which EMIs are pending
-      const paidInstallments = new Set(payments.map(p => p.installmentNumber));
+      const paidInstallments = new Set(
+        payments
+          .filter(p => p.installmentNumber !== null)
+          .map(p => p.installmentNumber!)
+      );
+
       const pendingEmis = [];
 
-      for (let i = 1; i <= emiPlan.numberOfInstallments; i++) {
-        if (!paidInstallments.has(i)) {
-          pendingEmis.push({
-            installmentNumber: i,
-            amount: emiPlan.installmentAmount,
-            dueDate: this.calculateEmiDueDate(emiPlan.startDate, i, 'monthly'),
-            status: 'pending'
-          });
+      if (storedSchedule.length > 0) {
+        // Use stored schedule
+        for (const item of storedSchedule) {
+          if (!paidInstallments.has(item.installmentNumber)) {
+            pendingEmis.push({
+              installmentNumber: item.installmentNumber,
+              amount: item.amount,
+              dueDate: item.dueDate,
+              status: item.status
+            });
+          }
+        }
+      } else {
+        // Fallback to dynamic calculation
+        for (let i = 1; i <= emiPlan.numberOfInstallments; i++) {
+          if (!paidInstallments.has(i)) {
+            pendingEmis.push({
+              installmentNumber: i,
+              amount: emiPlan.installmentAmount,
+              dueDate: this.calculateEmiDueDate(emiPlan.startDate, i, 'monthly'),
+              status: 'pending'
+            });
+          }
         }
       }
 
       return pendingEmis;
     } catch (error) {
       console.error("Error getting pending EMIs:", error);
+      throw error;
+    }
+  }
+
+  async getEmiPlanSchedule(emiPlanId: number): Promise<any[]> {
+    try {
+      const emiPlan = await this.getEmiPlan(emiPlanId);
+      if (!emiPlan) {
+        throw new Error("EMI plan not found");
+      }
+
+      // Check for stored schedule first
+      const storedSchedule = await db.select().from(schema.emiSchedule)
+        .where(eq(schema.emiSchedule.emiPlanId, emiPlanId))
+        .orderBy(schema.emiSchedule.installmentNumber);
+
+      // Get payments to map status
+      const payments = await db.select().from(schema.feePayments)
+        .where(eq(schema.feePayments.leadId, emiPlan.studentId))
+        .orderBy(schema.feePayments.installmentNumber);
+
+      const paidInstallments = new Set(
+        payments
+          .filter(p => p.installmentNumber !== null)
+          .map(p => p.installmentNumber!)
+      );
+
+      const fullSchedule = [];
+
+      if (storedSchedule.length > 0) {
+        // Use stored schedule
+        for (const item of storedSchedule) {
+          fullSchedule.push({
+            installmentNumber: item.installmentNumber,
+            amount: item.amount,
+            dueDate: item.dueDate,
+            status: paidInstallments.has(item.installmentNumber) ? 'paid' : item.status
+          });
+        }
+      } else {
+        // Fallback to dynamic calculation for older plans
+        for (let i = 1; i <= emiPlan.numberOfInstallments; i++) {
+          fullSchedule.push({
+            installmentNumber: i,
+            amount: emiPlan.installmentAmount,
+            dueDate: this.calculateEmiDueDate(emiPlan.startDate, i, 'monthly'),
+            status: paidInstallments.has(i) ? 'paid' : 'pending'
+          });
+        }
+      }
+
+      return fullSchedule;
+    } catch (error) {
+      console.error("Error getting EMI schedule:", error);
       throw error;
     }
   }
