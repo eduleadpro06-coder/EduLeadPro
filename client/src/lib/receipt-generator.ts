@@ -11,6 +11,9 @@ export interface FeeReceiptData {
     amount: string;
     date: string;
     transactionId?: string; // Optional transaction ID
+    organizationName?: string; // Organization name
+    organizationPhone?: string; // Organization phone
+    organizationAddress?: string; // Organization address
 }
 
 /* ============================
@@ -56,9 +59,9 @@ function drawReceipt(
     doc.setFontSize(8);
     doc.text(copyLabel, 195, y + 18, { align: "right" });
 
-    // Header
+    // Header - Use dynamic organization name or fallback
     doc.setFontSize(15);
-    doc.text("MELONS PRESCHOOL & DAYCARE", 105, y + 30, { align: "center" });
+    doc.text(data.organizationName || "MELONS PRESCHOOL & DAYCARE", 105, y + 30, { align: "center" });
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
@@ -107,8 +110,11 @@ function drawReceipt(
     doc.setFontSize(8);
     doc.text("Academic Year: 2025–26", 15, footerY);
 
+    // Footer - Use dynamic organization contact or fallback
     doc.text(
-        "Melons Preschool & Daycare, Manewada, Nagpur | Ph: 8591627145",
+        data.organizationAddress
+            ? `${data.organizationName || "Organization"}, ${data.organizationAddress} | Ph: ${data.organizationPhone || "N/A"}`
+            : "Melons Preschool & Daycare, Manewada, Nagpur | Ph: 8591627145",
         105,
         y + 132,
         { align: "center" }

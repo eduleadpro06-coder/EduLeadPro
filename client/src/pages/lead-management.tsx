@@ -283,15 +283,100 @@ export default function LeadManagement() {
     },
   });
 
+  // Financial Data State
+  const [financialData, setFinancialData] = useState({
+    amount: "0", // This will now be the NEXT EMI amount
+    totalPending: "0",
+    dueDate: "",
+    breakdown: ""
+  });
+
+  // Fetch financial data when lead is selected for WhatsApp
+  useEffect(() => {
+    if (whatsappLead && whatsappLead.status === 'enrolled') {
+      const fetchFinancials = async () => {
+        try {
+          // 1. Get EMI plans for the student
+          const plansRes = await fetch(`/api/emi-plans?studentId=${whatsappLead.id}`);
+          const plans = await plansRes.json();
+
+          if (plans && plans.length > 0) {
+            // 2. Get pending EMIs for the first active plan
+            const activePlan = plans.find((p: any) => p.status === 'active') || plans[0];
+            const pendingRes = await fetch(`/api/emi-plans/${activePlan.id}/pending-emis`);
+            const pendingEmis = await pendingRes.json();
+
+            if (pendingEmis && pendingEmis.length > 0) {
+              // Sort by due date
+              const sortedEmis = pendingEmis.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
+              // Next EMI is the earliest one
+              const nextEmi = sortedEmis[0];
+              const totalPending = sortedEmis.reduce((sum: number, emi: any) => sum + Number(emi.amount), 0);
+
+              // Generate Breakdown String
+              // Example: "EMI 1 (Due: 12/01/25): ₹5000\nEMI 2 (Due: 12/02/25): ₹5000"
+              const breakdown = sortedEmis.map((emi: any) =>
+                `Inst ${emi.installmentNumber} (Due: ${new Date(emi.dueDate).toLocaleDateString('en-IN')}): ₹${emi.amount}`
+              ).join('\n');
+
+              setFinancialData({
+                amount: nextEmi.amount, // ONLY the next installment amount
+                totalPending: totalPending.toString(),
+                dueDate: new Date(nextEmi.dueDate).toLocaleDateString('en-IN'),
+                breakdown: breakdown
+              });
+            } else {
+              setFinancialData({ amount: "0", totalPending: "0", dueDate: new Date().toLocaleDateString('en-IN'), breakdown: "No pending dues" });
+            }
+          } else {
+            setFinancialData({ amount: "0", totalPending: "0", dueDate: new Date().toLocaleDateString('en-IN'), breakdown: "No active plan" });
+          }
+        } catch (err) {
+          console.error("Error fetching financial data:", err);
+          setFinancialData({ amount: "0", totalPending: "0", dueDate: new Date().toLocaleDateString('en-IN'), breakdown: "Error fetching data" });
+        }
+      };
+      fetchFinancials();
+    } else {
+      // Reset for non-enrolled leads
+      setFinancialData({ amount: "0", totalPending: "0", dueDate: new Date().toLocaleDateString('en-IN'), breakdown: "" });
+    }
+  }, [whatsappLead]);
+
+  // Update message when financial data changes (if template is selected)
+  useEffect(() => {
+    if (selectedTemplate && whatsappLead) {
+      const selectedTpl = messageTemplates.find(t => t.name === selectedTemplate);
+      if (selectedTpl) {
+        setWhatsappMessage(replaceTemplateVariables(selectedTpl.content, whatsappLead));
+      }
+    }
+  }, [financialData]);
+
   // Function to replace template variables with actual lead data
   const replaceTemplateVariables = (template: string, lead: LeadWithCounselor) => {
     const instituteName = localStorage.getItem("customInstituteName") || "EduLead Pro";
-    return template
-      .replace(/{name}/g, lead.name)
-      .replace(/{class}/g, lead.class)
-      .replace(/{instituteName}/g, instituteName)
-      .replace(/{phone}/g, lead.phone)
-      .replace(/{email}/g, lead.email || "");
+    const today = new Date().toLocaleDateString('en-IN');
+
+    let text = template;
+
+    // Replace standard double brace variables {{variable}}
+    text = text.replace(/\{\{name\}\}/g, lead.name || "")
+      .replace(/\{\{studentName\}\}/g, lead.name || "")
+      .replace(/\{\{class\}\}/g, lead.class || "")
+      .replace(/\{\{instituteName\}\}/g, instituteName)
+      .replace(/\{\{phone\}\}/g, lead.phone || "")
+      .replace(/\{\{email\}\}/g, lead.email || "")
+      .replace(/\{\{parentName\}\}/g, lead.parentName || "Parent")
+      .replace(/\{\{date\}\}/g, today)
+      .replace(/\{\{dueDate\}\}/g, financialData.dueDate || today)
+      .replace(/\{\{amount\}\}/g, financialData.amount) // Shows Next EMI Amount
+      .replace(/\{\{total_pending\}\}/g, financialData.totalPending) // New: Shows Total
+      .replace(/\{\{fee_breakdown\}\}/g, financialData.breakdown) // New: Shows List
+      .replace(/\{\{startDate\}\}/g, today);
+
+    return text;
   };
 
   const handleLeadDeleted = (deletedId: number) => {

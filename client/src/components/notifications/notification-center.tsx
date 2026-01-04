@@ -178,6 +178,7 @@ function getTypeIcon(type: string) {
     case "followup": return <div className="p-1 rounded-full bg-teal-100 text-teal-700"><Bell size={16} /></div>;
     case "expense": return <div className="p-1 rounded-full bg-orange-100 text-orange-700"><Bell size={16} /></div>;
     case "student": return <div className="p-1 rounded-full bg-violet-100 text-violet-700"><Bell size={16} /></div>;
+    case "daycare": return <div className="p-1 rounded-full bg-pink-100 text-pink-700"><Bell size={16} /></div>;
     default: return <div className="p-1 rounded-full bg-gray-100 text-gray-700"><Bell size={16} /></div>;
   }
 }

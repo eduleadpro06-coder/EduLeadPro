@@ -1531,16 +1531,52 @@ export default function StudentFees() {
       const data = await res.json();
 
       const user = JSON.parse(localStorage.getItem('auth_user') || '{}');
-      // Try to get dynamic organization info, fallback to defaults
-      const orgName = settings?.organizationName || settings?.name || user?.organizationName || "EduLead Pro Institute";
+
+      // Fetch organization data if organizationId exists
+      let orgData = null;
+      if (user?.organizationId) {
+        try {
+          const orgRes = await fetch(`/api/organizations/${user.organizationId}/needs-onboarding`);
+          if (orgRes.ok) {
+            const orgResponse = await orgRes.json();
+            orgData = orgResponse.organization;
+          }
+        } catch (error) {
+          console.error("Failed to fetch organization data:", error);
+        }
+      }
+
+      // Use fetched organization data or fallback to settings/defaults
+      const orgName = orgData?.name || settings?.organizationName || settings?.name || user?.organizationName || "EduLead Pro Institute";
+      const orgPhone = orgData?.phone || settings?.phone || settings?.contactPhone || "(555) 123-4567";
+      const orgEmail = user?.email || settings?.email || settings?.contactEmail || "accounts@edulead.pro";
+
+      // Build formatted address from organization data
+      let orgAddress = "";
+      if (orgData?.address) {
+        const addressParts = [orgData.address];
+        if (orgData.city && orgData.state) {
+          addressParts.push(`${orgData.city}, ${orgData.state}`);
+        } else if (orgData.city) {
+          addressParts.push(orgData.city);
+        } else if (orgData.state) {
+          addressParts.push(orgData.state);
+        }
+        if (orgData.pincode) {
+          addressParts.push(orgData.pincode);
+        }
+        orgAddress = addressParts.join(", ");
+      } else {
+        orgAddress = settings?.address || "123 Education Lane, Knowledge City, 500081";
+      }
 
       generateInvoicePDF({
         ...data,
         organization: {
           name: orgName,
-          address: settings?.address || "123 Education Lane, Knowledge City, 500081",
-          email: settings?.email || settings?.contactEmail || "accounts@edulead.pro",
-          phone: settings?.phone || settings?.contactPhone || "(555) 123-4567"
+          address: orgAddress,
+          email: orgEmail,
+          phone: orgPhone
         }
       });
 
@@ -1880,13 +1916,33 @@ export default function StudentFees() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => {
+                                  onClick={async () => {
+                                    // Fetch organization data
+                                    let orgData: any = null;
+                                    const user = JSON.parse(localStorage.getItem('auth_user') || '{}');
+                                    if (user?.organizationId) {
+                                      try {
+                                        const orgRes = await fetch(`/api/organizations/${user.organizationId}/needs-onboarding`);
+                                        if (orgRes.ok) {
+                                          const orgResponse = await orgRes.json();
+                                          orgData = orgResponse.organization;
+                                        }
+                                      } catch (error) {
+                                        console.error("Failed to fetch organization data for receipt:", error);
+                                      }
+                                    }
+
                                     const receiptData: FeeReceiptData = {
                                       studentName: selectedStudent.name,
                                       className: selectedStudent.class,
                                       paymentMode: payment.paymentMode,
                                       amount: payment.amount,
                                       date: format(new Date(payment.paymentDate), "dd-MM-yyyy"),
+                                      organizationName: orgData?.name,
+                                      organizationPhone: orgData?.phone,
+                                      organizationAddress: orgData?.address
+                                        ? `${orgData.address}${orgData.city ? ', ' + orgData.city : ''}${orgData.state ? ', ' + orgData.state : ''}${orgData.pincode ? ', ' + orgData.pincode : ''}`
+                                        : undefined,
                                     };
                                     generateMelonsFeeReceipt(receiptData, payment.receiptNumber);
                                   }}

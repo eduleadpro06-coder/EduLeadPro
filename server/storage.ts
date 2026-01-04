@@ -4275,18 +4275,50 @@ export class DatabaseStorage implements IStorage {
     }
   }
   // Message Templates
-  async getAllMessageTemplates(category?: string): Promise<schema.MessageTemplate[]> {
-    if (category) {
-      return await db.select().from(schema.messageTemplates)
-        .where(and(
-          eq(schema.messageTemplates.category, category),
-          eq(schema.messageTemplates.isActive, true)
-        ))
-        .orderBy(schema.messageTemplates.displayName);
+  async getAllMessageTemplates(
+    organizationId?: number,
+    filters?: {
+      category?: string;
+      isActive?: boolean;
+      searchTerm?: string;
     }
-    return await db.select().from(schema.messageTemplates)
-      .where(eq(schema.messageTemplates.isActive, true))
-      .orderBy(schema.messageTemplates.displayName);
+  ): Promise<schema.MessageTemplate[]> {
+    const conditions = [];
+
+    // Organization filter
+    if (organizationId) {
+      conditions.push(eq(schema.messageTemplates.organizationId, organizationId));
+    }
+
+    // Category filter
+    if (filters?.category) {
+      conditions.push(eq(schema.messageTemplates.category, filters.category));
+    }
+
+    // Active status filter
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(schema.messageTemplates.isActive, filters.isActive));
+    }
+
+    // Search filter
+    if (filters?.searchTerm) {
+      conditions.push(
+        or(
+          ilike(schema.messageTemplates.displayName, `%${filters.searchTerm}%`),
+          ilike(schema.messageTemplates.name, `%${filters.searchTerm}%`),
+          ilike(schema.messageTemplates.content, `%${filters.searchTerm}%`)
+        )
+      );
+    }
+
+    const query = conditions.length > 0
+      ? db.select().from(schema.messageTemplates)
+        .where(and(...conditions))
+        .orderBy(schema.messageTemplates.displayName)
+      : db.select().from(schema.messageTemplates)
+        .orderBy(schema.messageTemplates.displayName);
+
+    return await query;
   }
 
   async getMessageTemplate(id: number): Promise<schema.MessageTemplate | undefined> {
@@ -4296,7 +4328,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMessageTemplate(template: schema.InsertMessageTemplate): Promise<schema.MessageTemplate> {
-    const result = await db.insert(schema.messageTemplates).values(template).returning();
+    // Auto-generate internal name from displayName if not provided
+    const templateData = {
+      ...template,
+      name: template.name || template.displayName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+      isActive: template.isActive !== undefined ? template.isActive : true,
+      isDefault: template.isDefault || false,
+    };
+
+    const result = await db.insert(schema.messageTemplates).values(templateData).returning();
     return result[0];
   }
 

@@ -141,7 +141,7 @@ export default function MessageTemplatesManager() {
     const updateMutation = useMutation({
         mutationFn: async (data: any) => {
             const res = await fetch(`/api/message-templates/${editingTemplate?.id}`, {
-                method: "PUT",
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...data,

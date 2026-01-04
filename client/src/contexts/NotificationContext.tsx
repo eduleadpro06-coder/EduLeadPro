@@ -1,6 +1,7 @@
 import React, { createContext, useContext, ReactNode } from "react";
 import { useNotifications } from "@/hooks/use-notifications";
 import type { Notification } from "@shared/schema";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NotificationContextType {
   notifications: Notification[];
@@ -25,8 +26,15 @@ interface NotificationProviderProps {
   userId?: number;
 }
 
-export function NotificationProvider({ children, userId = 1 }: NotificationProviderProps) {
-  const notificationData = useNotifications(userId);
+export function NotificationProvider({ children, userId: propUserId }: NotificationProviderProps) {
+  const { user } = useAuth();
+  // Ensure userId is a number. API returns number, but auth context might type it loosely.
+  const authUserId = user?.id ? Number(user.id) : undefined;
+
+  // Use prop if provided, otherwise use authenticated user ID, finally default to 1 (admin)
+  const effectiveUserId = propUserId || authUserId || 1;
+
+  const notificationData = useNotifications(effectiveUserId);
 
   return (
     <NotificationContext.Provider value={notificationData}>

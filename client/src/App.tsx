@@ -316,16 +316,16 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <NotificationProvider>
-          <AuthProvider>
+        <AuthProvider>
+          <NotificationProvider>
             <TooltipProvider>
               <FollowUpMonitor />
               <Toaster />
               <Router />
               <EnvironmentInfo />
             </TooltipProvider>
-          </AuthProvider>
-        </NotificationProvider>
+          </NotificationProvider>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

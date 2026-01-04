@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings as SettingsIcon, Bell, User, Database, Calculator, Edit } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Database, Calculator, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -35,24 +35,36 @@ interface GlobalClassFee {
 export default function Settings() {
   const { user } = useAuth();
 
-  const [profile, setProfile] = useState({
-    name: user?.displayName || "",
-    email: user?.email || "",
+  // Organization profile state
+  const [orgProfile, setOrgProfile] = useState({
+    name: "",
     phone: "",
-    role: user?.role || "",
+    address: "",
+    city: "",
+    state: "",
+    pincode: "",
   });
 
-  // Update profile when user changes
+  // Fetch organization data
+  const { data: organizationData, isLoading: isLoadingOrg } = useQuery<{ needsOnboarding: boolean, organization: any }>({
+    queryKey: [`/api/organizations/${user?.organizationId}/needs-onboarding`],
+    enabled: !!user?.organizationId,
+  });
+
+  // Update orgProfile when organization data is fetched
   React.useEffect(() => {
-    if (user) {
-      setProfile(prev => ({
-        ...prev,
-        name: user.displayName || prev.name,
-        email: user.email || prev.email,
-        role: user.role || prev.role,
-      }));
+    if (organizationData?.organization) {
+      const org = organizationData.organization;
+      setOrgProfile({
+        name: org.name || "",
+        phone: org.phone || "",
+        address: org.address || "",
+        city: org.city || "",
+        state: org.state || "",
+        pincode: org.pincode || "",
+      });
     }
-  }, [user]);
+  }, [organizationData]);
 
 
 
@@ -183,7 +195,7 @@ export default function Settings() {
   // --- END Global Fee Management State & Logic ---
 
   const [selectedTab, setSelectedTab] = useState(() => {
-    return window.location.hash.slice(1) || "profile";
+    return window.location.hash.slice(1) || "organization"; // Default to organization
   });
 
   const handleTabChange = (value: string) => {
@@ -191,25 +203,51 @@ export default function Settings() {
     window.location.hash = value;
   };
 
-  const handleSaveProfile = async () => {
-    try {
-      // TODO: Implement profile update API endpoint
-      // For now, just show success toast
-      toast({
-        title: "Profile updated",
-        description: "Your profile settings have been saved successfully.",
+  // Organization profile mutation
+  const orgProfileMutation = useMutation({
+    mutationFn: async (data: typeof orgProfile) => {
+      if (!user?.organizationId) throw new Error("No organization ID");
+      const response = await fetch(`/api/organizations/${user.organizationId}/contact-info`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
       });
-    } catch (error) {
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update organization");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/organizations/${user?.organizationId}/needs-onboarding`] });
+      toast({
+        title: "Organization updated",
+        description: "Organization profile has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "Failed to update profile",
+        description: error.message || "Failed to update organization profile",
         variant: "destructive",
       });
-    }
+    },
+  });
+
+  const handleSaveOrgProfile = async () => {
+    orgProfileMutation.mutate(orgProfile);
   };
 
+
+
+  interface NotificationPreferences {
+    overdueFollowups: boolean;
+    newLeads: boolean;
+    dailyReports: boolean;
+  }
+
   // Query for notification preferences
-  const { data: notifications, isLoading: notificationsLoading } = useQuery({
+  const { data: notifications, isLoading: notificationsLoading } = useQuery<NotificationPreferences>({
     queryKey: ["/api/user/notification-preferences"],
     enabled: !!user,
   });
@@ -254,12 +292,12 @@ export default function Settings() {
 
         <div className="flex gap-2 -mb-px w-full border-b">
           <Button
-            variant={selectedTab === "profile" ? "default" : "ghost"}
-            onClick={() => handleTabChange("profile")}
+            variant={selectedTab === "organization" ? "default" : "ghost"}
+            onClick={() => handleTabChange("organization")}
             className="rounded-b-none flex-1"
           >
-            <User className="mr-2 h-4 w-4" />
-            Profile
+            <Building className="mr-2 h-4 w-4" />
+            Organization
           </Button>
           <Button
             variant={selectedTab === "notifications" ? "default" : "ghost"}
@@ -285,68 +323,124 @@ export default function Settings() {
             <Calculator className="mr-2 h-4 w-4" />
             Global Fees
           </Button>
-          <Button
+          {/* <Button
             variant={selectedTab === "templates" ? "default" : "ghost"}
             onClick={() => handleTabChange("templates")}
             className="rounded-b-none flex-1"
           >
             <MessageSquare className="mr-2 h-4 w-4" />
             Templates
-          </Button>
+          </Button> */}
         </div>
 
-        {selectedTab === "profile" && (
+
+
+        {selectedTab === "organization" && (
           <div className="animate-in fade-in-50 duration-300">
             <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
               <CardHeader>
-                <CardTitle className="text-h3">Profile Information</CardTitle>
+                <CardTitle className="text-h3">Organization Profile</CardTitle>
                 <CardDescription>
-                  Update your personal information and contact details
+                  Manage your organization's contact information used in invoices and official documents
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-semibold">Full Name</Label>
-                    <Input
-                      id="name"
-                      value={profile.name}
-                      onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                      className="transition-all focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-semibold">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={profile.email}
-                      onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                      className="transition-all focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-sm font-semibold">Phone</Label>
-                    <Input
-                      id="phone"
-                      value={profile.phone}
-                      onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                      className="transition-all focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="role" className="text-sm font-semibold">Role</Label>
-                    <Input
-                      id="role"
-                      value={profile.role}
-                      disabled
-                      className="bg-gray-100"
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleSaveProfile} className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 transition-all duration-300">
-                  Save Profile
-                </Button>
+                {isLoadingOrg ? (
+                  <div className="text-center py-4">Loading organization data...</div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2 col-span-2">
+                        <Label htmlFor="org-name" className="text-sm font-semibold">Organization Name</Label>
+                        <Input
+                          id="org-name"
+                          value={orgProfile.name}
+                          disabled
+                          className="bg-gray-100"
+                        />
+                        <p className="text-xs text-muted-foreground">Contact support to change your organization name</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="org-phone" className="text-sm font-semibold">Phone Number *</Label>
+                        <Input
+                          id="org-phone"
+                          value={orgProfile.phone}
+                          onChange={(e) => setOrgProfile({ ...orgProfile, phone: e.target.value })}
+                          placeholder="Enter 10-digit phone number"
+                          className="transition-all focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="org-email" className="text-sm font-semibold">Email</Label>
+                        <Input
+                          id="org-email"
+                          type="email"
+                          value={user?.email || ""}
+                          disabled
+                          className="bg-gray-100"
+                        />
+                        <p className="text-xs text-muted-foreground">Using your account email</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="org-address" className="text-sm font-semibold">Address *</Label>
+                        <Textarea
+                          id="org-address"
+                          value={orgProfile.address}
+                          onChange={(e) => setOrgProfile({ ...orgProfile, address: e.target.value })}
+                          placeholder="Enter street address"
+                          rows={2}
+                          className="transition-all focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="org-city" className="text-sm font-semibold">City</Label>
+                        <Input
+                          id="org-city"
+                          value={orgProfile.city}
+                          onChange={(e) => setOrgProfile({ ...orgProfile, city: e.target.value })}
+                          placeholder="Enter city"
+                          className="transition-all focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="org-state" className="text-sm font-semibold">State</Label>
+                        <Input
+                          id="org-state"
+                          value={orgProfile.state}
+                          onChange={(e) => setOrgProfile({ ...orgProfile, state: e.target.value })}
+                          placeholder="Enter state"
+                          className="transition-all focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="org-pincode" className="text-sm font-semibold">PIN Code</Label>
+                        <Input
+                          id="org-pincode"
+                          value={orgProfile.pincode}
+                          onChange={(e) => setOrgProfile({ ...orgProfile, pincode: e.target.value })}
+                          placeholder="Enter PIN code"
+                          className="transition-all focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm text-blue-800">
+                        <strong>Note:</strong> This information will be displayed on invoices, receipts, and other official documents.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleSaveOrgProfile}
+                      disabled={orgProfileMutation.isPending}
+                      className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 transition-all duration-300"
+                    >
+                      {orgProfileMutation.isPending ? "Saving..." : "Save Organization Profile"}
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -840,11 +934,11 @@ export default function Settings() {
           </div>
         )}
 
-        {selectedTab === "templates" && (
+        {/* {selectedTab === "templates" && (
           <div className="animate-in fade-in-50 duration-300">
             <MessageTemplatesManager />
           </div>
-        )}
+        )} */}
 
       </main>
     </div >

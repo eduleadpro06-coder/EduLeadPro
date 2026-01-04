@@ -1,41 +1,69 @@
-
-import { storage } from "../server/storage";
 import { db } from "../server/db";
-import { feePayments, leads, feeStructure } from "../shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import * as schema from "../shared/schema";
 
-async function checkData() {
-    console.log("--- Dashboard Data Check ---");
+async function checkDashboardData() {
+    console.log("=== Dashboard Data Debug ===\n");
+
+    // Check all fee payments
+    const allPayments = await db.select().from(schema.feePayments);
+    console.log(`Total Fee Payments in DB: ${allPayments.length}`);
+
+    if (allPayments.length > 0) {
+        console.log("\nPayments:");
+        allPayments.forEach(payment => {
+            console.log(`  - ID: ${payment.id}, Amount: ₹${payment.amount}, Date: ${payment.paymentDate}, Org ID: ${payment.organizationId}`);
+        });
+
+        // Calculate total
+        const total = allPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+        console.log(`\nTotal Amount: ₹${total}`);
+    }
+
+    // Check totalRevenue calc
+    const totalCollectedResult = await db
+        .select({ total: sql<number>`cast(coalesce(sum(${schema.feePayments.amount}), 0) as integer)` })
+        .from(schema.feePayments);
+
+    console.log(`\nQuery Result for totalRevenue: ₹${totalCollectedResult[0]?.total || 0}`);
+
+    // Check with organization filter
+    const orgIds = [...new Set(allPayments.map(p => p.organizationId))];
+    console.log(`\nOrganizations found in payments: ${orgIds.join(", ")}`);
+
+    for (const orgId of orgIds) {
+        if (orgId) {
+            const orgTotal = await db
+                .select({ total: sql<number>`cast(coalesce(sum(${schema.feePayments.amount}), 0) as integer)` })
+                .from(schema.feePayments)
+                .where(eq(schema.feePayments.organizationId, orgId));
+
+            console.log(`  Org ${orgId}: ₹${orgTotal[0]?.total || 0}`);
+        }
+    }
 
     // Check enrolled students
-    const enrolled = await db.select().from(leads).where(eq(leads.status, 'enrolled'));
-    console.log(`Enrolled Students Count: ${enrolled.length}`);
-    enrolled.forEach(s => {
-        console.log(`- Student: ${s.name} (ID: ${s.id}), Org: ${s.organizationId}`);
-    });
+    const enrolledStudents = await db
+        .select({
+            id: schema.leads.id,
+            name: schema.leads.name,
+            organizationId: schema.leads.organizationId
+        })
+        .from(schema.leads)
+        .where(eq(schema.leads.status, 'enrolled'));
 
-    // Check fee payments
-    const payments = await db.select().from(feePayments);
-    console.log(`Fee Payments Count: ${payments.length}`);
-    payments.forEach(p => {
-        console.log(`- Amount: ${p.amount}, Date: ${p.paymentDate}, Category: ${p.paymentCategory}, Org: ${p.organizationId}`);
-    });
-
-    // Test the analytics function
-    const analytics = await storage.getDashboardAnalytics(1);
-    console.log("\n--- Analytics Results (Org 1) ---");
-    console.log(`Total Revenue (KPI - StudentFee): ${analytics.kpis.studentFee.value}`);
-    console.log(`Revenue Change Badge: ${analytics.kpis.studentFee.change}%`);
-    console.log(`Total Receivables (KPI): ${analytics.kpis.totalReceivables.value}`);
-
-    console.log(`\nFee Analytics Breakdown:`);
-    console.log(`Paid vs Pending:`, JSON.stringify(analytics.feeAnalytics.paidVsPending));
-
-    // Check the monthly collection trend to see if Dec 31st is there
-    console.log(`\nMonthly Collection Trend:`);
-    analytics.feeAnalytics.monthlyCollection.forEach((m: any) => {
-        console.log(`- ${m.month}: ${m.collected}`);
+    console.log(`\nEnrolled Students: ${enrolledStudents.length}`);
+    enrolledStudents.forEach(s => {
+        console.log(`  - ${s.name} (ID: ${s.id}, Org: ${s.organizationId})`);
     });
 }
 
-checkData().catch(console.error);
+checkDashboardData()
+    .then(() => {
+        console.log("\n=== Check Complete ===");
+        process.exit(0);
+    })
+    .catch((error) => {
+        console.error("Error:", error);
+        process.exit(1);
+    });

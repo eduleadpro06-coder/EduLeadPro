@@ -539,47 +539,203 @@ export default function Communication() {
         </TabsContent>
 
         <TabsContent value="templates" className="space-y-4">
+          {/* Search and Filter Bar */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search templates by name or content..."
+                      className="pl-10"
+                      value={templateSearch}
+                      onChange={(e) => setTemplateSearch(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <Select value={templateCategoryFilter} onValueChange={setTemplateCategoryFilter}>
+                  <SelectTrigger className="w-full md:w-48">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="sms">SMS</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={templateStatusFilter} onValueChange={setTemplateStatusFilter}>
+                  <SelectTrigger className="w-full md:w-48">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active Only</SelectItem>
+                    <SelectItem value="inactive">Inactive Only</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button onClick={() => { setEditingTemplate(null); setTemplateDialogOpen(true); }}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      New Template
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>{editingTemplate ? 'Edit Template' : 'Create New Template'}</DialogTitle>
+                      <DialogDescription>
+                        {editingTemplate ? 'Update your message template' : 'Create a reusable template with dynamic variables like {{name}}, {{instituteName}}, etc.'}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleTemplateSubmit} className="space-y-4">
+                      <div>
+                        <Label htmlFor="displayName">Display Name *</Label>
+                        <Input
+                          id="displayName"
+                          name="displayName"
+                          placeholder="e.g., Welcome Message"
+                          defaultValue={editingTemplate?.displayName}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="category">Category *</Label>
+                        <Select name="category" defaultValue={editingTemplate?.category || "whatsapp"} required>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="whatsapp">📱 WhatsApp</SelectItem>
+                            <SelectItem value="sms">💬 SMS</SelectItem>
+                            <SelectItem value="email">📧 Email</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="content">Message Content *</Label>
+                        <Textarea
+                          id="content"
+                          name=
+
+                          "content"
+                          rows={6}
+                          placeholder="Hello {{name}}, welcome to {{instituteName}}!"
+                          defaultValue={editingTemplate?.content}
+                          required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Available variables: {'{{'} name {'}}'},  {'{{'} instituteName {'}}'},  {'{{'} class {'}}'},  {'{{'} parentName {'}}'},  {'{{'} dueDate {'}}'},  {'{{'} amount {'}}'}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="isActive"
+                          name="isActive"
+                          defaultChecked={editingTemplate?.isActive !== false}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor="isActive" className="font-normal">Active Status</Label>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-4">
+                        <Button type="button" variant="outline" onClick={() => setTemplateDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={templateMutation.isPending}>
+                          {templateMutation.isPending ? 'Saving...' : editingTemplate ? 'Update Template' : 'Create Template'}
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Templates Grid */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {templates.map((template: CommunicationTemplate) => (
-              <Card key={template.id}>
+            {filteredTemplates.map((template: any) => (
+              <Card key={template.id} className="flex flex-col">
                 <CardHeader>
                   <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-body font-semibold">{template.name}</CardTitle>
-                      <CardDescription>{template.category.replace("_", " ")}</CardDescription>
+                    <div className="flex-1">
+                      <CardTitle className="text-body font-semibold">{template.displayName}</CardTitle>
+                      <CardDescription className="capitalize mt-1">{template.category}</CardDescription>
                     </div>
                     <Badge variant={template.isActive ? "default" : "secondary"}>
                       {template.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
+                <CardContent className="flex-1">
+                  <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      {getTypeIcon(template.type)}
-                      <span className="text-sm font-medium">{template.type.toUpperCase()}</span>
+                      {getTypeIcon(template.category)}
+                      <span className="text-sm font-medium">{template.category.toUpperCase()}</span>
                     </div>
-                    {template.subject && (
-                      <div className="text-sm">
-                        <strong>Subject:</strong> {template.subject}
+                    <div className="text-sm text-muted-foreground line-clamp-3">
+                      {template.content}
+                    </div>
+                    {template.variables && (
+                      <div className="flex flex-wrap gap-1">
+                        {JSON.parse(template.variables || '[]').slice(0, 3).map((v: string, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs">
+                            {v}
+                          </Badge>
+                        ))}
                       </div>
                     )}
-                    <div className="text-sm text-muted-foreground">
-                      {template.content.substring(0, 100)}...
-                    </div>
-                  </div>
-                  <div className="flex gap-2 mt-4">
-                    <Button size="sm" variant="outline">
-                      Edit
-                    </Button>
-                    <Button size="sm" onClick={() => handleUseTemplate(template)}>
-                      Use Template
-                    </Button>
                   </div>
                 </CardContent>
+                <div className="px-6 pb-4 flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setEditingTemplate(template);
+                      setTemplateDialogOpen(true);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleUseTemplate(template)}
+                  >
+                    Use
+                  </Button>
+                  {!template.isDefault && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 hover:bg-red-50"
+                      onClick={() => handleDeleteTemplate(template.id)}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                </div>
               </Card>
             ))}
           </div>
+
+          {filteredTemplates.length === 0 && (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <MessageSquare className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                <p className="text-lg font-semibold text-gray-700">No templates found</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  {templateSearch || templateCategoryFilter !== 'all' || templateStatusFilter !== 'all'
+                    ? 'Try adjusting your filters'
+                    : 'Create your first template to get started'}
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">

@@ -296,6 +296,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Organization Onboarding Endpoints
+  // Check if organization needs onboarding (missing contact info)
+  app.get("/api/organizations/:id/needs-onboarding", async (req, res) => {
+    try {
+      const organizationId = parseInt(req.params.id);
+      const userOrgId = await getOrganizationId(req);
+
+      // Ensure user can only check their own organization
+      if (organizationId !== userOrgId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const org = await storage.getOrganization(organizationId);
+
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      // Organization needs onboarding if phone or address is missing
+      const needsOnboarding = !org.phone || !org.address;
+
+      res.json({
+        needsOnboarding,
+        organization: {
+          id: org.id,
+          name: org.name,
+          phone: org.phone,
+          address: org.address,
+          city: org.city,
+          state: org.state,
+          pincode: org.pincode
+        }
+      });
+    } catch (error) {
+      console.error("Check onboarding status error:", error);
+      res.status(500).json({ message: "Failed to check onboarding status" });
+    }
+  });
+
+  // Update organization contact information
+  app.patch("/api/organizations/:id/contact-info", async (req, res) => {
+    try {
+      const organizationId = parseInt(req.params.id);
+      const userOrgId = await getOrganizationId(req);
+
+      // Ensure user can only update their own organization
+      if (organizationId !== userOrgId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const { phone, address, city, state, pincode } = req.body;
+
+      // Validate required fields
+      if (!phone || !address) {
+        return res.status(400).json({ message: "Phone and address are required" });
+      }
+
+      // Validate phone format (10 digits)
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (phoneDigits.length !== 10) {
+        return res.status(400).json({ message: "Phone number must be 10 digits" });
+      }
+
+      const updated = await storage.updateOrganization(organizationId, {
+        phone,
+        address,
+        city: city || null,
+        state: state || null,
+        pincode: pincode || null
+      });
+
+      if (!updated) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      res.json({
+        message: "Organization contact information updated successfully",
+        organization: updated
+      });
+    } catch (error) {
+      console.error("Organization update error:", error);
+      res.status(500).json({ message: "Failed to update organization" });
+    }
+  });
+
+
   // Recent leads
   app.get("/api/dashboard/leads", async (req, res) => {
     try {
@@ -1404,9 +1490,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Message Templates Routes
   app.get("/api/message-templates", async (req, res) => {
     try {
-      const category = req.query.category as string | undefined;
-      const templates = await storage.getAllMessageTemplates(category);
-      res.json(templates);
+      const organizationId = await getOrganizationId(req);
+      const { category, isActive, searchTerm } = req.query;
+
+      const filters: any = {};
+      if (category) filters.category = category as string;
+      if (isActive !== undefined) filters.isActive = isActive === 'true';
+      if (searchTerm) filters.searchTerm = searchTerm as string;
+
+      // Fetch templates for this organization AND system-wide templates (organizationId = NULL)
+      const orgTemplates = await storage.getAllMessageTemplates(organizationId, filters);
+      const systemTemplates = await storage.getAllMessageTemplates(undefined, filters);
+
+      // Combine and deduplicate (prefer organization-specific over system defaults)
+      const allTemplates = [...orgTemplates, ...systemTemplates];
+      const uniqueTemplates = allTemplates.filter((template, index, self) =>
+        index === self.findIndex((t) => t.name === template.name)
+      );
+
+      res.json(uniqueTemplates);
     } catch (error) {
       console.error("Error fetching message templates:", error);
       res.status(500).json({ message: "Failed to fetch message templates" });
@@ -1432,7 +1534,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "No organization assigned" });
       }
 
-      const templateData = { ...req.body, organizationId };
+      // Get user ID from request
+      const userName = req.headers['x-user-name'] as string;
+      const users = userName ? await db.select().from(schema.users).where(eq(schema.users.username, userName.toLowerCase())).limit(1) : [];
+      const userId = users.length > 0 ? users[0].id : undefined;
+
+      const templateData = {
+        ...req.body,
+        organizationId,
+        createdBy: userId,
+      };
+
       const newTemplate = await storage.createMessageTemplate(templateData);
       res.status(201).json(newTemplate);
     } catch (error) {
@@ -1458,8 +1570,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await storage.deleteMessageTemplate(Number(req.params.id));
       res.sendStatus(204);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting template:", error);
+      if (error.message === "Cannot delete default templates") {
+        return res.status(400).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to delete template" });
     }
   });

@@ -7,6 +7,11 @@ export const organizations = pgTable("organizations", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
+  phone: varchar("phone", { length: 20 }), // Organization phone number
+  address: text("address"), // Organization address
+  city: varchar("city", { length: 100 }), // City
+  state: varchar("state", { length: 100 }), // State
+  pincode: varchar("pincode", { length: 10 }), // PIN code
   settings: jsonb("settings"), // JSON for logo, timezone, billing config, etc.
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import DonutChart from "@/components/dashboard/DonutChart";
 import KPICard from "@/components/dashboard/KPICard";
@@ -7,6 +8,8 @@ import { AreaChart as RCAreaChart, BarChart as RCBarChart, PieChart as RCPieChar
 import Header from "@/components/layout/header";
 import { useQuery } from "@tanstack/react-query";
 import { Notification } from "@shared/schema";
+import { useAuth } from "@/contexts/AuthContext";
+import OrganizationOnboarding from "@/components/onboarding/organization-onboarding";
 
 interface DashboardAnalytics {
   kpis: {
@@ -50,10 +53,37 @@ interface DashboardAnalytics {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [orgData, setOrgData] = useState<any>(null);
+
   const { data: analytics, isLoading, error } = useQuery<DashboardAnalytics>({
     queryKey: ['/api/dashboard/analytics'],
     refetchInterval: 60000,
   });
+
+  // Check if organization needs onboarding
+  useEffect(() => {
+    async function checkOnboarding() {
+      if (user?.organizationId) {
+        try {
+          const res = await fetch(`/api/organizations/${user.organizationId}/needs-onboarding`);
+          if (res.ok) {
+            const data = await res.json();
+
+            if (data.needsOnboarding) {
+              setShowOnboarding(true);
+              setOrgData(data.organization);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to check onboarding status:", error);
+        }
+      }
+    }
+
+    checkOnboarding();
+  }, [user]);
 
   if (isLoading) {
     return (
@@ -109,6 +139,14 @@ export default function Dashboard() {
 
   return (
     <>
+      {showOnboarding && orgData && (
+        <OrganizationOnboarding
+          organizationId={orgData.id}
+          organizationName={orgData.name}
+          onComplete={() => setShowOnboarding(false)}
+        />
+      )}
+
       <Header title="Dashboard" subtitle="Overview of your school's performance" />
       <div className="min-h-screen w-full bg-gray-50 text-gray-900 px-4 pb-8">
 
@@ -165,11 +203,12 @@ export default function Dashboard() {
 
           <KPICard
             title="Fee Collected"
-            value={`₹${analytics.kpis.avgOrderValue.value.toLocaleString()}`}
+            value={`₹${analytics.feeAnalytics.totalRevenue.toLocaleString()}`}
             change={analytics.kpis.avgOrderValue.change}
             icon={Wallet}
             color="purple"
-            progress={65}
+            progress={collectionProgress}
+            tooltip="Total fees collected from all students across all payment types (Registration, EMI, Admission Form Fee, Other)."
           />
 
           <KPICard

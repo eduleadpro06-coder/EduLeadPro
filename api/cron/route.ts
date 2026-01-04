@@ -10,6 +10,7 @@ import logger from '../../server/config/logger.js';
  * to run daily daycare management tasks including:
  * - Enrollment expiration checks
  * - Overdue follow-up notifications
+ * - Payment due notifications
  * 
  * Schedule: "30 3 * * *" (9:00 AM IST / 3:30 AM UTC)
  * 
@@ -85,12 +86,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         logger.info(`[CRON] Created ${overdueNotifications} notifications for overdue follow-ups`);
 
+        // 3. Check for payments due today
+        const { checkPaymentDuesAndNotify } = await import('../../server/cron-utils.js');
+        const paymentNotifications = await checkPaymentDuesAndNotify(db, schema, daycareStorage, logger);
+
+        logger.info(`[CRON] Payment due check completed. Created ${paymentNotifications} notifications.`);
+
         // Log summary
-        const totalIssues = expirationResult.expiring + expirationResult.expired + overdueFollowups.length;
+        const totalIssues = expirationResult.expiring + expirationResult.expired + overdueFollowups.length + paymentNotifications;
         if (totalIssues > 0) {
-            logger.warn(`[CRON] Summary: ${expirationResult.expiring} enrollments expiring tomorrow, ${expirationResult.expired} expired enrollments, ${overdueFollowups.length} overdue follow-ups`);
+            logger.warn(`[CRON] Summary: ${expirationResult.expiring} enrollments expiring tomorrow, ${expirationResult.expired} expired enrollments, ${overdueFollowups.length} overdue follow-ups, ${paymentNotifications} payment dues`);
         } else {
-            logger.info('[CRON] All clear - no expiring enrollments or overdue follow-ups');
+            logger.info('[CRON] All clear - no expiring enrollments, overdue follow-ups, or payment dues');
         }
 
         // Return success response
@@ -100,7 +107,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 enrollmentsExpiringTomorrow: expirationResult.expiring,
                 expiredEnrollments: expirationResult.expired,
                 overdueFollowups: overdueFollowups.length,
-                notificationsCreated: expirationResult.notifications + overdueNotifications
+                paymentNotifications: paymentNotifications,
+                notificationsCreated: expirationResult.notifications + overdueNotifications + paymentNotifications
             }
         });
 
