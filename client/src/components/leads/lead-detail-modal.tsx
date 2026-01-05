@@ -185,6 +185,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
     },
     onSuccess: (updatedLead) => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics"] }); // Refresh dashboard when enrollment changes
       setIsEditing(false);
 
       // Notify parent component to update the selected lead

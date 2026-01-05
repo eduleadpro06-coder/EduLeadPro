@@ -1194,6 +1194,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!lead) {
         return res.status(404).json({ message: "Lead not found" });
       }
+
+      // Invalidate dashboard cache when lead status changes (e.g., enrollment)
+      const organizationId = await getOrganizationId(req);
+      if (organizationId) {
+        cacheService.delete(cacheService.dashboardKey(organizationId));
+        console.log(`[Cache] Invalidated dashboard cache for org ${organizationId} after lead update`);
+      }
+
       res.json(lead);
     } catch (error) {
       console.error("Error updating lead:", error);
@@ -1676,8 +1684,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/e-mandates/:id", async (req, res) => {
     try {
-      const eMandate = await storage.updateEMandate(parseInt(req.params.id), req.body);
-      res.json(eMandate);
+      const updated = await storage.updateLead(parseInt(req.params.id), req.body);
+
+      // Invalidate dashboard cache when lead status changes (e.g., enrollment)
+      const organizationId = await getOrganizationId(req);
+      if (organizationId) {
+        cacheService.delete(cacheService.dashboardKey(organizationId));
+        console.log(`[Cache] Invalidated dashboard cache for org ${organizationId} after lead update`);
+      }
+
+      res.json(updated);
     } catch (error) {
       console.error("E-Mandate update error:", error);
       res.status(500).json({ message: "Failed to update E-Mandate" });

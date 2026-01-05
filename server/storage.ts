@@ -1332,14 +1332,21 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // Get all fee structures
-    const [allFeeStructures, allEmiPlans, allInstallments] = await Promise.all([
+    // Get all fee structures AND global class fees
+    const [allFeeStructures, allEmiPlans, allInstallments, allGlobalClassFees] = await Promise.all([
       db.select().from(schema.feeStructure)
         .where(organizationId ? eq(schema.feeStructure.organizationId, organizationId) : sql`1=1`),
       db.select().from(schema.emiPlans)
         .where(organizationId ? eq(schema.emiPlans.organizationId, organizationId) : sql`1=1`),
       db.select().from(schema.emiSchedule)
-        .where(ne(schema.emiSchedule.status, 'paid'))
+        .where(ne(schema.emiSchedule.status, 'paid')),
+      db.select().from(schema.globalClassFees)
+        .where(
+          and(
+            organizationId ? eq(schema.globalClassFees.organizationId, organizationId) : sql`1=1`,
+            eq(schema.globalClassFees.isActive, true)
+          )
+        )
     ]);
 
     // Map EMI plans for quick lookup: studentId -> totalAmount
@@ -1356,6 +1363,14 @@ export class DatabaseStorage implements IStorage {
       feeMap.set(key, Number(fs.totalFees));
     });
 
+    // Map global class fees for quick lookup: className -> total amount
+    const globalFeeMap = new Map<string, number>();
+    allGlobalClassFees.forEach(gcf => {
+      const existing = globalFeeMap.get(gcf.className) || 0;
+      // Sum all fee types for a class (tuition, library, etc.)
+      globalFeeMap.set(gcf.className, existing + Number(gcf.amount));
+    });
+
     // Memory-safe filtering for Pending installments (avoiding complex JOIN syntax issues)
     const enrolledStudentIds = new Set(enrolledStudents.map(s => s.id));
     const totalPendingEMIs = allInstallments
@@ -1363,8 +1378,8 @@ export class DatabaseStorage implements IStorage {
       .reduce((sum, i) => sum + Number(i.amount), 0);
 
     // REFINED GROSS POTENTIAL CALCULATION (User Accounting Model):
-    // Total Receivables = Sum of all Enrolled Students' Defined Plans (EMI Plan Total OR Class Fee)
-    // Pending = Total Receivables - Total Collected
+    // Total Receivables = Sum of all Enrolled Students' Defined Plans
+    // Priority: EMI Plan > Fee Structure > Global Class Fees
 
     let totalExpectedRevenue = 0;
 
@@ -1373,11 +1388,15 @@ export class DatabaseStorage implements IStorage {
       if (emiPlanMap.has(student.id)) {
         totalExpectedRevenue += emiPlanMap.get(student.id) || 0;
       }
-      // 2. Fallback: Global fee structure
+      // 2. Fallback: Class+Stream specific fee structure
       else {
         const key = `${student.class}_${student.stream}`;
         if (feeMap.has(key)) {
           totalExpectedRevenue += feeMap.get(key) || 0;
+        }
+        // 3. Final fallback: Global class fees
+        else if (globalFeeMap.has(student.class)) {
+          totalExpectedRevenue += globalFeeMap.get(student.class) || 0;
         }
       }
     });
@@ -1405,13 +1424,16 @@ export class DatabaseStorage implements IStorage {
     // So Pending = (Base + Extra) - (Collected Base + Collected Extra)
     // This correctly leaves the Pending amount as just the Base balance (e.g. 28,000).
 
-    const totalPending = Math.max(0, totalExpectedRevenue - totalCollectedAllTime);
+    // If we have expected revenue (from fee structures/EMI), calculate pending normally
+    // Otherwise, if there are payments but no structures, show 0 pending and 100% collection
+    const totalPending = totalExpectedRevenue > 0
+      ? Math.max(0, totalExpectedRevenue - totalCollectedAllTime)
+      : 0; // No structures = no pending expectation
 
-    // Collection rate: Collected / (Collected + Pending) which is effectively Collected / TotalExpected
-    // But we use the numbers we have.
+    // Collection rate: Collected / Expected (or 100% if collected without structures)
     const collectionRate = totalExpectedRevenue > 0
       ? (totalCollectedAllTime / totalExpectedRevenue) * 100
-      : (totalCollectedAllTime > 0 ? 100 : 0);
+      : (totalCollectedAllTime > 0 ? 100 : 0); // If collected without structures, show 100%
 
     const paidVsPending = [
       { label: 'Collected', value: totalCollectedAllTime },
@@ -1774,7 +1796,7 @@ export class DatabaseStorage implements IStorage {
           change: `${leadChange >= "0" ? '+' : ''}${leadChange}%`
         },
         studentFee: {
-          value: totalRevenue,
+          value: totalExpectedRevenue, // Total expected revenue from all enrolled students
           change: `${parseFloat(totalRevenueChange) >= 0 ? '+' : ''}${totalRevenueChange}%`
         },
         staffManagement: {
@@ -1790,8 +1812,8 @@ export class DatabaseStorage implements IStorage {
           change: `${parseFloat(expenseChange) >= 0 ? '+' : ''}${expenseChange}%`
         },
         totalReceivables: {
-          value: totalExpectedRevenue,
-          change: ""
+          value: totalExpectedRevenue > 0 ? totalExpectedRevenue : totalCollectedAllTime, // Fallback to collected when no structures
+          change: totalExpectedRevenue > 0 ? "" : "No fee structures"
         },
         conversionRate: {
           value: Math.round(currentConversionRate * 100) / 100,
