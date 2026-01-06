@@ -15,6 +15,7 @@ import {
   Package,
   FileText,
   Facebook,
+  Bus,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getActiveAIFeatures, getComingSoonFeatures, isAIFeaturePath } from "@/config/aiFeatures";
@@ -30,6 +31,7 @@ const navigation = [
   { name: "Expenses", href: "/expenses", icon: Wallet },
   { name: "Reports", href: "/reports", icon: FileText },
   { name: "Meta Marketing", href: "/meta-marketing", icon: Facebook, separator: true },
+  { name: "App Management", href: "/app-management", icon: Bus },
 ];
 
 

@@ -1,0 +1,12 @@
+{
+    "rewrites": [
+        {
+            "source": "/api/:path*",
+            "destination": "https://edu-lead-pro.vercel.app/api/:path*"
+        },
+        {
+            "source": "/((?!assets/|.*\\..*).*)",
+            "destination": "/index.html"
+        }
+    ]
+}

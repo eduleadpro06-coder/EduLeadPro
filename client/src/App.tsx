@@ -14,6 +14,7 @@ import ComprehensiveAIDashboard from "@/pages/comprehensive-ai-dashboard";
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
 import MetaMarketing from "@/pages/meta-marketing";
+import AppManagement from "@/pages/app-management";
 import Login from "@/pages/login";
 import Landing from "@/pages/landing";
 import BookDemo from "@/pages/book-demo";
@@ -249,6 +250,18 @@ function Router() {
               <Sidebar />
               <div className="flex-1 ml-64">
                 <MetaMarketing />
+              </div>
+            </div>
+          )} />
+        )}
+      </Route>
+      <Route path="/app-management">
+        {() => (
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <AppManagement />
               </div>
             </div>
           )} />

@@ -12,6 +12,7 @@ import { sql } from "drizzle-orm";
 import { registerDaycareRoutes } from "./daycareRoutes.js";
 import express from "express"; // Added for express.Request type
 import { cacheService } from "./cache-service.js"; // Performance optimization: caching layer
+import { getOrganizationId } from "./utils.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("🚀 Starting route registration...");
@@ -1002,8 +1003,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Check and create organization for Google OAuth users
+  // =====================================================
+  // MOBILE APP MANAGEMENT (ADMIN SIDE)
+  // =====================================================
 
+  // Announcements
+  app.get("/api/announcements", async (req, res) => {
+    try {
+      const orgId = await getOrganizationId(req);
+      if (!orgId) return res.status(401).json({ message: "Organization required" });
+      const announcements = await storage.getAnnouncementsForAdmin(orgId);
+      res.json(announcements);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch announcements" });
+    }
+  });
+
+  app.post("/api/announcements", async (req, res) => {
+    try {
+      const orgId = await getOrganizationId(req);
+      if (!orgId) return res.status(401).json({ message: "Organization required" });
+      const data = { ...req.body, organizationId: orgId };
+      const announcement = await storage.createAnnouncement(data);
+      res.json(announcement);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create announcement" });
+    }
+  });
+
+  app.delete("/api/announcements/:id", async (req, res) => {
+    try {
+      await storage.deleteAnnouncement(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete announcement" });
+    }
+  });
+
+  // Events
+  app.get("/api/events", async (req, res) => {
+    try {
+      const orgId = await getOrganizationId(req);
+      if (!orgId) return res.status(401).json({ message: "Organization required" });
+      const events = await storage.getEventsForAdmin(orgId);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch events" });
+    }
+  });
+
+  app.post("/api/events", async (req, res) => {
+    try {
+      const orgId = await getOrganizationId(req);
+      if (!orgId) return res.status(401).json({ message: "Organization required" });
+      const data = { ...req.body, organizationId: orgId };
+      const event = await storage.createEvent(data);
+      res.json(event);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create event" });
+    }
+  });
+
+  app.delete("/api/events/:id", async (req, res) => {
+    try {
+      await storage.deleteEvent(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete event" });
+    }
+  });
+
+  // Daily Updates
+  app.get("/api/daily-updates", async (req, res) => {
+    try {
+      const orgId = await getOrganizationId(req);
+      if (!orgId) return res.status(401).json({ message: "Organization required" });
+      const updates = await storage.getDailyUpdatesForAdmin(orgId);
+      res.json(updates);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch daily updates" });
+    }
+  });
+
+  app.post("/api/daily-updates", async (req, res) => {
+    try {
+      const orgId = await getOrganizationId(req);
+      if (!orgId) return res.status(401).json({ message: "Organization required" });
+      const data = { ...req.body, organizationId: orgId };
+      const update = await storage.createDailyUpdate(data);
+      res.json(update);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create daily update" });
+    }
+  });
+
+  app.delete("/api/daily-updates/:id", async (req, res) => {
+    try {
+      await storage.deleteDailyUpdate(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete daily update" });
+    }
+  });
+
+  // Homework
+  app.get("/api/homework", async (req, res) => {
+    try {
+      const orgId = await getOrganizationId(req);
+      if (!orgId) return res.status(401).json({ message: "Organization required" });
+      const homework = await storage.getHomeworkForAdmin(orgId);
+      res.json(homework);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch homework" });
+    }
+  });
+
+  app.post("/api/homework", async (req, res) => {
+    try {
+      const orgId = await getOrganizationId(req);
+      if (!orgId) return res.status(401).json({ message: "Organization required" });
+      const data = { ...req.body, organizationId: orgId };
+      const homework = await storage.createHomework(data);
+      res.json(homework);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create homework" });
+    }
+  });
+
+  app.delete("/api/homework/:id", async (req, res) => {
+    try {
+      await storage.deleteHomework(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete homework" });
+    }
+  });
 
   // Get single lead
   app.get("/api/leads/:id", async (req, res) => {
@@ -5136,7 +5270,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
   registerDaycareRoutes(app);
 
+  // ============================================
+  // MOBILE APP ROUTES
+  // ============================================
+  const mobileRoutes = await import('./mobileRoutes.js');
+  app.use('/api/mobile', mobileRoutes.default);
+  console.log('✅ Mobile routes registered');
+
+  // PRESCHOOL MOBILE ROUTES (Daily Updates, Homework, Attendance)
+  // ============================================
+  // const preschoolRoutes = await import('./preschoolRoutes.js');
+  // app.use('/api/preschool', preschoolRoutes.default);
+  // console.log('✅ Preschool routes registered');
+
 
   const httpServer = createServer(app);
+
+  // ============================================
+  // WEBSOCKET SERVER FOR BUS TRACKING
+  // ============================================
+  const BusTrackingWebSocket = (await import('./websocket.js')).default;
+  const busTracking = new BusTrackingWebSocket(httpServer);
+  console.log('✅ WebSocket server initialized for bus tracking');
+
   return httpServer;
 }

@@ -37,6 +37,8 @@ export const leads = pgTable("leads", {
   email: text("email"),
   phone: text("phone").notNull(),
   class: text("class").notNull(), // Class 9, Class 10, etc.
+  section: text("section"), // Section A, B, etc.
+  batch: text("batch"), // Batch time/year
   stream: text("stream"), // Science, Commerce, Arts
   status: text("status").notNull().default("new"), // new, contacted, interested, enrolled, dropped
   source: text("source").notNull(), // facebook, google_ads, website, referral, etc.
@@ -54,6 +56,7 @@ export const leads = pgTable("leads", {
   admissionLikelihood: text("admission_likelihood"),
   deletedAt: timestamp("deleted_at"),
   organizationId: integer("organization_id").references(() => organizations.id),
+  appPassword: text("app_password"),
 });
 
 export const followUps = pgTable("follow_ups", {
@@ -1173,3 +1176,162 @@ export type InsertMetaAdSet = z.infer<typeof insertMetaAdSetSchema>;
 export type InsertMetaAd = z.infer<typeof insertMetaAdSchema>;
 export type InsertMetaLeadForm = z.infer<typeof insertMetaLeadFormSchema>;
 export type InsertMetaSyncedLead = z.infer<typeof insertMetaSyncedLeadSchema>;
+
+// =====================================================
+// MOBILE APP TABLES - for Parent/Teacher/Driver Apps
+// =====================================================
+
+// Daily Updates - Teacher posts about activities
+export const dailyUpdates = pgTable("daily_updates", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  leadId: integer("lead_id").references(() => leads.id),
+  title: varchar("title", { length: 200 }),
+  content: text("content").notNull(),
+  mediaUrls: text("media_urls").array(),
+  activityType: varchar("activity_type", { length: 50 }),
+  mood: varchar("mood", { length: 20 }),
+  teacherName: varchar("teacher_name", { length: 100 }),
+  className: varchar("class_name", { length: 50 }),
+  section: varchar("section", { length: 10 }),
+  isPinned: boolean("is_pinned").default(false),
+  postedAt: timestamp("posted_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Student Attendance
+export const studentAttendance = pgTable("student_attendance", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  leadId: integer("lead_id").notNull().references(() => leads.id),
+  date: date("date").notNull(),
+  status: varchar("status", { length: 20 }).notNull(),
+  checkInTime: varchar("check_in_time", { length: 10 }),
+  checkOutTime: varchar("check_out_time", { length: 10 }),
+  markedBy: varchar("marked_by", { length: 100 }),
+  markedAt: timestamp("marked_at").defaultNow(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Homework
+export const preschoolHomework = pgTable("preschool_homework", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  className: varchar("class_name", { length: 50 }).notNull(),
+  section: varchar("section", { length: 10 }),
+  teacherName: varchar("teacher_name", { length: 100 }),
+  subject: varchar("subject", { length: 100 }),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  mediaUrls: text("media_urls").array(),
+  dueDate: date("due_date"),
+  postedAt: timestamp("posted_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const homeworkSubmissions = pgTable("homework_submissions", {
+  id: serial("id").primaryKey(),
+  homeworkId: integer("homework_id").notNull().references(() => preschoolHomework.id),
+  leadId: integer("lead_id").notNull().references(() => leads.id),
+  submissionText: text("submission_text"),
+  mediaUrls: text("media_urls").array(),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  feedback: text("feedback"),
+  status: varchar("status", { length: 20 }).default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const preschoolAnnouncements = pgTable("preschool_announcements", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  title: varchar("title", { length: 200 }).notNull(),
+  content: text("content").notNull(),
+  mediaUrl: text("media_url"),
+  priority: varchar("priority", { length: 20 }).default("normal"),
+  targetRoles: varchar("target_roles", { length: 20 }).array(),
+  targetClasses: varchar("target_classes", { length: 50 }).array(),
+  createdBy: varchar("created_by", { length: 100 }),
+  publishedAt: timestamp("published_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const preschoolEvents = pgTable("preschool_events", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  eventDate: date("event_date").notNull(),
+  eventTime: varchar("event_time", { length: 10 }),
+  endTime: varchar("end_time", { length: 10 }),
+  location: varchar("location", { length: 200 }),
+  eventType: varchar("event_type", { length: 50 }),
+  forClasses: varchar("for_classes", { length: 50 }).array(),
+  createdBy: varchar("created_by", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const parentTeacherMessages = pgTable("parent_teacher_messages", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  leadId: integer("lead_id").references(() => leads.id),
+  fromName: varchar("from_name", { length: 100 }).notNull(),
+  fromEmail: varchar("from_email", { length: 255 }).notNull(),
+  toName: varchar("to_name", { length: 100 }).notNull(),
+  toEmail: varchar("to_email", { length: 255 }).notNull(),
+  subject: varchar("subject", { length: 200 }),
+  message: text("message").notNull(),
+  mediaUrls: text("media_urls").array(),
+  isRead: boolean("is_read").default(false),
+  readAt: timestamp("read_at"),
+  parentMessageId: integer("parent_message_id").references((): any => parentTeacherMessages.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const leadPreschoolProfiles = pgTable("lead_preschool_profiles", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull().unique().references(() => leads.id),
+  photoUrl: text("photo_url"),
+  bloodGroup: varchar("blood_group", { length: 10 }),
+  medicalConditions: text("medical_conditions"),
+  allergies: text("allergies"),
+  emergencyContactName: varchar("emergency_contact_name", { length: 100 }),
+  emergencyContactPhone: varchar("emergency_contact_phone", { length: 20 }),
+  emergencyContactRelation: varchar("emergency_contact_relation", { length: 50 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Insert Schemas
+export const insertDailyUpdateSchema = createInsertSchema(dailyUpdates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertStudentAttendanceSchema = createInsertSchema(studentAttendance).omit({ id: true, createdAt: true });
+export const insertPreschoolHomeworkSchema = createInsertSchema(preschoolHomework).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertHomeworkSubmissionSchema = createInsertSchema(homeworkSubmissions).omit({ id: true, createdAt: true });
+export const insertPreschoolAnnouncementSchema = createInsertSchema(preschoolAnnouncements).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPreschoolEventSchema = createInsertSchema(preschoolEvents).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertParentTeacherMessageSchema = createInsertSchema(parentTeacherMessages).omit({ id: true, createdAt: true });
+export const insertLeadPreschoolProfileSchema = createInsertSchema(leadPreschoolProfiles).omit({ id: true, createdAt: true, updatedAt: true });
+
+// Types
+export type DailyUpdate = typeof dailyUpdates.$inferSelect;
+export type StudentAttendance = typeof studentAttendance.$inferSelect;
+export type PreschoolHomework = typeof preschoolHomework.$inferSelect;
+export type HomeworkSubmission = typeof homeworkSubmissions.$inferSelect;
+export type PreschoolAnnouncement = typeof preschoolAnnouncements.$inferSelect;
+export type PreschoolEvent = typeof preschoolEvents.$inferSelect;
+export type ParentTeacherMessage = typeof parentTeacherMessages.$inferSelect;
+export type LeadPreschoolProfile = typeof leadPreschoolProfiles.$inferSelect;
+
+export type InsertDailyUpdate = z.infer<typeof insertDailyUpdateSchema>;
+export type InsertStudentAttendance = z.infer<typeof insertStudentAttendanceSchema>;
+export type InsertPreschoolHomework = z.infer<typeof insertPreschoolHomeworkSchema>;
+export type InsertHomeworkSubmission = z.infer<typeof insertHomeworkSubmissionSchema>;
+export type InsertPreschoolAnnouncement = z.infer<typeof insertPreschoolAnnouncementSchema>;
+export type InsertPreschoolEvent = z.infer<typeof insertPreschoolEventSchema>;
+export type InsertParentTeacherMessage = z.infer<typeof insertParentTeacherMessageSchema>;
+export type InsertLeadPreschoolProfile = z.infer<typeof insertLeadPreschoolProfileSchema>;

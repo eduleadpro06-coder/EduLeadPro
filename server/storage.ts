@@ -9,7 +9,10 @@ import type {
   EMandate, InsertEMandate, EmiSchedule, InsertEmiSchedule,
   GlobalClassFee, InsertGlobalClassFee, EmiPlan, InsertEmiPlan,
   Notification, InsertNotification, MessageTemplate, InsertMessageTemplate,
-  CommunicationLog, InsertCommunicationLog, Organization, InsertOrganization
+  CommunicationLog, InsertCommunicationLog, Organization, InsertOrganization,
+  DailyUpdate, InsertDailyUpdate, StudentAttendance, InsertStudentAttendance,
+  PreschoolHomework, InsertPreschoolHomework, PreschoolAnnouncement, InsertPreschoolAnnouncement,
+  PreschoolEvent, InsertPreschoolEvent
 } from "../shared/schema.js";
 
 // Type definitions for complex queries
@@ -278,6 +281,23 @@ export interface IStorage {
 
   // New method
   generateMonthlyPayrollForAllStaff(month: number, year: number): Promise<{ created: number; skipped: number; errors: any[] }>;
+
+  // Mobile Content Management
+  getAnnouncementsForAdmin(organizationId: number): Promise<PreschoolAnnouncement[]>;
+  createAnnouncement(announcement: InsertPreschoolAnnouncement): Promise<PreschoolAnnouncement>;
+  deleteAnnouncement(id: number): Promise<boolean>;
+
+  getEventsForAdmin(organizationId: number): Promise<PreschoolEvent[]>;
+  createEvent(event: InsertPreschoolEvent): Promise<PreschoolEvent>;
+  deleteEvent(id: number): Promise<boolean>;
+
+  getDailyUpdatesForAdmin(organizationId: number): Promise<DailyUpdate[]>;
+  createDailyUpdate(update: InsertDailyUpdate): Promise<DailyUpdate>;
+  deleteDailyUpdate(id: number): Promise<boolean>;
+
+  getHomeworkForAdmin(organizationId: number): Promise<PreschoolHomework[]>;
+  createHomework(homework: InsertPreschoolHomework): Promise<PreschoolHomework>;
+  deleteHomework(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4795,6 +4815,75 @@ export class DatabaseStorage implements IStorage {
       totalValue: totalValue.toFixed(2),
       generatedAt: new Date().toISOString()
     };
+  }
+
+  // Mobile Content Management
+  async getAnnouncementsForAdmin(organizationId: number): Promise<PreschoolAnnouncement[]> {
+    return await db.select()
+      .from(schema.preschoolAnnouncements)
+      .where(eq(schema.preschoolAnnouncements.organizationId, organizationId))
+      .orderBy(desc(schema.preschoolAnnouncements.publishedAt));
+  }
+
+  async createAnnouncement(announcement: InsertPreschoolAnnouncement): Promise<PreschoolAnnouncement> {
+    const result = await db.insert(schema.preschoolAnnouncements).values(announcement).returning();
+    return result[0];
+  }
+
+  async deleteAnnouncement(id: number): Promise<boolean> {
+    await db.delete(schema.preschoolAnnouncements).where(eq(schema.preschoolAnnouncements.id, id));
+    return true;
+  }
+
+  async getEventsForAdmin(organizationId: number): Promise<PreschoolEvent[]> {
+    return await db.select()
+      .from(schema.preschoolEvents)
+      .where(eq(schema.preschoolEvents.organizationId, organizationId))
+      .orderBy(asc(schema.preschoolEvents.eventDate));
+  }
+
+  async createEvent(event: InsertPreschoolEvent): Promise<PreschoolEvent> {
+    const result = await db.insert(schema.preschoolEvents).values(event).returning();
+    return result[0];
+  }
+
+  async deleteEvent(id: number): Promise<boolean> {
+    await db.delete(schema.preschoolEvents).where(eq(schema.preschoolEvents.id, id));
+    return true;
+  }
+
+  async getDailyUpdatesForAdmin(organizationId: number): Promise<DailyUpdate[]> {
+    return await db.select()
+      .from(schema.dailyUpdates)
+      .where(eq(schema.dailyUpdates.organizationId, organizationId))
+      .orderBy(desc(schema.dailyUpdates.postedAt));
+  }
+
+  async createDailyUpdate(update: InsertDailyUpdate): Promise<DailyUpdate> {
+    const result = await db.insert(schema.dailyUpdates).values(update).returning();
+    return result[0];
+  }
+
+  async deleteDailyUpdate(id: number): Promise<boolean> {
+    await db.delete(schema.dailyUpdates).where(eq(schema.dailyUpdates.id, id));
+    return true;
+  }
+
+  async getHomeworkForAdmin(organizationId: number): Promise<PreschoolHomework[]> {
+    return await db.select()
+      .from(schema.preschoolHomework)
+      .where(eq(schema.preschoolHomework.organizationId, organizationId))
+      .orderBy(desc(schema.preschoolHomework.postedAt));
+  }
+
+  async createHomework(homework: InsertPreschoolHomework): Promise<PreschoolHomework> {
+    const result = await db.insert(schema.preschoolHomework).values(homework).returning();
+    return result[0];
+  }
+
+  async deleteHomework(id: number): Promise<boolean> {
+    await db.delete(schema.preschoolHomework).where(eq(schema.preschoolHomework.id, id));
+    return true;
   }
 
 }
