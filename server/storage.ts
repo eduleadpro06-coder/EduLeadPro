@@ -4835,6 +4835,9 @@ export const storage = new DatabaseStorage();
 // Daycare Storage - Standalone module for daycare management
 export { daycareStorage } from "./daycareStorage.js";
 
+// Meta Marketing Storage - Standalone module for Meta marketing integration
+export { metaStorage } from "./metaStorage.js";
+
 // Only seed when explicitly enabled in non-production environments
 const shouldSeed = process.env.NODE_ENV !== 'production' && process.env.SEED_ON_START === 'true';
 

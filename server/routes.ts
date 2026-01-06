@@ -4888,6 +4888,250 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // META MARKETING ROUTES
+  // ============================================
+
+  const { metaStorage } = await import('./storage.js');
+  const { metaAPIService } = await import('./meta-api-service.js');
+
+  // OAuth - Initiate connection
+  app.get("/api/meta/oauth/authorize", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      // Generate OAuth URL with organization ID as state
+      const authUrl = metaAPIService.generateOAuthUrl(organizationId.toString());
+      res.redirect(authUrl);
+    } catch (error) {
+      console.error("OAuth initiation error:", error);
+      res.status(500).json({ message: "Failed to initiate OAuth" });
+    }
+  });
+
+  // OAuth - Callback handler
+  app.get("/api/meta/oauth/callback", async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!code || !state) {
+        return res.status(400).json({ message: "Missing OAuth parameters" });
+      }
+
+      const organizationId = parseInt(state as string);
+
+      // Exchange code for token
+      const tokenData = await metaAPIService.exchangeCodeForToken(code as string);
+
+      // Get long-lived token
+      const longLivedToken = await metaAPIService.getLongLivedToken(tokenData.accessToken);
+
+      // Get ad accounts and pages
+      const [adAccounts, pages] = await Promise.all([
+        metaAPIService.getAdAccounts(longLivedToken.accessToken),
+        metaAPIService.getPages(longLivedToken.accessToken)
+      ]);
+
+      if (adAccounts.length === 0) {
+        return res.status(400).json({ message: "No ad accounts found" });
+      }
+
+      // Calculate token expiration
+      const expiresAt = new Date();
+      expiresAt.setSeconds(expiresAt.getSeconds() + longLivedToken.expiresIn);
+
+      // Store connection
+      await metaStorage.createConnection({
+        organizationId,
+        accessToken: longLivedToken.accessToken,
+        tokenExpiresAt: expiresAt,
+        adAccountId: adAccounts[0].id,
+        pageId: pages[0]?.id,
+        pageName: pages[0]?.name,
+      });
+
+      // Redirect to Meta Marketing page
+      res.redirect("/meta-marketing?connected=true");
+    } catch (error) {
+      console.error("OAuth callback error:", error);
+      res.redirect("/meta-marketing?error=connection_failed");
+    }
+  });
+
+  // Disconnect Meta account
+  app.delete("/api/meta/oauth/disconnect", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      await metaStorage.deleteConnection(organizationId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Disconnect error:", error);
+      res.status(500).json({ message: "Failed to disconnect" });
+    }
+  });
+
+  // Get connection status
+  app.get("/api/meta/connection/status", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const connection = await metaStorage.getConnection(organizationId);
+      res.json(connection || null);
+    } catch (error) {
+      console.error("Connection status error:", error);
+      res.status(500).json({ message: "Failed to get connection status" });
+    }
+  });
+
+  // Get campaigns
+  app.get("/api/meta/campaigns", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const campaigns = await metaStorage.getCampaigns(organizationId);
+      res.json(campaigns);
+    } catch (error) {
+      console.error("Get campaigns error:", error);
+      res.status(500).json({ message: "Failed to fetch campaigns" });
+    }
+  });
+
+  // Create campaign
+  app.post("/api/meta/campaigns", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const connection = await metaStorage.getConnection(organizationId);
+      if (!connection) {
+        return res.status(400).json({ message: "No Meta connection found" });
+      }
+
+      // Create campaign via Meta API
+      const metaCampaign = await metaAPIService.createCampaign(
+        connection.adAccountId,
+        connection.accessToken,
+        req.body
+      );
+
+      // Store in database
+      const campaign = await metaStorage.createCampaign({
+        organizationId,
+        metaCampaignId: metaCampaign.id,
+        name: req.body.name,
+        objective: req.body.objective,
+        status: req.body.status || "PAUSED",
+        dailyBudget: req.body.dailyBudget,
+        lifetimeBudget: req.body.lifetimeBudget,
+      });
+
+      res.json(campaign);
+    } catch (error) {
+      console.error("Create campaign error:", error);
+      res.status(500).json({ message: "Failed to create campaign" });
+    }
+  });
+
+  // Manual lead sync
+  app.post("/api/meta/leads/sync", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const connection = await metaStorage.getConnection(organizationId);
+      if (!connection) {
+        return res.status(400).json({ message: "No Meta connection found" });
+      }
+
+      // Get all lead forms
+      const forms = await metaStorage.getLeadForms(organizationId);
+      let syncedCount = 0;
+
+      for (const form of forms) {
+        try {
+          // Get leads from this form
+          const metaLeads = await metaAPIService.getLeadsFromForm(
+            form.metaFormId,
+            connection.accessToken
+          );
+
+          for (const metaLead of metaLeads) {
+            // Check if already synced
+            const exists = await metaStorage.checkLeadExists(metaLead.id, organizationId);
+            if (exists) continue;
+
+            // Parse lead data and create CRM lead
+            const leadData = metaLead.field_data.reduce((acc: any, field: any) => {
+              acc[field.name] = field.values[0];
+              return acc;
+            }, {});
+
+            // Create lead in CRM
+            const crmLead = await storage.createLead({
+              name: leadData.full_name || leadData.name || "Unknown",
+              email: leadData.email,
+              phone: leadData.phone,
+              class: leadData.class || "Not Specified",
+              source: "Meta Ads",
+              status: "new",
+              organizationId,
+            });
+
+            // Create sync record
+            await metaStorage.createSyncedLead({
+              organizationId,
+              metaLeadId: metaLead.id,
+              crmLeadId: crmLead.id,
+              formId: form.id,
+              rawData: metaLead,
+            });
+
+            syncedCount++;
+          }
+        } catch (formError) {
+          console.error(`Error syncing form ${form.id}:`, formError);
+        }
+      }
+
+      res.json({ count: syncedCount, message: `Synced ${syncedCount} new leads` });
+    } catch (error) {
+      console.error("Lead sync error:", error);
+      res.status(500).json({ message: "Failed to sync leads" });
+    }
+  });
+
+  // Get sync history
+  app.get("/api/meta/leads/sync-history", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const history = await metaStorage.getSyncedLeads(organizationId, 50);
+      res.json(history);
+    } catch (error) {
+      console.error("Sync history error:", error);
+      res.status(500).json({ message: "Failed to fetch sync history" });
+    }
+  });
+
+  // ============================================
   // DAYCARE MANAGEMENT ROUTES
   // ============================================
   registerDaycareRoutes(app);

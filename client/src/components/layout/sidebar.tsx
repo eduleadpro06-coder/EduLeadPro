@@ -14,6 +14,7 @@ import {
   Baby,
   Package,
   FileText,
+  Facebook,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getActiveAIFeatures, getComingSoonFeatures, isAIFeaturePath } from "@/config/aiFeatures";
@@ -28,7 +29,9 @@ const navigation = [
   { name: "Stock Management", href: "/inventory", icon: Package },
   { name: "Expenses", href: "/expenses", icon: Wallet },
   { name: "Reports", href: "/reports", icon: FileText },
+  { name: "Meta Marketing", href: "/meta-marketing", icon: Facebook, separator: true },
 ];
+
 
 export default function Sidebar() {
   const [location] = useLocation();
@@ -120,8 +123,13 @@ export default function Sidebar() {
               const Icon = item.icon;
               // Add divider after Daycare Management (index 3)
               const dividerAfter = idx === 3;
+              // Add divider before item if separator flag is true
+              const dividerBefore = (item as any).separator === true;
               return (
                 <>
+                  {dividerBefore && (
+                    <div className="my-2 border-t border-gray-200 mx-2"></div>
+                  )}
                   <Link
                     key={item.name}
                     href={item.href}

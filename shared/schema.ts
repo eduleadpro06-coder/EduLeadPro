@@ -1061,3 +1061,115 @@ export type InventoryTransactionWithItem = InventoryTransaction & {
   item: InventoryItem;
   user?: User;
 };
+
+// =====================================================
+// META MARKETING INTEGRATION
+// =====================================================
+
+// Meta Connections - Store OAuth connection per organization
+export const metaConnections = pgTable("meta_connections", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizations.id).notNull(),
+  accessToken: text("access_token").notNull(),
+  tokenExpiresAt: timestamp("token_expires_at").notNull(),
+  refreshToken: text("refresh_token"),
+  adAccountId: varchar("ad_account_id", { length: 100 }).notNull(),
+  pageId: varchar("page_id", { length: 100 }),
+  pageName: varchar("page_name", { length: 255 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Meta Campaigns
+export const metaCampaigns = pgTable("meta_campaigns", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizations.id).notNull(),
+  metaCampaignId: varchar("meta_campaign_id", { length: 100 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  objective: varchar("objective", { length: 100 }).notNull(), // LEADS, TRAFFIC, AWARENESS, etc.
+  status: varchar("status", { length: 50 }).default("ACTIVE"),
+  dailyBudget: decimal("daily_budget", { precision: 10, scale: 2 }),
+  lifetimeBudget: decimal("lifetime_budget", { precision: 10, scale: 2 }),
+  startTime: timestamp("start_time"),
+  endTime: timestamp("end_time"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Meta Ad Sets
+export const metaAdSets = pgTable("meta_ad_sets", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizations.id).notNull(),
+  campaignId: integer("campaign_id").references(() => metaCampaigns.id).notNull(),
+  metaAdSetId: varchar("meta_ad_set_id", { length: 100 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  targeting: jsonb("targeting"), // JSON for audience targeting config
+  bidAmount: decimal("bid_amount", { precision: 10, scale: 2 }),
+  optimizationGoal: varchar("optimization_goal", { length: 100 }),
+  billingEvent: varchar("billing_event", { length: 100 }),
+  status: varchar("status", { length: 50 }).default("ACTIVE"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Meta Ads
+export const metaAds = pgTable("meta_ads", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizations.id).notNull(),
+  adSetId: integer("ad_set_id").references(() => metaAdSets.id).notNull(),
+  metaAdId: varchar("meta_ad_id", { length: 100 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  creative: jsonb("creative").notNull(), // JSON for ad creative (image, text, CTA, etc.)
+  status: varchar("status", { length: 50 }).default("ACTIVE"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Meta Lead Forms
+export const metaLeadForms = pgTable("meta_lead_forms", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizations.id).notNull(),
+  metaFormId: varchar("meta_form_id", { length: 100 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  questions: jsonb("questions").notNull(), // JSON array of form questions
+  privacyPolicyUrl: text("privacy_policy_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Meta Synced Leads - Maps Meta leads to CRM leads
+export const metaSyncedLeads = pgTable("meta_synced_leads", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizations.id).notNull(),
+  metaLeadId: varchar("meta_lead_id", { length: 100 }).notNull(),
+  crmLeadId: integer("crm_lead_id").references(() => leads.id).notNull(),
+  formId: integer("form_id").references(() => metaLeadForms.id),
+  campaignId: integer("campaign_id").references(() => metaCampaigns.id),
+  adId: integer("ad_id").references(() => metaAds.id),
+  rawData: jsonb("raw_data").notNull(), // Full lead data from Meta
+  syncedAt: timestamp("synced_at").defaultNow().notNull(),
+});
+
+// Insert schemas
+export const insertMetaConnectionSchema = createInsertSchema(metaConnections).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMetaCampaignSchema = createInsertSchema(metaCampaigns).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMetaAdSetSchema = createInsertSchema(metaAdSets).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMetaAdSchema = createInsertSchema(metaAds).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMetaLeadFormSchema = createInsertSchema(metaLeadForms).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMetaSyncedLeadSchema = createInsertSchema(metaSyncedLeads).omit({ id: true, syncedAt: true });
+
+// Types
+export type MetaConnection = typeof metaConnections.$inferSelect;
+export type MetaCampaign = typeof metaCampaigns.$inferSelect;
+export type MetaAdSet = typeof metaAdSets.$inferSelect;
+export type MetaAd = typeof metaAds.$inferSelect;
+export type MetaLeadForm = typeof metaLeadForms.$inferSelect;
+export type MetaSyncedLead = typeof metaSyncedLeads.$inferSelect;
+
+export type InsertMetaConnection = z.infer<typeof insertMetaConnectionSchema>;
+export type InsertMetaCampaign = z.infer<typeof insertMetaCampaignSchema>;
+export type InsertMetaAdSet = z.infer<typeof insertMetaAdSetSchema>;
+export type InsertMetaAd = z.infer<typeof insertMetaAdSchema>;
+export type InsertMetaLeadForm = z.infer<typeof insertMetaLeadFormSchema>;
+export type InsertMetaSyncedLead = z.infer<typeof insertMetaSyncedLeadSchema>;
