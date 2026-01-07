@@ -40,15 +40,19 @@ router.post('/auth/login', async (req: Request, res: Response) => {
         // First, check if this is a STAFF member (Teacher/Driver)
         const { data: staffMembers, error: staffError } = await supabase
             .from('staff')
-            .select('id, name, phone, role, organization_id, email')
+            .select('id, name, phone, role, organization_id, email, app_password')
             .eq('phone', phone)
             .eq('is_active', true);
 
         if (!staffError && staffMembers && staffMembers.length > 0) {
             const staff = staffMembers[0];
 
-            // For staff, password is their phone number (simple auth for now)
-            if (password === phone || password === '1234') {
+            // Check password - priority: custom app_password > phone number > default 1234
+            const isValidPassword = staff.app_password
+                ? password === staff.app_password  // If custom password set, must match
+                : (password === phone || password === '1234');  // Otherwise allow defaults
+
+            if (isValidPassword) {
                 // Fetch organization name
                 let organizationName = 'School';
                 if (staff.organization_id) {
@@ -75,7 +79,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
                         organization_id: staff.organization_id,
                         organizationName: organizationName
                     },
-                    requiresPasswordChange: false, // Staff don't need password change
+                    requiresPasswordChange: !staff.app_password, // Prompt to set password if not set
                     students: [] // Staff don't have student children
                 });
             } else {
@@ -193,6 +197,54 @@ router.post('/auth/change-password', async (req: Request, res: Response) => {
         res.json({ success: true, message: 'Password updated successfully' });
     } catch (error) {
         console.error('Password change error:', error);
+        res.status(500).json({ error: 'Failed to update password' });
+    }
+});
+
+// Change password for STAFF (Teachers/Drivers)
+router.post('/auth/change-password-staff', async (req, res) => {
+    try {
+        const { phone, oldPassword, newPassword } = req.body;
+
+        if (!phone || !newPassword) {
+            return res.status(400).json({ error: 'Phone and new password are required' });
+        }
+
+        // Find staff member
+        const { data: staffMembers, error: findError } = await supabase
+            .from('staff')
+            .select('id, phone, app_password')
+            .eq('phone', phone)
+            .eq('is_active', true);
+
+        if (findError || !staffMembers || staffMembers.length === 0) {
+            return res.status(404).json({ error: 'Staff member not found' });
+        }
+
+        const staff = staffMembers[0];
+
+        // Verify old password if provided (or allow defaults)
+        if (oldPassword) {
+            const isValidOld = staff.app_password
+                ? oldPassword === staff.app_password
+                : (oldPassword === phone || oldPassword === '1234');
+
+            if (!isValidOld) {
+                return res.status(401).json({ error: 'Invalid old password' });
+            }
+        }
+
+        // Update password
+        const { error: updateError } = await supabase
+            .from('staff')
+            .update({ app_password: newPassword })
+            .eq('id', staff.id);
+
+        if (updateError) throw updateError;
+
+        res.json({ success: true, message: 'Password updated successfully' });
+    } catch (error) {
+        console.error('Staff password change error:', error);
         res.status(500).json({ error: 'Failed to update password' });
     }
 });
