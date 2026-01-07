@@ -80,7 +80,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
                         organization_id: staff.organization_id,
                         organizationName: organizationName
                     },
-                    requiresPasswordChange: !staff.app_password, // Prompt to set password if not set
+                    requiresPasswordChange: false, // Disabled temporarily - allow direct login
                     students: [] // Staff don't have student children
                 });
             } else {
