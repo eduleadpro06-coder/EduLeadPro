@@ -17,6 +17,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 
 // Services & Screens
 import { api, type Child, type DailyUpdate, type Attendance, type Announcement } from './services/api';
@@ -59,6 +62,17 @@ const mockData = {
   },
 };
 
+// Configure notifications
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
 function App() {
   const [fontsLoaded] = useFonts({
     'Feather': Platform.OS === 'web'
@@ -68,8 +82,9 @@ function App() {
 
   const [user, setUser] = useState<any>(null);
   const [children, setChildren] = useState<any[]>([]);
-  type TabType = 'home' | 'bus' | 'activities' | 'messages' | 'fees';
+  type TabType = 'home' | 'bus' | 'activities' | 'notifications' | 'fees';
   const [activeTab, setActiveTab] = useState<TabType>('home');
+  const [expoPushToken, setExpoPushToken] = useState<string>('');
   const [drawerVisible, setDrawerVisible] = useState(false); // Drawer State
   const [showEmergency, setShowEmergency] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -99,11 +114,26 @@ function App() {
           if (savedUser.role === 'parent' && students.length > 0) {
             fetchLiveData(students[0].id, savedUser.organization_id);
           }
+          // Register for push if we have a user
+          registerForPushNotifications();
         }
       } catch (e) { console.error(e); } finally { setIsLoadingSession(false); }
     };
     init();
   }, []);
+
+  const registerForPushNotifications = async () => {
+    try {
+      const token = await registerForPushNotificationsAsync();
+      if (token) {
+        setExpoPushToken(token);
+        // Send to backend
+        await api.post('/common/push-token', { token, deviceType: Platform.OS });
+      }
+    } catch (error) {
+      console.warn('Failed to register for push notifications:', error);
+    }
+  };
 
   const fetchLiveData = async (childId: number, organizationId: number) => {
     if (!childId || !organizationId) {
@@ -176,6 +206,8 @@ function App() {
       fetchLiveData(students[0].id, loggedInUser.organization_id);
     }
     await AsyncStorage.setItem('user_session', JSON.stringify({ user: loggedInUser, students }));
+    // Register for push after login
+    registerForPushNotifications();
   };
 
   const handleLogout = async () => {
@@ -229,9 +261,9 @@ function App() {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.profileBtn} onPress={() => setActiveTab('messages')}>
+        <TouchableOpacity style={styles.profileBtn} onPress={() => setActiveTab('notifications')}>
           <Feather name="bell" size={20} color={colors.textSecondary} />
-          <View style={styles.notifDot} />
+          {announcements.length > 0 && <View style={styles.notifDot} />}
         </TouchableOpacity>
       </View>
 
@@ -316,7 +348,7 @@ function App() {
                 {[
                   { label: 'Bus', icon: 'map', tab: 'bus', color: colors.info },
                   { label: 'Fees', icon: 'credit-card', tab: 'fees', color: colors.danger },
-                  { label: 'Chat', icon: 'message-circle', tab: 'messages', color: colors.warning },
+                  { label: 'Alerts', icon: 'bell', tab: 'notifications', color: colors.warning },
                 ].map((action, i) => (
                   <TouchableOpacity
                     key={i}
@@ -389,7 +421,7 @@ function App() {
         {/* --- Dynamic Screen Content --- */}
         {activeTab === 'bus' && <View style={styles.modalContainer}><BusScreen currentChild={displayedChild} /></View>}
         {activeTab === 'activities' && <View style={styles.modalContainer}><ActivitiesScreen currentUser={user} currentChild={displayedChild} /></View>}
-        {activeTab === 'messages' && <View style={styles.modalContainer}><MessagesScreen /></View>}
+        {activeTab === 'notifications' && <View style={styles.modalContainer}><MessagesScreen announcements={announcements} /></View>}
         {activeTab === 'fees' && <View style={styles.modalContainer}><ParentFeesScreen currentChild={displayedChild} /></View>}
 
 
@@ -411,7 +443,7 @@ function App() {
           { id: 'activities', label: 'Daily Updates', icon: 'grid' },
           { id: 'bus', label: 'Bus Tracking', icon: 'map-pin' },
           { id: 'fees', label: 'Fee Payments', icon: 'credit-card' },
-          { id: 'messages', label: 'Messages', icon: 'message-circle' },
+          { id: 'notifications', label: 'Notifications', icon: 'bell' },
         ]}
       />
 
@@ -474,5 +506,40 @@ const styles = StyleSheet.create({
   modalContainer: { marginTop: 10, minHeight: 400 },
 
 });
+
+async function registerForPushNotificationsAsync() {
+  let token;
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+
+  if (Device.isDevice) {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') {
+      console.warn('Failed to get push token for push notification!');
+      return;
+    }
+
+    // Learn more about projectId here: https://docs.expo.dev/push-notifications/push-notifications-setup/#configure-projectid
+    token = (await Notifications.getExpoPushTokenAsync({
+      projectId: Constants.expoConfig?.extra?.eas?.projectId,
+    })).data;
+  } else {
+    console.warn('Must use physical device for Push Notifications');
+  }
+
+  return token;
+}
 
 export default App;

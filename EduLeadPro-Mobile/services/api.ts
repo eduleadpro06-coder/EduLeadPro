@@ -224,6 +224,15 @@ class APIService {
         return data.data || data; // Handle both v1 (data wrapper) and legacy formats
     }
 
+    // Generic POST method
+    async post<T>(endpoint: string, body: any, options?: RequestInit): Promise<T> {
+        return this.fetchWithAuth<T>(endpoint, {
+            ...options,
+            method: 'POST',
+            body: JSON.stringify(body)
+        });
+    }
+
     // Authentication
     async login(phone: string, password: string): Promise<LoginResponse> {
         const response = await fetch(`${this.baseURL}/mobile/auth/login`, {

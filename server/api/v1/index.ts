@@ -8,6 +8,7 @@ import { refreshTokenHandler } from '../../middleware/auth.js';
 import parentRouter from './parent.js';
 import teacherRouter from './teacher.js';
 import driverRouter from './driver.js';
+import commonRouter from './common.js';
 
 const router = express.Router();
 
@@ -18,6 +19,7 @@ router.post('/auth/refresh-token', refreshTokenHandler);
 router.use('/parent', parentRouter);
 router.use('/teacher', teacherRouter);
 router.use('/driver', driverRouter);
+router.use('/common', commonRouter);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

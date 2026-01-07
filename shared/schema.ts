@@ -275,6 +275,17 @@ export const notifications = pgTable("notifications", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Push Tokens for Mobile Notifications
+export const pushTokens = pgTable("push_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id), // For staff/admins
+  leadId: integer("lead_id").references(() => leads.id), // For parents (linked via leads)
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  deviceType: varchar("device_type", { length: 20 }), // ios, android
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const recentlyDeletedLeads = pgTable("recently_deleted_leads", {
   id: serial("id").primaryKey(),
   original_lead_id: integer("original_lead_id"),
@@ -538,6 +549,7 @@ export const insertEMandateSchema = createInsertSchema(eMandates).omit({ id: tru
 export const insertEmiScheduleSchema = createInsertSchema(emiSchedule).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEmiPlanSchema = createInsertSchema(emiPlans).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPushTokenSchema = createInsertSchema(pushTokens).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRecentlyDeletedEmployeeSchema = createInsertSchema(recentlyDeletedEmployee).omit({ id: true, created_at: true, updated_at: true });
 export const insertMessageTemplateSchema = createInsertSchema(messageTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 
@@ -571,6 +583,7 @@ export type EMandate = typeof eMandates.$inferSelect;
 export type EmiSchedule = typeof emiSchedule.$inferSelect;
 export type EmiPlan = typeof emiPlans.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type PushToken = typeof pushTokens.$inferSelect;
 export type RecentlyDeletedEmployee = typeof recentlyDeletedEmployee.$inferSelect;
 export type MessageTemplate = typeof messageTemplates.$inferSelect;
 
@@ -603,6 +616,7 @@ export type InsertEMandate = z.infer<typeof insertEMandateSchema>;
 export type InsertEmiSchedule = z.infer<typeof insertEmiScheduleSchema>;
 export type InsertEmiPlan = z.infer<typeof insertEmiPlanSchema>;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type InsertPushToken = z.infer<typeof insertPushTokenSchema>;
 export type InsertMessageTemplate = z.infer<typeof insertMessageTemplateSchema>;
 
 

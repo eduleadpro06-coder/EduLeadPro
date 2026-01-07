@@ -14,6 +14,11 @@ import express from "express"; // Added for express.Request type
 import { cacheService } from "./cache-service.js"; // Performance optimization: caching layer
 import { getOrganizationId } from "./utils.js";
 import mobileApiV1 from "./api/v1/index.js"; // NEW: Mobile API v1
+import { Expo } from 'expo-server-sdk';
+import { eq, inArray, sql, and, or } from 'drizzle-orm';
+import { pushTokens, users, leads } from "../shared/schema.js";
+
+const expo = new Expo();
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("🚀 Starting route registration...");
@@ -1114,6 +1119,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const announcement = await storage.createAnnouncement(data);
+
+      // TRIGGER PUSH NOTIFICATIONS IF URGENT
+      if (priority === "high") {
+        try {
+          // Fetch push tokens for all parents/staff in this organization
+          // Optimized: Get all tokens for users/leads in this organization
+          const orgTokens = await db.select({ token: pushTokens.token })
+            .from(pushTokens)
+            .leftJoin(users, eq(pushTokens.userId, users.id))
+            .leftJoin(leads, eq(pushTokens.leadId, leads.id))
+            .where(
+              and(
+                eq(pushTokens.token, pushTokens.token), // Placeholder to allow and()
+                or(
+                  eq(users.organizationId, orgId),
+                  eq(leads.organizationId, orgId)
+                )
+              )
+            );
+
+          const pushTokensList = orgTokens.map(t => t.token).filter(Expo.isPushToken);
+
+          if (pushTokensList.length > 0) {
+            const messages = pushTokensList.map(token => ({
+              to: token,
+              sound: 'default',
+              title: `Urgent: ${title}`,
+              body: content,
+              data: { announcementId: announcement.id, priority: 'high' },
+            }));
+
+            // Chunk and send
+            const chunks = expo.chunkPushNotifications(messages);
+            for (const chunk of chunks) {
+              await expo.sendPushNotificationsAsync(chunk);
+            }
+            console.log(`[Push] Sent ${pushTokensList.length} urgent notifications for announcement ${announcement.id}`);
+          }
+        } catch (pushError) {
+          console.error("[Push] Failed to send urgent notifications:", pushError);
+          // Don't fail the request if push fails
+        }
+      }
+
       res.json(announcement);
     } catch (error) {
       console.error("Failed to create announcement:", error);
