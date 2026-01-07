@@ -159,7 +159,10 @@ function App() {
   const handleLoginSuccess = async (loggedInUser: any, students: any[]) => {
     setUser(loggedInUser);
     setChildren(students);
-    fetchLiveData(loggedInUser, students[0]);
+    // Only fetch parent data for parents, not for teachers/drivers
+    if (loggedInUser.role !== 'teacher' && loggedInUser.role !== 'driver') {
+      fetchLiveData(loggedInUser, students[0]);
+    }
     try {
       await AsyncStorage.setItem('user_session', JSON.stringify({ user: loggedInUser, students }));
     } catch (e) {
