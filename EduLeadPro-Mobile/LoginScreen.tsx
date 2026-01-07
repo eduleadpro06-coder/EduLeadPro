@@ -8,9 +8,9 @@ import {
     Platform,
     Dimensions,
     StatusBar,
-    TouchableOpacity,
     Alert,
-    Modal
+    Modal,
+    Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -131,8 +131,12 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
             {/* Header Content */}
             <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-                <View style={styles.logoCircle}>
-                    <Feather name="book-open" size={40} color={colors.accent} />
+                <View style={styles.logoContainer}>
+                    <Image
+                        source={require('./assets/logo.png')}
+                        style={styles.logoImage}
+                        resizeMode="cover"
+                    />
                 </View>
                 <Text style={styles.title}>Parent Portal</Text>
                 <Text style={styles.subtitle}>Powered by EduLead Pro</Text>
@@ -242,16 +246,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: spacing.xl,
     },
-    logoCircle: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+    logoContainer: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: colors.surface,
+        overflow: 'hidden',
+        marginBottom: spacing.md,
+        ...shadows.md,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.1)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: spacing.md,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)'
+    },
+    logoImage: {
+        width: '100%',
+        height: '100%',
     },
     title: {
         ...typography.h1,

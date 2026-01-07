@@ -17,7 +17,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 
@@ -62,16 +61,6 @@ const mockData = {
   },
 };
 
-// Configure notifications
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
 
 function App() {
   const [fontsLoaded] = useFonts({
@@ -84,7 +73,6 @@ function App() {
   const [children, setChildren] = useState<any[]>([]);
   type TabType = 'home' | 'bus' | 'activities' | 'notifications' | 'fees';
   const [activeTab, setActiveTab] = useState<TabType>('home');
-  const [expoPushToken, setExpoPushToken] = useState<string>('');
   const [drawerVisible, setDrawerVisible] = useState(false); // Drawer State
   const [showEmergency, setShowEmergency] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -114,26 +102,11 @@ function App() {
           if (savedUser.role === 'parent' && students.length > 0) {
             fetchLiveData(students[0].id, savedUser.organization_id);
           }
-          // Register for push if we have a user
-          registerForPushNotifications();
         }
       } catch (e) { console.error(e); } finally { setIsLoadingSession(false); }
     };
     init();
   }, []);
-
-  const registerForPushNotifications = async () => {
-    try {
-      const token = await registerForPushNotificationsAsync();
-      if (token) {
-        setExpoPushToken(token);
-        // Send to backend
-        await api.post('/common/push-token', { token, deviceType: Platform.OS });
-      }
-    } catch (error) {
-      console.warn('Failed to register for push notifications:', error);
-    }
-  };
 
   const fetchLiveData = async (childId: number, organizationId: number) => {
     if (!childId || !organizationId) {
@@ -206,8 +179,6 @@ function App() {
       fetchLiveData(students[0].id, loggedInUser.organization_id);
     }
     await AsyncStorage.setItem('user_session', JSON.stringify({ user: loggedInUser, students }));
-    // Register for push after login
-    registerForPushNotifications();
   };
 
   const handleLogout = async () => {
@@ -507,46 +478,5 @@ const styles = StyleSheet.create({
 
 });
 
-async function registerForPushNotificationsAsync() {
-  let token;
-
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
-  }
-
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== 'granted') {
-      console.warn('Failed to get push token for push notification!');
-      return;
-    }
-
-    // Learn more about projectId here: https://docs.expo.dev/push-notifications/push-notifications-setup/#configure-projectid
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-
-    if (!projectId) {
-      console.warn('Push Notifications: No "projectId" found in app.json. Please configure EAS Project ID.');
-      return;
-    }
-
-    token = (await Notifications.getExpoPushTokenAsync({
-      projectId,
-    })).data;
-  } else {
-    console.warn('Must use physical device for Push Notifications');
-  }
-
-  return token;
-}
 
 export default App;

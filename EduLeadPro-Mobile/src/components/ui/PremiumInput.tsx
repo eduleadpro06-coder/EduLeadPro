@@ -91,7 +91,7 @@ export default function PremiumInput({
                     placeholderTextColor={colors.textTertiary}
                     style={[
                         styles.input,
-                        Platform.OS === 'web' && { outlineWidth: 0 } as any
+                        Platform.OS === 'web' && { outlineWidth: 0, outlineStyle: 'none' } as any
                     ]}
                     onFocus={handleFocus}
                     onBlur={handleBlur}

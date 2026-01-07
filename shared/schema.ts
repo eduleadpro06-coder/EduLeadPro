@@ -97,6 +97,7 @@ export const staff = pgTable("staff", {
   ifscCode: varchar("ifsc_code", { length: 11 }),
   panNumber: varchar("pan_number", { length: 10 }),
   organizationId: integer("organization_id").references(() => organizations.id),
+  appPassword: varchar("app_password", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

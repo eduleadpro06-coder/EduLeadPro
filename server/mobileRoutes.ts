@@ -76,6 +76,11 @@ router.post('/auth/login', async (req: Request, res: Response) => {
             .eq('phone', phone)
             .eq('is_active', true);
 
+        if (staffError) {
+            console.error('[Login] Staff fetch error:', staffError);
+            throw staffError;
+        }
+
         if (!staffError && staffMembers && staffMembers.length > 0) {
             const staff = staffMembers[0];
 
@@ -140,8 +145,13 @@ router.post('/auth/login', async (req: Request, res: Response) => {
         // If not staff, check for PARENT (existing logic)
         const { data: students, error: fetchError } = await supabase
             .from('leads')
-            .select('id, name, class, status, parent_name, parent_phone, phone, app_password, organization_id, pickup_location, drop_location')
-            .or(`parent_phone.eq.${phone},phone.eq.${phone}`);
+            .select('id, name, class, status, parent_name, parent_phone, phone, app_password, organization_id')
+            .or(`parent_phone.eq."${phone}",phone.eq."${phone}"`);
+
+        if (fetchError) {
+            console.error('[Login] Parent/Student fetch error:', fetchError);
+            throw fetchError;
+        }
 
         if (fetchError) throw fetchError;
 
@@ -219,8 +229,11 @@ router.post('/auth/login', async (req: Request, res: Response) => {
         });
 
     } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('[API] Login error details:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            details: error instanceof Error ? error.message : String(error)
+        });
     }
 });
 
