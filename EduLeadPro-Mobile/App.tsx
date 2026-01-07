@@ -98,7 +98,10 @@ function App() {
           const { user: savedUser, students } = JSON.parse(sessionData);
           setUser(savedUser);
           setChildren(students);
-          fetchLiveData(savedUser, students[0]);
+          // Only fetch parent data for parents, not for teachers/drivers
+          if (savedUser.role === 'parent' && students.length > 0) {
+            fetchLiveData(students[0].id, savedUser.organization_id);
+          }
         }
       } catch (e) {
         console.error('Failed to load session', e);
@@ -109,14 +112,14 @@ function App() {
     loadSession();
   }, []);
 
-  const fetchLiveData = async (currentUser: any, currentChild: any) => {
-    if (!currentUser || !currentChild) return;
+  const fetchLiveData = async (childId: number, organizationId: number) => {
+    if (!childId || !organizationId) return;
     try {
-      // Parallel fetching
+      // Parallel fetching using v1 API
       const [annRes, attRes, updRes] = await Promise.all([
-        api.getAnnouncements(currentUser.organization_id),
-        api.getTodayAttendance(currentChild.id),
-        api.getDailyUpdates(currentChild.id)
+        api.getAnnouncements(organizationId),
+        api.getTodayAttendance(childId),
+        api.getDailyUpdates(childId)
       ]);
       setAnnouncements(annRes);
       setTodayAttendance(attRes);
@@ -131,7 +134,7 @@ function App() {
   const onRefresh = async () => {
     setIsRefreshing(true);
     if (user && children.length > 0) {
-      await fetchLiveData(user, children[0]);
+      await fetchLiveData(children[0].id, user.organization_id);
     }
     setIsRefreshing(false);
   };
@@ -160,8 +163,8 @@ function App() {
     setUser(loggedInUser);
     setChildren(students);
     // Only fetch parent data for parents, not for teachers/drivers
-    if (loggedInUser.role !== 'teacher' && loggedInUser.role !== 'driver') {
-      fetchLiveData(loggedInUser, students[0]);
+    if (loggedInUser.role === 'parent' && students.length > 0) {
+      fetchLiveData(students[0].id, loggedInUser.organization_id);
     }
     try {
       await AsyncStorage.setItem('user_session', JSON.stringify({ user: loggedInUser, students }));
@@ -175,6 +178,9 @@ function App() {
     setChildren([]);
     setActiveTab('home');
     try {
+      // Clear JWT tokens
+      await api.clearTokens();
+      // Clear session
       await AsyncStorage.removeItem('user_session');
     } catch (e) {
       console.error('Failed to clear session', e);

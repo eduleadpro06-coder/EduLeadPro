@@ -7,6 +7,7 @@
 import express, { Request, Response } from 'express';
 import { supabase } from './supabase.js';
 import { getOrganizationId } from './utils.js';
+import { generateAccessToken, generateRefreshToken } from './middleware/auth.js';
 
 const router = express.Router();
 import { db } from './db.js';
@@ -68,20 +69,38 @@ router.post('/auth/login', async (req: Request, res: Response) => {
                 const userRole = staff.role.toLowerCase();
                 const isTeacher = userRole.includes('teacher');
                 const isDriver = userRole.includes('driver');
+                const normalizedRole = isDriver ? 'driver' : (isTeacher ? 'teacher' : 'staff');
+
+                // Generate JWT tokens
+                const accessToken = generateAccessToken(
+                    staff.id,
+                    staff.phone,
+                    normalizedRole,
+                    staff.organization_id
+                );
+                const refreshToken = generateRefreshToken(
+                    staff.id,
+                    staff.phone,
+                    normalizedRole,
+                    staff.organization_id
+                );
 
                 return res.json({
                     success: true,
+                    accessToken,
+                    refreshToken,
                     user: {
+                        userId: staff.id,
                         staffId: staff.id,
                         name: staff.name,
                         phone: staff.phone,
                         email: staff.email,
-                        role: isDriver ? 'driver' : (isTeacher ? 'teacher' : 'staff'),
+                        role: normalizedRole,
                         organization_id: staff.organization_id,
                         organizationName: organizationName
                     },
-                    requiresPasswordChange: false, // Disabled temporarily - allow direct login
-                    students: [] // Staff don't have student children
+                    requiresPasswordChange: false,
+                    students: []
                 });
             } else {
                 return res.status(401).json({ error: 'Invalid Password' });
@@ -133,9 +152,27 @@ router.post('/auth/login', async (req: Request, res: Response) => {
             }
         }
 
+        // Generate JWT tokens for parent
+        // Use lead_id as userId for parents (linked to first child)
+        const accessToken = generateAccessToken(
+            parentRecord.id,
+            parentRecord.parent_phone,
+            'parent',
+            parentRecord.organization_id
+        );
+        const refreshToken = generateRefreshToken(
+            parentRecord.id,
+            parentRecord.parent_phone,
+            'parent',
+            parentRecord.organization_id
+        );
+
         return res.json({
             success: true,
+            accessToken,
+            refreshToken,
             user: {
+                userId: parentRecord.id,
                 name: parentRecord.parent_name || 'Parent',
                 phone: parentRecord.parent_phone,
                 role: 'parent',

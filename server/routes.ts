@@ -13,9 +13,14 @@ import { registerDaycareRoutes } from "./daycareRoutes.js";
 import express from "express"; // Added for express.Request type
 import { cacheService } from "./cache-service.js"; // Performance optimization: caching layer
 import { getOrganizationId } from "./utils.js";
+import mobileApiV1 from "./api/v1/index.js"; // NEW: Mobile API v1
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("🚀 Starting route registration...");
+
+  // NEW: Mobile API v1 - Modern JWT-based API for mobile apps
+  app.use("/api/v1/mobile", mobileApiV1);
+  console.log("✅ Mounted Mobile API v1 at /api/v1/mobile");
 
   // Test route to verify routes are working
   app.get("/api/test", (req, res) => {
