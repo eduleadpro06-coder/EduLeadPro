@@ -1,6 +1,7 @@
 /**
  * Mobile App API Routes
- * Handles all API endpoints for the mobile application
+ * Handles authentication and data for Parent/Teacher/Driver mobile apps
+ * Last updated: 2026-01-07 - Staff password management
  */
 
 import express, { Request, Response } from 'express';
