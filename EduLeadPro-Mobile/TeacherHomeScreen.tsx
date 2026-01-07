@@ -1,14 +1,14 @@
-```
 import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-  Platform
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    ActivityIndicator,
+    RefreshControl,
+    Platform,
+    Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -17,6 +17,9 @@ import TeacherAttendanceScreen from './TeacherAttendanceScreen';
 import TeacherActivityScreen from './TeacherActivityScreen';
 
 interface TeacherHomeScreenProps {
+    user: any;
+    onLogout: () => void;
+}
 
 type TabType = 'dashboard' | 'attendance' | 'students';
 
@@ -204,7 +207,7 @@ export default function TeacherHomeScreen({ user, onLogout }: TeacherHomeScreenP
                                     <View key={student.id} style={styles.studentCard}>
                                         <Text style={styles.studentName}>{student.name}</Text>
                                         <Text style={styles.studentClass}>Class: {student.class}</Text>
-                                        <Text style={styles.studentInfo}>Parent: {student parent_name}</Text>
+                                        <Text style={styles.studentInfo}>Parent: {student.parent_name}</Text>
                                     </View>
                                 ))}
                             </View>

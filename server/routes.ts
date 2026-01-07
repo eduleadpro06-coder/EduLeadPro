@@ -750,6 +750,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Login endpoint
+  app.post("/api/login", async (req, res) => {
+    const { email, password } = req.body;
+    console.log("Login attempt:", { email });
+
+    try {
+      const user = await storage.getUserByEmail(email);
+
+      if (!user || user.password !== password) {
+        console.log("Login failed: Invalid credentials");
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Import JWT utilities from middleware
+      const { generateAccessToken, generateRefreshToken } = await import('./middleware/auth.js');
+
+      // Generate JWT tokens
+      const accessToken = generateAccessToken({
+        id: user.id,
+        email: user.email,
+        role: user.role || 'admin',
+        organization_id: user.organizationId
+      });
+
+      const refreshToken = generateRefreshToken({
+        id: user.id,
+        email: user.email,
+        role: user.role || 'admin',
+        organization_id: user.organizationId
+      });
+
+      // Get organization details
+      const organization = user.organizationId
+        ? await storage.getOrganization(user.organizationId)
+        : null;
+
+      // Set session (for backward compatibility)
+      if (!req.session) {
+        req.session = {} as any;
+      }
+      req.session.userId = user.id;
+      req.session.userName = user.name;
+      req.session.organizationId = user.organizationId;
+
+      console.log("Login successful:", {
+        userId: user.id,
+        organizationId: user.organizationId,
+      });
+
+      // Return both session info and JWT tokens
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role || 'admin',
+          organization_id: user.organizationId,
+          organizationName: organization?.name
+        },
+        // NEW: JWT tokens for modern auth
+        accessToken,
+        refreshToken
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Check and create organization for Google OAuth users
   app.post("/api/auth/check-google-user", async (req, res) => {
     try {
@@ -795,7 +865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create new organization with user-provided name
       const timestamp = Date.now();
-      const orgSlug = `${organizationName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${timestamp}`;
+      const orgSlug = `${organizationName.toLowerCase().replace(/[^a-z0-9]+/g, '-')} -${timestamp} `;
 
       const newOrg = await storage.createOrganization({
         name: organizationName,
@@ -1169,9 +1239,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username = (req.session as any).username;
       }
 
-      console.log(`[CREATE LEAD] Request received. Username: ${username || 'undefined'}`);
+      console.log(`[CREATE LEAD] Request received.Username: ${username || 'undefined'} `);
 
-      console.log(`[CREATE LEAD] Request received. Username: ${username || 'undefined'}`);
+      console.log(`[CREATE LEAD] Request received.Username: ${username || 'undefined'} `);
 
       // Optional user lookup - proceed even if user not found (as per request)
       let user = null;
@@ -1730,7 +1800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { transcript, leadId, leadName } = req.body;
 
-      const summary = `Counseling session with ${leadName} covered admission requirements and next steps. Student shows strong interest in Science stream.`;
+      const summary = `Counseling session with ${leadName} covered admission requirements and next steps.Student shows strong interest in Science stream.`;
       const keyPoints = [
         "Student interested in Science stream",
         "Parent concerned about fee structure",
@@ -1842,23 +1912,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/e-mandates/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      console.log(`API: Attempting to delete E-Mandate with ID: ${id}`);
+      console.log(`API: Attempting to delete E - Mandate with ID: ${id} `);
 
       const mandate = await storage.getEMandate(parseInt(id));
       if (!mandate) {
-        console.log(`API: E-Mandate ${id} not found`);
+        console.log(`API: E - Mandate ${id} not found`);
         return res.status(404).json({ message: "E-Mandate not found" });
       }
 
-      console.log(`API: Found mandate:`, JSON.stringify(mandate, null, 2));
+      console.log(`API: Found mandate: `, JSON.stringify(mandate, null, 2));
 
       const result = await storage.deleteEMandate(mandate.id);
 
       if (result) {
-        console.log(`API: E-Mandate ${id} deleted successfully`);
+        console.log(`API: E - Mandate ${id} deleted successfully`);
         res.json({ message: "E-Mandate deleted successfully" });
       } else {
-        console.log(`API: Failed to delete E-Mandate ${id} - storage.deleteEMandate returned false`);
+        console.log(`API: Failed to delete E - Mandate ${id} - storage.deleteEMandate returned false`);
         res.status(400).json({ message: "E-Mandate could not be deleted" });
       }
     } catch (error: any) {
@@ -2064,7 +2134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!feePayment.receiptNumber) {
         try {
           const academicYear = "2025-26";
-          const receiptNumber = `MEL/${academicYear}/${String(feePayment.id).padStart(6, '0')}`;
+          const receiptNumber = `MEL / ${academicYear}/${String(feePayment.id).padStart(6, '0')}`;
           console.log(`Generating persistent receipt number for payment ${feePayment.id}: ${receiptNumber}`);
 
           const updatedPayment = await storage.updateFeePayment(feePayment.id, { receiptNumber });

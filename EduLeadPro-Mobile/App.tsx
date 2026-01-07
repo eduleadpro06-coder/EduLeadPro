@@ -343,7 +343,7 @@ function App() {
   return (
     <View style={styles.rootContainer}>
       <View style={styles.appFrame}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar style="light" />
 
         {/* Modern Minimalist Header Bar (Global) */}
         <View style={styles.topToolbar}>

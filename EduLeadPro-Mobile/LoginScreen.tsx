@@ -59,11 +59,17 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         try {
             const response = await api.login(phone, password);
 
+            // DEBUG: Log the entire response
+            console.log('🔍 LOGIN RESPONSE:', JSON.stringify(response, null, 2));
+            console.log('🔍 User Role:', response.user?.role);
+            console.log('🔍 User Object:', JSON.stringify(response.user, null, 2));
+
             if (response.success && response.user) {
                 if (response.requiresPasswordChange) {
                     setTempUserRole(response.user.role || ''); // Store role for password change
                     setShowChangePassword(true);
                 } else {
+                    console.log('✅ Calling onLoginSuccess with user:', response.user);
                     onLoginSuccess(response.user, response.students || []);
                 }
             } else {

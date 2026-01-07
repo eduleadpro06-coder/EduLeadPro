@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { offlineCache } from '../services/offline-cache';
-import { api } from '../services/api';
+import { api } from '../../services/api';
 
 export function useOffline() {
     const [isOnline, setIsOnline] = useState(true);
