@@ -75,7 +75,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
                         organization_id: staff.organization_id,
                         organizationName: organizationName
                     },
-                    requiresPasswordChange: password === '1234',
+                    requiresPasswordChange: false, // Staff don't need password change
                     students: [] // Staff don't have student children
                 });
             } else {
