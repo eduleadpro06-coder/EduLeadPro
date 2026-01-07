@@ -210,7 +210,7 @@ class APIService {
     }
 
     async changePasswordStaff(phone: string, newPassword: string, oldPassword?: string): Promise<any> {
-        const res = await fetch(`${this.baseURL}/auth/change-password-staff`, {
+        const res = await fetch(`${this.baseURL}/api/mobile/auth/change-password-staff`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phone, newPassword, oldPassword }),
