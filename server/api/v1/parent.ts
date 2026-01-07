@@ -186,7 +186,7 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
         const { supabase } = await import('../../supabase.js');
         const { data: child } = await supabase
             .from('leads')
-            .select('organization_id, class')
+            .select('organization_id, class, stream')
             .eq('id', childId)
             .single();
 
@@ -200,35 +200,95 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
             });
         }
 
-        // Get payment history
+        // 1. Determine Total Fees
+        let totalFees = 0;
+
+        // Check for EMI Plan (specific to student)
+        const { data: emiPlan } = await supabase
+            .from('emi_plans')
+            .select('id, total_amount, status')
+            .eq('student_id', childId)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (emiPlan) {
+            totalFees = parseFloat(emiPlan.total_amount);
+        } else {
+            // Fallback to Class/Stream Fee Structure
+            let query = supabase
+                .from('fee_structure')
+                .select('total_fees')
+                .eq('organization_id', child.organization_id)
+                .eq('class', child.class);
+
+            if (child.stream) {
+                query = query.eq('stream', child.stream);
+            }
+
+            const { data: feeStructure } = await query.limit(1).single();
+
+            if (feeStructure) {
+                totalFees = parseFloat(feeStructure.total_fees);
+            }
+        }
+
+        // Get EMI Schedule if plan exists
+        let emiDetails = null;
+        if (emiPlan) {
+            const { data: schedule } = await supabase
+                .from('emi_schedule')
+                .select('id, installment_number, amount, due_date, status, paid_date')
+                .eq('emi_plan_id', emiPlan.id)
+                .order('due_date', { ascending: true });
+
+            if (schedule) {
+                emiDetails = {
+                    planId: emiPlan.id,
+                    totalAmount: parseFloat(emiPlan.total_amount),
+                    installments: schedule.map((s: any) => ({
+                        id: s.id,
+                        installmentNumber: s.installment_number,
+                        amount: s.amount,
+                        dueDate: s.due_date,
+                        status: s.status,
+                        paidDate: s.paid_date
+                    }))
+                };
+            }
+        }
+
+        // 2. Get Payment History & Calculate Paid Amount
         const { data: payments, error: paymentsError } = await supabase
             .from('fee_payments')
             .select('id, amount, payment_date, payment_mode, receipt_number, status')
             .eq('lead_id', childId)
+            .eq('status', 'completed')
             .order('payment_date', { ascending: false });
 
         if (paymentsError) throw paymentsError;
 
-        // Calculate total paid
         const totalPaid = (payments || []).reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
 
-        // Get fee structure for this class
-        const { data: feeStructure } = await supabase
-            .from('global_class_fees')
-            .select('amount, fee_type')
-            .eq('organization_id', child.organization_id)
-            .eq('class_name', child.class)
-            .eq('is_active', true);
-
-        const totalFees = (feeStructure || []).reduce((sum, f) => sum + parseFloat(f.amount || '0'), 0);
+        // Format payments for frontend (camelCase)
+        const formattedPayments = (payments || []).map((p: any) => ({
+            id: p.id,
+            amount: p.amount,
+            date: p.payment_date,
+            mode: p.payment_mode,
+            receiptNumber: p.receipt_number,
+            status: p.status
+        }));
 
         res.json({
             success: true,
             data: {
                 totalFees,
                 totalPaid,
-                balance: totalFees - totalPaid,
-                payments: payments || []
+                balance: Math.max(0, totalFees - totalPaid),
+                payments: formattedPayments,
+                emiDetails
             }
         });
     } catch (error) {
@@ -334,12 +394,14 @@ router.get('/announcements', async (req: Request, res: Response) => {
     try {
         const organizationId = req.user!.organizationId;
         const limit = parseInt(req.query.limit as string) || 10;
+        const now = new Date().toISOString();
 
         const { supabase } = await import('../../supabase.js');
         const { data: announcements, error } = await supabase
-            .from('announcements')
-            .select('id, title, content, priority, published_at')
+            .from('preschool_announcements')
+            .select('id, title, content, priority, published_at, expires_at')
             .eq('organization_id', organizationId)
+            .or(`expires_at.is.null,expires_at.gt."${now}"`)
             .order('published_at', { ascending: false })
             .limit(limit);
 
@@ -370,16 +432,19 @@ router.get('/announcements', async (req: Request, res: Response) => {
 router.get('/events', async (req: Request, res: Response) => {
     try {
         const organizationId = req.user!.organizationId;
-        const today = new Date().toISOString().split('T')[0];
+        // Fetch events from 12 months ago to show full academic year context
+        const startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 12);
+        const dateString = startDate.toISOString().split('T')[0];
 
         const { supabase } = await import('../../supabase.js');
         const { data: events, error } = await supabase
-            .from('events')
+            .from('preschool_events')
             .select('id, title, description, event_date, event_time, event_type')
             .eq('organization_id', organizationId)
-            .gte('event_date', today)
+            .gte('event_date', dateString)
             .order('event_date', { ascending: true })
-            .limit(20);
+            .limit(50);
 
         if (error) throw error;
 

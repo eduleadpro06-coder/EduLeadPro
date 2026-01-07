@@ -3,396 +3,293 @@ import {
     View,
     Text,
     StyleSheet,
+    Image,
     ScrollView,
     TouchableOpacity,
-    TextInput,
-    ActivityIndicator,
     Alert,
-    Platform
+    Platform,
+    KeyboardAvoidingView
 } from 'react-native';
+import { Camera, CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
-import { api } from './services/api';
-import { useOffline } from './src/hooks/useOffline';
-import { offlineCache } from './src/services/offline-cache';
+import { LinearGradient } from 'expo-linear-gradient';
+
+import { api, type Child } from './services/api';
+import { colors, spacing, typography, shadows, layout } from './src/theme';
+import PremiumCard from './src/components/ui/PremiumCard';
+import PremiumButton from './src/components/ui/PremiumButton';
+import PremiumInput from './src/components/ui/PremiumInput';
 
 interface ActivityScreenProps {
-    onBack: () => void;
+    onBack?: () => void;
 }
 
 export default function TeacherActivityScreen({ onBack }: ActivityScreenProps) {
-    const [students, setStudents] = useState<any[]>([]);
-    const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
-    const [activityContent, setActivityContent] = useState('');
-    const [activityType, setActivityType] = useState('learning');
-    const [activityMood, setActivityMood] = useState('happy');
-    const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
-    const [showStudentPicker, setShowStudentPicker] = useState(false);
-    const { isOnline } = useOffline();
+    const [students, setStudents] = useState<Child[]>([]);
+    const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [activityType, setActivityType] = useState('Learning');
+    const [mood, setMood] = useState('Happy');
+
+    const [permission, requestPermission] = useCameraPermissions();
+    const [cameraVisible, setCameraVisible] = useState(false);
+    const [cameraRef, setCameraRef] = useState<CameraView | null>(null);
+    const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+    const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
         loadStudents();
     }, []);
 
     const loadStudents = async () => {
-        setLoading(true);
         try {
             const data = await api.getTeacherStudents('');
             setStudents(data);
+            if (data.length > 0) setSelectedStudentId(data[0].id);
         } catch (error) {
-            console.error('Failed to load students:', error);
-            Alert.alert('Error', 'Failed to load students');
-        } finally {
-            setLoading(false);
+            console.error(error);
         }
     };
 
-    const submitActivity = async () => {
-        if (!selectedStudent || !activityContent.trim()) {
-            Alert.alert('Validation', 'Please select a student and enter activity details');
+    const handleCamera = () => {
+        if (!permission?.granted) {
+            requestPermission();
+            return;
+        }
+        setCameraVisible(true);
+    };
+
+    const handleGallery = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.7,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+            setCapturedPhoto(result.assets[0].uri);
+        }
+    };
+
+    const takePicture = async () => {
+        if (cameraRef) {
+            try {
+                const photo = await cameraRef.takePictureAsync({ quality: 0.7 });
+                setCapturedPhoto(photo?.uri || null);
+                setCameraVisible(false);
+            } catch (error) {
+                Alert.alert('Error', 'Could not take photo');
+            }
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (!selectedStudentId || !title || !description) {
+            Alert.alert('Incomplete', 'Please fill all required fields');
             return;
         }
 
-        setSubmitting(true);
+        setUploading(true);
         try {
-            if (isOnline) {
-                await api.postActivity(selectedStudent, activityContent, {
-                    activityType,
-                    mood: activityMood
+            let mediaUrls: string[] = [];
+            if (capturedPhoto) {
+                // Determine mime type
+                const uriParts = capturedPhoto.split('.');
+                const fileType = uriParts[uriParts.length - 1];
+                const mimeType = fileType === 'png' ? 'image/png' : 'image/jpeg';
+
+                const formData = new FormData();
+                // @ts-ignore
+                formData.append('file', {
+                    uri: capturedPhoto,
+                    name: `upload.${fileType}`,
+                    type: mimeType
                 });
-                Alert.alert('Success', 'Activity posted successfully');
-            } else {
-                await offlineCache.queueAction('post_activity', {
-                    leadId: selectedStudent,
-                    content: activityContent,
-                    options: { activityType, mood: activityMood }
-                });
-                Alert.alert('Queued', 'Activity will be synced when online');
+
+                const uploadRes = await api.uploadMedia(formData);
+                if (uploadRes && uploadRes.url) {
+                    mediaUrls.push(uploadRes.url);
+                }
             }
 
-            // Reset form
-            setSelectedStudent(null);
-            setActivityContent('');
-            setActivityType('learning');
-            setActivityMood('happy');
-            onBack();
+            await api.postActivity(selectedStudentId, {
+                type: activityType,
+                title,
+                content: description,
+                mood: mood,
+                mediaUrls
+            });
+
+            Alert.alert('Success', 'Activity posted to timeline!', [
+                { text: 'OK', onPress: () => onBack?.() }
+            ]);
         } catch (error) {
-            console.error('Failed to post activity:', error);
             Alert.alert('Error', 'Failed to post activity');
         } finally {
-            setSubmitting(false);
+            setUploading(false);
         }
     };
 
-    const selectedStudentData = students.find(s => s.id === selectedStudent);
+    if (cameraVisible) {
+        return (
+            <View style={styles.cameraContainer}>
+                <CameraView style={{ flex: 1 }} ref={(ref) => setCameraRef(ref)} />
+
+                {/* Overlay Controls */}
+                <View style={StyleSheet.absoluteFillObject}>
+                    <View style={styles.cameraHeader}>
+                        <TouchableOpacity onPress={() => setCameraVisible(false)} style={styles.closeBtn}>
+                            <Feather name="x" size={24} color="white" />
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.cameraFooter}>
+                        <TouchableOpacity onPress={takePicture} style={styles.captureBtn}>
+                            <View style={styles.captureInner} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        );
+    }
 
     return (
-        <View style={styles.container}>
-            {/* Header */}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: colors.background }}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Feather name="arrow-left" size={24} color="#111827" />
+                <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+                    <Feather name="arrow-left" size={24} color={colors.primary} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Post Activity</Text>
+                <Text style={styles.headerTitle}>New Post</Text>
                 <View style={{ width: 40 }} />
             </View>
 
-            {loading ? (
-                <ActivityIndicator size="large" color="#8B5CF6" style={{ marginTop: 50 }} />
-            ) : (
-                <ScrollView style={styles.content}>
-                    {/* Student Selector */}
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Select Student</Text>
-                        <TouchableOpacity
-                            style={styles.picker}
-                            onPress={() => setShowStudentPicker(!showStudentPicker)}
-                        >
-                            <Text style={[styles.pickerText, !selectedStudent && styles.placeholderText]}>
-                                {selectedStudentData ? selectedStudentData.name : 'Choose a student...'}
-                            </Text>
-                            <Feather name="chevron-down" size={20} color="#6B7280" />
+            <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+
+                {/* Media Section */}
+                {capturedPhoto ? (
+                    <View style={styles.mediaPreview}>
+                        <Image source={{ uri: capturedPhoto }} style={styles.mediaImage} />
+                        <TouchableOpacity style={styles.removeMedia} onPress={() => setCapturedPhoto(null)}>
+                            <Feather name="x" size={16} color="white" />
                         </TouchableOpacity>
-
-                        {showStudentPicker && (
-                            <View style={styles.studentPicker}>
-                                {students.map(student => (
-                                    <TouchableOpacity
-                                        key={student.id}
-                                        style={styles.studentOption}
-                                        onPress={() => {
-                                            setSelectedStudent(student.id);
-                                            setShowStudentPicker(false);
-                                        }}
-                                    >
-                                        <Text style={styles.studentOptionText}>{student.name}</Text>
-                                        <Text style={styles.studentOptionClass}>{student.class}</Text>
-                                    </TouchableOpacity>
-                                ))}
+                    </View>
+                ) : (
+                    <View style={styles.mediaSelector}>
+                        <TouchableOpacity style={styles.mediaBtn} onPress={handleCamera}>
+                            <View style={[styles.iconCircle, { backgroundColor: colors.infoBg }]}>
+                                <Feather name="camera" size={24} color={colors.info} />
                             </View>
-                        )}
+                            <Text style={styles.mediaLabel}>Camera</Text>
+                        </TouchableOpacity>
+                        <View style={styles.mediaDivider} />
+                        <TouchableOpacity style={styles.mediaBtn} onPress={handleGallery}>
+                            <View style={[styles.iconCircle, { backgroundColor: colors.warningBg }]}>
+                                <Feather name="image" size={24} color={colors.warning} />
+                            </View>
+                            <Text style={styles.mediaLabel}>Gallery</Text>
+                        </TouchableOpacity>
                     </View>
+                )}
 
-                    {/* Activity Type */}
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Activity Type</Text>
-                        <View style={styles.buttonGroup}>
-                            {[
-                                { value: 'learning', icon: 'book', label: 'Learning' },
-                                { value: 'meal', icon: 'coffee', label: 'Meal' },
-                                { value: 'nap', icon: 'moon', label: 'Nap' },
-                                { value: 'play', icon: 'smile', label: 'Play' }
-                            ].map(type => (
-                                <TouchableOpacity
-                                    key={type.value}
-                                    style={[
-                                        styles.optionButton,
-                                        activityType === type.value && styles.optionButtonActive
-                                    ]}
-                                    onPress={() => setActivityType(type.value)}
-                                >
-                                    <Feather
-                                        name={type.icon as any}
-                                        size={18}
-                                        color={activityType === type.value ? '#fff' : '#6B7280'}
-                                    />
-                                    <Text style={[
-                                        styles.optionButtonText,
-                                        activityType === type.value && styles.optionButtonTextActive
-                                    ]}>
-                                        {type.label}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </View>
+                <View style={{ height: spacing.lg }} />
 
-                    {/* Mood Selector */}
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Mood</Text>
-                        <View style={styles.buttonGroup}>
-                            {[
-                                { value: 'happy', emoji: '😊', label: 'Happy' },
-                                { value: 'neutral', emoji: '😐', label: 'Neutral' },
-                                { value: 'sad', emoji: '😢', label: 'Sad' }
-                            ].map(mood => (
-                                <TouchableOpacity
-                                    key={mood.value}
-                                    style={[
-                                        styles.moodButton,
-                                        activityMood === mood.value && styles.moodButtonActive
-                                    ]}
-                                    onPress={() => setActivityMood(mood.value)}
-                                >
-                                    <Text style={styles.emojiText}>{mood.emoji}</Text>
-                                    <Text style={[
-                                        styles.moodLabel,
-                                        activityMood === mood.value && styles.moodLabelActive
-                                    ]}>
-                                        {mood.label}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </View>
+                {/* Form */}
+                <PremiumInput
+                    label="Title"
+                    placeholder="e.g. Art Class Masterpiece"
+                    value={title}
+                    onChangeText={setTitle}
+                />
 
-                    {/* Activity Description */}
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Activity Description</Text>
-                        <TextInput
-                            style={styles.textArea}
-                            placeholder="What did the student do today?"
-                            placeholderTextColor="#9CA3AF"
-                            multiline
-                            numberOfLines={4}
-                            value={activityContent}
-                            onChangeText={setActivityContent}
-                        />
-                    </View>
+                <PremiumInput
+                    label="Description"
+                    placeholder="Describe the moment..."
+                    value={description}
+                    onChangeText={setDescription}
+                    multiline
+                    numberOfLines={4}
+                    style={{ height: 100, textAlignVertical: 'top', paddingTop: 12 }}
+                />
 
-                    {/* Submit Button */}
-                    <TouchableOpacity
-                        style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-                        onPress={submitActivity}
-                        disabled={submitting}
-                    >
-                        {submitting ? (
-                            <ActivityIndicator color="#fff" />
-                        ) : (
-                            <>
-                                <Feather name="send" size={18} color="#fff" />
-                                <Text style={styles.submitButtonText}>Post Activity</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
+                {/* Student Selector (Chips) */}
+                <Text style={styles.label}>Tag Student</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+                    {students.map(student => {
+                        const isSelected = selectedStudentId === student.id;
+                        return (
+                            <TouchableOpacity
+                                key={student.id}
+                                style={[styles.chip, isSelected && styles.chipSelected]}
+                                onPress={() => setSelectedStudentId(student.id)}
+                            >
+                                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                                    {student.name.split(' ')[0]}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </ScrollView>
-            )}
-        </View>
+
+                {/* Mood Selector */}
+                <Text style={styles.label}>Mood</Text>
+                <View style={styles.moodRow}>
+                    {['Happy', 'Focused', 'Creative', 'Sleepy', 'Excited'].map(m => {
+                        const isSelected = mood === m;
+                        return (
+                            <TouchableOpacity
+                                key={m}
+                                style={[styles.moodChip, isSelected && { borderColor: colors.accent, backgroundColor: colors.accentLight }]}
+                                onPress={() => setMood(m)}
+                            >
+                                <Text style={{ fontSize: 12, color: isSelected ? colors.accent : colors.textSecondary }}>{m}</Text>
+                            </TouchableOpacity>
+                        )
+                    })}
+                </View>
+
+                <View style={{ height: spacing.xl }} />
+
+                <PremiumButton
+                    title="Share Update"
+                    onPress={handleSubmit}
+                    loading={uploading}
+                />
+
+            </ScrollView>
+        </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F9FAFB'
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'ios' ? 50 : 20,
-        paddingBottom: 16,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB'
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'center'
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#111827'
-    },
-    content: {
-        flex: 1,
-        padding: 16
-    },
-    formGroup: {
-        marginBottom: 24
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#374151',
-        marginBottom: 8
-    },
-    picker: {
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#D1D5DB',
-        padding: 12,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-    },
-    pickerText: {
-        fontSize: 16,
-        color: '#111827'
-    },
-    placeholderText: {
-        color: '#9CA3AF'
-    },
-    studentPicker: {
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#D1D5DB',
-        marginTop: 8,
-        maxHeight: 200
-    },
-    studentOption: {
-        padding: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB'
-    },
-    studentOptionText: {
-        fontSize: 16,
-        color: '#111827',
-        fontWeight: '500'
-    },
-    studentOptionClass: {
-        fontSize: 14,
-        color: '#6B7280',
-        marginTop: 2
-    },
-    buttonGroup: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8
-    },
-    optionButton: {
-        flex: 1,
-        minWidth: '45%',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        padding: 12,
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: '#D1D5DB',
-        backgroundColor: '#fff'
-    },
-    optionButtonActive: {
-        borderColor: '#8B5CF6',
-        backgroundColor: '#8B5CF6'
-    },
-    optionButtonText: {
-        fontSize: 14,
-        color: '#6B7280',
-        fontWeight: '500'
-    },
-    optionButtonTextActive: {
-        color: '#fff'
-    },
-    moodButton: {
-        flex: 1,
-        alignItems: 'center',
-        padding: 12,
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: '#D1D5DB',
-        backgroundColor: '#fff'
-    },
-    moodButtonActive: {
-        borderColor: '#8B5CF6',
-        backgroundColor: '#F3E8FF'
-    },
-    emojiText: {
-        fontSize: 32,
-        marginBottom: 4
-    },
-    moodLabel: {
-        fontSize: 12,
-        color: '#6B7280'
-    },
-    moodLabelActive: {
-        color: '#8B5CF6',
-        fontWeight: '600'
-    },
-    textArea: {
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#D1D5DB',
-        padding: 12,
-        fontSize: 16,
-        minHeight: 100,
-        textAlignVertical: 'top'
-    },
-    submitButton: {
-        backgroundColor: '#8B5CF6',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        padding: 16,
-        borderRadius: 12,
-        marginTop: 8,
-        marginBottom: 32
-    },
-    submitButtonDisabled: {
-        opacity: 0.6
-    },
-    submitButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600'
-    }
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: spacing.md, backgroundColor: colors.background },
+    headerTitle: { ...typography.h3 },
+    backBtn: { padding: 8 },
+
+    cameraContainer: { flex: 1, backgroundColor: 'black' },
+    cameraHeader: { position: 'absolute', top: 50, left: 20 },
+    closeBtn: { padding: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 },
+    cameraFooter: { position: 'absolute', bottom: 50, left: 0, right: 0, alignItems: 'center' },
+    captureBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
+    captureInner: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'white' },
+
+    mediaSelector: { flexDirection: 'row', borderRadius: spacing.borderRadius.lg, backgroundColor: colors.surface, padding: spacing.lg, ...shadows.sm, justifyContent: 'space-around', alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: colors.border },
+    mediaBtn: { alignItems: 'center', width: 100 },
+    iconCircle: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+    mediaLabel: { ...typography.caption, fontWeight: '600' },
+    mediaDivider: { width: 1, height: '80%', backgroundColor: colors.border },
+
+    mediaPreview: { height: 250, borderRadius: spacing.borderRadius.lg, overflow: 'hidden', ...shadows.md },
+    mediaImage: { width: '100%', height: '100%' },
+    removeMedia: { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.6)', padding: 6, borderRadius: 15 },
+
+    label: { ...typography.caption, fontWeight: '700', color: colors.textSecondary, marginBottom: 8, marginTop: 16 },
+    chipRow: { flexDirection: 'row', marginBottom: 8 },
+    chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.surfaceHighlight, marginRight: 8, borderWidth: 1, borderColor: 'transparent' },
+    chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+    chipText: { fontSize: 13, color: colors.textSecondary },
+    chipTextSelected: { color: colors.textInverted, fontWeight: '600' },
+
+    moodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    moodChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
 });

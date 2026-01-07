@@ -23,6 +23,36 @@ router.get('/auth/run-migration', async (_req, res) => {
     }
 });
 
+// MEDIA UPLOAD ENDPOINT
+router.post('/media/upload', express.json({ limit: '50mb' }), async (req: Request, res: Response) => {
+    try {
+        const { image, folder } = req.body;
+        if (!image) return res.status(400).json({ error: 'No image data provided' });
+
+        // Upload to Supabase Storage
+        const buffer = Buffer.from(image.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+        const fileName = `${folder || 'activities'}/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+
+        const { data, error } = await supabase.storage
+            .from('media')
+            .upload(fileName, buffer, {
+                contentType: 'image/jpeg',
+                upsert: false
+            });
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('media')
+            .getPublicUrl(fileName);
+
+        res.json({ success: true, url: publicUrl });
+    } catch (error: any) {
+        console.error('Upload error:', error);
+        res.status(500).json({ error: 'Failed to upload media' });
+    }
+});
+
 // =====================================================
 // AUTHENTICATION ENDPOINTS
 // =====================================================
@@ -110,7 +140,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
         // If not staff, check for PARENT (existing logic)
         const { data: students, error: fetchError } = await supabase
             .from('leads')
-            .select('id, name, class, status, parent_name, parent_phone, phone, app_password, organization_id')
+            .select('id, name, class, status, parent_name, parent_phone, phone, app_password, organization_id, pickup_location, drop_location')
             .or(`parent_phone.eq.${phone},phone.eq.${phone}`);
 
         if (fetchError) throw fetchError;
@@ -566,6 +596,100 @@ router.post('/bus-location/update', async (req: Request, res: Response) => {
 // =====================================================
 // PARENT LIVE DATA ENDPOINTS
 // =====================================================
+
+/**
+ * Get Child Fees
+ * GET /api/mobile/child/:childId/fees
+ */
+router.get('/child/:childId/fees', async (req: Request, res: Response) => {
+    try {
+        const childId = parseInt(req.params.childId);
+
+        if (isNaN(childId)) {
+            return res.status(400).json({ error: 'Invalid child ID' });
+        }
+
+        // 1. Get Child Details (to know class/stream if needed)
+        const { data: child, error: childError } = await supabase
+            .from('leads')
+            .select('id, class, stream, organization_id')
+            .eq('id', childId)
+            .single();
+
+        if (childError || !child) {
+            return res.status(404).json({ error: 'Student not found' });
+        }
+
+        // 2. Determine Total Fees
+        let totalFees = 0;
+        let feeSource = 'default'; // 'emi_plan', 'fee_structure', 'none'
+
+        // Check for EMI Plan (specific to student)
+        const { data: emiPlan } = await supabase
+            .from('emi_plans')
+            .select('total_amount, status')
+            .eq('student_id', childId)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false }) // Get latest active plan
+            .limit(1)
+            .single();
+
+        if (emiPlan) {
+            totalFees = parseFloat(emiPlan.total_amount);
+            feeSource = 'emi_plan';
+        } else {
+            // Fallback to Class/Stream Fee Structure
+            // Note: Stream might be null for lower classes
+            let query = supabase
+                .from('fee_structure')
+                .select('total_fees')
+                .eq('organization_id', child.organization_id)
+                .eq('class', child.class);
+
+            if (child.stream) {
+                query = query.eq('stream', child.stream);
+            }
+
+            const { data: feeStructure } = await query.limit(1).single();
+
+            if (feeStructure) {
+                totalFees = parseFloat(feeStructure.total_fees);
+                feeSource = 'fee_structure';
+            }
+        }
+
+        // 3. Calculate Paid Amount
+        const { data: payments } = await supabase
+            .from('fee_payments')
+            .select('id, amount, payment_date, payment_mode, status, receipt_number')
+            .eq('lead_id', childId)
+            .eq('status', 'completed')
+            .order('payment_date', { ascending: false });
+
+        const paidAmount = (payments || []).reduce((sum, p) => sum + parseFloat(p.amount), 0);
+        const outstandingAmount = Math.max(0, totalFees - paidAmount);
+
+        res.json({
+            totalFees,
+            paidAmount,
+            outstandingAmount,
+            currency: 'INR',
+            feeSource,
+            payments: (payments || []).map(p => ({
+                id: p.id,
+                amount: parseFloat(p.amount),
+                date: p.payment_date,
+                mode: p.payment_mode,
+                status: p.status,
+                receiptNumber: p.receipt_number
+            }))
+        });
+
+    } catch (error) {
+        console.error('Fetch fees error:', error);
+        res.status(500).json({ error: 'Failed to fetch fee details' });
+    }
+});
 
 /**
  * Get Bus Location for Student
@@ -1229,7 +1353,7 @@ router.get('/announcements', async (req: Request, res: Response) => {
             .from('preschool_announcements')
             .select('*')
             .eq('organization_id', organizationId)
-            .or(`expires_at.is.null,expires_at.gt.${now}`)
+            .or(`expires_at.is.null,expires_at.gt."${now}"`)
             .order('published_at', { ascending: false })
             .limit(20);
 

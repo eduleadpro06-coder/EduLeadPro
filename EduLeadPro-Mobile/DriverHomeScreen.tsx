@@ -3,389 +3,220 @@ import {
     View,
     Text,
     StyleSheet,
-    ScrollView,
     TouchableOpacity,
+    Alert,
+    Platform,
+    StatusBar,
     ActivityIndicator,
-    RefreshControl,
-    Alert
+    ScrollView
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { api } from './services/api';
+import * as Location from 'expo-location';
 
-const colors = {
-    primary: '#2D7A5F',
-    primaryDark: '#1F5A45',
-    white: '#FFFFFF',
-    background: '#F0FDF4',
-    textPrimary: '#111827',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    danger: '#EF4444',
-    cardBg: '#FFFFFF',
-};
+import { api } from './services/api';
+import DriverTripScreen from './DriverTripScreen';
+
+// Premium Design
+import { colors, spacing, typography, shadows, layout } from './src/theme';
+import PremiumCard from './src/components/ui/PremiumCard';
+import PremiumButton from './src/components/ui/PremiumButton';
+
+const { width } = layout;
 
 interface DriverHomeScreenProps {
     user: any;
     onLogout: () => void;
 }
 
-export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenProps) {
-    const [dashboardData, setDashboardData] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [trackingActive, setTrackingActive] = useState(false);
-    const [locationInterval, setLocationInterval] = useState<any>(null);
+type DriverTabType = 'dashboard' | 'routes' | 'history';
 
+export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenProps) {
+    const [activeTab, setActiveTab] = useState<DriverTabType>('dashboard');
+    const [dashboardData, setDashboardData] = useState<any>(null);
+    const [activeTrip, setActiveTrip] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+
+    // Check for active trip on load
     useEffect(() => {
-        fetchDashboard();
-        return () => {
-            if (locationInterval) {
-                clearInterval(locationInterval);
-            }
-        };
+        checkActiveTrip();
     }, []);
 
-    const fetchDashboard = async () => {
+    const checkActiveTrip = async () => {
+        setLoading(true);
         try {
-            const data = await api.getDriverDashboard(user.staffId);
+            // Ideally backend endpoint would return active trip status
+            const data = await api.getDriverDashboard(user.id || 0); // Assuming API signature
             setDashboardData(data);
+            if (data?.activeTrip) setActiveTrip(data.activeTrip);
         } catch (error) {
-            console.error('Failed to fetch driver dashboard:', error);
-            Alert.alert('Error', 'Failed to load dashboard data');
+            console.error(error);
         } finally {
-            setIsLoading(false);
-            setIsRefreshing(false);
+            setLoading(false);
         }
     };
 
-    const onRefresh = () => {
-        setIsRefreshing(true);
-        fetchDashboard();
-    };
-
-    const toggleTracking = () => {
-        if (!trackingActive) {
-            startLocationTracking();
-        } else {
-            stopLocationTracking();
+    const handleStartTrip = async (routeId: string) => {
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'Location access is required for trips.');
+                return;
+            }
+            // Mock Starting trip locally if API not fully ready or for UI demo
+            const trip = { id: Date.now(), routeId, status: 'live' };
+            setActiveTrip(trip);
+            // await api.startTrip(routeId); 
+        } catch (error) {
+            Alert.alert('Error', 'Could not start trip');
         }
     };
 
-    const startLocationTracking = () => {
-        if (!dashboardData?.route) {
-            Alert.alert('Error', 'No route assigned');
-            return;
-        }
-
-        setTrackingActive(true);
-        Alert.alert('Tracking Started', 'Your location is being shared with parents');
-
-        // Simulate location updates every 30 seconds
-        // In a real app, you'd use react-native-geolocation or expo-location
-        const interval = setInterval(() => {
-            const mockLat = 19.0760 + (Math.random() - 0.5) * 0.01;
-            const mockLng = 72.8777 + (Math.random() - 0.5) * 0.01;
-
-            api.updateBusLocation(dashboardData.route.id, mockLat, mockLng, 30, 90)
-                .then(() => console.log('Location updated'))
-                .catch(() => console.error('Failed to update location'));
-        }, 30000);
-
-        setLocationInterval(interval);
+    const handleEndTrip = () => {
+        setActiveTrip(null);
+        // await api.endTrip(activeTrip.id);
     };
 
-    const stopLocationTracking = () => {
-        setTrackingActive(false);
-        if (locationInterval) {
-            clearInterval(locationInterval);
-            setLocationInterval(null);
-        }
-        Alert.alert('Tracking Stopped', 'Location sharing has been disabled');
-    };
-
-    if (isLoading) {
+    if (activeTrip && activeTab === 'dashboard') {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={colors.primary} />
-            </View>
+            <DriverTripScreen
+                route={{ id: activeTrip.routeId, name: 'Morning Route (Active)' }} // Pass real data
+                onTripEnd={handleEndTrip}
+            />
         );
     }
 
-    const { driver, route, assignedStudents } = dashboardData || {};
-
     return (
         <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
+
             {/* Header */}
             <View style={styles.header}>
-                <View>
-                    <Text style={styles.greeting}>Hello, {user.name}!</Text>
-                    <Text style={styles.role}>Driver Dashboard</Text>
-                </View>
-                <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
-                    <Feather name="log-out" size={22} color={colors.primary} />
-                </TouchableOpacity>
+                <LinearGradient
+                    colors={[colors.primaryDark, colors.primary]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.headerGradient}
+                >
+                    <View style={styles.headerRow}>
+                        <View>
+                            <Text style={styles.roleLabel}>DRIVER PORTAL</Text>
+                            <Text style={styles.name}>{user.name}</Text>
+                        </View>
+                        <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
+                            <Feather name="log-out" size={20} color="rgba(255,255,255,0.8)" />
+                        </TouchableOpacity>
+                    </View>
+                </LinearGradient>
             </View>
 
-            <ScrollView
-                style={styles.content}
-                refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
-            >
-                {/* Live Tracking Toggle */}
-                <View style={styles.trackingCard}>
-                    <View style={styles.trackingHeader}>
-                        <Feather
-                            name={trackingActive ? "radio" : "navigation"}
-                            size={32}
-                            color={trackingActive ? colors.success : colors.textSecondary}
-                        />
-                        <Text style={styles.trackingTitle}>
-                            {trackingActive ? 'Tracking Active' : 'Start Tracking'}
-                        </Text>
-                    </View>
-                    <Text style={styles.trackingDesc}>
-                        {trackingActive
-                            ? 'Parents can see your live location'
-                            : 'Enable GPS tracking to share your location with parents'}
-                    </Text>
-                    <TouchableOpacity
-                        style={[
-                            styles.trackingButton,
-                            { backgroundColor: trackingActive ? colors.danger : colors.success }
-                        ]}
-                        onPress={toggleTracking}
-                    >
-                        <Text style={styles.trackingButtonText}>
-                            {trackingActive ? 'Stop Tracking' : 'Start Tracking'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+            <ScrollView contentContainerStyle={styles.content}>
 
-                {/* Route Info */}
-                {route ? (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>My Route</Text>
-                        <View style={styles.routeCard}>
-                            <View style={styles.routeHeader}>
-                                <Feather name="map-pin" size={24} color={colors.primary} />
-                                <View style={{ marginLeft: 12, flex: 1 }}>
-                                    <Text style={styles.routeName}>{route.route_name}</Text>
-                                    <Text style={styles.routeNumber}>Route #{route.route_number}</Text>
-                                </View>
-                            </View>
-                            <View style={styles.routeTimings}>
-                                <View style={styles.timingItem}>
-                                    <Feather name="sunrise" size={16} color={colors.textSecondary} />
-                                    <Text style={styles.timingText}>Start: {route.start_time || 'N/A'}</Text>
-                                </View>
-                                <View style={styles.timingItem}>
-                                    <Feather name="sunset" size={16} color={colors.textSecondary} />
-                                    <Text style={styles.timingText}>End: {route.end_time || 'N/A'}</Text>
-                                </View>
-                            </View>
-                        </View>
+                {/* Status Card */}
+                <PremiumCard style={{ marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface }}>
+                    <View style={[styles.statusIcon, { backgroundColor: activeTrip ? colors.successBg : colors.surfaceHighlight }]}>
+                        <Feather name={activeTrip ? "navigation" : "map"} size={24} color={activeTrip ? colors.success : colors.textSecondary} />
                     </View>
+                    <View>
+                        <Text style={styles.statusTitle}>{activeTrip ? 'Trip in Progress' : 'Ready for Trip'}</Text>
+                        <Text style={styles.statusSub}>{activeTrip ? 'Tracking is active' : 'Select a route to start'}</Text>
+                    </View>
+                </PremiumCard>
+
+                {/* Today's Routes */}
+                <Text style={styles.sectionTitle}>Assigned Routes</Text>
+
+                {loading ? (
+                    <ActivityIndicator color={colors.primary} />
                 ) : (
-                    <View style={styles.section}>
-                        <Text style={styles.emptyText}>No route assigned</Text>
+                    // Mock Routes if no data
+                    <View>
+                        <PremiumCard style={styles.routeCard}>
+                            <View style={styles.routeHeader}>
+                                <Text style={styles.routeTitle}>Morning Pickup - Route A</Text>
+                                <Text style={styles.routeTime}>07:30 AM</Text>
+                            </View>
+                            <View style={styles.routeInfo}>
+                                <Feather name="users" size={16} color={colors.textSecondary} />
+                                <Text style={styles.routeDetail}>12 Students</Text>
+                                <View style={styles.dot} />
+                                <Feather name="map-pin" size={16} color={colors.textSecondary} />
+                                <Text style={styles.routeDetail}>8 Stops</Text>
+                            </View>
+                            <PremiumButton
+                                title="Start Trip"
+                                icon="play"
+                                onPress={() => handleStartTrip('1')}
+                                style={{ marginTop: 12 }}
+                            />
+                        </PremiumCard>
+
+                        <PremiumCard style={styles.routeCard}>
+                            <View style={styles.routeHeader}>
+                                <Text style={styles.routeTitle}>Afternoon Drop - Route A</Text>
+                                <Text style={styles.routeTime}>02:30 PM</Text>
+                            </View>
+                            <View style={styles.routeInfo}>
+                                <Feather name="users" size={16} color={colors.textSecondary} />
+                                <Text style={styles.routeDetail}>10 Students</Text>
+                            </View>
+                            <PremiumButton
+                                title="Start Trip"
+                                icon="play"
+                                variant="outline"
+                                onPress={() => handleStartTrip('2')}
+                                style={{ marginTop: 12 }}
+                            />
+                        </PremiumCard>
                     </View>
                 )}
-
-                {/* Assigned Students */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>
-                        Assigned Students ({assignedStudents?.length || 0})
-                    </Text>
-                    {assignedStudents && assignedStudents.length > 0 ? (
-                        assignedStudents.map((student: any) => (
-                            <View key={student.id} style={styles.studentCard}>
-                                <View style={styles.studentAvatar}>
-                                    <Feather name="user" size={20} color={colors.primary} />
-                                </View>
-                                <View style={styles.studentInfo}>
-                                    <Text style={styles.studentName}>{student.name}</Text>
-                                    <Text style={styles.studentClass}>{student.class}</Text>
-                                    <Text style={styles.studentPhone}>{student.parent_phone}</Text>
-                                </View>
-                                <TouchableOpacity style={styles.callButton}>
-                                    <Feather name="phone" size={20} color={colors.primary} />
-                                </TouchableOpacity>
-                            </View>
-                        ))
-                    ) : (
-                        <Text style={styles.emptyText}>No students assigned to this route</Text>
-                    )}
-                </View>
-
-                <View style={{ height: 80 }} />
             </ScrollView>
+
+            {/* Bottom Navigation */}
+            <View style={styles.bottomBarContainer}>
+                <PremiumCard style={styles.bottomBar} variant="elevated">
+                    {['dashboard', 'routes', 'history'].map(tab => {
+                        const isActive = activeTab === tab;
+                        const icons: any = { dashboard: 'home', routes: 'map', history: 'clock' };
+                        return (
+                            <TouchableOpacity key={tab} onPress={() => setActiveTab(tab as DriverTabType)} style={styles.tabItem}>
+                                <Feather name={icons[tab]} size={24} color={isActive ? colors.accent : colors.textSecondary} />
+                                {isActive && <Text style={[styles.tabLabel, { color: colors.accent }]}>{tab.charAt(0).toUpperCase() + tab.slice(1)}</Text>}
+                            </TouchableOpacity>
+                        )
+                    })}
+                </PremiumCard>
+            </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.background,
-    },
-    header: {
-        backgroundColor: colors.white,
-        paddingTop: 50,
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-    },
-    greeting: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: colors.textPrimary,
-    },
-    role: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        marginTop: 2,
-    },
-    logoutBtn: {
-        padding: 8,
-    },
-    content: {
-        flex: 1,
-    },
-    trackingCard: {
-        backgroundColor: colors.white,
-        margin: 20,
-        padding: 24,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: colors.border,
-        alignItems: 'center',
-    },
-    trackingHeader: {
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    trackingTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: colors.textPrimary,
-        marginTop: 12,
-    },
-    trackingDesc: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        textAlign: 'center',
-        marginBottom: 20,
-    },
-    trackingButton: {
-        paddingVertical: 14,
-        paddingHorizontal: 32,
-        borderRadius: 12,
-        width: '100%',
-        alignItems: 'center',
-    },
-    trackingButtonText: {
-        color: colors.white,
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    section: {
-        paddingHorizontal: 20,
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: colors.textPrimary,
-        marginBottom: 16,
-    },
-    routeCard: {
-        backgroundColor: colors.white,
-        padding: 20,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    routeHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    routeName: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: colors.textPrimary,
-    },
-    routeNumber: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        marginTop: 4,
-    },
-    routeTimings: {
-        flexDirection: 'row',
-        gap: 20,
-    },
-    timingItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    timingText: {
-        fontSize: 14,
-        color: colors.textSecondary,
-    },
-    studentCard: {
-        backgroundColor: colors.white,
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: colors.border,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    studentAvatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: colors.primary + '20',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    studentInfo: {
-        flex: 1,
-        marginLeft: 12,
-    },
-    studentName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: colors.textPrimary,
-    },
-    studentClass: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        marginTop: 2,
-    },
-    studentPhone: {
-        fontSize: 12,
-        color: colors.textSecondary,
-        marginTop: 4,
-    },
-    callButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: colors.primary + '20',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    emptyText: {
-        textAlign: 'center',
-        color: colors.textSecondary,
-        fontSize: 14,
-        padding: 20,
-    },
+    container: { flex: 1, backgroundColor: colors.background },
+    header: { height: 160, marginBottom: -30, zIndex: 1 },
+    headerGradient: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: 50, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+    roleLabel: { ...typography.caption, color: colors.accent, fontWeight: '700', letterSpacing: 1 },
+    name: { ...typography.h2, color: colors.textInverted },
+    logoutBtn: { padding: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12 },
+
+    content: { flex: 1, paddingTop: 40, paddingHorizontal: spacing.lg, paddingBottom: 100 },
+
+    statusIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
+    statusTitle: { ...typography.h3, fontSize: 16 },
+    statusSub: { ...typography.caption },
+
+    sectionTitle: { ...typography.h3, fontSize: 18, marginBottom: spacing.md, marginTop: spacing.md },
+
+    routeCard: { marginBottom: spacing.md },
+    routeHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    routeTitle: { ...typography.h3, fontSize: 16 },
+    routeTime: { ...typography.caption, fontWeight: '700', color: colors.textPrimary },
+    routeInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+    routeDetail: { ...typography.caption, marginLeft: 4, marginRight: 8 },
+    dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.textTertiary, marginHorizontal: 4 },
+
+    bottomBarContainer: { position: 'absolute', bottom: 20, left: 20, right: 20 },
+    bottomBar: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 10, borderRadius: 30 },
+    tabItem: { flexDirection: 'row', alignItems: 'center', padding: 8 },
+    tabLabel: { marginLeft: 8, fontWeight: '700', fontSize: 12 },
 });

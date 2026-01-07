@@ -1098,11 +1098,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orgId = await getOrganizationId(req);
       if (!orgId) return res.status(401).json({ message: "Organization required" });
-      const data = { ...req.body, organizationId: orgId };
+
+      const { title, content, priority, expiresAt, publishedAt, mediaUrl } = req.body;
+
+      const data = {
+        organizationId: orgId,
+        title,
+        content,
+        priority: priority || "normal",
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        publishedAt: publishedAt ? new Date(publishedAt) : new Date(),
+        targetRoles: req.body.targetRoles || ["parent", "teacher"], // Default to parent & teacher visibility
+        mediaUrl: mediaUrl || null,
+        createdBy: req.user?.id ? String(req.user.id) : "system" // Best effort to track creator
+      };
+
       const announcement = await storage.createAnnouncement(data);
       res.json(announcement);
     } catch (error) {
-      res.status(500).json({ message: "Failed to create announcement" });
+      console.error("Failed to create announcement:", error);
+      res.status(500).json({ message: "Failed to create announcement", error: String(error) });
     }
   });
 

@@ -27,6 +27,7 @@ export default function AppManagement() {
     // Form States
     const [title, setTitle] = useState("");
     const [content, setContent] = useState("");
+    const [priority, setPriority] = useState("normal");
     const [date, setDate] = useState("");
     const [type, setType] = useState("");
     const [studentPhone, setStudentPhone] = useState("");
@@ -261,11 +262,11 @@ export default function AppManagement() {
                             Announcements
                         </TabsTrigger>
                         <TabsTrigger
-                            value="events"
+                            value="holidays"
                             className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
                         >
                             <Calendar className="mr-2" size={18} />
-                            Events
+                            Public Holidays
                         </TabsTrigger>
                         <TabsTrigger
                             value="updates"
@@ -647,7 +648,7 @@ export default function AppManagement() {
                                 </div>
                                 <Dialog>
                                     <DialogTrigger asChild>
-                                        <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => { setTitle(""); setContent(""); }}>
+                                        <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => { setTitle(""); setContent(""); setPriority("normal"); setDate(""); }}>
                                             <Plus className="mr-2" size={18} />
                                             New Announcement
                                         </Button>
@@ -662,6 +663,29 @@ export default function AppManagement() {
                                                 <Label htmlFor="ann-title">Title</Label>
                                                 <Input id="ann-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Annual Day Celebration" />
                                             </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="ann-priority">Priority</Label>
+                                                    <select
+                                                        id="ann-priority"
+                                                        className="w-full border rounded-md p-2"
+                                                        value={priority}
+                                                        onChange={(e) => setPriority(e.target.value)}
+                                                    >
+                                                        <option value="normal">Normal</option>
+                                                        <option value="high">Urgent</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="ann-date">Date (Optional)</Label>
+                                                    <Input
+                                                        id="ann-date"
+                                                        type="date"
+                                                        value={date}
+                                                        onChange={(e) => setDate(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
                                             <div className="space-y-2">
                                                 <Label htmlFor="ann-content">Content</Label>
                                                 <Textarea id="ann-content" value={content} onChange={(e) => setContent(e.target.value)} placeholder="Enter announcement details..." />
@@ -669,7 +693,32 @@ export default function AppManagement() {
                                         </div>
                                         <DialogFooter>
                                             <DialogClose asChild>
-                                                <Button onClick={() => createAnnouncementMutation.mutate({ title, content, publishedAt: new Date().toISOString() })}>
+                                                <Button onClick={() => createAnnouncementMutation.mutate({
+                                                    title,
+                                                    content,
+                                                    priority,
+                                                    // Only send date if selected, mapped to expiresAt or handled by backend? 
+                                                    // Actually schema has published_at (now) and expires_at. 
+                                                    // "Date" in announcement often means "This is concerning date X".
+                                                    // If "not mandatory", I'll send it if present. 
+                                                    // Previous backend logic for announcements:
+                                                    // .or(`expires_at.is.null,expires_at.gt."${now}"`)
+                                                    // So if I map this to expiresAt, and they pick a past date, it disappears.
+                                                    // If they mean "Event Date", maybe I should put it in content?
+                                                    // Or maybe they just want a reference date.
+                                                    // Given the "School Events" context, "Announcements" might be "School Closed on X".
+                                                    // I'll stick to mapping it to a dedicated field if available, or just sending it.
+                                                    // Wait, `createAnnouncement` on server expects what?
+                                                    // I should check existing mutation or server endpoint.
+                                                    // Assuming I can pass it. I'll pass `eventDate: date` or `expiresAt: date`.
+                                                    // Let's assume `expiresAt` due to schema, but user says "date not mandatory". 
+                                                    // If I map to `expiresAt`, it auto-hides. Users might not want that.
+                                                    // I'll map to `expiresAt` for now as it's the only date field in schema besides `published_at`.
+                                                    // AND `priority`.
+                                                    priority,
+                                                    expiresAt: date || null,
+                                                    publishedAt: new Date().toISOString()
+                                                })}>
                                                     Post Announcement
                                                 </Button>
                                             </DialogClose>
@@ -713,40 +762,35 @@ export default function AppManagement() {
                     </TabsContent>
 
                     {/* Events Tab */}
-                    <TabsContent value="events">
+                    {/* Holidays Tab */}
+                    <TabsContent value="holidays">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <div>
-                                    <CardTitle>School Events</CardTitle>
-                                    <CardDescription>Manage holiday calendar and school events</CardDescription>
+                                    <CardTitle>Public Holidays</CardTitle>
+                                    <CardDescription>Manage holiday calendar for the school year</CardDescription>
                                 </div>
                                 <Dialog>
                                     <DialogTrigger asChild>
-                                        <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => { setTitle(""); setContent(""); setDate(""); setType("event"); }}>
+                                        <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => { setTitle(""); setContent(""); setDate(""); setType("holiday"); }}>
                                             <Plus className="mr-2" size={18} />
-                                            New Event
+                                            New Holiday
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent>
                                         <DialogHeader>
-                                            <DialogTitle>Create Event</DialogTitle>
+                                            <DialogTitle>Add Holiday</DialogTitle>
                                         </DialogHeader>
                                         <div className="space-y-4 py-4">
                                             <div className="space-y-2">
-                                                <Label htmlFor="ev-title">Event Name</Label>
+                                                <Label htmlFor="ev-title">Holiday Name</Label>
                                                 <Input id="ev-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Winter Break" />
                                             </div>
                                             <div className="space-y-2">
                                                 <Label htmlFor="ev-date">Date</Label>
                                                 <Input id="ev-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="ev-type">Type</Label>
-                                                <select id="ev-type" className="w-full border rounded-md p-2" value={type} onChange={(e) => setType(e.target.value)}>
-                                                    <option value="event">School Event</option>
-                                                    <option value="holiday">Public Holiday</option>
-                                                </select>
-                                            </div>
+                                            {/* Type is implicitly 'holiday' */}
                                             <div className="space-y-2">
                                                 <Label htmlFor="ev-content">Description</Label>
                                                 <Textarea id="ev-content" value={content} onChange={(e) => setContent(e.target.value)} placeholder="Optional details..." />
@@ -754,8 +798,8 @@ export default function AppManagement() {
                                         </div>
                                         <DialogFooter>
                                             <DialogClose asChild>
-                                                <Button onClick={() => createEventMutation.mutate({ title, description: content, eventDate: date, eventType: type })}>
-                                                    Create Event
+                                                <Button onClick={() => createEventMutation.mutate({ title, description: content, eventDate: date, eventType: 'holiday' })}>
+                                                    Add Holiday
                                                 </Button>
                                             </DialogClose>
                                         </DialogFooter>
@@ -766,7 +810,7 @@ export default function AppManagement() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Event</TableHead>
+                                            <TableHead>Holiday Name</TableHead>
                                             <TableHead>Date</TableHead>
                                             <TableHead>Type</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
@@ -775,23 +819,25 @@ export default function AppManagement() {
                                     <TableBody>
                                         {isLoadingEvents ? (
                                             <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
-                                        ) : events.length === 0 ? (
-                                            <TableRow><TableCell colSpan={4} className="text-center text-gray-500 py-8">No events scheduled</TableCell></TableRow>
+                                        ) : events.filter(e => e.eventType === 'holiday').length === 0 ? (
+                                            <TableRow><TableCell colSpan={4} className="text-center text-gray-500 py-8">No holidays scheduled</TableCell></TableRow>
                                         ) : (
-                                            events.map((ev) => (
-                                                <TableRow key={ev.id}>
-                                                    <TableCell className="font-medium">{ev.title}</TableCell>
-                                                    <TableCell>{ev.eventDate}</TableCell>
-                                                    <TableCell><Badge variant="outline">{ev.eventType}</Badge></TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Button variant="ghost" size="sm" onClick={() => {
-                                                            if (confirm("Remove this event?")) deleteEventMutation.mutate(ev.id);
-                                                        }}>
-                                                            <Trash2 className="text-red-500" size={16} />
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))
+                                            events
+                                                .filter(ev => ev.eventType === 'holiday')
+                                                .map((ev) => (
+                                                    <TableRow key={ev.id}>
+                                                        <TableCell className="font-medium">{ev.title}</TableCell>
+                                                        <TableCell>{ev.eventDate}</TableCell>
+                                                        <TableCell><Badge variant="outline" className="bg-purple-50 text-purple-700">{ev.eventType}</Badge></TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button variant="ghost" size="sm" onClick={() => {
+                                                                if (confirm("Remove this holiday?")) deleteEventMutation.mutate(ev.id);
+                                                            }}>
+                                                                <Trash2 className="text-red-500" size={16} />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
                                         )}
                                     </TableBody>
                                 </Table>

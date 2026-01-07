@@ -3,388 +3,186 @@ import {
     View,
     Text,
     StyleSheet,
-    ScrollView,
     TouchableOpacity,
-    ActivityIndicator,
+    FlatList,
     Alert,
-    Platform
+    Platform,
+    StatusBar,
+    ActivityIndicator
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { api } from './services/api';
-import { useOffline } from './src/hooks/useOffline';
-import { offlineCache } from './src/services/offline-cache';
+import * as Location from 'expo-location';
+
+import { api, type Child } from './services/api';
+import { colors, spacing, typography, shadows, layout } from './src/theme';
+import PremiumCard from './src/components/ui/PremiumCard';
+import PremiumButton from './src/components/ui/PremiumButton';
 
 interface DriverTripScreenProps {
-    user: any;
-    onBack: () => void;
+    route: { id: string; name: string };
+    onTripEnd: () => void;
 }
 
-export default function DriverTripScreen({ user, onBack }: DriverTripScreenProps) {
-    const [tripActive, setTripActive] = useState(false);
-    const [tripData, setTripData] = useState<any>(null);
+export default function DriverTripScreen({ route, onTripEnd }: DriverTripScreenProps) {
     const [students, setStudents] = useState<any[]>([]);
-    const [checkedStudents, setCheckedStudents] = useState<Set<number>>(new Set());
-    const [loading, setLoading] = useState(false);
-    const { isOnline } = useOffline();
+    const [loading, setLoading] = useState(true);
+    const [location, setLocation] = useState<Location.LocationObject | null>(null);
 
     useEffect(() => {
-        loadTripData();
+        // Imitate fetching students for this route
+        const mockStudents = [
+            { id: 101, name: 'Aarav Sharma', status: 'pending', stop: 'Sector 4' },
+            { id: 102, name: 'Vivaan Gupta', status: 'pending', stop: 'Market Road' },
+            { id: 103, name: 'Siya Patel', status: 'boarded', stop: 'City Park' },
+        ];
+        setTimeout(() => {
+            setStudents(mockStudents);
+            setLoading(false);
+        }, 1000);
+
+        // Start Location Tracking
+        const interval = setInterval(async () => {
+            const loc = await Location.getCurrentPositionAsync({});
+            setLocation(loc);
+            // api.updateBusLocation(...)
+        }, 10000);
+
+        return () => clearInterval(interval);
     }, []);
 
-    const loadTripData = async () => {
-        setLoading(true);
-        try {
-            const activeTrip = await api.getActiveTrip();
-            if (activeTrip) {
-                setTripActive(true);
-                setTripData(activeTrip);
-                setStudents(activeTrip.students || []);
+    const toggleStatus = (studentId: number) => {
+        setStudents(prev => prev.map(s => {
+            if (s.id === studentId) {
+                const newStatus = s.status === 'boarded' ? 'dropped' : s.status === 'pending' ? 'boarded' : 'pending';
+                return { ...s, status: newStatus };
             }
-        } catch (error) {
-            console.error('Failed to load trip:', error);
-        } finally {
-            setLoading(false);
+            return s;
+        }));
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'boarded': return colors.success;
+            case 'dropped': return colors.info;
+            default: return colors.warning; // pending
         }
     };
 
-    const startTrip = async () => {
-        Alert.alert(
-            'Start Trip',
-            'Are you sure you want to start the trip?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Start',
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            if (isOnline) {
-                                const trip = await api.startTrip();
-                                setTripActive(true);
-                                setTripData(trip);
-                                setStudents(trip.students || []);
-                                Alert.alert('Success', 'Trip started successfully');
-                            } else {
-                                await offlineCache.queueAction('start_trip', {});
-                                Alert.alert('Queued', 'Trip start will be synced when online');
-                            }
-                        } catch (error) {
-                            console.error('Failed to start trip:', error);
-                            Alert.alert('Error', 'Failed to start trip');
-                        } finally {
-                            setLoading(false);
-                        }
-                    }
-                }
-            ]
-        );
+    const getStatusIcon = (status: string) => {
+        switch (status) {
+            case 'boarded': return 'check-circle';
+            case 'dropped': return 'home';
+            default: return 'clock';
+        }
     };
 
-    const endTrip = async () => {
+    const handleEndTrip = () => {
         Alert.alert(
             'End Trip',
-            'Are you sure all students have been dropped off?',
+            'Are you sure you want to end this trip?',
             [
                 { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'End Trip',
-                    style: 'destructive',
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            if (isOnline) {
-                                await api.endTrip();
-                                setTripActive(false);
-                                setTripData(null);
-                                setStudents([]);
-                                setCheckedStudents(new Set());
-                                Alert.alert('Success', 'Trip ended successfully');
-                                onBack();
-                            } else {
-                                await offlineCache.queueAction('end_trip', {});
-                                Alert.alert('Queued', 'Trip end will be synced when online');
-                                onBack();
-                            }
-                        } catch (error) {
-                            console.error('Failed to end trip:', error);
-                            Alert.alert('Error', 'Failed to end trip');
-                        } finally {
-                            setLoading(false);
-                        }
-                    }
-                }
+                { text: 'End Trip', style: 'destructive', onPress: onTripEnd }
             ]
         );
-    };
-
-    const toggleStudent = (studentId: number) => {
-        const newChecked = new Set(checkedStudents);
-        if (newChecked.has(studentId)) {
-            newChecked.delete(studentId);
-        } else {
-            newChecked.add(studentId);
-        }
-        setCheckedStudents(newChecked);
     };
 
     return (
         <View style={styles.container}>
-            {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Feather name="arrow-left" size={24} color="#fff" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>
-                    {tripActive ? 'Trip in Progress' : 'Start Trip'}
-                </Text>
-                <View style={{ width: 40 }} />
+                <LinearGradient
+                    colors={[colors.danger, '#991b1b']} // Red for "Live Action" awareness
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.headerGradient}
+                >
+                    <View style={styles.headerContent}>
+                        <View>
+                            <View style={styles.liveTag}>
+                                <View style={styles.liveDot} />
+                                <Text style={styles.liveText}>LIVE TRACKING</Text>
+                            </View>
+                            <Text style={styles.routeTitle}>{route.name}</Text>
+                        </View>
+                        <TouchableOpacity onPress={handleEndTrip} style={styles.closeBtn}>
+                            <Feather name="x" size={24} color="white" />
+                        </TouchableOpacity>
+                    </View>
+                </LinearGradient>
+            </View>
+
+            <View style={styles.infoBar}>
+                <Text style={styles.infoText}>Next Stop: <Text style={{ fontWeight: '700' }}>Sector 4</Text></Text>
+                <Text style={styles.infoText}>{students.filter(s => s.status === 'boarded').length} Onboard</Text>
             </View>
 
             {loading ? (
-                <ActivityIndicator size="large" color="#8B5CF6" style={{ marginTop: 50 }} />
+                <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
             ) : (
-                <ScrollView style={styles.content}>
-                    {!tripActive ? (
-                        /* Start Trip View */
-                        <View style={styles.startView}>
-                            <View style={styles.iconContainer}>
-                                <Feather name="truck" size={64} color="#8B5CF6" />
-                            </View>
-                            <Text style={styles.startTitle}>Ready to start your route?</Text>
-                            <Text style={styles.startSubtitle}>
-                                Make sure you've checked the vehicle and are ready to pick up students
-                            </Text>
-
-                            <TouchableOpacity style={styles.startButton} onPress={startTrip}>
-                                <Feather name="play-circle" size={24} color="#fff" />
-                                <Text style={styles.startButtonText}>Start Trip</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ) : (
-                        /* Active Trip View */
-                        <>
-                            {/* Trip Info */}
-                            <View style={styles.tripInfo}>
-                                <View style={styles.tripInfoRow}>
-                                    <Feather name="map-pin" size={20} color="#8B5CF6" />
-                                    <Text style={styles.tripInfoText}>Route: {tripData?.routeName || 'Morning Route'}</Text>
+                <FlatList
+                    data={students}
+                    keyExtractor={item => item.id.toString()}
+                    contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}
+                    renderItem={({ item }) => (
+                        <PremiumCard style={styles.studentCard}>
+                            <View style={styles.studentRow}>
+                                <View style={styles.avatar}>
+                                    <Feather name="user" size={20} color={colors.primary} />
                                 </View>
-                                <View style={styles.tripInfoRow}>
-                                    <Feather name="users" size={20} color="#10B981" />
-                                    <Text style={styles.tripInfoText}>
-                                        {checkedStudents.size}/{students.length} students checked
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.studentName}>{item.name}</Text>
+                                    <Text style={styles.stopName}>{item.stop}</Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={[styles.statusBtn, { backgroundColor: getStatusColor(item.status) + '20' }]}
+                                    onPress={() => toggleStatus(item.id)}
+                                >
+                                    <Feather name={getStatusIcon(item.status) as any} size={20} color={getStatusColor(item.status)} />
+                                    <Text style={[styles.statusLabel, { color: getStatusColor(item.status) }]}>
+                                        {item.status.toUpperCase()}
                                     </Text>
-                                </View>
+                                </TouchableOpacity>
                             </View>
-
-                            {/* Student Checklist */}
-                            <Text style={styles.sectionTitle}>Student Checklist</Text>
-                            {students.map(student => {
-                                const isChecked = checkedStudents.has(student.id);
-                                return (
-                                    <TouchableOpacity
-                                        key={student.id}
-                                        style={[styles.studentItem, isChecked && styles.studentItemChecked]}
-                                        onPress={() => toggleStudent(student.id)}
-                                    >
-                                        <View style={styles.studentInfo}>
-                                            <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
-                                                {isChecked && <Feather name="check" size={16} color="#fff" />}
-                                            </View>
-                                            <View>
-                                                <Text style={[styles.studentName, isChecked && styles.studentNameChecked]}>
-                                                    {student.name}
-                                                </Text>
-                                                <Text style={styles.studentStop}>{student.stopName || 'Stop ' + student.stopNumber}</Text>
-                                            </View>
-                                        </View>
-                                        {isChecked && (
-                                            <View style={styles.checkedBadge}>
-                                                <Text style={styles.checkedText}>Picked Up</Text>
-                                            </View>
-                                        )}
-                                    </TouchableOpacity>
-                                );
-                            })}
-
-                            {/* End Trip Button */}
-                            <TouchableOpacity style={styles.endButton} onPress={endTrip}>
-                                <Feather name="stop-circle" size={20} color="#fff" />
-                                <Text style={styles.endButtonText}>End Trip</Text>
-                            </TouchableOpacity>
-                        </>
+                        </PremiumCard>
                     )}
-                </ScrollView>
+                />
             )}
+
+            <View style={styles.footer}>
+                <PremiumButton
+                    title="Complete Trip"
+                    variant="danger"
+                    size="lg"
+                    onPress={handleEndTrip}
+                />
+            </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F9FAFB'
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'ios' ? 50 : 20,
-        paddingBottom: 16,
-        backgroundColor: '#10B981'
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'center'
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#fff'
-    },
-    content: {
-        flex: 1,
-        padding: 16
-    },
-    startView: {
-        alignItems: 'center',
-        paddingTop: 60
-    },
-    iconContainer: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        backgroundColor: '#F3E8FF',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 24
-    },
-    startTitle: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: '#111827',
-        marginBottom: 12,
-        textAlign: 'center'
-    },
-    startSubtitle: {
-        fontSize: 16,
-        color: '#6B7280',
-        textAlign: 'center',
-        marginBottom: 40,
-        paddingHorizontal: 32
-    },
-    startButton: {
-        backgroundColor: '#10B981',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        paddingHorizontal: 32,
-        paddingVertical: 16,
-        borderRadius: 12
-    },
-    startButtonText: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: '600'
-    },
-    tripInfo: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 24,
-        gap: 12
-    },
-    tripInfoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12
-    },
-    tripInfoText: {
-        fontSize: 16,
-        color: '#111827',
-        fontWeight: '500'
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#111827',
-        marginBottom: 16
-    },
-    studentItem: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: 'transparent'
-    },
-    studentItemChecked: {
-        backgroundColor: '#F0FDF4',
-        borderColor: '#10B981'
-    },
-    studentInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        flex: 1
-    },
-    checkbox: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#D1D5DB',
-        alignItems: 'center',
-        justifyContent: 'center'
-    },
-    checkboxChecked: {
-        backgroundColor: '#10B981',
-        borderColor: '#10B981'
-    },
-    studentName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#111827'
-    },
-    studentNameChecked: {
-        color: '#065F46'
-    },
-    studentStop: {
-        fontSize: 14,
-        color: '#6B7280',
-        marginTop: 2
-    },
-    checkedBadge: {
-        backgroundColor: '#10B981',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12
-    },
-    checkedText: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: '600'
-    },
-    endButton: {
-        backgroundColor: '#EF4444',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        padding: 16,
-        borderRadius: 12,
-        marginTop: 24,
-        marginBottom: 32
-    },
-    endButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600'
-    }
+    container: { flex: 1, backgroundColor: colors.background },
+    header: { height: 140, marginBottom: 0 },
+    headerGradient: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: 50, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+    headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    routeTitle: { ...typography.h2, color: 'white', fontSize: 22 },
+    closeBtn: { padding: 8, backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 20 },
+
+    liveTag: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, marginBottom: 8 },
+    liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e', marginRight: 6 },
+    liveText: { color: 'white', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+
+    infoBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.border },
+    infoText: { ...typography.body, fontWeight: '600' },
+
+    studentCard: { marginBottom: spacing.md, paddingVertical: spacing.md },
+    studentRow: { flexDirection: 'row', alignItems: 'center' },
+    avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceHighlight, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
+    studentName: { ...typography.body, fontWeight: '700' },
+    stopName: { ...typography.caption },
+
+    statusBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
+    statusLabel: { fontSize: 11, fontWeight: '700', marginLeft: 6 },
+
+    footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: spacing.lg, backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, ...shadows.lg },
 });

@@ -1,12 +1,26 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 // API Service for Mobile App with JWT Authentication
 // V1 API with token-based auth and auto-refresh
-const IS_WEB_PROD = Platform.OS === 'web' && process.env.NODE_ENV === 'production';
-const API_BASE_URL = IS_WEB_PROD
-    ? '/api'
-    : 'https://edu-lead-pro.vercel.app/api';
+
+const getBaseUrl = () => {
+    if (Platform.OS === 'web') return '/api';
+
+    if (__DEV__) {
+        const debuggerHost = Constants.expoConfig?.hostUri;
+        const localhost = debuggerHost?.split(':')[0];
+
+        if (localhost) {
+            return `http://${localhost}:5000/api`;
+        }
+    }
+
+    return 'https://edu-lead-pro.vercel.app/api';
+};
+
+const API_BASE_URL = getBaseUrl();
 
 // Storage keys for tokens
 const ACCESS_TOKEN_KEY = '@eduleadpro:accessToken';
@@ -165,7 +179,8 @@ class APIService {
             headers['Authorization'] = `Bearer ${accessToken}`;
         }
 
-        let response = await fetch(`${this.baseURL}${endpoint}`, {
+        const url = `${this.baseURL}${endpoint}`;
+        let response = await fetch(url, {
             ...options,
             headers
         });
@@ -200,8 +215,9 @@ class APIService {
         }
 
         if (!response.ok) {
+            console.error(`API Error ${response.status} at ${url}: ${response.statusText}`);
             const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error?.message || `API Error: ${response.statusText}`);
+            throw new Error(errorData.error?.message || `API Error: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
@@ -291,6 +307,10 @@ class APIService {
         }));
     }
 
+    async getStudentFees(childId: number): Promise<any> {
+        return this.fetchWithAuth(`/v1/mobile/parent/child/${childId}/fees`);
+    }
+
     async getTodayAttendance(childId: number): Promise<Attendance | null> {
         try {
             const allAttendance = await this.getAttendance(childId, 1);
@@ -365,6 +385,17 @@ class APIService {
                 ...options
             })
         });
+    }
+
+    async uploadMedia(base64Image: string): Promise<string> {
+        const data = await this.fetchWithAuth<{ success: boolean; url: string }>('/mobile/media/upload', {
+            method: 'POST',
+            body: JSON.stringify({
+                image: base64Image,
+                folder: 'activities'
+            })
+        });
+        return data.url;
     }
 
     async getTodayAttendanceAll(): Promise<any> {

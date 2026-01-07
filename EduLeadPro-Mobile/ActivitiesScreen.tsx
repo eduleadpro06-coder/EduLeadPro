@@ -1,28 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { api, type DailyUpdate, type Event, type Homework } from './services/api';
+import { api, type DailyUpdate, type Event, type Homework, type Announcement } from './services/api';
+import { colors, spacing, typography } from './src/theme';
 
 const { width } = Dimensions.get('window');
 
-const colors = {
-    primary: '#2D7A5F',
-    primaryLight: '#D1FAE5',
-    white: '#FFFFFF',
-    textPrimary: '#111827',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    background: '#F0FDF4',
-    border: '#E5E7EB',
-    accent: '#F59E0B',
-    primaryDark: '#1F5A45',
-};
-
 const tabs = [
     { id: 'daily', label: 'Daily Updates' },
-    { id: 'events', label: 'Events' },
+    { id: 'announcements', label: 'Announcements' },
     { id: 'holidays', label: 'Holidays' },
-    { id: 'homework', label: 'Homework' },
 ];
 
 interface ActivitiesScreenProps {
@@ -33,9 +20,9 @@ interface ActivitiesScreenProps {
 export default function ActivitiesScreen({ currentUser, currentChild }: ActivitiesScreenProps) {
     const [activeTab, setActiveTab] = useState('daily');
     const [updates, setUpdates] = useState<DailyUpdate[]>([]);
-    const [events, setEvents] = useState<Event[]>([]);
+    const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+    // Removed unused events state since we only show holidays
     const [holidays, setHolidays] = useState<Event[]>([]);
-    const [homework, setHomework] = useState<Homework[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -43,21 +30,29 @@ export default function ActivitiesScreen({ currentUser, currentChild }: Activiti
     }, [currentChild]);
 
     const fetchData = async () => {
-        if (!currentChild) return;
+        if (!currentChild?.id || !currentUser?.organization_id) {
+            console.warn('ActivitiesScreen: Missing child or org ID', { childId: currentChild?.id, orgId: currentUser?.organization_id });
+            setIsLoading(false);
+            return;
+        }
+
         setIsLoading(true);
         try {
-            const [updRes, evRes, hwRes] = await Promise.all([
+            // Fetch only relevant sections: Updates, Announcements, Events (for holidays)
+            const [updRes, annRes, evRes] = await Promise.all([
                 api.getDailyUpdates(currentChild.id),
-                api.getEvents(currentUser.organization_id),
-                api.getHomework(currentChild.class)
+                api.getAnnouncements(currentUser.organization_id),
+                api.getEvents(currentUser.organization_id)
             ]);
 
-            setUpdates(updRes);
-            setEvents(evRes.filter(e => e.eventType === 'event'));
-            setHolidays(evRes.filter(e => e.eventType === 'holiday'));
-            setHomework(hwRes);
-        } catch (e) {
-            console.error('Failed to fetch screen data', e);
+            setUpdates(Array.isArray(updRes) ? updRes : []);
+            setAnnouncements(Array.isArray(annRes) ? annRes : []);
+
+            // Filter for holidays
+            setHolidays(Array.isArray(evRes) ? evRes.filter(e => e.eventType === 'holiday') : []);
+
+        } catch (e: any) {
+            console.error('Failed to fetch screen data Error:', e.message || e);
         } finally {
             setIsLoading(false);
         }
@@ -82,7 +77,11 @@ export default function ActivitiesScreen({ currentUser, currentChild }: Activiti
 
             {/* Tabs */}
             <View style={styles.tabContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+                >
                     {tabs.map(tab => (
                         <TouchableOpacity
                             key={tab.id}
@@ -103,66 +102,68 @@ export default function ActivitiesScreen({ currentUser, currentChild }: Activiti
                 ) : (
                     <>
                         {/* Daily Updates Feed */}
-                        {activeTab === 'daily' && updates.length === 0 && (
-                            <Text style={{ textAlign: 'center', marginTop: 50, color: colors.textSecondary }}>No updates yet.</Text>
-                        )}
-                        {activeTab === 'daily' && updates.map((item) => (
-                            <View key={item.id} style={styles.card}>
-                                {item.mediaUrls && item.mediaUrls.length > 0 && (
-                                    <Image source={{ uri: item.mediaUrls[0] }} style={styles.cardImage} />
-                                )}
-                                <View style={styles.cardContent}>
-                                    <View style={styles.cardHeader}>
-                                        <View style={styles.teacherRow}>
-                                            <View style={styles.teacherAvatar}>
-                                                <Feather name="user" size={14} color={colors.primary} />
+                        {activeTab === 'daily' && (
+                            updates.length === 0 ? (
+                                <View style={styles.emptyState}>
+                                    <View style={styles.iconCircle}>
+                                        <Feather name="sun" size={40} color={colors.textSecondary} />
+                                    </View>
+                                    <Text style={styles.emptyTitle}>No Updates Yet</Text>
+                                    <Text style={styles.emptyText}>Daily activities and photos will appear here.</Text>
+                                </View>
+                            ) : (
+                                updates.map((item) => (
+                                    <View key={item.id} style={styles.card}>
+                                        {item.mediaUrls && item.mediaUrls.length > 0 && (
+                                            <Image source={{ uri: item.mediaUrls[0] }} style={styles.cardImage} />
+                                        )}
+                                        <View style={styles.cardContent}>
+                                            <View style={styles.cardHeader}>
+                                                <View style={styles.teacherRow}>
+                                                    <View style={styles.teacherAvatar}>
+                                                        <Feather name="user" size={14} color={colors.primary} />
+                                                    </View>
+                                                    <Text style={styles.teacherName}>{item.teacherName || 'Class Teacher'}</Text>
+                                                </View>
+                                                <Text style={styles.time}>{new Date(item.postedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
                                             </View>
-                                            <Text style={styles.teacherName}>{item.teacherName || 'Class Teacher'}</Text>
+                                            <Text style={styles.title}>{item.title || item.activityType.toUpperCase()}</Text>
+                                            <Text style={styles.desc}>{item.content}</Text>
                                         </View>
-                                        <Text style={styles.time}>{new Date(item.postedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
                                     </View>
-                                    <Text style={styles.title}>{item.title || item.activityType.toUpperCase()}</Text>
-                                    <Text style={styles.desc}>{item.content}</Text>
-                                    <View style={styles.actions}>
-                                        <TouchableOpacity style={styles.actionBtn}>
-                                            <Feather name="heart" size={18} color={colors.textSecondary} />
-                                            <Text style={styles.actionText}>Like</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={styles.actionBtn}>
-                                            <Feather name="message-circle" size={18} color={colors.textSecondary} />
-                                            <Text style={styles.actionText}>Comment</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            </View>
-                        ))}
+                                ))
+                            )
+                        )}
 
-                        {/* Events List */}
-                        {activeTab === 'events' && events.map((item) => {
-                            const d = formatDate(item.eventDate);
-                            return (
-                                <View key={item.id} style={styles.eventCard}>
-                                    <View style={styles.dateBox}>
-                                        <Text style={styles.month}>{d.month}</Text>
-                                        <Text style={styles.date}>{d.day}</Text>
+                        {/* Announcements List */}
+                        {activeTab === 'announcements' && (
+                            announcements.length === 0 ? (
+                                <View style={styles.emptyState}>
+                                    <View style={styles.iconCircle}>
+                                        <Feather name="bell" size={40} color={colors.textSecondary} />
                                     </View>
-                                    <View style={styles.eventInfo}>
-                                        <Text style={styles.eventTitle}>{item.title}</Text>
-                                        <View style={styles.infoRow}>
-                                            <Feather name="clock" size={14} color={colors.textSecondary} />
-                                            <Text style={styles.infoText}>{item.eventTime || 'TBA'}</Text>
-                                        </View>
-                                        <View style={styles.infoRow}>
-                                            <Feather name="map-pin" size={14} color={colors.textSecondary} />
-                                            <Text style={styles.infoText}>{item.description || 'School Campus'}</Text>
-                                        </View>
-                                    </View>
-                                    <View style={styles.arrowBox}>
-                                        <Feather name="chevron-right" size={20} color={colors.textLight} />
-                                    </View>
+                                    <Text style={styles.emptyTitle}>No Announcements</Text>
+                                    <Text style={styles.emptyText}>School notices and alerts will be shown here.</Text>
                                 </View>
-                            );
-                        })}
+                            ) : (
+                                announcements.map((item) => (
+                                    <View key={item.id} style={styles.announcementCard}>
+                                        <View style={styles.announcementHeader}>
+                                            <View style={[styles.priorityBadge, item.priority === 'high' ? { backgroundColor: '#FEE2E2' } : { backgroundColor: '#E0F2FE' }]}>
+                                                <Text style={[styles.priorityText, item.priority === 'high' ? { color: '#DC2626' } : { color: '#0284C7' }]}>
+                                                    {item.priority === 'high' ? 'URGENT' : 'NOTICE'}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.time}>{new Date(item.publishedAt).toLocaleDateString()}</Text>
+                                        </View>
+                                        <Text style={styles.announcementTitle}>{item.title}</Text>
+                                        <Text style={styles.desc}>{item.content}</Text>
+                                    </View>
+                                ))
+                            )
+                        )}
+
+
 
                         {/* Holidays List */}
                         {activeTab === 'holidays' && holidays.map((item) => {
@@ -181,25 +182,7 @@ export default function ActivitiesScreen({ currentUser, currentChild }: Activiti
                             );
                         })}
 
-                        {/* Homework List */}
-                        {activeTab === 'homework' && homework.map((item) => (
-                            <View key={item.id} style={styles.card}>
-                                <View style={styles.cardContent}>
-                                    <View style={styles.cardHeader}>
-                                        <Badge style={{ backgroundColor: colors.accent + '20' }}>
-                                            <Text style={{ color: colors.accent, fontSize: 11, fontWeight: '700' }}>{item.subject || 'HOMEWORK'}</Text>
-                                        </Badge>
-                                        <Text style={styles.time}>Due: {item.dueDate}</Text>
-                                    </View>
-                                    <Text style={styles.title}>{item.title}</Text>
-                                    <Text style={styles.desc}>{item.description}</Text>
-                                    <View style={styles.teacherRow}>
-                                        <Feather name="user" size={14} color={colors.textSecondary} />
-                                        <Text style={styles.teacherName}>{item.teacherName || 'Subject Teacher'}</Text>
-                                    </View>
-                                </View>
-                            </View>
-                        ))}
+
                     </>
                 )}
 
@@ -217,31 +200,38 @@ const Badge = ({ children, style }: any) => (
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 20, backgroundColor: 'white' },
+    header: { paddingHorizontal: spacing.lg, paddingTop: 60, paddingBottom: 20, backgroundColor: 'white' },
     headerTitle: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
 
-    tabContainer: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 16, backgroundColor: 'white', paddingBottom: 12 },
-    tab: { marginRight: 24, paddingBottom: 8 },
-    activeTab: { borderBottomWidth: 2, borderBottomColor: colors.primary },
-    tabText: { fontSize: 16, color: colors.textSecondary, fontWeight: '500' },
-    activeTabText: { color: colors.primary, fontWeight: '600' },
+    tabContainer: { flexDirection: 'row', marginBottom: 16, backgroundColor: 'white', paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    tab: { marginHorizontal: 16, paddingBottom: 8 },
+    activeTab: { borderBottomWidth: 2, borderBottomColor: colors.accent },
+    tabText: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
+    activeTabText: { color: colors.accent, fontWeight: '700' },
 
-    content: { padding: 20 },
+    content: { padding: spacing.lg },
 
     // Update Card
-    card: { backgroundColor: 'white', borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.05, elevation: 2, overflow: 'hidden' },
+    card: { backgroundColor: 'white', borderRadius: 20, marginBottom: spacing.lg, shadowColor: '#000', shadowOpacity: 0.05, elevation: 2, overflow: 'hidden' },
     cardImage: { width: '100%', height: 200 },
-    cardContent: { padding: 16 },
+    cardContent: { padding: spacing.md },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     teacherRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    teacherAvatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-    teacherName: { fontSize: 13, fontWeight: '500', color: colors.textPrimary },
-    time: { fontSize: 12, color: colors.textLight },
-    title: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
-    desc: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 16 },
-    actions: { flexDirection: 'row', gap: 24, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 },
+    teacherAvatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.accentLight, alignItems: 'center', justifyContent: 'center' },
+    teacherName: { fontSize: 13, fontWeight: '600', color: colors.accent },
+    time: { fontSize: 12, color: colors.textTertiary },
+    title: { fontSize: 17, fontWeight: '700', color: colors.primary, marginBottom: 4 },
+    desc: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 12 },
+    actions: { flexDirection: 'row', gap: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 },
     actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     actionText: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
+
+    // Announcement Card
+    announcementCard: { backgroundColor: 'white', borderRadius: 16, padding: spacing.md, marginBottom: spacing.md, shadowColor: '#000', shadowOpacity: 0.05, elevation: 2 },
+    announcementHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+    priorityBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+    priorityText: { fontSize: 10, fontWeight: '700' },
+    announcementTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
 
     // Event Card
     eventCard: { flexDirection: 'row', backgroundColor: 'white', borderRadius: 16, padding: 16, marginBottom: 16, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.03, elevation: 1 },
@@ -256,4 +246,10 @@ const styles = StyleSheet.create({
 
     // Holiday
     holidayCard: { flexDirection: 'row', backgroundColor: 'white', borderRadius: 16, padding: 16, marginBottom: 16, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.03, elevation: 1 },
+
+    // Empty State
+    emptyState: { alignItems: 'center', marginTop: 60 },
+    iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
+    emptyText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', width: '80%' },
 });

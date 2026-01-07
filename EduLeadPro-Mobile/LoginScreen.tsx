@@ -1,37 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
-    TextInput,
-    TouchableOpacity,
     StyleSheet,
-    ActivityIndicator,
-    Alert,
-    Modal,
-    Image,
+    Animated,
     KeyboardAvoidingView,
     Platform,
     Dimensions,
-    StatusBar
+    StatusBar,
+    TouchableOpacity,
+    Alert,
+    Modal
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { api, type Child } from './services/api';
+import { colors, spacing, typography, shadows, layout } from './src/theme';
+import PremiumButton from './src/components/ui/PremiumButton';
+import PremiumInput from './src/components/ui/PremiumInput';
+import PremiumCard from './src/components/ui/PremiumCard';
 
-const { width, height } = Dimensions.get('window');
-
-const colors = {
-    primary: '#2D7A5F',
-    primaryDark: '#1F5A45',
-    accent: '#34D399',
-    white: '#FFFFFF',
-    background: '#F0FDF4', // Very light mint/white
-    textPrimary: '#111827',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    inputBg: '#F9FAFB',
-    danger: '#EF4444',
-};
+const { width, height } = layout;
 
 interface LoginScreenProps {
     onLoginSuccess: (user: any, students: Child[]) => void;
@@ -42,12 +31,33 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
+    // Animations
+    const fadeAnim = React.useRef(new Animated.Value(0)).current;
+    const slideAnim = React.useRef(new Animated.Value(50)).current;
+
     // Password Change State
     const [showChangePassword, setShowChangePassword] = useState(false);
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [changeLoading, setChangeLoading] = useState(false);
     const [tempUserRole, setTempUserRole] = useState('');
+
+    useEffect(() => {
+        // Entrance Animation
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 800,
+                useNativeDriver: true,
+            }),
+            Animated.spring(slideAnim, {
+                toValue: 0,
+                friction: 8,
+                tension: 40,
+                useNativeDriver: true,
+            })
+        ]).start();
+    }, []);
 
     const handleLogin = async () => {
         if (!phone || !password) {
@@ -58,18 +68,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         setLoading(true);
         try {
             const response = await api.login(phone, password);
-
-            // DEBUG: Log the entire response
-            console.log('🔍 LOGIN RESPONSE:', JSON.stringify(response, null, 2));
-            console.log('🔍 User Role:', response.user?.role);
-            console.log('🔍 User Object:', JSON.stringify(response.user, null, 2));
-
             if (response.success && response.user) {
                 if (response.requiresPasswordChange) {
-                    setTempUserRole(response.user.role || ''); // Store role for password change
+                    setTempUserRole(response.user.role || '');
                     setShowChangePassword(true);
                 } else {
-                    console.log('✅ Calling onLoginSuccess with user:', response.user);
                     onLoginSuccess(response.user, response.students || []);
                 }
             } else {
@@ -92,16 +95,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             Alert.alert('Error', 'Passwords do not match');
             return;
         }
-        if (newPassword.length < 4) {
-            Alert.alert('Error', 'Password must be at least 4 characters');
-            return;
-        }
 
         setChangeLoading(true);
         try {
-            // Detect if user is staff (will be set during login if requiresPasswordChange)
             const isStaff = tempUserRole && (tempUserRole === 'teacher' || tempUserRole === 'driver' || tempUserRole === 'staff');
-
             const result = isStaff
                 ? await api.changePasswordStaff(phone, newPassword, password)
                 : await api.changePassword(phone, newPassword);
@@ -110,9 +107,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 Alert.alert('Success', 'Password updated! Logging you in...');
                 setShowChangePassword(false);
                 const response = await api.login(phone, newPassword);
-                if (response.success) {
-                    onLoginSuccess(response.user, response.students || []);
-                }
+                if (response.success) onLoginSuccess(response.user, response.students || []);
             } else {
                 Alert.alert('Update Failed', result.message || 'Could not update password');
             }
@@ -125,172 +120,108 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
+            <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
 
-            {/* Background Header */}
+            {/* Background */}
             <LinearGradient
-                colors={[colors.primaryDark, colors.primary]}
-                style={styles.headerBackground}
-            >
-                <View style={styles.logoContainer}>
-                    <View style={styles.iconCircle}>
-                        <Feather name="book-open" size={40} color={colors.primary} />
-                    </View>
-                    <Text style={styles.appTitle}>EduLead Pro</Text>
-                    <Text style={styles.appSubtitle}>Parent Portal</Text>
+                colors={[colors.primaryDark, colors.primary, colors.background]}
+                locations={[0, 0.4, 1]}
+                style={styles.background}
+            />
+
+            {/* Header Content */}
+            <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
+                <View style={styles.logoCircle}>
+                    <Feather name="book-open" size={40} color={colors.accent} />
                 </View>
+                <Text style={styles.title}>EduLead Pro</Text>
+                <Text style={styles.subtitle}>Excellence in Management</Text>
+            </Animated.View>
 
-                {/* Decorative Circles */}
-                <View style={styles.circle1} />
-                <View style={styles.circle2} />
-            </LinearGradient>
-
-            {/* Main Content (Login Card) */}
+            {/* Login Form Card */}
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={styles.keyboardView}
             >
-                <View style={styles.cardContainer}>
-                    <View style={styles.welcomeContainer}>
-                        <Text style={styles.welcomeTitle}>Welcome Back!</Text>
-                        <Text style={styles.welcomeSub}>Sign in to view your child's progress</Text>
-                    </View>
+                <Animated.View style={{
+                    transform: [{ translateY: slideAnim }],
+                    opacity: fadeAnim,
+                    width: '100%',
+                    paddingHorizontal: spacing.lg
+                }}>
+                    <PremiumCard style={styles.card}>
 
-                    <View style={styles.form}>
-                        {/* Phone Input */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.inputLabel}>Mobile Number</Text>
-                            <View style={styles.inputWrapper}>
-                                <Feather name="smartphone" size={20} color={colors.textSecondary} style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="e.g. 9876543210"
-                                    placeholderTextColor="#9CA3AF"
-                                    keyboardType="phone-pad"
-                                    value={phone}
-                                    onChangeText={setPhone}
-                                />
-                            </View>
-                        </View>
+                        <Text style={styles.cardTitle}>Welcome Back</Text>
+                        <Text style={styles.cardSub}>Sign in to access your portal</Text>
 
-                        {/* Password Input */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.inputLabel}>Password</Text>
-                            <View style={styles.inputWrapper}>
-                                <Feather name="lock" size={20} color={colors.textSecondary} style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Enter password"
-                                    placeholderTextColor="#9CA3AF"
-                                    secureTextEntry
-                                    value={password}
-                                    onChangeText={setPassword}
-                                />
-                            </View>
-                            <Text style={styles.hint}>Default password: 1234</Text>
-                        </View>
+                        <View style={{ height: spacing.lg }} />
 
-                        {/* Login Button */}
-                        <TouchableOpacity
+                        <PremiumInput
+                            label="Mobile Number"
+                            placeholder="9876543210"
+                            icon="smartphone"
+                            value={phone}
+                            onChangeText={setPhone}
+                            keyboardType="phone-pad"
+                        />
+
+                        <PremiumInput
+                            label="Password"
+                            placeholder="Enter your password"
+                            icon="lock"
+                            secureTextEntry
+                            value={password}
+                            onChangeText={setPassword}
+                            hint="Default: 1234"
+                        />
+
+                        <View style={{ height: spacing.md }} />
+
+                        <PremiumButton
+                            title="Sign In"
                             onPress={handleLogin}
-                            disabled={loading}
-                            activeOpacity={0.8}
-                        >
-                            <LinearGradient
-                                colors={[colors.primary, colors.primaryDark]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.loginButton}
-                            >
-                                {loading ? (
-                                    <ActivityIndicator color="white" />
-                                ) : (
-                                    <Text style={styles.loginButtonText}>Sign In</Text>
-                                )}
-                                {!loading && <Feather name="arrow-right" size={20} color="white" style={{ marginLeft: 8 }} />}
-                            </LinearGradient>
-                        </TouchableOpacity>
+                            loading={loading}
+                            icon="log-in"
+                        />
 
-                        {/* Subtle Internal Access Info */}
-                        <View style={styles.staffLoginInfo}>
-                            <View style={styles.divider} />
-                            <Text style={styles.staffLoginText}>Internal Access</Text>
-                            <Text style={styles.staffLoginSub}>Authorized personnel can sign in here using their registered credentials for official duties.</Text>
+                        <View style={styles.divider}>
+                            <View style={styles.line} />
+                            <Text style={styles.orText}>Internal Access</Text>
+                            <View style={styles.line} />
                         </View>
 
-                        {/* Help Link */}
-                        <TouchableOpacity style={styles.helpButton}>
-                            <Text style={styles.helpText}>Need help signing in?</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                        <Text style={styles.footerText}>
+                            Teachers & Staff members use your registered credentials.
+                        </Text>
+                    </PremiumCard>
+                </Animated.View>
             </KeyboardAvoidingView>
 
-            {/* Change Password Modal */}
-            <Modal
-                visible={showChangePassword}
-                transparent={true}
-                animationType="fade"
-            >
+            {/* Change Password Modal (Simplified for brevity, reusing styles) */}
+            <Modal visible={showChangePassword} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
-                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                        <View style={styles.modalContent}>
-                            <View style={styles.modalHeader}>
-                                <View style={[styles.iconCircle, { width: 50, height: 50, marginBottom: 0 }]}>
-                                    <Feather name="shield" size={24} color={colors.primary} />
-                                </View>
-                                <Text style={styles.modalTitle}>Set New Password</Text>
-                            </View>
+                    <PremiumCard style={{ width: '90%' }}>
+                        <Text style={styles.cardTitle}>Set New Password</Text>
+                        <Text style={[styles.cardSub, { marginBottom: 20 }]}>Secure your account</Text>
 
-                            <Text style={styles.modalSubtitle}>
-                                For your security, please set a new password for your account.
-                            </Text>
+                        <PremiumInput
+                            label="New Password"
+                            icon="lock"
+                            secureTextEntry
+                            value={newPassword}
+                            onChangeText={setNewPassword}
+                        />
+                        <PremiumInput
+                            label="Confirm Password"
+                            icon="check-circle"
+                            secureTextEntry
+                            value={confirmPassword}
+                            onChangeText={setConfirmPassword}
+                        />
 
-                            <View style={styles.inputContainer}>
-                                <View style={styles.inputWrapper}>
-                                    <Feather name="lock" size={20} color={colors.textSecondary} style={styles.inputIcon} />
-                                    <TextInput
-                                        style={styles.input}
-                                        placeholder="New Password"
-                                        placeholderTextColor="#9CA3AF"
-                                        secureTextEntry
-                                        value={newPassword}
-                                        onChangeText={setNewPassword}
-                                    />
-                                </View>
-                            </View>
-
-                            <View style={[styles.inputContainer, { marginBottom: 24 }]}>
-                                <View style={styles.inputWrapper}>
-                                    <Feather name="check-circle" size={20} color={colors.textSecondary} style={styles.inputIcon} />
-                                    <TextInput
-                                        style={styles.input}
-                                        placeholder="Confirm New Password"
-                                        placeholderTextColor="#9CA3AF"
-                                        secureTextEntry
-                                        value={confirmPassword}
-                                        onChangeText={setConfirmPassword}
-                                    />
-                                </View>
-                            </View>
-
-                            <TouchableOpacity
-                                onPress={handleChangePassword}
-                                disabled={changeLoading}
-                            >
-                                <LinearGradient
-                                    colors={[colors.primary, colors.primaryDark]}
-                                    style={styles.loginButton}
-                                >
-                                    {changeLoading ? (
-                                        <ActivityIndicator color="white" />
-                                    ) : (
-                                        <Text style={styles.loginButtonText}>Update Password</Text>
-                                    )}
-                                </LinearGradient>
-                            </TouchableOpacity>
-                        </View>
-                    </KeyboardAvoidingView>
+                        <View style={{ height: 20 }} />
+                        <PremiumButton title="Update Password" onPress={handleChangePassword} loading={changeLoading} />
+                    </PremiumCard>
                 </View>
             </Modal>
         </View>
@@ -302,211 +233,82 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.background,
     },
-    headerBackground: {
-        height: height * 0.45,
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-        paddingTop: 60,
-        alignItems: 'center',
-        position: 'relative',
-        overflow: 'hidden',
+    background: {
+        position: 'absolute',
+        left: 0, right: 0, top: 0,
+        height: height * 0.6, // Gradient covers top 60%
     },
-    logoContainer: {
+    header: {
+        marginTop: height * 0.12,
         alignItems: 'center',
-        zIndex: 10,
+        marginBottom: spacing.xl,
     },
-    iconCircle: {
+    logoCircle: {
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: 'white',
+        backgroundColor: 'rgba(255,255,255,0.1)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 16,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 5,
+        marginBottom: spacing.md,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)'
     },
-    appTitle: {
-        fontSize: 28,
-        fontWeight: '800',
-        color: 'white',
-        letterSpacing: 0.5,
+    title: {
+        ...typography.h1,
+        color: colors.textInverted,
+        fontSize: 32,
     },
-    appSubtitle: {
-        fontSize: 16,
-        color: 'rgba(255,255,255,0.8)',
-        marginTop: 4,
-        fontWeight: '500',
+    subtitle: {
+        ...typography.subtitle,
+        color: 'rgba(255,255,255,0.7)',
+        marginTop: spacing.xs,
     },
-    // Decorative
-    circle1: {
-        position: 'absolute',
-        top: -50,
-        left: -50,
-        width: 200,
-        height: 200,
-        borderRadius: 100,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-    },
-    circle2: {
-        position: 'absolute',
-        top: 50,
-        right: -20,
-        width: 150,
-        height: 150,
-        borderRadius: 75,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-    },
-
     keyboardView: {
         flex: 1,
-        marginTop: -80, // Overlap the header
+        justifyContent: 'flex-start',
     },
-    cardContainer: {
-        marginHorizontal: 20,
-        backgroundColor: 'white',
-        borderRadius: 24,
-        padding: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 10,
+    card: {
+        paddingVertical: spacing.xl,
+        paddingHorizontal: spacing.lg,
     },
-    welcomeContainer: {
-        marginBottom: 24,
+    cardTitle: {
+        ...typography.h2,
+        color: colors.primary,
+        textAlign: 'center',
     },
-    welcomeTitle: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: colors.textPrimary,
-    },
-    welcomeSub: {
-        fontSize: 14,
+    cardSub: {
+        ...typography.body,
         color: colors.textSecondary,
-        marginTop: 4,
+        textAlign: 'center',
+        marginTop: spacing.xs,
     },
-    form: {
-        gap: 16,
-    },
-    inputContainer: {
-        gap: 8,
-    },
-    inputLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: colors.textPrimary,
-        marginLeft: 4,
-    },
-    inputWrapper: {
+    divider: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.inputBg,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        height: 50,
+        marginVertical: spacing.lg,
     },
-    inputIcon: {
-        marginRight: 10,
-    },
-    input: {
+    line: {
         flex: 1,
-        fontSize: 16,
-        color: colors.textPrimary,
-        height: '100%',
+        height: 1,
+        backgroundColor: colors.border,
     },
-    hint: {
-        fontSize: 12,
+    orText: {
+        ...typography.caption,
+        marginHorizontal: spacing.md,
         color: colors.textSecondary,
-        marginLeft: 4,
-        marginTop: 4,
+        textTransform: 'uppercase',
     },
-    loginButton: {
-        flexDirection: 'row',
-        height: 54,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 8,
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+    footerText: {
+        ...typography.caption,
+        textAlign: 'center',
+        color: colors.textTertiary,
+        marginHorizontal: spacing.sm,
     },
-    loginButtonText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    helpButton: {
-        alignItems: 'center',
-        marginTop: 16,
-    },
-    helpText: {
-        color: colors.textSecondary,
-        fontSize: 14,
-    },
-
-    // Modal
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.6)',
         justifyContent: 'center',
-        padding: 20,
-    },
-    modalContent: {
-        backgroundColor: 'white',
-        borderRadius: 24,
-        padding: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.2,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    modalHeader: {
         alignItems: 'center',
-        marginBottom: 16,
-    },
-    modalTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: colors.textPrimary,
-        marginTop: 12,
-    },
-    modalSubtitle: {
-        textAlign: 'center',
-        color: colors.textSecondary,
-        marginBottom: 24,
-        lineHeight: 20,
-    },
-    staffLoginInfo: {
-        marginTop: 12,
-        alignItems: 'center',
-    },
-    divider: {
-        width: '100%',
-        height: 1,
-        backgroundColor: '#F3F4F6',
-        marginBottom: 16,
-    },
-    staffLoginText: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: colors.primary,
-        marginBottom: 4,
-    },
-    staffLoginSub: {
-        fontSize: 12,
-        color: colors.textSecondary,
-        textAlign: 'center',
-        paddingHorizontal: 20,
-        lineHeight: 18,
-    },
+    }
 });

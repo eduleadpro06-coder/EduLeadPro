@@ -3,18 +3,10 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from './services/api';
+import { colors, spacing, typography } from './src/theme';
 
 const { width } = Dimensions.get('window');
 
-const colors = {
-    primary: '#2D7A5F',
-    white: '#FFFFFF',
-    textPrimary: '#111827',
-    textSecondary: '#6B7280',
-    success: '#10B981',
-    background: '#F0FDF4',
-    border: '#E5E7EB',
-};
 
 interface BusScreenProps {
     currentChild: any;
@@ -43,6 +35,16 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
         }
     };
 
+    if (!currentChild) {
+        return (
+            <View style={[styles.container, styles.emptyContainer]}>
+                <Feather name="user-x" size={64} color={colors.textSecondary} />
+                <Text style={styles.emptyTitle}>No Student Selected</Text>
+                <Text style={styles.emptyText}>Please select a student to view their bus status.</Text>
+            </View>
+        );
+    }
+
     if (isLoading) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -53,13 +55,27 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
 
     if (!busData || !busData.isLive) {
         return (
-            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
                 <View style={styles.emptyContainer}>
-                    <Feather name="navigation-2" size={64} color={colors.textSecondary} />
-                    <Text style={styles.emptyTitle}>Bus Tracking Unavailable</Text>
+                    <View style={[styles.iconCircle, { backgroundColor: colors.background }]}>
+                        <Feather name="map-pin" size={40} color={colors.textSecondary} />
+                    </View>
+                    <Text style={styles.emptyTitle}>Bus Tracking Inactive</Text>
                     <Text style={styles.emptyText}>
-                        {busData?.message || 'Live tracking is not available at this moment'}
+                        {busData?.message || 'The bus trip has not started yet or live tracking is unavailable for this route.'}
                     </Text>
+
+                    {/* Fallback Static Info if available */}
+                    {busData?.route && (
+                        <View style={[styles.card, { marginTop: 24, width: '100%' }]}>
+                            <View style={styles.busHeader}>
+                                <Text style={styles.busNumber}>{busData.route}</Text>
+                                <View style={styles.currentTagContainer}>
+                                    <Text style={styles.currentTagText}>Current Stop</Text>
+                                </View>
+                            </View>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
         );
@@ -150,7 +166,7 @@ const styles = StyleSheet.create({
         padding: 8,
         borderRadius: 8,
     },
-    currentTag: {
+    currentTagContainer: {
         backgroundColor: colors.success,
         paddingHorizontal: 8,
         paddingVertical: 2,
@@ -179,8 +195,8 @@ const styles = StyleSheet.create({
     liveText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
     busPin: { position: 'absolute', top: '50%', left: '50%', width: 40, height: 40, marginLeft: -20, marginTop: -20, backgroundColor: colors.primary, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'white', shadowColor: '#000', shadowOpacity: 0.3, elevation: 5 },
 
-    contentContainer: { marginTop: -20, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.background, flex: 1, padding: 20 },
-    card: { backgroundColor: 'white', borderRadius: 16, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2, marginBottom: 24 },
+    contentContainer: { marginTop: -spacing.lg, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.background, flex: 1, padding: spacing.lg },
+    card: { backgroundColor: 'white', borderRadius: 16, padding: spacing.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2, marginBottom: spacing.lg },
     busHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
     busNumber: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
     routeText: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
@@ -196,21 +212,27 @@ const styles = StyleSheet.create({
     rating: { fontSize: 12, color: colors.textSecondary },
     callButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center' },
 
-    section: { marginBottom: 24 },
+    section: { marginBottom: spacing.lg },
     sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 12 },
-    timelineCard: { backgroundColor: 'white', borderRadius: 16, padding: 20 },
+    timelineCard: { backgroundColor: 'white', borderRadius: 16, padding: spacing.lg },
     timelineItem: { flexDirection: 'row', height: 60 },
     timelineLeft: { width: 70, alignItems: 'flex-end', paddingRight: 12 },
     time: { fontSize: 12, color: colors.textSecondary, fontWeight: '500', paddingTop: 4 },
     timelineCenter: { alignItems: 'center', width: 24 },
     dot: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', zIndex: 2, borderWidth: 2, borderColor: 'white' },
     dotCompleted: { backgroundColor: colors.primary },
-    dotCurrent: { backgroundColor: colors.white, borderColor: colors.primary, borderWidth: 4 },
+    dotCurrent: { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 4 },
     innerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'white' },
     line: { width: 2, flex: 1, backgroundColor: '#E5E7EB', position: 'absolute', top: 16, bottom: -16 },
     lineCompleted: { backgroundColor: colors.primary },
     timelineRight: { flex: 1, paddingLeft: 12, paddingTop: 2 },
     stopName: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
     stopNameCurrent: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
-    currentTag: { fontSize: 11, color: colors.primary, marginTop: 2, fontWeight: '500' },
+    currentTagText: { fontSize: 11, color: colors.primary, marginTop: 2, fontWeight: '500' },
+    iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    liveTag: { position: 'absolute', top: 16, right: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, zIndex: 10 },
+    etaHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+    etaTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginLeft: 8 },
+    etaTime: { fontSize: 32, fontWeight: '800', color: colors.primary },
+    etaSubtext: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
 });

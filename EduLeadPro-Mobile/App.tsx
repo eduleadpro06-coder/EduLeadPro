@@ -11,42 +11,33 @@ import {
   Platform,
   ActivityIndicator,
   RefreshControl,
-  StatusBar as RNStatusBar // Renamed to avoid conflict with expo-status-bar
+  StatusBar as RNStatusBar
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
+import { StatusBar } from 'expo-status-bar';
+
+// Services & Screens
 import { api, type Child, type DailyUpdate, type Attendance, type Announcement } from './services/api';
+import { offlineCache } from './src/services/offline-cache';
+import { useOffline } from './src/hooks/useOffline';
+import OfflineBanner from './src/components/OfflineBanner';
+
 import LoginScreen from './LoginScreen';
 import BusScreen from './BusScreen';
 import ActivitiesScreen from './ActivitiesScreen';
 import MessagesScreen from './MessagesScreen';
 import TeacherHomeScreen from './TeacherHomeScreen';
 import DriverHomeScreen from './DriverHomeScreen';
-import { offlineCache } from './src/services/offline-cache'; // New import
-import { useOffline } from './src/hooks/useOffline'; // New import
-import OfflineBanner from './src/components/OfflineBanner'; // New import
-import { StatusBar } from 'expo-status-bar'; // New import, potentially replacing RNStatusBar for consistency
+import ParentFeesScreen from './ParentFeesScreen';
 
-const { width } = Dimensions.get('window');
+// Premium Design System
+import { colors, spacing, typography, shadows, layout } from './src/theme';
+import PremiumCard from './src/components/ui/PremiumCard';
+import PremiumDrawer from './src/components/ui/PremiumDrawer';
 
-// Premium Color Palette
-const colors = {
-  primary: '#2D7A5F',
-  primaryDark: '#1F5A45',
-  primaryLight: '#4ADE80',
-  white: '#FFFFFF',
-  background: '#F0FDF4', // Light mint bg
-  textPrimary: '#111827',
-  textSecondary: '#6B7280',
-  textLight: '#9CA3AF',
-  border: '#E5E7EB',
-  success: '#10B981',
-  warning: '#F59E0B',
-  danger: '#EF4444',
-  cardBg: '#FFFFFF',
-  iconBg: '#F3F4F6',
-};
+const { width } = layout;
 
 // Mock data (fallback)
 const mockData = {
@@ -58,12 +49,6 @@ const mockData = {
       batch: 'Morning',
       status: 'Active',
       checkInTime: '09:00 AM',
-    },
-    todayActivity: {
-      title: 'Art & Craft Session',
-      description: 'Creating beautiful paintings using watercolors. Creativity and focus.',
-      teacher: 'Ms. Priya Patel',
-      time: '2 hours ago',
     },
     busStatus: {
       isLive: true,
@@ -83,57 +68,49 @@ function App() {
 
   const [user, setUser] = useState<any>(null);
   const [children, setChildren] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'home' | 'bus' | 'activities' | 'messages' | 'emergency'>('home');
+  type TabType = 'home' | 'bus' | 'activities' | 'messages' | 'fees';
+  const [activeTab, setActiveTab] = useState<TabType>('home');
+  const [drawerVisible, setDrawerVisible] = useState(false); // Drawer State
   const [showEmergency, setShowEmergency] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+
+  // Data State
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [todayAttendance, setTodayAttendance] = useState<Attendance | null>(null);
   const [latestActivity, setLatestActivity] = useState<DailyUpdate | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  /* State */
+  const [feeBalance, setFeeBalance] = useState<number | null>(null);
+  const [nextPayment, setNextPayment] = useState<{ amount: number; label: string; date?: string; status: 'paid' | 'due' | 'outstanding' } | null>(null);
 
-  // Offline functionality
+
   const { isOnline, lastSyncTime, syncNow, isSyncing } = useOffline();
 
-  // Initialize offline cache on app startup
+  // Initialization
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        await offlineCache.init();
-        console.log('[App] Offline cache initialized');
-      } catch (error) {
-        console.error('[App] Failed to initialize cache:', error);
-      }
-    };
-    initializeApp();
-  }, []);
-
-  // Load session on mount
-  useEffect(() => {
-    const loadSession = async () => {
+    const init = async () => {
+      try { await offlineCache.init(); } catch (e) { console.error(e); }
       try {
         const sessionData = await AsyncStorage.getItem('user_session');
         if (sessionData) {
           const { user: savedUser, students } = JSON.parse(sessionData);
           setUser(savedUser);
           setChildren(students);
-          // Only fetch parent data for parents, not for teachers/drivers
           if (savedUser.role === 'parent' && students.length > 0) {
             fetchLiveData(students[0].id, savedUser.organization_id);
           }
         }
-      } catch (e) {
-        console.error('Failed to load session', e);
-      } finally {
-        setIsLoadingSession(false);
-      }
+      } catch (e) { console.error(e); } finally { setIsLoadingSession(false); }
     };
-    loadSession();
+    init();
   }, []);
 
   const fetchLiveData = async (childId: number, organizationId: number) => {
-    if (!childId || !organizationId) return;
+    if (!childId || !organizationId) {
+      console.warn('fetchLiveData called with invalid IDs:', { childId, organizationId });
+      return;
+    }
     try {
-      // Cache-first approach: Load from cache immediately if offline
       if (!isOnline) {
         const [cachedAnn, cachedAtt, cachedAct] = await Promise.all([
           offlineCache.getCachedAnnouncements(),
@@ -146,677 +123,356 @@ function App() {
         return;
       }
 
-      // If online, fetch fresh data
-      const [annRes, attRes, updRes] = await Promise.all([
+      const [annRes, attRes, updRes, feeRes] = await Promise.all([
         api.getAnnouncements(organizationId),
         api.getTodayAttendance(childId),
-        api.getDailyUpdates(childId)
+        api.getDailyUpdates(childId),
+        api.getStudentFees(childId)
       ]);
-
       setAnnouncements(annRes);
       setTodayAttendance(attRes);
-      if (updRes.length > 0) {
-        setLatestActivity(updRes[0]);
+      if (updRes.length > 0) setLatestActivity(updRes[0]);
+
+      if (feeRes) {
+        setFeeBalance(feeRes.balance);
+
+        // Smart Payment Logic
+        if (feeRes.balance <= 0) {
+          setNextPayment({ amount: 0, label: 'All Paid', status: 'paid' });
+        } else if (feeRes.emiDetails?.installments) {
+          const upcoming = feeRes.emiDetails.installments.find((i: any) => i.status === 'pending');
+          if (upcoming) {
+            const d = new Date(upcoming.dueDate);
+            const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            setNextPayment({ amount: upcoming.amount, label: `Due ${dateStr}`, date: upcoming.dueDate, status: 'due' });
+          } else {
+            setNextPayment({ amount: feeRes.balance, label: 'Outstanding', status: 'outstanding' });
+          }
+        } else {
+          setNextPayment({ amount: feeRes.balance, label: 'Outstanding', status: 'outstanding' });
+        }
       }
 
-      // Update cache
       await offlineCache.cacheAnnouncements(annRes);
       await offlineCache.cacheAttendance(childId, attRes ? [attRes] : []);
       await offlineCache.cacheActivities(childId, updRes);
-    } catch (e) {
-      console.error('Failed to fetch live data', e);
-    }
+    } catch (e) { console.error('Error fetching live data:', e); }
   };
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    if (user && children.length > 0) {
+    if (user && children.length > 0 && children[0].id) {
       await fetchLiveData(children[0].id, user.organization_id);
+    } else {
+      console.warn('Cannot refresh: Missing user or student data');
     }
     setIsRefreshing(false);
   };
 
-  // Use the first child from login response
-  const realChild = children.length > 0 ? children[0] : null;
-
-  const displayedChild = realChild ? {
-    name: realChild.name,
-    photo: 'user', // Default icon
-    class: realChild.class || 'N/A',
-    batch: 'Standard',
-    status: realChild.status || 'Active',
-    checkInTime: todayAttendance?.checkInTime || 'Not checked in'
-  } : mockData.parent.child;
-
-  if (!fontsLoaded || isLoadingSession) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
   const handleLoginSuccess = async (loggedInUser: any, students: any[]) => {
     setUser(loggedInUser);
     setChildren(students);
-    // Only fetch parent data for parents, not for teachers/drivers
     if (loggedInUser.role === 'parent' && students.length > 0) {
       fetchLiveData(students[0].id, loggedInUser.organization_id);
     }
-    try {
-      await AsyncStorage.setItem('user_session', JSON.stringify({ user: loggedInUser, students }));
-    } catch (e) {
-      console.error('Failed to save session', e);
-    }
+    await AsyncStorage.setItem('user_session', JSON.stringify({ user: loggedInUser, students }));
   };
 
   const handleLogout = async () => {
     setUser(null);
     setChildren([]);
     setActiveTab('home');
-    try {
-      // Clear JWT tokens
-      await api.clearTokens();
-      // Clear session
-      await AsyncStorage.removeItem('user_session');
-      // Clear offline cache
-      await offlineCache.clearAllCache();
-    } catch (e) {
-      console.error('Failed to clear session', e);
-    }
+    setDrawerVisible(false);
+    await api.clearTokens();
+    await AsyncStorage.removeItem('user_session');
+    await offlineCache.clearAllCache();
   };
 
-  // Handle role-based routing
-  if (!user) {
+  // Rendering Helpers
+  const displayedChild = children.length > 0 ? {
+    id: children[0].id,
+    name: children[0].name,
+    class: children[0].class || 'N/A',
+    batch: 'Standard',
+    status: children[0].status || 'Active',
+    checkInTime: todayAttendance?.checkInTime || 'Not checked in'
+  } : mockData.parent.child;
+
+  if (!fontsLoaded || isLoadingSession) {
     return (
-      <LoginScreen onLoginSuccess={handleLoginSuccess} />
-    );
-  }
-
-  // DEBUG: Log user and role to verify routing
-  console.log('🔍 ROUTING CHECK - User:', JSON.stringify(user, null, 2));
-  console.log('🔍 User Role:', user.role);
-  console.log('🔍 Is Teacher?', user.role === 'teacher');
-  console.log('🔍 Is Driver?', user.role === 'driver');
-
-  // Route Teachers to Teacher Dashboard
-  if (user.role === 'teacher') {
-    console.log('✅ Routing to TeacherHomeScreen');
-    return <TeacherHomeScreen user={user} onLogout={handleLogout} />;
-  }
-
-  // Route Drivers to Driver Dashboard
-  if (user.role === 'driver') {
-    console.log('✅ Routing to DriverHomeScreen');
-    return <DriverHomeScreen user={user} onLogout={handleLogout} />;
-  }
-
-  console.log('⚠️ Defaulting to Parent UI');
-  // Parent UI continues below (existing code)
-
-  // Emergency Screen
-  if (showEmergency) {
-    return (
-      <View style={styles.container}>
-        <StatusBar style="light" />
-
-        {/* Offline Banner */}
-        <OfflineBanner
-          isOnline={isOnline}
-          lastSyncTime={lastSyncTime}
-          isSyncing={isSyncing}
-          onSyncPress={syncNow}
-        />
-
-        <LinearGradient
-          colors={[colors.danger, '#991B1B']}
-          style={styles.header}
-        >
-          <View style={styles.headerRow}>
-            <TouchableOpacity onPress={() => setShowEmergency(false)} style={styles.backButton}>
-              <Feather name="arrow-left" size={24} color="white" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Emergency & Alerts</Text>
-            <View style={{ width: 40 }} />
-          </View>
-        </LinearGradient>
-
-        <ScrollView style={styles.scrollContent} contentContainerStyle={{ paddingBottom: 40 }}>
-          {/* Emergency Status */}
-          <View style={styles.section}>
-            <View style={styles.emergencyStatusCard}>
-              <View style={styles.emergencyIconLarge}>
-                <Feather name="alert-circle" size={32} color={colors.danger} />
-                <View style={[styles.pulseDot, { backgroundColor: colors.danger }]} />
-              </View>
-              <View style={styles.emergencyStatusContent}>
-                <Text style={styles.cardLabel}>Current Status</Text>
-                <Text style={[styles.cardTitle, { color: colors.danger, fontSize: 22 }]}>Wait for Updates</Text>
-                <Text style={styles.cardTime}>Last updated: Just now</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Emergency Contacts */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Emergency Contacts</Text>
-            <View style={styles.grid}>
-              {[
-                { title: 'School Office', sub: 'Reception', icon: 'phone', color: colors.success, bg: '#D1FAE5' },
-                { title: 'Emergency', sub: '911 / Police', icon: 'shield', color: colors.danger, bg: '#FEE2E2' },
-                { title: 'Principal', sub: 'Dr. Rajesh', icon: 'user', color: colors.warning, bg: '#FEF3C7' },
-                { title: 'Teacher', sub: 'Ms. Priya', icon: 'book', color: '#3B82F6', bg: '#DBEAFE' }
-              ].map((item, index) => (
-                <TouchableOpacity key={index} style={[styles.gridCard, { backgroundColor: item.bg }]}>
-                  <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
-                    <Feather name={item.icon as any} size={24} color="white" />
-                  </View>
-                  <Text style={styles.gridTitle}>{item.title}</Text>
-                  <Text style={styles.gridSub}>{item.sub}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Alert Feed */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recent Alerts</Text>
-            <View style={styles.alertCard}>
-              <View style={styles.alertHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Feather name="bell" size={18} color={colors.danger} />
-                  <Text style={[styles.cardTitle, { fontSize: 16 }]}>Pickup Alert</Text>
-                </View>
-                <Text style={styles.cardTime}>Yesterday</Text>
-              </View>
-              <Text style={styles.cardDesc}>
-                Please ensure to pick up your child by 2:00 PM due to early dispersal.
-              </Text>
-            </View>
-          </View>
-        </ScrollView>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
-  // Main Dashboard
+  if (!user) return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+  if (user.role === 'teacher') return <TeacherHomeScreen user={user} onLogout={handleLogout} />;
+  if (user.role === 'driver') return <DriverHomeScreen user={user} onLogout={handleLogout} />;
+
+  // -------------------------------- PARENT UI --------------------------------
+
   return (
-    <View style={styles.rootContainer}>
-      <View style={styles.appFrame}>
-        <StatusBar style="light" />
+    <View style={styles.container}>
+      <StatusBar style="dark" />
 
-        {/* Modern Minimalist Header Bar (Global) */}
-        <View style={styles.topToolbar}>
-          <View style={{ width: 44 }}>
-            <Feather name="menu" size={22} color={colors.textPrimary} />
-          </View>
-          <View style={styles.toolbarCenter}>
-            {user.organizationName ? (
-              <Text style={styles.toolbarOrgName}>{user.organizationName}</Text>
-            ) : (
-              <Text style={styles.toolbarOrgName}>EduLead Pro</Text>
-            )}
-          </View>
-          <View style={styles.toolbarActions}>
-            <TouchableOpacity style={styles.toolbarIconBtn} onPress={handleLogout}>
-              <Feather name="log-out" size={20} color={colors.textPrimary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.toolbarIconBtn}>
-              <Feather name="bell" size={22} color={colors.textPrimary} />
-              <View style={styles.toolbarBadge} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Content Area */}
-        <View style={styles.scrollContent}>
-          {activeTab === 'home' && (
-            <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-
-              {/* Main Greeting Section */}
-              <View style={styles.greetingHeader}>
-                <View>
-                  <Text style={styles.welcomeSub}>Welcome back,</Text>
-                  <Text style={styles.welcomeTitle}>{user.name || 'Parent'} 👋</Text>
-                </View>
-              </View>
-
-              {/* Child Profile Card */}
-              <View style={styles.profileSection}>
-                <View style={styles.profileCard}>
-                  <View style={styles.profileRow}>
-                    <View style={styles.avatarContainer}>
-                      <Feather name="user" size={32} color={colors.primary} />
-                    </View>
-                    <View style={styles.profileInfo}>
-                      <Text style={styles.studentName}>{displayedChild.name}</Text>
-                      <Text style={styles.studentDetails}>{displayedChild.class} • {displayedChild.batch}</Text>
-                      <View style={styles.statusPill}>
-                        <View style={styles.statusDot} />
-                        <Text style={styles.statusText}>{displayedChild.status}</Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* Quick Stats Grid */}
-              <View style={styles.section}>
-                <View style={styles.statsRow}>
-                  <View style={styles.statCard}>
-                    <View style={[styles.iconBox, { backgroundColor: '#ECFDF5' }]}>
-                      <Feather name="check" size={20} color={colors.primary} />
-                    </View>
-                    <View>
-                      <Text style={styles.statLabel}>Attendance</Text>
-                      <Text style={styles.statValue}>Present</Text>
-                    </View>
-                  </View>
-                  <View style={styles.statCard}>
-                    <View style={[styles.iconBox, { backgroundColor: '#FEF3C7' }]}>
-                      <Feather name="clock" size={20} color={colors.warning} />
-                    </View>
-                    <View>
-                      <Text style={styles.statLabel}>Check-in</Text>
-                      <Text style={styles.statValue}>{displayedChild.checkInTime}</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* School Announcements */}
-              {announcements.length > 0 && (
-                <View style={[styles.section, { marginBottom: 20 }]}>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Announcements</Text>
-                  </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-                    {announcements.map((ann) => (
-                      <View key={ann.id} style={[styles.announcementCard, { width: width * 0.7 }]}>
-                        <LinearGradient
-                          colors={['#4F46E5', '#7C3AED']}
-                          style={styles.announcementGradient}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                        >
-                          <Feather name="bell" size={20} color="#FFF" style={{ marginBottom: 8 }} />
-                          <Text style={styles.announcementTitle} numberOfLines={1}>{ann.title}</Text>
-                          <Text style={styles.announcementDesc} numberOfLines={2}>{ann.content}</Text>
-                        </LinearGradient>
-                      </View>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-
-              {/* Latest Activity */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Latest Activity</Text>
-                  <TouchableOpacity onPress={() => setActiveTab('activities')}>
-                    <Text style={styles.seeAll}>See All</Text>
-                  </TouchableOpacity>
-                </View>
-                {latestActivity ? (
-                  <View style={styles.activityCard}>
-                    {latestActivity.mediaUrls && latestActivity.mediaUrls.length > 0 ? (
-                      <Image
-                        source={{ uri: latestActivity.mediaUrls[0] }}
-                        style={styles.activityImage}
-                      />
-                    ) : (
-                      <View style={[styles.activityImage, { backgroundColor: colors.primaryLight + '30', justifyContent: 'center', alignItems: 'center' }]}>
-                        <Feather name="activity" size={48} color={colors.primary} />
-                      </View>
-                    )}
-                    <View style={styles.activityOverlay}>
-                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.gradientOverlay} />
-                      <View style={styles.activityTextContent}>
-                        <Text style={styles.activityTitle}>{latestActivity.title || latestActivity.activityType.toUpperCase()}</Text>
-                        <Text style={styles.activityDesc} numberOfLines={2}>
-                          {latestActivity.content}
-                        </Text>
-                        <View style={styles.teacherRow}>
-                          <Feather name="user" size={14} color="rgba(255,255,255,0.8)" />
-                          <Text style={styles.teacherText}>{latestActivity.teacherName || 'Class Teacher'}</Text>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={[styles.activityCard, { padding: 40, alignItems: 'center' }]}>
-                    <Feather name="calendar" size={40} color={colors.textLight} />
-                    <Text style={{ color: colors.textSecondary, marginTop: 12 }}>No activity updates for today yet.</Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Bus Tracking */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Bus Tracking</Text>
-                  <View style={styles.liveTag}>
-                    <View style={styles.liveDot} />
-                    <Text style={styles.liveText}>LIVE</Text>
-                  </View>
-                </View>
-                <View style={styles.busCard}>
-                  <View style={styles.mapPlaceholder}>
-                    <Feather name="map" size={40} color={colors.primaryLight} />
-                    <Text style={styles.mapText}>Map Preview</Text>
-                  </View>
-                  <View style={styles.busFooter}>
-                    <View>
-                      <Text style={styles.busLabel}>Location</Text>
-                      <Text style={styles.busValue}>{mockData.parent.busStatus.location}</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={styles.busLabel}>ETA</Text>
-                      <Text style={[styles.busValue, { color: colors.primary }]}>{mockData.parent.busStatus.eta}</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* Quick Actions */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Quick Actions</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-                  {[
-                    { name: 'Pay Fees', icon: 'credit-card', color: colors.primary },
-                    { name: 'Timetable', icon: 'calendar', color: '#8B5CF6' },
-                    { name: 'Gallery', icon: 'image', color: '#EC4899' },
-                    { name: 'Report', icon: 'file-text', color: '#F59E0B' },
-                  ].map((action, i) => (
-                    <TouchableOpacity key={i} style={styles.actionPill}>
-                      <View style={[styles.actionIcon, { backgroundColor: action.color + '15' }]}>
-                        <Feather name={action.icon as any} size={20} color={action.color} />
-                      </View>
-                      <Text style={styles.actionText}>{action.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </ScrollView>
-          )}
-
-          {activeTab === 'bus' && <BusScreen currentChild={displayedChild} />}
-          {activeTab === 'activities' && <ActivitiesScreen currentUser={user} currentChild={displayedChild} />}
-          {activeTab === 'messages' && <MessagesScreen />}
-        </View>
-
-        {/* Floating Emergency Button */}
-        <TouchableOpacity
-          style={styles.emergencyFloat}
-          onPress={() => setShowEmergency(true)}
-          activeOpacity={0.8}
-        >
-          <LinearGradient
-            colors={[colors.danger, '#991B1B']}
-            style={styles.emergencyGradient}
-          >
-            <Feather name="alert-triangle" size={24} color="white" />
-          </LinearGradient>
+      {/* --- Header --- */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.menuBtn} onPress={() => setDrawerVisible(true)}>
+          <Feather name="menu" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
 
-        {/* Bottom Navigation */}
-        <View style={styles.bottomNavContainer}>
-          <View style={styles.bottomNav}>
-            {[
-              { id: 'home', label: 'Home', icon: 'home' },
-              { id: 'bus', label: 'Bus', icon: 'map-pin' },
-              { id: 'activities', label: 'Activities', icon: 'grid' },
-              { id: 'messages', label: 'Chat', icon: 'message-square' },
-            ].map((tab) => (
-              <TouchableOpacity
-                key={tab.id}
-                style={styles.navItem}
-                onPress={() => setActiveTab(tab.id as any)}
-              >
-                <Feather
-                  name={tab.icon as any}
-                  size={24}
-                  color={activeTab === tab.id ? colors.primary : colors.textSecondary}
-                />
-                <Text style={[
-                  styles.navLabel,
-                  activeTab === tab.id && { color: colors.primary, fontWeight: '600' }
-                ]}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={styles.headerOrg}>{user.organizationName || 'EduLead Pro'}</Text>
+          <Text style={styles.headerTitle}>
+            {activeTab === 'home' ? 'Overview' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+          </Text>
         </View>
+
+        <TouchableOpacity style={styles.profileBtn} onPress={() => setActiveTab('messages')}>
+          <Feather name="bell" size={20} color={colors.textSecondary} />
+          <View style={styles.notifDot} />
+        </TouchableOpacity>
       </View>
+
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+      >
+        <OfflineBanner isOnline={isOnline} lastSyncTime={lastSyncTime} isSyncing={isSyncing} onSyncPress={syncNow} />
+
+        {activeTab === 'home' && (
+          <>
+            {/* --- Child Hero Card --- */}
+            <View style={styles.heroSection}>
+              <LinearGradient
+                colors={[colors.primary, colors.primaryDark]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.heroCard}
+              >
+                <View style={styles.heroRow}>
+                  <View style={styles.heroAvatar}>
+                    <Feather name="user" size={32} color={colors.accent} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.heroName}>{displayedChild.name}</Text>
+                    <Text style={styles.heroDetail}>{displayedChild.class}</Text>
+                  </View>
+                  <View style={styles.statusBadge}>
+                    <View style={styles.statusDot} />
+                    <Text style={styles.statusText}>{displayedChild.status}</Text>
+                  </View>
+                </View>
+
+                {/* Live Stats inside Card */}
+                <View style={styles.heroStats}>
+                  <View style={styles.heroStatItem}>
+                    <Feather name="user-check" size={16} color={colors.accent} />
+                    <Text style={styles.heroStatValue}>{todayAttendance ? (todayAttendance.status.charAt(0).toUpperCase() + todayAttendance.status.slice(1)) : 'Pending'}</Text>
+                    <Text style={styles.heroStatLabel}>Attendance</Text>
+                  </View>
+                  <View style={styles.heroDivider} />
+                  {children.length > 0 && (children[0].pickup_location || children[0].drop_location) ? (
+                    <View style={styles.heroStatItem}>
+                      <Feather name="navigation" size={16} color={colors.accent} />
+                      <Text style={styles.heroStatValue}>Assigned</Text>
+                      <Text style={styles.heroStatLabel}>Transport</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.heroStatItem}>
+                      {nextPayment?.status === 'paid' ? (
+                        <>
+                          <Feather name="check-circle" size={16} color={colors.success} />
+                          <Text style={[styles.heroStatValue, { color: colors.success }]}>Paid</Text>
+                          <Text style={styles.heroStatLabel}>Fees Cleared</Text>
+                        </>
+                      ) : nextPayment?.status === 'due' ? (
+                        <>
+                          <Feather name="calendar" size={16} color={colors.accent} />
+                          <Text style={styles.heroStatValue}>₹{nextPayment.amount.toLocaleString('en-IN')}</Text>
+                          <Text style={styles.heroStatLabel}>{nextPayment.label}</Text>
+                        </>
+                      ) : (
+                        <>
+                          <Feather name="credit-card" size={16} color={colors.accent} />
+                          <Text style={styles.heroStatValue}>{feeBalance !== null ? `₹${feeBalance.toLocaleString('en-IN')}` : '--'}</Text>
+                          <Text style={styles.heroStatLabel}>Fees Due</Text>
+                        </>
+                      )}
+                    </View>
+                  )}
+                </View>
+              </LinearGradient>
+            </View>
+
+            {/* --- Quick Actions (Pills) --- */}
+            <View style={{ paddingVertical: spacing.md }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[styles.quickActionsContainer, { paddingHorizontal: 0 }]}
+              >
+                {[
+                  { label: 'Bus', icon: 'map', tab: 'bus', color: colors.info },
+                  { label: 'Fees', icon: 'credit-card', tab: 'fees', color: colors.danger },
+                  { label: 'Chat', icon: 'message-circle', tab: 'messages', color: colors.warning },
+                ].map((action, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={styles.quickActionPill}
+                    onPress={() => setActiveTab(action.tab as TabType)}
+                  >
+                    <View style={[styles.quickActionIcon, { backgroundColor: action.color + '20' }]}>
+                      <Feather name={action.icon as any} size={20} color={action.color} />
+                    </View>
+                    <Text style={styles.quickActionText}>{action.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* --- Latest Announcement --- */}
+            {announcements.length > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Notice Board</Text>
+                </View>
+                <PremiumCard style={{ backgroundColor: colors.infoBg }}>
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <Feather name="bell" size={24} color={colors.info} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.cardTitle, { color: colors.info }]}>{announcements[0].title}</Text>
+                      <Text style={styles.cardDesc} numberOfLines={2}>{announcements[0].content}</Text>
+                    </View>
+                  </View>
+                </PremiumCard>
+              </View>
+            )}
+
+            {/* --- Activity Feed Preview --- */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Daily Highlights</Text>
+                <TouchableOpacity onPress={() => setActiveTab('activities')}>
+                  <Text style={styles.seeAll}>View All</Text>
+                </TouchableOpacity>
+              </View>
+
+              {latestActivity ? (
+                <PremiumCard style={{ padding: 0 }}>
+                  {latestActivity.mediaUrls && latestActivity.mediaUrls.length > 0 ? (
+                    <Image source={{ uri: latestActivity.mediaUrls[0] }} style={{ width: '100%', height: 180 }} />
+                  ) : (
+                    <View style={{ height: 120, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceHighlight }}>
+                      <Feather name="image" size={40} color={colors.textTertiary} />
+                    </View>
+                  )}
+                  <View style={{ padding: spacing.md }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={styles.activityTitle}>{latestActivity.title || 'Class Activity'}</Text>
+                      <Text style={styles.activityDate}>{new Date(latestActivity.postedAt).toLocaleDateString()}</Text>
+                    </View>
+                    <Text style={styles.cardDesc} numberOfLines={3}>{latestActivity.content}</Text>
+                  </View>
+                </PremiumCard>
+              ) : (
+                <PremiumCard variant="flat" style={{ alignItems: 'center', padding: spacing.xl }}>
+                  <Feather name="sun" size={40} color={colors.textTertiary} />
+                  <Text style={{ marginTop: 12, color: colors.textSecondary }}>No updates yet today.</Text>
+                </PremiumCard>
+              )}
+            </View>
+          </>
+        )}
+
+        {/* --- Dynamic Screen Content --- */}
+        {activeTab === 'bus' && <View style={styles.modalContainer}><BusScreen currentChild={displayedChild} /></View>}
+        {activeTab === 'activities' && <View style={styles.modalContainer}><ActivitiesScreen currentUser={user} currentChild={displayedChild} /></View>}
+        {activeTab === 'messages' && <View style={styles.modalContainer}><MessagesScreen /></View>}
+        {activeTab === 'fees' && <View style={styles.modalContainer}><ParentFeesScreen currentChild={displayedChild} /></View>}
+
+
+        {/* Spacer for scroll */}
+        <View style={{ height: 50 }} />
+
+      </ScrollView>
+
+      {/* --- Sidebar Drawer --- */}
+      <PremiumDrawer
+        isVisible={drawerVisible}
+        onClose={() => setDrawerVisible(false)}
+        activeTab={activeTab}
+        onSelectTab={(tab) => setActiveTab(tab as TabType)}
+        user={{ name: user.name, role: user.role }}
+        onLogout={handleLogout}
+        menuItems={[
+          { id: 'home', label: 'Home Overview', icon: 'home' },
+          { id: 'activities', label: 'Daily Updates', icon: 'grid' },
+          { id: 'bus', label: 'Bus Tracking', icon: 'map-pin' },
+          { id: 'fees', label: 'Fee Payments', icon: 'credit-card' },
+          { id: 'messages', label: 'Messages', icon: 'message-circle' },
+        ]}
+      />
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { flex: 1 },
 
-  rootContainer: {
-    flex: 1,
-    backgroundColor: Platform.OS === 'web' ? '#F3F4F6' : colors.background, // Mobile-like background on web
-    alignItems: 'center', // Center on large screens
-    justifyContent: 'center',
-  },
-  appFrame: {
-    flex: 1,
-    width: '100%',
-    maxWidth: Platform.OS === 'web' ? 480 : '100%', // Max width for mobile look
-    height: Platform.OS === 'web' ? '95%' : '100%', // Slight margin on desktop
-    backgroundColor: colors.background,
-    overflow: 'hidden',
-    borderRadius: Platform.OS === 'web' ? 24 : 0, // Rounded corners on web
-    shadowColor: Platform.OS === 'web' ? '#000' : 'transparent',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: Platform.OS === 'web' ? 10 : 0,
-  },
-
-  // Header & Toolbar
-  topToolbar: {
+  header: {
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    height: Platform.OS === 'web' ? 70 : (Platform.OS === 'ios' ? 100 : 80),
-    paddingTop: Platform.OS === 'web' ? 10 : (Platform.OS === 'ios' ? 50 : 30),
-    paddingHorizontal: 20,
-    backgroundColor: 'white',
+    alignItems: 'center',
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    zIndex: 1000,
+    borderBottomColor: colors.border, // Added border for sidebar mode
   },
-  toolbarCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  toolbarOrgName: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.primary,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  toolbarActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  toolbarIconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F9FAFB',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  toolbarBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.danger,
-    borderWidth: 1.5,
-    borderColor: 'white',
-  },
+  menuBtn: { padding: 8, marginLeft: -8 }, // Align visual left
+  headerOrg: { ...typography.caption, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1.2, fontSize: 11, fontWeight: '700' },
+  headerTitle: { ...typography.h3, fontSize: 16, marginTop: -2 },
+  profileBtn: { padding: 8, backgroundColor: colors.surfaceHighlight, borderRadius: 20 },
+  notifDot: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.danger, borderWidth: 1, borderColor: colors.surfaceHighlight },
 
-  // Greeting Header
-  greetingHeader: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 20,
-  },
-  welcomeSub: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  welcomeTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.textPrimary,
-  },
-
-  // Profile Section
-  profileSection: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    zIndex: 100,
-    position: 'relative',
-  },
-  profileCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 }, // Deeper shadow
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  profileRow: { flexDirection: 'row', alignItems: 'center' },
-  avatarContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#ECFDF5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  profileInfo: { flex: 1 },
-  studentName: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  studentDetails: { fontSize: 13, color: colors.textSecondary, marginTop: 2, fontWeight: '500' },
-  statusPill: { position: 'absolute', right: 0, top: 0, flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  heroSection: { paddingHorizontal: spacing.lg, marginBottom: spacing.lg, marginTop: spacing.md },
+  heroCard: { borderRadius: spacing.borderRadius.lg, padding: spacing.lg, ...shadows.lg },
+  heroRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
+  heroAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
+  heroName: { ...typography.h3, color: colors.textInverted },
+  heroDetail: { ...typography.caption, color: 'rgba(255,255,255,0.8)' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
   statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success, marginRight: 6 },
-  statusText: { fontSize: 11, color: colors.success, fontWeight: '600', textTransform: 'uppercase' },
+  statusText: { fontSize: 10, fontWeight: '700', color: colors.success, textTransform: 'uppercase' },
 
-  // Sections
-  section: { marginTop: 20, paddingHorizontal: 20 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  seeAll: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  heroStats: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: 12 },
+  heroStatItem: { flex: 1, alignItems: 'center' },
+  heroStatValue: { ...typography.h3, color: colors.textInverted, fontSize: 16, marginTop: 4 },
+  heroStatLabel: { ...typography.caption, color: 'rgba(255,255,255,0.6)', fontSize: 11 },
+  heroDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
 
-  // Stats
-  statsRow: { flexDirection: 'row', gap: 16 },
-  statCard: { flex: 1, backgroundColor: 'white', padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 12, shadowColor: '#000', shadowOpacity: 0.03, elevation: 1 },
-  iconBox: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  statLabel: { fontSize: 12, color: colors.textSecondary, marginBottom: 2 },
-  statValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  quickActionsContainer: { paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.lg, justifyContent: 'center', flexGrow: 1 },
+  quickActionPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 30, ...shadows.sm },
+  quickActionIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
+  quickActionText: { ...typography.caption, fontWeight: '600', color: colors.textPrimary, fontSize: 13 },
 
-  // Activity
-  announcementCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  announcementGradient: {
-    padding: 16,
-    height: 120,
-    justifyContent: 'center',
-  },
-  announcementTitle: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  announcementDesc: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  activityCard: { borderRadius: 20, overflow: 'hidden', height: 200, backgroundColor: 'black' },
-  activityImage: { width: '100%', height: '100%', opacity: 0.9 },
-  activityOverlay: { ...StyleSheet.absoluteFillObject },
-  gradientOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '80%' },
-  activityTextContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20 },
-  activityTitle: { color: 'white', fontSize: 18, fontWeight: '700', marginBottom: 6 },
-  activityDesc: { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginBottom: 12, lineHeight: 18 },
-  teacherRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  teacherText: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '500' },
+  section: { paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  sectionTitle: { ...typography.h3, fontSize: 18 },
+  seeAll: { ...typography.button, color: colors.accent, fontSize: 14 },
 
-  // Bus Card
-  busCard: { backgroundColor: '#EFF6FF', borderRadius: 20, overflow: 'hidden' }, // Light blue bg
-  mapPlaceholder: { height: 120, alignItems: 'center', justifyContent: 'center', backgroundColor: '#DBEAFE' },
-  mapText: { marginTop: 8, color: '#3B82F6', fontWeight: '500' },
-  busFooter: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', backgroundColor: 'white' },
-  busLabel: { fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 2 },
-  busValue: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  liveTag: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.danger, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, gap: 4 },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'white' },
-  liveText: { color: 'white', fontSize: 10, fontWeight: '700' },
+  cardTitle: { ...typography.h3, fontSize: 16, marginBottom: 4 },
+  cardDesc: { ...typography.body, color: colors.textSecondary, fontSize: 13 },
+  activityTitle: { ...typography.h3, fontSize: 16 },
+  activityDate: { ...typography.caption },
 
-  // Quick Actions
-  actionPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, gap: 8, shadowColor: '#000', shadowOpacity: 0.03, elevation: 1 },
-  actionIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  actionText: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  modalContainer: { marginTop: 10, minHeight: 400 },
 
-  // FAB
-  emergencyFloat: { position: 'absolute', bottom: 90, right: 20, zIndex: 50 },
-  emergencyGradient: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', shadowColor: colors.danger, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
-
-  // Bottom Nav
-  bottomNavContainer: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 4, paddingBottom: Platform.OS === 'ios' ? 24 : 0, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 10 },
-  bottomNav: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', height: 70 },
-  navItem: { alignItems: 'center', justifyContent: 'center', width: 60, gap: 4 },
-  navLabel: { fontSize: 10, color: colors.textSecondary, fontWeight: '500' },
-
-  // Emergency Header
-  header: { height: 100, paddingTop: 40, paddingHorizontal: 20, justifyContent: 'center' },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerTitle: { color: 'white', fontSize: 20, fontWeight: '700' },
-  backButton: { padding: 4 },
-  emergencyStatusCard: { backgroundColor: '#FEF2F2', padding: 20, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 16, borderWidth: 1, borderColor: '#FEE2E2' },
-  emergencyIconLarge: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#FECACA', alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  pulseDot: { position: 'absolute', top: 0, right: 0, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: 'white' },
-  emergencyStatusContent: { flex: 1 },
-  cardLabel: { fontSize: 12, color: '#7F1D1D' },
-  cardTitle: { fontWeight: '700', color: colors.textPrimary },
-  cardTime: { fontSize: 12, color: colors.textSecondary },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  gridCard: { width: (width - 52) / 2, padding: 16, borderRadius: 16, gap: 12 },
-  iconCircle: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  gridTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  gridSub: { fontSize: 12, color: colors.textSecondary },
-  alertCard: { backgroundColor: 'white', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#FEE2E2', borderLeftWidth: 4, borderLeftColor: colors.danger },
-  alertHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  alertTitle: { fontWeight: '700', color: colors.textPrimary },
-  alertTime: { fontSize: 12, color: colors.textSecondary },
-  cardDesc: { color: colors.textSecondary, marginTop: 8 },
 });
 
 export default App;
