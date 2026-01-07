@@ -76,7 +76,8 @@ export default function PremiumInput({
                         android: isFocused ? { elevation: 2 } : {},
                     })
                 },
-                style
+                style,
+                Platform.OS === 'web' && { outlineWidth: 0 } as any
             ]}>
                 {icon && (
                     <Feather
@@ -88,7 +89,10 @@ export default function PremiumInput({
                 )}
                 <TextInput
                     placeholderTextColor={colors.textTertiary}
-                    style={styles.input}
+                    style={[
+                        styles.input,
+                        Platform.OS === 'web' && { outlineWidth: 0 } as any
+                    ]}
                     onFocus={handleFocus}
                     onBlur={handleBlur}
                     selectionColor={colors.accent}

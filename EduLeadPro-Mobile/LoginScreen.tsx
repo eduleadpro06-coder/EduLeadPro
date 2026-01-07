@@ -134,8 +134,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 <View style={styles.logoCircle}>
                     <Feather name="book-open" size={40} color={colors.accent} />
                 </View>
-                <Text style={styles.title}>EduLead Pro</Text>
-                <Text style={styles.subtitle}>Excellence in Management</Text>
+                <Text style={styles.title}>Parent Portal</Text>
+                <Text style={styles.subtitle}>Powered by EduLead Pro</Text>
             </Animated.View>
 
             {/* Login Form Card */}
@@ -152,7 +152,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                     <PremiumCard style={styles.card}>
 
                         <Text style={styles.cardTitle}>Welcome Back</Text>
-                        <Text style={styles.cardSub}>Sign in to access your portal</Text>
+                        <Text style={styles.cardSub}>Stay connected with your child's progress</Text>
 
                         <View style={{ height: spacing.lg }} />
 
@@ -172,7 +172,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                             secureTextEntry
                             value={password}
                             onChangeText={setPassword}
-                            hint="Default: 1234"
                         />
 
                         <View style={{ height: spacing.md }} />
@@ -260,9 +259,11 @@ const styles = StyleSheet.create({
         fontSize: 32,
     },
     subtitle: {
-        ...typography.subtitle,
+        ...typography.caption,
         color: 'rgba(255,255,255,0.7)',
         marginTop: spacing.xs,
+        fontSize: 14,
+        letterSpacing: 0.5,
     },
     keyboardView: {
         flex: 1,

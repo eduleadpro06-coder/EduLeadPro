@@ -76,7 +76,7 @@ Notifications.setNotificationHandler({
 function App() {
   const [fontsLoaded] = useFonts({
     'Feather': Platform.OS === 'web'
-      ? { uri: 'https://cdn.jsdelivr.net/npm/@expo/vector-icons@13.0.0/build/vendor/react-native-vector-icons/Fonts/Feather.ttf' }
+      ? { uri: 'https://unpkg.com/@expo/vector-icons@latest/build/vendor/react-native-vector-icons/Fonts/Feather.ttf' }
       : require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf'),
   });
 
@@ -532,8 +532,15 @@ async function registerForPushNotificationsAsync() {
     }
 
     // Learn more about projectId here: https://docs.expo.dev/push-notifications/push-notifications-setup/#configure-projectid
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+
+    if (!projectId) {
+      console.warn('Push Notifications: No "projectId" found in app.json. Please configure EAS Project ID.');
+      return;
+    }
+
     token = (await Notifications.getExpoPushTokenAsync({
-      projectId: Constants.expoConfig?.extra?.eas?.projectId,
+      projectId,
     })).data;
   } else {
     console.warn('Must use physical device for Push Notifications');
