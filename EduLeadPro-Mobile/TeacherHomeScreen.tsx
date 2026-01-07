@@ -1,235 +1,216 @@
+```
 import React, { useState, useEffect } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    ScrollView,
-    TouchableOpacity,
-    ActivityIndicator,
-    RefreshControl,
-    Alert
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  Platform
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { api } from './services/api';
-
-const colors = {
-    primary: '#2D7A5F',
-    primaryDark: '#1F5A45',
-    white: '#FFFFFF',
-    background: '#F0FDF4',
-    textPrimary: '#111827',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    warning: '#F59E0B',
-    cardBg: '#FFFFFF',
-};
+import TeacherAttendanceScreen from './TeacherAttendanceScreen';
+import TeacherActivityScreen from './TeacherActivityScreen';
 
 interface TeacherHomeScreenProps {
-    user: any;
-    onLogout: () => void;
-}
+
+type TabType = 'dashboard' | 'attendance' | 'students';
 
 export default function TeacherHomeScreen({ user, onLogout }: TeacherHomeScreenProps) {
+    const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+    const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+
+    // Dashboard data
     const [dashboardData, setDashboardData] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'students'>('overview');
+
+    // Students data
+    const [students, setStudents] = useState<any[]>([]);
 
     useEffect(() => {
-        fetchDashboard();
-    }, []);
+        if (activeTab === 'dashboard') {
+            loadDashboard();
+        } else if (activeTab === 'students' || activeTab === 'attendance') {
+            loadStudents();
+        }
+    }, [activeTab]);
 
-    const fetchDashboard = async () => {
+    const loadDashboard = async () => {
+        setLoading(true);
         try {
-            const data = await api.getTeacherDashboard(user.staffId);
+            const data = await api.getTeacherDashboard();
             setDashboardData(data);
         } catch (error) {
-            console.error('Failed to fetch teacher dashboard:', error);
+            console.error('Failed to load dashboard:', error);
             Alert.alert('Error', 'Failed to load dashboard data');
         } finally {
-            setIsLoading(false);
-            setIsRefreshing(false);
+            setLoading(false);
         }
     };
 
-    const onRefresh = () => {
-        setIsRefreshing(true);
-        fetchDashboard();
-    };
-
-    const handleMarkAttendance = async (studentId: number, status: 'present' | 'absent') => {
+    const loadStudents = async () => {
+        setLoading(true);
         try {
-            const now = new Date();
-            const checkInTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-            await api.markAttendance(
-                studentId,
-                status,
-                checkInTime,
-                user.name,
-                user.organization_id
-            );
-            Alert.alert('Success', `Student marked as ${status}`);
-            fetchDashboard();
+            const data = await api.getTeacherStudents('');
+            setStudents(data);
         } catch (error) {
-            Alert.alert('Error', 'Failed to mark attendance');
+            console.error('Failed to load students:', error);
+            Alert.alert('Error', 'Failed to load students');
+        } finally {
+            setLoading(false);
         }
     };
 
-    if (isLoading) {
-        return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-        );
-    }
-
-    const { teacher, todayAttendance, recentUpdates, students } = dashboardData || {};
-    const presentCount = todayAttendance?.filter((a: any) => a.status === 'present').length || 0;
-    const absentCount = todayAttendance?.filter((a: any) => a.status === 'absent').length || 0;
+    const onRefresh = async () => {
+        setRefreshing(true);
+        try {
+            if (activeTab === 'dashboard') {
+                await loadDashboard();
+            } else {
+                await loadStudents();
+            }
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
-                <View>
-                    <Text style={styles.greeting}>Hello, {user.name}!</Text>
-                    <Text style={styles.role}>Teacher Dashboard</Text>
+            <LinearGradient colors={['#8B5CF6', '#7C3AED']} style={styles.header}>
+                <View style={styles.headerContent}>
+                    <View>
+                        <Text style={styles.greeting}>Hello,</Text>
+                        <Text style={styles.name}>{user.name}</Text>
+                        <Text style={styles.role}>Teacher</Text>
+                    </View>
+                    <TouchableOpacity onPress={onLogout}>
+                        <Feather name="log-out" size={24} color="#fff" />
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
-                    <Feather name="log-out" size={22} color={colors.primary} />
-                </TouchableOpacity>
+            </LinearGradient>
+
+            {/* Tab Bar */}
+            <View style={styles.tabBar}>
+                {[
+                    { key: 'dashboard', icon: 'home', label: 'Dashboard' },
+                    { key: 'attendance', icon: 'check-square', label: 'Attendance' },
+                    { key: 'students', icon: 'users', label: 'Students' }
+                ].map(tab => (
+                    <TouchableOpacity
+                        key={tab.key}
+                        style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+                        onPress={() => setActiveTab(tab.key as TabType)}
+                    >
+                        <Feather
+                            name={tab.icon as any}
+                            size={20}
+                            color={activeTab === tab.key ? '#8B5CF6' : '#9CA3AF'}
+                        />
+                        <Text style={[
+                            styles.tabLabel,
+                            activeTab === tab.key && styles.tabLabelActive
+                        ]}>
+                            {tab.label}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
             </View>
 
-            {/* Tabs */}
-            <View style={styles.tabContainer}>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
-                    onPress={() => setActiveTab('overview')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>Overview</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'attendance' && styles.activeTab]}
-                    onPress={() => setActiveTab('attendance')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'attendance' && styles.activeTabText]}>Attendance</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'students' && styles.activeTab]}
-                    onPress={() => setActiveTab('students')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'students' && styles.activeTabText]}>Students</Text>
-                </TouchableOpacity>
-            </View>
-
+            {/* Content */}
             <ScrollView
                 style={styles.content}
-                refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             >
-                {/* Overview Tab */}
-                {activeTab === 'overview' && (
+                {loading ? (
+                    <ActivityIndicator size="large" color="#8B5CF6" style={{ marginTop: 50 }} />
+                ) : (
                     <>
-                        {/* Quick Stats */}
-                        <View style={styles.statsContainer}>
-                            <View style={[styles.statCard, { backgroundColor: colors.success + '20' }]}>
-                                <Feather name="check-circle" size={24} color={colors.success} />
-                                <Text style={styles.statNumber}>{presentCount}</Text>
-                                <Text style={styles.statLabel}>Present Today</Text>
-                            </View>
-                            <View style={[styles.statCard, { backgroundColor: colors.warning + '20' }]}>
-                                <Feather name="x-circle" size={24} color={colors.warning} />
-                                <Text style={styles.statNumber}>{absentCount}</Text>
-                                <Text style={styles.statLabel}>Absent Today</Text>
-                            </View>
-                        </View>
-
-                        {/* Recent Updates */}
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Recent Updates Posted</Text>
-                            {recentUpdates && recentUpdates.length > 0 ? (
-                                recentUpdates.slice(0, 5).map((update: any) => (
-                                    <View key={update.id} style={styles.updateCard}>
-                                        <View style={styles.updateHeader}>
-                                            <Text style={styles.updateType}>{update.activity_type.toUpperCase()}</Text>
-                                            <Text style={styles.updateTime}>
-                                                {new Date(update.posted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </Text>
+                        {activeTab === 'dashboard' && dashboardData && (
+                            <>
+                                <View style={styles.statsGrid}>
+                                    <View style={styles.statCard}>
+                                        <View style={styles.statCardInner}>
+                                            <Feather name="users" size={24} color="#8B5CF6" />
+                                            <Text style={styles.statValue}>{dashboardData.totalStudents || 0}</Text>
+                                            <Text style={styles.statLabel}>Total Students</Text>
                                         </View>
-                                        <Text style={styles.updateContent} numberOfLines={2}>{update.content}</Text>
                                     </View>
-                                ))
-                            ) : (
-                                <Text style={styles.emptyText}>No updates posted yet</Text>
-                            )}
-                        </View>
-                    </>
-                )}
 
-                {/* Attendance Tab */}
-                {activeTab === 'attendance' && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Mark Attendance</Text>
-                        {students && students.length > 0 ? (
-                            students.map((student: any) => {
-                                const attended = todayAttendance?.find((a: any) => a.lead_id === student.id);
-                                return (
-                                    <View key={student.id} style={styles.studentCard}>
-                                        <View style={styles.studentInfo}>
-                                            <Text style={styles.studentName}>{student.name}</Text>
-                                            <Text style={styles.studentClass}>{student.class}</Text>
+                                    <View style={styles.statCard}>
+                                        <View style={styles.statCardInner}>
+                                            <Feather name="check-circle" size={24} color="#10B981" />
+                                            <Text style={styles.statValue}>{dashboardData.presentToday || 0}</Text>
+                                            <Text style={styles.statLabel}>Present Today</Text>
                                         </View>
-                                        {attended ? (
-                                            <View style={[styles.statusBadge, { backgroundColor: attended.status === 'present' ? colors.success : colors.warning }]}>
-                                                <Text style={styles.statusText}>{attended.status.toUpperCase()}</Text>
-                                            </View>
-                                        ) : (
-                                            <View style={styles.attendanceActions}>
-                                                <TouchableOpacity
-                                                    style={[styles.attendanceBtn, { backgroundColor: colors.success }]}
-                                                    onPress={() => handleMarkAttendance(student.id, 'present')}
-                                                >
-                                                    <Feather name="check" size={18} color={colors.white} />
-                                                </TouchableOpacity>
-                                                <TouchableOpacity
-                                                    style={[styles.attendanceBtn, { backgroundColor: colors.warning }]}
-                                                    onPress={() => handleMarkAttendance(student.id, 'absent')}
-                                                >
-                                                    <Feather name="x" size={18} color={colors.white} />
-                                                </TouchableOpacity>
-                                            </View>
-                                        )}
                                     </View>
-                                );
-                            })
-                        ) : (
-                            <Text style={styles.emptyText}>No students found</Text>
-                        )}
-                    </View>
-                )}
 
-                {/* Students Tab */}
-                {activeTab === 'students' && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>All Students ({students?.length || 0})</Text>
-                        {students && students.length > 0 ? (
-                            students.map((student: any) => (
-                                <View key={student.id} style={styles.studentCard}>
-                                    <View style={styles.studentInfo}>
-                                        <Text style={styles.studentName}>{student.name}</Text>
-                                        <Text style={styles.studentClass}>{student.class}</Text>
-                                        <Text style={styles.studentPhone}>{student.parent_phone}</Text>
+                                    <View style={styles.statCard}>
+                                        <View style={styles.statCardInner}>
+                                            <Feather name="x-circle" size={24} color="#EF4444" />
+                                            <Text style={styles.statValue}>{dashboardData.absentToday || 0}</Text>
+                                            <Text style={styles.statLabel}>Absent Today</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.statCard}>
+                                        <View style={styles.statCardInner}>
+                                            <Feather name="clock" size={24} color="#F59E0B" />
+                                            <Text style={styles.statValue}>{dashboardData.notMarked || 0}</Text>
+                                            <Text style={styles.statLabel}>Not Marked</Text>
+                                        </View>
                                     </View>
                                 </View>
-                            ))
-                        ) : (
-                            <Text style={styles.emptyText}>No students enrolled</Text>
-                        )}
-                    </View>
-                )}
 
-                <View style={{ height: 80 }} />
+                                <View style={styles.quickActions}>
+                                    <Text style={styles.sectionTitle}>Quick Actions</Text>
+
+                                    <TouchableOpacity
+                                        style={styles.actionButton}
+                                        onPress={() => setActiveTab('attendance')}
+                                    >
+                                        <Feather name="check-square" size={20} color="#fff" />
+                                        <Text style={styles.actionButtonText}>Mark Attendance</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[styles.actionButton, { backgroundColor: '#F59E0B' }]}
+                                        onPress={() => setActiveTab('students')}
+                                    >
+                                        <Feather name="users" size={20} color="#fff" />
+                                        <Text style={styles.actionButtonText}>View Students</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </>
+                        )}
+
+                        {activeTab === 'attendance' && (
+                            <View>
+                                <Text style={styles.sectionTitle}>Mark Attendance</Text>
+                                <Text style={styles.placeholder}>
+                                    Attendance marking UI coming soon...
+                                </Text>
+                            </View>
+                        )}
+
+                        {activeTab === 'students' && (
+                            <View>
+                                <Text style={styles.sectionTitle}>Students List</Text>
+                                {students.map(student => (
+                                    <View key={student.id} style={styles.studentCard}>
+                                        <Text style={styles.studentName}>{student.name}</Text>
+                                        <Text style={styles.studentClass}>Class: {student.class}</Text>
+                                        <Text style={styles.studentInfo}>Parent: {student parent_name}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                    </>
+                )}
             </ScrollView>
         </View>
     );
@@ -238,171 +219,148 @@ export default function TeacherHomeScreen({ user, onLogout }: TeacherHomeScreenP
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F9FAFB'
     },
     header: {
-        backgroundColor: colors.white,
-        paddingTop: 50,
-        paddingHorizontal: 20,
+        paddingTop: Platform.OS === 'ios' ? 50 : 30,
         paddingBottom: 20,
+        paddingHorizontal: 20
+    },
+    headerContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        alignItems: 'center'
     },
     greeting: {
+        color: 'rgba(255, 255, 255, 0.9)',
+        fontSize: 14
+    },
+    name: {
+        color: '#fff',
         fontSize: 24,
-        fontWeight: '700',
-        color: colors.textPrimary,
+        fontWeight: 'bold',
+        marginTop: 4
     },
     role: {
+        color: 'rgba(255, 255, 255, 0.8)',
         fontSize: 14,
-        color: colors.textSecondary,
-        marginTop: 2,
+        marginTop: 2
     },
-    logoutBtn: {
-        padding: 8,
-    },
-    tabContainer: {
+    tabBar: {
         flexDirection: 'row',
-        backgroundColor: colors.white,
-        paddingHorizontal: 20,
+        backgroundColor: '#fff',
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: '#E5E7EB'
     },
     tab: {
+        flex: 1,
+        alignItems: 'center',
         paddingVertical: 12,
-        paddingHorizontal: 16,
-        marginRight: 12,
-    },
-    activeTab: {
         borderBottomWidth: 2,
-        borderBottomColor: colors.primary,
+        borderBottomColor: 'transparent'
     },
-    tabText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: colors.textSecondary,
+    tabActive: {
+        borderBottomColor: '#8B5CF6'
     },
-    activeTabText: {
-        color: colors.primary,
-        fontWeight: '600',
+    tabLabel: {
+        fontSize: 12,
+        color: '#9CA3AF',
+        marginTop: 4
+    },
+    tabLabelActive: {
+        color: '#8B5CF6',
+        fontWeight: '600'
     },
     content: {
         flex: 1,
-    },
-    statsContainer: {
-        flexDirection: 'row',
-        padding: 20,
-        gap: 12,
-    },
-    statCard: {
-        flex: 1,
-        padding: 20,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
-    statNumber: {
-        fontSize: 32,
-        fontWeight: '700',
-        color: colors.textPrimary,
-        marginTop: 8,
-    },
-    statLabel: {
-        fontSize: 12,
-        color: colors.textSecondary,
-        marginTop: 4,
-    },
-    section: {
-        padding: 20,
+        padding: 16
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: colors.textPrimary,
-        marginBottom: 16,
+        color: '#111827',
+        marginBottom: 16
     },
-    updateCard: {
-        backgroundColor: colors.white,
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    updateHeader: {
+    statsGrid: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 8,
+        flexWrap: 'wrap',
+        marginHorizontal: -8
     },
-    updateType: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: colors.primary,
+    statCard: {
+        width: '50%',
+        padding: 8
     },
-    updateTime: {
-        fontSize: 12,
-        color: colors.textSecondary,
-    },
-    updateContent: {
-        fontSize: 14,
-        color: colors.textPrimary,
-    },
-    studentCard: {
-        backgroundColor: colors.white,
-        padding: 16,
+    statCardInner: {
+        backgroundColor: '#fff',
         borderRadius: 12,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: colors.border,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+        padding: 16,
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2
     },
-    studentInfo: {
-        flex: 1,
+    statValue: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: '#111827',
+        marginTop: 8
     },
-    studentName: {
+    statLabel: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginTop: 4,
+        textAlign: 'center'
+    },
+    quickActions: {
+        marginTop: 24
+    },
+    actionButton: {
+        backgroundColor: '#8B5CF6',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 12
+    },
+    actionButtonText: {
+        color: '#fff',
         fontSize: 16,
         fontWeight: '600',
-        color: colors.textPrimary,
+        marginLeft: 8
+    },
+    placeholder: {
+        fontSize: 16,
+        color: '#6B7280',
+        textAlign: 'center',
+        marginTop: 32
+    },
+    studentCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1
+    },
+    studentName: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#111827'
     },
     studentClass: {
         fontSize: 14,
-        color: colors.textSecondary,
-        marginTop: 2,
+        color: '#6B7280',
+        marginTop: 4
     },
-    studentPhone: {
-        fontSize: 12,
-        color: colors.textSecondary,
-        marginTop: 4,
-    },
-    attendanceActions: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    attendanceBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    statusBadge: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12,
-    },
-    statusText: {
-        color: colors.white,
-        fontSize: 12,
-        fontWeight: '700',
-    },
-    emptyText: {
-        textAlign: 'center',
-        color: colors.textSecondary,
+    studentInfo: {
         fontSize: 14,
-        padding: 20,
-    },
+        color: '#6B7280',
+        marginTop: 4
+    }
 });

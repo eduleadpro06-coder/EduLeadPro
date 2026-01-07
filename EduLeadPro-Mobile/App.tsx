@@ -11,7 +11,7 @@ import {
   Platform,
   ActivityIndicator,
   RefreshControl,
-  StatusBar
+  StatusBar as RNStatusBar // Renamed to avoid conflict with expo-status-bar
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -23,6 +23,10 @@ import ActivitiesScreen from './ActivitiesScreen';
 import MessagesScreen from './MessagesScreen';
 import TeacherHomeScreen from './TeacherHomeScreen';
 import DriverHomeScreen from './DriverHomeScreen';
+import { offlineCache } from './src/services/offline-cache'; // New import
+import { useOffline } from './src/hooks/useOffline'; // New import
+import OfflineBanner from './src/components/OfflineBanner'; // New import
+import { StatusBar } from 'expo-status-bar'; // New import, potentially replacing RNStatusBar for consistency
 
 const { width } = Dimensions.get('window');
 
@@ -70,8 +74,6 @@ const mockData = {
   },
 };
 
-// ... imports ...
-
 function App() {
   const [fontsLoaded] = useFonts({
     'Feather': Platform.OS === 'web'
@@ -88,6 +90,22 @@ function App() {
   const [todayAttendance, setTodayAttendance] = useState<Attendance | null>(null);
   const [latestActivity, setLatestActivity] = useState<DailyUpdate | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Offline functionality
+  const { isOnline, lastSyncTime, syncNow, isSyncing } = useOffline();
+
+  // Initialize offline cache on app startup
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        await offlineCache.init();
+        console.log('[App] Offline cache initialized');
+      } catch (error) {
+        console.error('[App] Failed to initialize cache:', error);
+      }
+    };
+    initializeApp();
+  }, []);
 
   // Load session on mount
   useEffect(() => {
@@ -115,17 +133,36 @@ function App() {
   const fetchLiveData = async (childId: number, organizationId: number) => {
     if (!childId || !organizationId) return;
     try {
-      // Parallel fetching using v1 API
+      // Cache-first approach: Load from cache immediately if offline
+      if (!isOnline) {
+        const [cachedAnn, cachedAtt, cachedAct] = await Promise.all([
+          offlineCache.getCachedAnnouncements(),
+          offlineCache.getCachedAttendance(childId, 1),
+          offlineCache.getCachedActivities(childId, 1)
+        ]);
+        setAnnouncements(cachedAnn);
+        setTodayAttendance(cachedAtt[0] || null);
+        if (cachedAct.length > 0) setLatestActivity(cachedAct[0]);
+        return;
+      }
+
+      // If online, fetch fresh data
       const [annRes, attRes, updRes] = await Promise.all([
         api.getAnnouncements(organizationId),
         api.getTodayAttendance(childId),
         api.getDailyUpdates(childId)
       ]);
+
       setAnnouncements(annRes);
       setTodayAttendance(attRes);
       if (updRes.length > 0) {
         setLatestActivity(updRes[0]);
       }
+
+      // Update cache
+      await offlineCache.cacheAnnouncements(annRes);
+      await offlineCache.cacheAttendance(childId, attRes ? [attRes] : []);
+      await offlineCache.cacheActivities(childId, updRes);
     } catch (e) {
       console.error('Failed to fetch live data', e);
     }
@@ -182,6 +219,8 @@ function App() {
       await api.clearTokens();
       // Clear session
       await AsyncStorage.removeItem('user_session');
+      // Clear offline cache
+      await offlineCache.clearAllCache();
     } catch (e) {
       console.error('Failed to clear session', e);
     }
@@ -219,7 +258,16 @@ function App() {
   if (showEmergency) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar style="light" />
+
+        {/* Offline Banner */}
+        <OfflineBanner
+          isOnline={isOnline}
+          lastSyncTime={lastSyncTime}
+          isSyncing={isSyncing}
+          onSyncPress={syncNow}
+        />
+
         <LinearGradient
           colors={[colors.danger, '#991B1B']}
           style={styles.header}
