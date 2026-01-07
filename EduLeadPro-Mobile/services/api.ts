@@ -200,13 +200,22 @@ class APIService {
         return data;
     }
 
-    async changePassword(phone: string, newPassword: string): Promise<{ success: boolean; message: string }> {
-        const response = await fetch(`${this.baseURL}/auth/change-password`, {
+    async changePassword(phone: string, newPassword: string): Promise<any> {
+        const res = await fetch(`${this.baseURL}/auth/change-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phone, newPassword }),
         });
-        return await response.json();
+        return res.json();
+    }
+
+    async changePasswordStaff(phone: string, newPassword: string, oldPassword?: string): Promise<any> {
+        const res = await fetch(`${this.baseURL}/auth/change-password-staff`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, newPassword, oldPassword }),
+        });
+        return res.json();
     }
 
     // Teacher Methods

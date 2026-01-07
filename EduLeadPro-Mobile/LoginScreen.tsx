@@ -47,6 +47,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [changeLoading, setChangeLoading] = useState(false);
+    const [tempUserRole, setTempUserRole] = useState('');
 
     const handleLogin = async () => {
         if (!phone || !password) {
@@ -60,6 +61,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
             if (response.success && response.user) {
                 if (response.requiresPasswordChange) {
+                    setTempUserRole(response.user.role || ''); // Store role for password change
                     setShowChangePassword(true);
                 } else {
                     onLoginSuccess(response.user, response.students || []);
@@ -91,7 +93,13 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         setChangeLoading(true);
         try {
-            const result = await api.changePassword(phone, newPassword);
+            // Detect if user is staff (will be set during login if requiresPasswordChange)
+            const isStaff = tempUserRole && (tempUserRole === 'teacher' || tempUserRole === 'driver' || tempUserRole === 'staff');
+
+            const result = isStaff
+                ? await api.changePasswordStaff(phone, newPassword, password)
+                : await api.changePassword(phone, newPassword);
+
             if (result.success) {
                 Alert.alert('Success', 'Password updated! Logging you in...');
                 setShowChangePassword(false);
