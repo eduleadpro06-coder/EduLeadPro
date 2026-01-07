@@ -188,16 +188,25 @@ function App() {
     );
   }
 
+  // DEBUG: Log user and role to verify routing
+  console.log('🔍 ROUTING CHECK - User:', JSON.stringify(user, null, 2));
+  console.log('🔍 User Role:', user.role);
+  console.log('🔍 Is Teacher?', user.role === 'teacher');
+  console.log('🔍 Is Driver?', user.role === 'driver');
+
   // Route Teachers to Teacher Dashboard
   if (user.role === 'teacher') {
+    console.log('✅ Routing to TeacherHomeScreen');
     return <TeacherHomeScreen user={user} onLogout={handleLogout} />;
   }
 
   // Route Drivers to Driver Dashboard
   if (user.role === 'driver') {
+    console.log('✅ Routing to DriverHomeScreen');
     return <DriverHomeScreen user={user} onLogout={handleLogout} />;
   }
 
+  console.log('⚠️ Defaulting to Parent UI');
   // Parent UI continues below (existing code)
 
   // Emergency Screen
