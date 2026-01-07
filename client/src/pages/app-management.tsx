@@ -38,6 +38,19 @@ export default function AppManagement() {
         queryKey: ['/api/leads']
     });
 
+    // Fetch Teachers (Staff with Teacher role)
+    const { data: allStaff = [] } = useQuery<any[]>({
+        queryKey: ['/api/staff']
+    });
+
+    const teachers = allStaff.filter(staff =>
+        staff.role?.toLowerCase().includes('teacher') && staff.isActive
+    );
+
+    const drivers = allStaff.filter(staff =>
+        staff.role?.toLowerCase().includes('driver') && staff.isActive
+    );
+
     // Reset Password Mutation
     const resetPasswordMutation = useMutation({
         mutationFn: async (leadId: number) => {
@@ -199,6 +212,20 @@ export default function AppManagement() {
                             Parent Access
                         </TabsTrigger>
                         <TabsTrigger
+                            value="teachers"
+                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
+                        >
+                            <Users className="mr-2" size={18} />
+                            Teachers
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="drivers"
+                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
+                        >
+                            <Bus className="mr-2" size={18} />
+                            Drivers
+                        </TabsTrigger>
+                        <TabsTrigger
                             value="routes"
                             className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
                         >
@@ -336,6 +363,191 @@ export default function AppManagement() {
                                         </TableBody>
                                     </Table>
                                 </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Teachers Tab */}
+                    <TabsContent value="teachers">
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle>Teachers (Mobile Access)</CardTitle>
+                                        <CardDescription>
+                                            View all teachers who can access the mobile app
+                                        </CardDescription>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                                            <Input
+                                                placeholder="Search teachers..."
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="pl-10 w-64"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="rounded-md border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Name</TableHead>
+                                                <TableHead>Phone</TableHead>
+                                                <TableHead>Email</TableHead>
+                                                <TableHead>Role</TableHead>
+                                                <TableHead className="text-center">Students</TableHead>
+                                                <TableHead>Status</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {teachers.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                                                        No teachers found. Create staff members with "Teacher" role in Staff Management.
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                teachers
+                                                    .filter(teacher =>
+                                                        !searchTerm ||
+                                                        teacher.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                        teacher.phone?.includes(searchTerm)
+                                                    )
+                                                    .map((teacher: any) => {
+                                                        const studentCount = leads.filter(l =>
+                                                            l.organizationId === teacher.organizationId &&
+                                                            l.status === 'enrolled'
+                                                        ).length;
+
+                                                        return (
+                                                            <TableRow key={teacher.id}>
+                                                                <TableCell className="font-medium">{teacher.name}</TableCell>
+                                                                <TableCell>{teacher.phone}</TableCell>
+                                                                <TableCell className="text-gray-600">{teacher.email || 'N/A'}</TableCell>
+                                                                <TableCell>
+                                                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                                                        {teacher.role}
+                                                                    </Badge>
+                                                                </TableCell>
+                                                                <TableCell className="text-center font-semibold">
+                                                                    {studentCount}
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                                                                        Mobile Enabled
+                                                                    </Badge>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                                {teachers.length > 0 && (
+                                    <div className="mt-4 text-sm text-gray-600">
+                                        Showing {teachers.filter(t =>
+                                            !searchTerm ||
+                                            t.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            t.phone?.includes(searchTerm)
+                                        ).length} of {teachers.length} teachers
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Drivers Tab */}
+                    <TabsContent value="drivers">
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle>Drivers (Mobile Access)</CardTitle>
+                                        <CardDescription>
+                                            View all drivers who can access the mobile app
+                                        </CardDescription>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                                            <Input
+                                                placeholder="Search drivers..."
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="pl-10 w-64"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="rounded-md border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Name</TableHead>
+                                                <TableHead>Phone</TableHead>
+                                                <TableHead>Email</TableHead>
+                                                <TableHead>Role</TableHead>
+                                                <TableHead className="text-center">Assigned Route</TableHead>
+                                                <TableHead>Status</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {drivers.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                                                        No drivers found. Create staff members with "Driver" role in Staff Management.
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                drivers
+                                                    .filter(driver =>
+                                                        !searchTerm ||
+                                                        driver.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                        driver.phone?.includes(searchTerm)
+                                                    )
+                                                    .map((driver: any) => (
+                                                        <TableRow key={driver.id}>
+                                                            <TableCell className="font-medium">{driver.name}</TableCell>
+                                                            <TableCell>{driver.phone}</TableCell>
+                                                            <TableCell className="text-gray-600">{driver.email || 'N/A'}</TableCell>
+                                                            <TableCell>
+                                                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                                                    {driver.role}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell className="text-center">
+                                                                <Badge variant="outline" className="text-gray-600">
+                                                                    Route Assignment TBD
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                                                                    Mobile Enabled
+                                                                </Badge>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                                {drivers.length > 0 && (
+                                    <div className="mt-4 text-sm text-gray-600">
+                                        Showing {drivers.filter(d =>
+                                            !searchTerm ||
+                                            d.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            d.phone?.includes(searchTerm)
+                                        ).length} of {drivers.length} drivers
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </TabsContent>

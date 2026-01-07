@@ -21,6 +21,8 @@ import LoginScreen from './LoginScreen';
 import BusScreen from './BusScreen';
 import ActivitiesScreen from './ActivitiesScreen';
 import MessagesScreen from './MessagesScreen';
+import TeacherHomeScreen from './TeacherHomeScreen';
+import DriverHomeScreen from './DriverHomeScreen';
 
 const { width } = Dimensions.get('window');
 
@@ -176,11 +178,24 @@ function App() {
     }
   };
 
+  // Handle role-based routing
   if (!user) {
     return (
       <LoginScreen onLoginSuccess={handleLoginSuccess} />
     );
   }
+
+  // Route Teachers to Teacher Dashboard
+  if (user.role === 'teacher') {
+    return <TeacherHomeScreen user={user} onLogout={handleLogout} />;
+  }
+
+  // Route Drivers to Driver Dashboard
+  if (user.role === 'driver') {
+    return <DriverHomeScreen user={user} onLogout={handleLogout} />;
+  }
+
+  // Parent UI continues below (existing code)
 
   // Emergency Screen
   if (showEmergency) {
@@ -459,8 +474,8 @@ function App() {
             </ScrollView>
           )}
 
-          {activeTab === 'bus' && <BusScreen />}
-          {activeTab === 'activities' && <ActivitiesScreen currentUser={user} currentChild={children[0]} />}
+          {activeTab === 'bus' && <BusScreen currentChild={displayedChild} />}
+          {activeTab === 'activities' && <ActivitiesScreen currentUser={user} currentChild={displayedChild} />}
           {activeTab === 'messages' && <MessagesScreen />}
         </View>
 

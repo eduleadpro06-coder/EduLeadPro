@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { api } from './services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -15,29 +16,54 @@ const colors = {
     border: '#E5E7EB',
 };
 
-const mockBus = {
-    driver: {
-        name: 'Rajesh Kumar',
-        phone: '+91 98765 43210',
-        photo: 'https://randomuser.me/api/portraits/men/32.jpg',
-        rating: 4.8
-    },
-    attendant: {
-        name: 'Sunita Devi',
-        phone: '+91 98765 12345',
-    },
-    busNumber: 'MH 14 DX 4521',
-    route: [
-        { id: 1, name: 'School Campus', time: '1:30 PM', status: 'completed' },
-        { id: 2, name: 'Mg Road Signal', time: '1:45 PM', status: 'completed' },
-        { id: 3, name: 'City Mall', time: '2:00 PM', status: 'current' },
-        { id: 4, name: 'Sector 45', time: '2:15 PM', status: 'pending' },
-        { id: 5, name: 'Green Valley', time: '2:30 PM', status: 'pending' },
-    ]
-};
+interface BusScreenProps {
+    currentChild: any;
+}
 
-export default function BusScreen() {
+export default function BusScreen({ currentChild }: BusScreenProps) {
+    const [busData, setBusData] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    useEffect(() => {
+        if (currentChild) {
+            fetchBusData();
+        }
+    }, [currentChild]);
+
+    const fetchBusData = async () => {
+        try {
+            const data = await api.getBusLocation(currentChild.id);
+            setBusData(data);
+        } catch (error) {
+            console.error('Failed to fetch bus location:', error);
+        } finally {
+            setIsLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+        );
+    }
+
+    if (!busData || !busData.isLive) {
+        return (
+            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+                <View style={styles.emptyContainer}>
+                    <Feather name="navigation-2" size={64} color={colors.textSecondary} />
+                    <Text style={styles.emptyTitle}>Bus Tracking Unavailable</Text>
+                    <Text style={styles.emptyText}>
+                        {busData?.message || 'Live tracking is not available at this moment'}
+                    </Text>
+                </View>
+            </ScrollView>
+        );
+    }
 
     return (
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -63,7 +89,7 @@ export default function BusScreen() {
                 <View style={styles.card}>
                     <View style={styles.busHeader}>
                         <View>
-                            <Text style={styles.busNumber}>{mockBus.busNumber}</Text>
+                            <Text style={styles.busNumber}>{busData.busNumber}</Text>
                             <Text style={styles.routeText}>Route #12 • Afternoon Drop</Text>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: '#DCFCE7' }]}>
@@ -74,14 +100,12 @@ export default function BusScreen() {
                     <View style={styles.divider} />
 
                     <View style={styles.driverRow}>
-                        <Image source={{ uri: mockBus.driver.photo }} style={styles.driverPhoto} />
+                        <View style={[styles.driverPhoto, { backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' }]}>
+                            <Feather name="user" size={24} color={colors.textSecondary} />
+                        </View>
                         <View style={styles.driverInfo}>
                             <Text style={styles.label}>Driver</Text>
-                            <Text style={styles.name}>{mockBus.driver.name}</Text>
-                            <View style={styles.ratingRow}>
-                                <Feather name="star" size={12} color="#F59E0B" />
-                                <Text style={styles.rating}>{mockBus.driver.rating}</Text>
-                            </View>
+                            <Text style={styles.name}>Driver info unavailable</Text>
                         </View>
                         <TouchableOpacity style={styles.callButton}>
                             <Feather name="phone" size={20} color="white" />
@@ -94,50 +118,23 @@ export default function BusScreen() {
                         </View>
                         <View style={styles.driverInfo}>
                             <Text style={styles.label}>Attendant</Text>
-                            <Text style={styles.name}>{mockBus.attendant.name}</Text>
+                            <Text style={styles.name}>Attendant info unavailable</Text>
                         </View>
-                        <TouchableOpacity style={[styles.callButton, { backgroundColor: '#6B7280' }]}>
-                            <Feather name="phone" size={20} color="white" />
-                        </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* Timeline */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Route Timeline</Text>
-                    <View style={styles.timelineCard}>
-                        {mockBus.route.map((stop, index) => {
-                            const isLast = index === mockBus.route.length - 1;
-                            const isCompleted = stop.status === 'completed';
-                            const isCurrent = stop.status === 'current';
-
-                            return (
-                                <View key={stop.id} style={styles.timelineItem}>
-                                    <View style={styles.timelineLeft}>
-                                        <Text style={styles.time}>{stop.time}</Text>
-                                    </View>
-                                    <View style={styles.timelineCenter}>
-                                        <View style={[
-                                            styles.dot,
-                                            isCompleted && styles.dotCompleted,
-                                            isCurrent && styles.dotCurrent
-                                        ]}>
-                                            {isCompleted && <Feather name="check" size={10} color="white" />}
-                                            {isCurrent && <View style={styles.innerDot} />}
-                                        </View>
-                                        {!isLast && <View style={[styles.line, isCompleted && styles.lineCompleted]} />}
-                                    </View>
-                                    <View style={styles.timelineRight}>
-                                        <Text style={[styles.stopName, isCurrent && styles.stopNameCurrent]}>
-                                            {stop.name}
-                                        </Text>
-                                        {isCurrent && <Text style={styles.currentTag}>Bus is here</Text>}
-                                    </View>
-                                </View>
-                            );
-                        })}
+                {/* ETA Card */}
+                <View style={styles.card}>
+                    <View style={styles.etaHeader}>
+                        <Feather name="clock" size={20} color={colors.primary} />
+                        <Text style={styles.etaTitle}>Estimated Arrival</Text>
                     </View>
+                    <Text style={styles.etaTime}>{busData.eta || '~15 mins'}</Text>
+                    <Text style={styles.etaSubtext}>Location last updated: {new Date(busData.lastUpdate).toLocaleTimeString()}</Text>
                 </View>
+
+                {/* Route Timeline - Hidden for now */}
+                <View style={{ height: 80 }} />
             </View>
         </ScrollView>
     );
@@ -148,7 +145,36 @@ const styles = StyleSheet.create({
     mapContainer: { height: 250, width: '100%', position: 'relative' },
     mapImage: { width: '100%', height: '100%', opacity: 0.9 },
     mapOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.1)' },
-    liveTag: { position: 'absolute', top: 40, left: 20, backgroundColor: colors.success, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 6 },
+    mapPin: {
+        position: 'absolute',
+        padding: 8,
+        borderRadius: 8,
+    },
+    currentTag: {
+        backgroundColor: colors.success,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
+        minHeight: 400,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: colors.textPrimary,
+        marginTop: 16,
+    },
+    emptyText: {
+        fontSize: 14,
+        color: colors.textSecondary,
+        marginTop: 8,
+        textAlign: 'center',
+    },
     pulsingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'white' },
     liveText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
     busPin: { position: 'absolute', top: '50%', left: '50%', width: 40, height: 40, marginLeft: -20, marginTop: -20, backgroundColor: colors.primary, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'white', shadowColor: '#000', shadowOpacity: 0.3, elevation: 5 },

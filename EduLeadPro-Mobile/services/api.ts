@@ -208,6 +208,47 @@ class APIService {
         });
         return await response.json();
     }
+
+    // Teacher Methods
+    async getTeacherDashboard(staffId: number): Promise<any> {
+        const response = await fetch(`${this.baseURL}/teacher/dashboard/${staffId}`);
+        return await response.json();
+    }
+
+    async markAttendance(leadId: number, status: string, checkInTime: string, markedBy: string, organizationId: number): Promise<{ success: boolean; message: string }> {
+        const response = await fetch(`${this.baseURL}/attendance/mark`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ leadId, status, checkInTime, markedBy, organizationId }),
+        });
+        return await response.json();
+    }
+
+    // Driver Methods
+    async getDriverDashboard(staffId: number): Promise<any> {
+        const response = await fetch(`${this.baseURL}/driver/dashboard/${staffId}`);
+        return await response.json();
+    }
+
+    async updateBusLocation(routeId: number, latitude: number, longitude: number, speed?: number, heading?: number): Promise<{ success: boolean; message: string }> {
+        const response = await fetch(`${this.baseURL}/bus-location/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ routeId, latitude, longitude, speed, heading }),
+        });
+        return await response.json();
+    }
+
+    // Parent Live Data Methods
+    async getBusLocation(leadId: number): Promise<any> {
+        const response = await fetch(`${this.baseURL}/bus-location/${leadId}`);
+        return await response.json();
+    }
+
+    async getParentMessages(leadId: number): Promise<any[]> {
+        const response = await fetch(`${this.baseURL}/parent-messages/${leadId}`);
+        return await response.json();
+    }
 }
 
 export const api = new APIService();

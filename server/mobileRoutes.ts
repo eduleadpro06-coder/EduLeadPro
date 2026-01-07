@@ -37,6 +37,53 @@ router.post('/auth/login', async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Phone number and password required' });
         }
 
+        // First, check if this is a STAFF member (Teacher/Driver)
+        const { data: staffMembers, error: staffError } = await supabase
+            .from('staff')
+            .select('id, name, phone, role, organization_id, email')
+            .eq('phone', phone)
+            .eq('is_active', true);
+
+        if (!staffError && staffMembers && staffMembers.length > 0) {
+            const staff = staffMembers[0];
+
+            // For staff, password is their phone number (simple auth for now)
+            if (password === phone || password === '1234') {
+                // Fetch organization name
+                let organizationName = 'School';
+                if (staff.organization_id) {
+                    const { data: org } = await supabase
+                        .from('organizations')
+                        .select('name')
+                        .eq('id', staff.organization_id)
+                        .single();
+                    if (org) organizationName = org.name;
+                }
+
+                const userRole = staff.role.toLowerCase();
+                const isTeacher = userRole.includes('teacher');
+                const isDriver = userRole.includes('driver');
+
+                return res.json({
+                    success: true,
+                    user: {
+                        staffId: staff.id,
+                        name: staff.name,
+                        phone: staff.phone,
+                        email: staff.email,
+                        role: isDriver ? 'driver' : (isTeacher ? 'teacher' : 'staff'),
+                        organization_id: staff.organization_id,
+                        organizationName: organizationName
+                    },
+                    requiresPasswordChange: password === '1234',
+                    students: [] // Staff don't have student children
+                });
+            } else {
+                return res.status(401).json({ error: 'Invalid Password' });
+            }
+        }
+
+        // If not staff, check for PARENT (existing logic)
         const { data: students, error: fetchError } = await supabase
             .from('leads')
             .select('id, name, class, status, parent_name, parent_phone, phone, app_password, organization_id')
@@ -45,7 +92,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
         if (fetchError) throw fetchError;
 
         if (!students || students.length === 0) {
-            return res.status(404).json({ error: 'No student found with this registered phone number' });
+            return res.status(404).json({ error: 'No account found with this phone number' });
         }
 
         // Check Password
@@ -87,6 +134,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
                 name: parentRecord.parent_name || 'Parent',
                 phone: parentRecord.parent_phone,
                 role: 'parent',
+                organization_id: parentRecord.organization_id,
                 organizationName: organizationName
             },
             requiresPasswordChange: requiresChange,
@@ -200,6 +248,324 @@ router.post('/auth/logout', async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
+// =====================================================
+// TEACHER ENDPOINTS
+// =====================================================
+
+/**
+ * Teacher Dashboard
+ * GET /api/mobile/teacher/dashboard/:staffId
+ */
+router.get('/teacher/dashboard/:staffId', async (req: Request, res: Response) => {
+    try {
+        const staffId = parseInt(req.params.staffId);
+
+        // Get teacher info
+        const { data: teacher, error: teacherError } = await supabase
+            .from('staff')
+            .select('id, name, role, organization_id')
+            .eq('id', staffId)
+            .single();
+
+        if (teacherError || !teacher) {
+            return res.status(404).json({ error: 'Teacher not found' });
+        }
+
+        // Get today's date
+        const today = new Date().toISOString().split('T')[0];
+
+        // Get attendance summary for today (for enrolled students in this org)
+        const { data: todayAttendance } = await supabase
+            .from('student_attendance')
+            .select('lead_id, status, check_in_time')
+            .eq('organization_id', teacher.organization_id)
+            .eq('date', today);
+
+        // Get recent daily updates posted by this teacher
+        const { data: recentUpdates } = await supabase
+            .from('daily_updates')
+            .select('id, lead_id, activity_type, content, posted_at')
+            .eq('organization_id', teacher.organization_id)
+            .eq('teacher_name', teacher.name)
+            .order('posted_at', { ascending: false })
+            .limit(10);
+
+        // Get enrolled students for this organization (teacher sees all students)
+        const { data: students } = await supabase
+            .from('leads')
+            .select('id, name, class, parent_phone')
+            .eq('organization_id', teacher.organization_id)
+            .eq('status', 'enrolled')
+            .order('class', { ascending: true });
+
+        res.json({
+            teacher: {
+                id: teacher.id,
+                name: teacher.name,
+                role: teacher.role
+            },
+            todayAttendance: todayAttendance || [],
+            recentUpdates: recentUpdates || [],
+            students: students || []
+        });
+    } catch (error) {
+        console.error('Teacher dashboard error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * Mark Attendance
+ * POST /api/mobile/attendance/mark
+ */
+router.post('/attendance/mark', async (req: Request, res: Response) => {
+    try {
+        const { leadId, status, checkInTime, markedBy, organizationId } = req.body;
+
+        if (!leadId || !status || !organizationId) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+
+        // Check if attendance already exists for today
+        const { data: existing } = await supabase
+            .from('student_attendance')
+            .select('id')
+            .eq('lead_id', leadId)
+            .eq('date', today)
+            .single();
+
+        if (existing) {
+            // Update existing
+            const { error } = await supabase
+                .from('student_attendance')
+                .update({
+                    status,
+                    check_in_time: checkInTime || null,
+                    marked_by: markedBy,
+                    marked_at: new Date().toISOString()
+                })
+                .eq('id', existing.id);
+
+            if (error) throw error;
+        } else {
+            // Create new
+            const { error } = await supabase
+                .from('student_attendance')
+                .insert({
+                    organization_id: organizationId,
+                    lead_id: leadId,
+                    date: today,
+                    status,
+                    check_in_time: checkInTime || null,
+                    marked_by: markedBy,
+                    marked_at: new Date().toISOString()
+                });
+
+            if (error) throw error;
+        }
+
+        res.json({ success: true, message: 'Attendance marked successfully' });
+    } catch (error) {
+        console.error('Mark attendance error:', error);
+        res.status(500).json({ error: 'Failed to mark attendance' });
+    }
+});
+
+// =====================================================
+// DRIVER ENDPOINTS
+// =====================================================
+
+/**
+ * Driver Dashboard
+ * GET /api/mobile/driver/dashboard/:staffId
+ */
+router.get('/driver/dashboard/:staffId', async (req: Request, res: Response) => {
+    try {
+        const staffId = parseInt(req.params.staffId);
+
+        // Get driver info
+        const { data: driver, error: driverError } = await supabase
+            .from('staff')
+            .select('id, name, phone, organization_id')
+            .eq('id', staffId)
+            .single();
+
+        if (driverError || !driver) {
+            return res.status(404).json({ error: 'Driver not found' });
+        }
+
+        // Get assigned bus route (assuming driver's name or ID matches bus route assignment)
+        const { data: routes } = await supabase
+            .from('bus_routes')
+            .select('id, route_name, route_number, start_time, end_time')
+            .eq('organization_id', driver.organization_id)
+            .limit(1); // For now, get first route (can enhance later with driver assignment)
+
+        let assignedRoute = routes && routes.length > 0 ? routes[0] : null;
+
+        // Get students assigned to this route
+        let assignedStudents = [];
+        if (assignedRoute) {
+            const { data: studentAssignments } = await supabase
+                .from('student_bus_assignments')
+                .select('lead_id, pickup_stop_id, dropoff_stop_id')
+                .eq('route_id', assignedRoute.id);
+
+            if (studentAssignments && studentAssignments.length > 0) {
+                const leadIds = studentAssignments.map(sa => sa.lead_id);
+                const { data: students } = await supabase
+                    .from('leads')
+                    .select('id, name, class, parent_phone')
+                    .in('id', leadIds);
+
+                assignedStudents = students || [];
+            }
+        }
+
+        res.json({
+            driver: {
+                id: driver.id,
+                name: driver.name,
+                phone: driver.phone
+            },
+            route: assignedRoute,
+            assignedStudents
+        });
+    } catch (error) {
+        console.error('Driver dashboard error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * Update Bus Location
+ * POST /api/mobile/bus-location/update
+ */
+router.post('/bus-location/update', async (req: Request, res: Response) => {
+    try {
+        const { routeId, latitude, longitude, speed, heading } = req.body;
+
+        if (!routeId || latitude === undefined || longitude === undefined) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        // Store location in bus_location_history
+        const { error } = await supabase
+            .from('bus_location_history')
+            .insert({
+                route_id: routeId,
+                latitude,
+                longitude,
+                speed: speed || 0,
+                heading: heading || 0,
+                recorded_at: new Date().toISOString()
+            });
+
+        if (error) throw error;
+
+        res.json({ success: true, message: 'Location updated' });
+    } catch (error) {
+        console.error('Update bus location error:', error);
+        res.status(500).json({ error: 'Failed to update location' });
+    }
+});
+
+// =====================================================
+// PARENT LIVE DATA ENDPOINTS
+// =====================================================
+
+/**
+ * Get Bus Location for Student
+ * GET /api/mobile/bus-location/:leadId
+ */
+router.get('/bus-location/:leadId', async (req: Request, res: Response) => {
+    try {
+        const leadId = parseInt(req.params.leadId);
+
+        // Find student's bus assignment
+        const { data: assignment } = await supabase
+            .from('student_bus_assignments')
+            .select('route_id')
+            .eq('lead_id', leadId)
+            .single();
+
+        if (!assignment) {
+            return res.json({
+                isLive: false,
+                message: 'No bus route assigned'
+            });
+        }
+
+        // Get route info
+        const { data: route } = await supabase
+            .from('bus_routes')
+            .select('route_name, route_number')
+            .eq('id', assignment.route_id)
+            .single();
+
+        // Get latest location
+        const { data: latestLocation } = await supabase
+            .from('bus_location_history')
+            .select('latitude, longitude, recorded_at')
+            .eq('route_id', assignment.route_id)
+            .order('recorded_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (!latestLocation) {
+            return res.json({
+                isLive: false,
+                busNumber: route?.route_number || 'N/A',
+                message: 'Bus location not available'
+            });
+        }
+
+        // Check if location is recent (within last 5 minutes)
+        const now = new Date();
+        const recordedTime = new Date(latestLocation.recorded_at);
+        const diffMinutes = (now.getTime() - recordedTime.getTime()) / (1000 * 60);
+        const isLive = diffMinutes < 5;
+
+        res.json({
+            isLive,
+            busNumber: route?.route_number || 'N/A',
+            location: `${latestLocation.latitude}, ${latestLocation.longitude}`,
+            lastUpdate: latestLocation.recorded_at,
+            eta: '~15 mins' // TODO: Calculate actual ETA based on route
+        });
+    } catch (error) {
+        console.error('Get bus location error:', error);
+        res.status(500).json({ error: 'Failed to get bus location' });
+    }
+});
+
+/**
+ * Get Parent Messages
+ * GET /api/mobile/parent-messages/:leadId
+ */
+router.get('/parent-messages/:leadId', async (req: Request, res: Response) => {
+    try {
+        const leadId = parseInt(req.params.leadId);
+
+        const { data: messages, error } = await supabase
+            .from('parent_teacher_messages')
+            .select('id, from_name, subject, message, created_at, is_read')
+            .eq('lead_id', leadId)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (error) throw error;
+
+        res.json(messages || []);
+    } catch (error) {
+        console.error('Get parent messages error:', error);
+        res.status(500).json({ error: 'Failed to get messages' });
+    }
+});
+
 
 // =====================================================
 // BUS TRACKING ENDPOINTS
