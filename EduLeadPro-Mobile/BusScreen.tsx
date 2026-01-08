@@ -51,7 +51,7 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
 
     const fetchLiveLocation = async (routeId: number) => {
         try {
-            const response = await api.get(`/v1/mobile/parent/bus/${routeId}/live-location`);
+            const response = await api.getLiveBusLocation(routeId);
             if (response.data.isLive && response.data.location) {
                 setLiveLocation(response.data.location);
                 setIsLive(true);

@@ -441,6 +441,20 @@ class APIService {
         return await this.fetchWithAuth('/v1/mobile/driver/trip/active');
     }
 
+    // Parent Bus Tracking Methods
+    async getBusLocation(studentId: number): Promise<any> {
+        return await this.fetchWithAuth(`/students/${studentId}/bus-assignment`);
+    }
+
+    async getLiveBusLocation(routeId: number): Promise<any> {
+        return await this.fetchWithAuth(`/v1/mobile/parent/bus/${routeId}/live-location`);
+    }
+
+    // Generic GET method for flexibility
+    async get<T = any>(endpoint: string): Promise<T> {
+        return await this.fetchWithAuth<T>(endpoint);
+    }
+
     // Legacy method compatibility (kept for backward compatibility during migration)
     async getHomework(className: string): Promise<Homework[]> {
         // This would need a v1 endpoint - placeholder for now
