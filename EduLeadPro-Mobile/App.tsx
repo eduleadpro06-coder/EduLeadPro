@@ -38,6 +38,7 @@ import ParentFeesScreen from './ParentFeesScreen';
 import { colors, spacing, typography, shadows, layout } from './src/theme';
 import PremiumCard from './src/components/ui/PremiumCard';
 import PremiumDrawer from './src/components/ui/PremiumDrawer';
+import { LanguageProvider } from './src/hooks/LanguageContext';
 
 const { width } = layout;
 
@@ -203,8 +204,15 @@ function App() {
   }
 
   if (!user) return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+
+  const WrappedDriverHome = () => (
+    <LanguageProvider>
+      <DriverHomeScreen user={user} onLogout={handleLogout} />
+    </LanguageProvider>
+  );
+
   if (user.role === 'teacher') return <TeacherHomeScreen user={user} onLogout={handleLogout} />;
-  if (user.role === 'driver') return <DriverHomeScreen user={user} onLogout={handleLogout} />;
+  if (user.role === 'driver') return <WrappedDriverHome />;
 
   // -------------------------------- PARENT UI --------------------------------
 
@@ -399,7 +407,7 @@ function App() {
         isVisible={drawerVisible}
         onClose={() => setDrawerVisible(false)}
         activeTab={activeTab}
-        onSelectTab={(tab) => setActiveTab(tab as TabType)}
+        onSelectTab={(tab: string) => setActiveTab(tab as TabType)}
         user={{ name: user.name, role: user.role }}
         onLogout={handleLogout}
         menuItems={[

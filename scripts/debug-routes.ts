@@ -27,7 +27,7 @@ async function checkRoutes() {
         const columns = await sql`
         SELECT table_name, column_name, data_type, is_nullable
         FROM information_schema.columns 
-        WHERE table_name IN ('active_bus_sessions', 'student_bus_assignments', 'leads', 'staff', 'bus_routes')
+        WHERE table_name IN ('active_bus_sessions', 'student_bus_assignments', 'leads', 'staff', 'bus_routes', 'bus_location_history', 'bus_live_locations')
         ORDER BY table_name, ordinal_position
     `;
         console.table(columns);

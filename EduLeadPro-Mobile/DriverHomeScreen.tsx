@@ -16,6 +16,8 @@ import * as Location from 'expo-location';
 
 import { api } from './services/api';
 import DriverTripScreen from './DriverTripScreen';
+import PremiumDrawer from './src/components/ui/PremiumDrawer';
+import { LanguageProvider, useLanguage } from './src/hooks/LanguageContext';
 
 // Premium Design
 import { colors, spacing, typography, shadows, layout } from './src/theme';
@@ -32,6 +34,7 @@ interface DriverHomeScreenProps {
 type DriverTabType = 'dashboard' | 'routes' | 'history';
 
 export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenProps) {
+    const { t, language, setLanguage } = useLanguage();
     const [activeTab, setActiveTab] = useState<DriverTabType>('dashboard');
     const [dashboardData, setDashboardData] = useState<any>(null);
     const [activeTrip, setActiveTrip] = useState<any>(null);
@@ -126,13 +129,36 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
                     style={styles.headerGradient}
                 >
                     <View style={styles.headerRow}>
-                        <View>
-                            <Text style={styles.roleLabel}>DRIVER PORTAL</Text>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.roleLabel}>{t('portal_title')}</Text>
                             <Text style={styles.name}>{user.name}</Text>
                         </View>
-                        <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
-                            <Feather name="log-out" size={20} color="rgba(255,255,255,0.8)" />
-                        </TouchableOpacity>
+
+                        <View style={styles.headerRight}>
+                            <View style={styles.langSelector}>
+                                {(['en', 'hi', 'mr'] as const).map((lang) => (
+                                    <TouchableOpacity
+                                        key={lang}
+                                        onPress={() => setLanguage(lang)}
+                                        style={[
+                                            styles.langBtn,
+                                            language === lang && styles.langBtnActive
+                                        ]}
+                                    >
+                                        <Text style={[
+                                            styles.langText,
+                                            language === lang && styles.langTextActive
+                                        ]}>
+                                            {lang.toUpperCase()}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
+                                <Feather name="log-out" size={20} color="rgba(255,255,255,0.8)" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </LinearGradient>
             </View>
@@ -146,13 +172,13 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
                                 <Feather name={activeTrip ? "navigation" : "map"} size={24} color={activeTrip ? colors.success : colors.textSecondary} />
                             </View>
                             <View>
-                                <Text style={styles.statusTitle}>{activeTrip ? 'Trip in Progress' : 'Ready for Trip'}</Text>
-                                <Text style={styles.statusSub}>{activeTrip ? 'Tracking is active' : 'Select a route to start'}</Text>
+                                <Text style={styles.statusTitle}>{activeTrip ? t('trip_in_progress') : t('ready_for_trip')}</Text>
+                                <Text style={styles.statusSub}>{activeTrip ? t('tracking_active') : t('select_route')}</Text>
                             </View>
                         </PremiumCard>
 
                         {/* Today's Routes */}
-                        <Text style={styles.sectionTitle}>Assigned Routes</Text>
+                        <Text style={styles.sectionTitle}>{t('assigned_routes')}</Text>
 
                         {loading ? (
                             <ActivityIndicator color={colors.primary} />
@@ -170,7 +196,7 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
                                             </View>
                                             <View style={[styles.statusBadge, { backgroundColor: colors.success + '20' }]}>
                                                 <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
-                                                <Text style={[styles.statusText, { color: colors.success }]}>Active</Text>
+                                                <Text style={[styles.statusText, { color: colors.success }]}>{t('active')}</Text>
                                             </View>
                                         </View>
 
@@ -179,17 +205,17 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
                                         <View style={styles.routeInfo}>
                                             <View style={styles.infoItem}>
                                                 <Feather name="users" size={16} color={colors.textSecondary} />
-                                                <Text style={styles.routeDetail}>{dashboardData.assignedStudents?.length || 0} Students</Text>
+                                                <Text style={styles.routeDetail}>{dashboardData.assignedStudents?.length || 0} {t('students')}</Text>
                                             </View>
                                             <View style={styles.infoSeparator} />
                                             <View style={styles.infoItem}>
                                                 <Feather name="phone" size={16} color={colors.textSecondary} />
-                                                <Text style={styles.routeDetail}>{dashboardData.assignedRoute.helper_phone || 'No Helper'}</Text>
+                                                <Text style={styles.routeDetail}>{dashboardData.assignedRoute.helper_phone || t('no_helper')}</Text>
                                             </View>
                                         </View>
 
                                         <PremiumButton
-                                            title="Start Trip"
+                                            title={t('start_trip')}
                                             icon="play"
                                             onPress={() => handleStartTrip(dashboardData.assignedRoute.id)}
                                             style={{ marginTop: 16 }}
@@ -199,7 +225,7 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
                                     <View style={{ alignItems: 'center', padding: 20 }}>
                                         <Feather name="slash" size={40} color={colors.textTertiary} />
                                         <Text style={{ ...typography.body, color: colors.textSecondary, marginTop: 10 }}>
-                                            No routes assigned yet.
+                                            {t('no_routes')}
                                         </Text>
                                         {/* DEBUG INFO */}
                                         {dashboardData?.debug && (
@@ -216,14 +242,14 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
 
                 {activeTab === 'routes' && (
                     <View>
-                        <Text style={styles.sectionTitle}>All Routes</Text>
+                        <Text style={styles.sectionTitle}>{t('all_routes')}</Text>
                         {dashboardData?.assignedRoute ? (
                             <PremiumCard style={styles.routeCard}>
                                 <Text style={styles.routeTitle}>{dashboardData.assignedRoute.route_name}</Text>
-                                <Text style={styles.statusSub}>Bus: {dashboardData.assignedRoute.bus_number}</Text>
+                                <Text style={styles.statusSub}>{t('bus')}: {dashboardData.assignedRoute.bus_number}</Text>
                             </PremiumCard>
                         ) : (
-                            <Text style={styles.statusSub}>No routes found.</Text>
+                            <Text style={styles.statusSub}>{t('no_routes_found')}</Text>
                         )}
                     </View>
                 )}
@@ -231,8 +257,8 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
                 {activeTab === 'history' && (
                     <View style={{ alignItems: 'center', marginTop: 40 }}>
                         <Feather name="clock" size={48} color={colors.textTertiary} />
-                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Trip History</Text>
-                        <Text style={styles.statusSub}>History feature coming soon.</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('trip_history')}</Text>
+                        <Text style={styles.statusSub}>{t('coming_soon')}</Text>
                     </View>
                 )}
             </ScrollView>
@@ -246,7 +272,7 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
                         return (
                             <TouchableOpacity key={tab} onPress={() => setActiveTab(tab as DriverTabType)} style={styles.tabItem}>
                                 <Feather name={icons[tab]} size={24} color={isActive ? colors.accent : colors.textSecondary} />
-                                {isActive && <Text style={[styles.tabLabel, { color: colors.accent }]}>{tab.charAt(0).toUpperCase() + tab.slice(1)}</Text>}
+                                {isActive && <Text style={[styles.tabLabel, { color: colors.accent }]}>{t(tab as any)}</Text>}
                             </TouchableOpacity>
                         )
                     })}
@@ -294,4 +320,11 @@ const styles = StyleSheet.create({
     bottomBar: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 10, borderRadius: 30 },
     tabItem: { flexDirection: 'row', alignItems: 'center', padding: 8 },
     tabLabel: { marginLeft: 8, fontWeight: '700', fontSize: 12 },
+
+    headerRight: { flexDirection: 'row', alignItems: 'center' },
+    langSelector: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 4, marginRight: 10 },
+    langBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+    langBtnActive: { backgroundColor: colors.accent },
+    langText: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.6)' },
+    langTextActive: { color: colors.primaryDark },
 });

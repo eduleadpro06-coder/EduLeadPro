@@ -29,7 +29,12 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
     const [liveLocation, setLiveLocation] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isLive, setIsLive] = useState(false);
+    const [studentStatus, setStudentStatus] = useState<string>('pending');
+    const [statusTime, setStatusTime] = useState<string | null>(null);
     const mapRef = useRef<any>(null); // Using any to avoid type issues with conditional import
+    const [markerRotation, setMarkerRotation] = useState<number>(0);
+    const [followBus, setFollowBus] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
     const updateInterval = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
@@ -56,6 +61,7 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
             }
         } catch (error) {
             console.error('Failed to fetch bus data:', error);
+            setError('Failed to fetch bus data.');
         } finally {
             setIsLoading(false);
         }
@@ -64,24 +70,37 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
     const fetchLiveLocation = async (routeId: number) => {
         try {
             const response = await api.getLiveBusLocation(routeId);
-            if (response.data.isLive && response.data.location) {
-                setLiveLocation(response.data.location);
-                setIsLive(true);
-
-                // Center map on bus location
-                if (mapRef.current && response.data.location) {
-                    mapRef.current.animateToRegion({
+            if (response.success && response.data) {
+                if (response.data.location) {
+                    const newLocation = {
                         latitude: response.data.location.latitude,
                         longitude: response.data.location.longitude,
-                        latitudeDelta: 0.01,
-                        longitudeDelta: 0.01,
-                    }, 1000);
+                        speed: response.data.location.speed,
+                        timestamp: response.data.location.timestamp,
+                    };
+                    setLiveLocation(newLocation);
+                    setMarkerRotation(response.data.location.heading || 0);
+                    setIsLive(response.data.isLive);
+
+                    // Update student status
+                    setStudentStatus(response.data.studentStatus || 'pending');
+                    setStatusTime(response.data.statusTime);
+
+                    if (followBus && mapRef.current) {
+                        mapRef.current.animateToRegion({
+                            ...newLocation,
+                            latitudeDelta: 0.01,
+                            longitudeDelta: 0.01,
+                        }, 1000);
+                    }
+                } else {
+                    setIsLive(false);
+                    setStudentStatus(response.data.studentStatus || 'pending');
                 }
-            } else {
-                setIsLive(false);
             }
-        } catch (error) {
-            console.error('Failed to fetch live location:', error);
+        } catch (err) {
+            console.error("Error fetching live location:", err);
+            setError('Failed to fetch live location.');
             setIsLive(false);
         }
     };
@@ -218,10 +237,17 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
                             <Text style={styles.busNumber}>{busData.route?.vehicleNumber || 'Bus'}</Text>
                             <Text style={styles.routeText}>{busData.route?.routeName || 'Route'} • {busData.route?.status || 'Active'}</Text>
                         </View>
-                        <View style={[styles.statusBadge, { backgroundColor: isLive ? '#DCFCE7' : '#FEE2E2' }]}>
-                            <Text style={[styles.statusText, { color: isLive ? colors.primary : '#DC2626' }]}>
-                                {isLive ? 'On Time' : 'Inactive'}
-                            </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={styles.statusBadge}>
+                                <View style={[styles.statusDot, { backgroundColor: isLive ? '#4CAF50' : '#F44336' }]} />
+                                <Text style={styles.statusText}>{isLive ? 'Live Tracking' : 'Inactive'}</Text>
+                            </View>
+                            <View style={[styles.statusBadge, { marginLeft: 10, backgroundColor: '#E3F2FD' }]}>
+                                <Text style={[styles.statusText, { color: '#1976D2', textTransform: 'capitalize' }]}>
+                                    {studentStatus === 'boarded' ? '✅ Boarded' :
+                                        studentStatus === 'dropped' ? '🏠 Dropped' : '⏳ Waiting'}
+                                </Text>
+                            </View>
                         </View>
                     </View>
 
@@ -385,6 +411,12 @@ const styles = StyleSheet.create({
     statusText: {
         ...typography.caption,
         fontWeight: '700',
+    },
+    statusDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginRight: 6,
     },
     divider: {
         height: 1,

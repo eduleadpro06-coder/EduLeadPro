@@ -66,6 +66,126 @@
     "is_nullable": "YES"
   },
   {
+    "table_name": "bus_live_locations",
+    "column_name": "id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_live_locations",
+    "column_name": "route_id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_live_locations",
+    "column_name": "driver_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_live_locations",
+    "column_name": "latitude",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_live_locations",
+    "column_name": "longitude",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_live_locations",
+    "column_name": "speed",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_live_locations",
+    "column_name": "heading",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_live_locations",
+    "column_name": "accuracy",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_live_locations",
+    "column_name": "timestamp",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_live_locations",
+    "column_name": "is_active",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_location_history",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_location_history",
+    "column_name": "session_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_location_history",
+    "column_name": "route_id",
+    "data_type": "uuid",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_location_history",
+    "column_name": "latitude",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_location_history",
+    "column_name": "longitude",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_location_history",
+    "column_name": "speed",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_location_history",
+    "column_name": "heading",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_location_history",
+    "column_name": "accuracy",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_location_history",
+    "column_name": "altitude",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_location_history",
+    "column_name": "recorded_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
     "table_name": "bus_routes",
     "column_name": "id",
     "data_type": "integer",

@@ -441,6 +441,13 @@ class APIService {
         return await this.fetchWithAuth('/v1/mobile/driver/trip/active');
     }
 
+    async updateStudentTripStatus(studentId: number, sessionId: number, routeId: number, status: 'boarded' | 'dropped' | 'pending'): Promise<any> {
+        return await this.fetchWithAuth('/v1/mobile/driver/student-status', {
+            method: 'POST',
+            body: JSON.stringify({ studentId, sessionId, routeId, status })
+        });
+    }
+
     // Parent Bus Tracking Methods
     async getBusLocation(studentId: number): Promise<any> {
         return await this.fetchWithAuth(`/students/${studentId}/bus-assignment`);

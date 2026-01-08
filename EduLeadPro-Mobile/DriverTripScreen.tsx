@@ -18,6 +18,7 @@ import { api, type Child } from './services/api';
 import { colors, spacing, typography, shadows, layout } from './src/theme';
 import PremiumCard from './src/components/ui/PremiumCard';
 import PremiumButton from './src/components/ui/PremiumButton';
+import { useLanguage } from './src/hooks/LanguageContext';
 
 interface DriverTripScreenProps {
     route: { id: string; name: string };
@@ -26,6 +27,7 @@ interface DriverTripScreenProps {
 }
 
 export default function DriverTripScreen({ route, students: initialStudents, onTripEnd }: DriverTripScreenProps) {
+    const { t } = useLanguage();
     const [students, setStudents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
@@ -69,14 +71,30 @@ export default function DriverTripScreen({ route, students: initialStudents, onT
         return () => clearInterval(interval);
     }, [initialStudents]);
 
-    const toggleStatus = (studentId: number) => {
-        setStudents(prev => prev.map(s => {
-            if (s.id === studentId) {
-                const newStatus = s.status === 'boarded' ? 'dropped' : s.status === 'pending' ? 'boarded' : 'pending';
-                return { ...s, status: newStatus };
-            }
-            return s;
-        }));
+    const onUpdateStatus = (studentId: number, newStatus: 'pending' | 'boarded' | 'dropped') => {
+        setStudents(prev => prev.map(s =>
+            s.id === studentId ? { ...s, status: newStatus } : s
+        ));
+    };
+
+    const toggleStatus = async (studentId: number) => {
+        const student = students.find(s => s.id === studentId);
+        if (!student) return;
+
+        let nextStatus: 'pending' | 'boarded' | 'dropped' = 'pending';
+        if (student.status === 'pending') nextStatus = 'boarded';
+        else if (student.status === 'boarded') nextStatus = 'dropped';
+        else if (student.status === 'dropped') nextStatus = 'pending';
+
+        try {
+            // Assuming route.id is the tripSessionId
+            await api.updateStudentTripStatus(studentId, parseInt(route.id), parseInt(route.id), nextStatus);
+            onUpdateStatus(studentId, nextStatus);
+        } catch (error) {
+            console.error('Failed to update student status:', error);
+            // Optionally update UI anyway to be responsive, or show error
+            onUpdateStatus(studentId, nextStatus);
+        }
     };
 
     const getStatusColor = (status: string) => {
@@ -97,11 +115,11 @@ export default function DriverTripScreen({ route, students: initialStudents, onT
 
     const handleEndTrip = () => {
         Alert.alert(
-            'End Trip',
-            'Are you sure you want to end this trip?',
+            t('end_trip_title'),
+            t('end_trip_confirm'),
             [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'End Trip', style: 'destructive', onPress: onTripEnd }
+                { text: t('cancel'), style: 'cancel' },
+                { text: t('end_trip_btn'), style: 'destructive', onPress: onTripEnd }
             ]
         );
     };
@@ -118,7 +136,7 @@ export default function DriverTripScreen({ route, students: initialStudents, onT
                         <View>
                             <View style={styles.liveTag}>
                                 <View style={styles.liveDot} />
-                                <Text style={styles.liveText}>LIVE TRACKING</Text>
+                                <Text style={styles.liveText}>{t('live_tracking')}</Text>
                             </View>
                             <Text style={styles.routeTitle}>{route.name}</Text>
                         </View>
@@ -130,8 +148,8 @@ export default function DriverTripScreen({ route, students: initialStudents, onT
             </View>
 
             <View style={styles.infoBar}>
-                <Text style={styles.infoText}>Route: <Text style={{ fontWeight: '700' }}>{route.name}</Text></Text>
-                <Text style={styles.infoText}>{students.filter(s => s.status === 'boarded').length} Onboard</Text>
+                <Text style={styles.infoText}>{t('routes')}: <Text style={{ fontWeight: '700' }}>{route.name}</Text></Text>
+                <Text style={styles.infoText}>{students.filter(s => s.status === 'boarded').length} {t('onboard')}</Text>
             </View>
 
             {loading ? (
@@ -157,7 +175,7 @@ export default function DriverTripScreen({ route, students: initialStudents, onT
                                 >
                                     <Feather name={getStatusIcon(item.status) as any} size={20} color={getStatusColor(item.status)} />
                                     <Text style={[styles.statusLabel, { color: getStatusColor(item.status) }]}>
-                                        {item.status.toUpperCase()}
+                                        {t(item.status as any)}
                                     </Text>
                                 </TouchableOpacity>
                             </View>
@@ -168,7 +186,7 @@ export default function DriverTripScreen({ route, students: initialStudents, onT
 
             <View style={styles.footer}>
                 <PremiumButton
-                    title="Complete Trip"
+                    title={t('complete_trip')}
                     variant="danger"
                     size="lg"
                     onPress={handleEndTrip}

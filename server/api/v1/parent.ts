@@ -484,37 +484,51 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
             });
         }
 
-        // Get latest location from our location tracking table
-        const location = await storage.getLatestBusLocation(routeId);
+        const { supabase } = await import('../../supabase.js');
 
-        if (!location) {
-            return res.json({
-                success: true,
-                data: {
-                    isLive: false,
-                    message: 'Bus is not currently tracking'
-                }
-            });
+        // 1. Get latest location from the synchronized table
+        const { data: location, error: locError } = await supabase
+            .from('bus_live_locations')
+            .select('*')
+            .eq('route_id', routeId)
+            .eq('is_active', true)
+            .order('timestamp', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (locError && locError.code !== 'PGRST116') {
+            console.error('[Parent API] Location fetch error:', locError);
         }
 
-        // Check if location is recent (within last 2 minutes)
-        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
-        const locationTime = new Date(location.timestamp);
-        const isRecent = locationTime >= twoMinutesAgo;
+        // 2. Get latest student boarding status for this route
+        // We look for any lead_id that matches the authenticated parent's child
+        // For now, we'll just get the latest event for this route
+        const { data: studentEvent } = await supabase
+            .from('bus_trip_passenger_events')
+            .select('status, event_time')
+            .eq('route_id', routeId)
+            .order('event_time', { ascending: false })
+            .limit(1)
+            .single();
+
+        // Check if location is recent (within last 5 minutes)
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const isRecent = location ? new Date(location.timestamp) >= fiveMinutesAgo : false;
 
         res.json({
             success: true,
             data: {
-                isLive: isRecent && location.isActive,
-                location: {
+                isLive: isRecent && location?.is_active,
+                location: location ? {
                     latitude: parseFloat(location.latitude),
                     longitude: parseFloat(location.longitude),
                     speed: parseFloat(location.speed || '0'),
                     heading: parseFloat(location.heading || '0'),
-                    accuracy: parseFloat(location.accuracy || '0'),
                     timestamp: location.timestamp
-                },
-                message: isRecent ? 'Live tracking active' : 'Last known location (tracking inactive)'
+                } : null,
+                studentStatus: studentEvent?.status || 'pending',
+                statusTime: studentEvent?.event_time || null,
+                message: isRecent ? 'Live tracking active' : 'Tracking inactive'
             }
         });
     } catch (error) {

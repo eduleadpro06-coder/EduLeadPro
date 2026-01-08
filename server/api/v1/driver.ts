@@ -134,33 +134,81 @@ router.post('/location', async (req: Request, res: Response) => {
         }
 
         const { supabase } = await import('../../supabase.js');
-
-        // Insert location record
-        const { error } = await supabase
-            .from('bus_location_history')
-            .insert({
+        // Update BOTH tables for parent/admin visibility
+        // Table 1: bus_live_locations (used by parent portal map)
+        const { error: liveError } = await supabase
+            .from('bus_live_locations')
+            .upsert({
                 route_id: routeId,
+                driver_id: req.user?.userId, // Keep driver_id as it was in the original code
                 latitude,
                 longitude,
-                speed: speed || 0,
-                heading: heading || 0,
-                recorded_at: new Date().toISOString()
+                speed,
+                heading,
+                is_active: true,
+                timestamp: new Date().toISOString()
+            }, { onConflict: 'route_id' });
+
+        if (liveError) console.error('[Driver API] Live location error:', liveError);
+
+        // Table 2: active_bus_sessions (used for current status/dashboard)
+        const { error: sessionError } = await supabase
+            .from('active_bus_sessions')
+            .update({
+                current_latitude: latitude,
+                current_longitude: longitude,
+                current_speed: speed,
+                current_heading: heading,
+                last_updated: new Date().toISOString()
+            })
+            .eq('route_id', routeId)
+            .eq('status', 'live');
+
+        if (sessionError) console.error('[Driver API] Session update error:', sessionError);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Driver API] Update location error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+/**
+ * POST /api/v1/mobile/driver/student-status
+ * Update boarding/drop status for a student in a session
+ */
+router.post('/student-status', async (req: Request, res: Response) => {
+    try {
+        const { studentId, sessionId, routeId, status } = req.body;
+
+        if (!studentId || !sessionId || !routeId || !status) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required fields (studentId, sessionId, routeId, status)'
+            });
+        }
+
+        const { supabase } = await import('../../supabase.js');
+
+        // Log the event in the new table
+        const { error } = await supabase
+            .from('bus_trip_passenger_events')
+            .insert({
+                session_id: sessionId,
+                student_id: studentId,
+                route_id: routeId,
+                status: status,
+                event_time: new Date().toISOString()
             });
 
         if (error) throw error;
 
-        res.json({
-            success: true,
-            message: 'Location updated successfully'
-        });
+        res.json({ success: true });
     } catch (error) {
-        console.error('[Mobile API] Update location error:', error);
+        console.error('[Driver API] Update student status error:', error);
         res.status(500).json({
             success: false,
-            error: {
-                code: 'LOCATION_UPDATE_ERROR',
-                message: 'Failed to update location'
-            }
+            error: 'Failed to update student status'
         });
     }
 });
@@ -323,149 +371,6 @@ router.get('/trip/active', async (req: Request, res: Response) => {
     }
 });
 
-/**
- * POST /api/v1/mobile/driver/location/start-tracking
- * Start location tracking session
- */
-router.post('/location/start-tracking', async (req: Request, res: Response) => {
-    try {
-        const { routeId } = req.body;
-        const staffId = req.user!.userId;
-
-        if (!routeId) {
-            return res.status(400).json({
-                success: false,
-                error: {
-                    code: 'INVALID_REQUEST',
-                    message: 'routeId is required'
-                }
-            });
-        }
-
-        // Mark route as actively being tracked
-        // For now, just respond success - tracking state managed by location updates
-        res.json({
-            success: true,
-            data: {
-                message: 'Tracking session started',
-                routeId,
-                driverId: staffId
-            }
-        });
-    } catch (error) {
-        console.error('[Mobile API] Start tracking error:', error);
-        res.status(500).json({
-            success: false,
-            error: {
-                code: 'START_TRACKING_ERROR',
-                message: 'Failed to start tracking session'
-            }
-        });
-    }
-});
-
-/**
- * POST /api/v1/mobile/driver/location/update
- * Update bus GPS location (called every 30 seconds)
- */
-router.post('/location/update', async (req: Request, res: Response) => {
-    try {
-        const {
-            routeId,
-            latitude,
-            longitude,
-            speed,
-            heading,
-            accuracy
-        } = req.body;
-        const staffId = req.user!.userId;
-
-        if (!routeId || latitude === undefined || longitude === undefined) {
-            return res.status(400).json({
-                success: false,
-                error: {
-                    code: 'INVALID_REQUEST',
-                    message: 'routeId, latitude, and longitude are required'
-                }
-            });
-        }
-
-        const { storage } = await import('../../../storage.js');
-
-        // Save location to database
-        await storage.saveBusLocation({
-            routeId,
-            driverId: staffId,
-            latitude: latitude.toString(),
-            longitude: longitude.toString(),
-            speed: speed ? speed.toString() : '0',
-            heading: heading ? heading.toString() : '0',
-            accuracy: accuracy ? accuracy.toString() : '0',
-            isActive: true
-        });
-
-        // TODO: Broadcast via WebSocket to connected parents
-        // io.to(`route-${routeId}`).emit('bus:location:update', { routeId, latitude, longitude });
-
-        res.json({
-            success: true,
-            data: {
-                message: 'Location updated successfully',
-                timestamp: new Date().toISOString()
-            }
-        });
-    } catch (error) {
-        console.error('[Mobile API] Update location error:', error);
-        res.status(500).json({
-            success: false,
-            error: {
-                code: 'LOCATION_UPDATE_ERROR',
-                message: 'Failed to update location'
-            }
-        });
-    }
-});
-
-/**
- * POST /api/v1/mobile/driver/location/stop-tracking
- * Stop location tracking session
- */
-router.post('/location/stop-tracking', async (req: Request, res: Response) => {
-    try {
-        const { routeId } = req.body;
-
-        if (!routeId) {
-            return res.status(400).json({
-                success: false,
-                error: {
-                    code: 'INVALID_REQUEST',
-                    message: 'routeId is required'
-                }
-            });
-        }
-
-        const { storage } = await import('../../../storage.js');
-
-        // Mark all locations for this route as inactive
-        await storage.deactivateBusLocation(routeId);
-
-        res.json({
-            success: true,
-            data: {
-                message: 'Tracking session stopped'
-            }
-        });
-    } catch (error) {
-        console.error('[Mobile API] Stop tracking error:', error);
-        res.status(500).json({
-            success: false,
-            error: {
-                code: 'STOP_TRACKING_ERROR',
-                message: 'Failed to stop tracking session'
-            }
-        });
-    }
-});
-
 export default router;
+
 
