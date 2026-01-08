@@ -90,7 +90,7 @@ function App() {
   // Initialization
   useEffect(() => {
     const init = async () => {
-      try { await offlineCache.init(); } catch (e) { console.error(e); }
+      // TEMPORARILY DISABLED: try { await offlineCache.init(); } catch (e) { console.error(e); }
       try {
         const sessionData = await AsyncStorage.getItem('user_session');
         if (sessionData) {
@@ -113,14 +113,8 @@ function App() {
     }
     try {
       if (!isOnline) {
-        const [cachedAnn, cachedAtt, cachedAct] = await Promise.all([
-          offlineCache.getCachedAnnouncements(),
-          offlineCache.getCachedAttendance(childId, 1),
-          offlineCache.getCachedActivities(childId, 1)
-        ]);
-        setAnnouncements(cachedAnn);
-        setTodayAttendance(cachedAtt[0] || null);
-        if (cachedAct.length > 0) setLatestActivity(cachedAct[0]);
+        // TEMPORARILY DISABLED: Offline mode with cache
+        console.log('[App] Offline mode - cache disabled');
         return;
       }
 
@@ -154,9 +148,10 @@ function App() {
         }
       }
 
-      await offlineCache.cacheAnnouncements(annRes);
-      await offlineCache.cacheAttendance(childId, attRes ? [attRes] : []);
-      await offlineCache.cacheActivities(childId, updRes);
+      // TEMPORARILY DISABLED: Cache saving
+      // await offlineCache.cacheAnnouncements(annRes);
+      // await offlineCache.cacheAttendance(childId, attRes ? [attRes] : []);
+      // await offlineCache.cacheActivities(childId, updRes);
     } catch (e) { console.error('Error fetching live data:', e); }
   };
 
@@ -186,7 +181,7 @@ function App() {
     setDrawerVisible(false);
     await api.clearTokens();
     await AsyncStorage.removeItem('user_session');
-    await offlineCache.clearAllCache();
+    // TEMPORARILY DISABLED: await offlineCache.clearAllCache();
   };
 
   // Rendering Helpers

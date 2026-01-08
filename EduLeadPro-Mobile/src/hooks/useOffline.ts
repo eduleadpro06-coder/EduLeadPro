@@ -34,8 +34,9 @@ export function useOffline() {
 
     const loadLastSyncTime = async () => {
         try {
-            const syncTime = await offlineCache.getLastSyncTime('last_children_sync');
-            setLastSyncTime(syncTime);
+            // TEMPORARILY DISABLED: await offlineCache.getLastSyncTime('last_children_sync');
+            // setLastSyncTime(syncTime);
+            console.log('[Offline] Cache disabled - skipping sync time load');
         } catch (error) {
             console.error('[Offline] Failed to load sync time:', error);
         }
@@ -46,19 +47,8 @@ export function useOffline() {
 
         setIsSyncing(true);
         try {
-            // Sync pending actions first
-            const pendingActions = await offlineCache.getPendingActions();
-
-            for (const action of pendingActions) {
-                try {
-                    await executePendingAction(action);
-                    await offlineCache.removePendingAction(action.id);
-                    console.log(`[Offline] Synced action: ${action.actionType}`);
-                } catch (error) {
-                    console.error(`[Offline] Failed to sync action ${action.actionType}:`, error);
-                }
-            }
-
+            // TEMPORARILY DISABLED: Offline cache sync
+            console.log('[Offline] Cache disabled - skipping sync');
             setLastSyncTime(new Date());
         } catch (error) {
             console.error('[Offline] Sync error:', error);
@@ -111,22 +101,12 @@ export function useChildren() {
 
     const loadChildren = async () => {
         try {
-            // Load from cache first (instant)
-            const cachedChildren = await offlineCache.getCachedChildren();
-            if (cachedChildren.length > 0) {
-                setChildren(cachedChildren);
-                setFromCache(true);
-                setLoading(false);
-            }
-
-            // If online, fetch fresh data in background
+            // TEMPORARILY DISABLED: Cache-first loading
+            // Fetch directly from API
             if (isOnline) {
                 const freshChildren = await api.getChildren();
                 setChildren(freshChildren);
                 setFromCache(false);
-
-                // Update cache
-                await offlineCache.cacheChildren(freshChildren);
             }
         } catch (error) {
             console.error('[useChildren] Error:', error);
@@ -156,22 +136,11 @@ export function useAttendance(childId: number, days: number = 30) {
         if (!childId) return;
 
         try {
-            // Load from cache first
-            const cachedAttendance = await offlineCache.getCachedAttendance(childId, days);
-            if (cachedAttendance.length > 0) {
-                setAttendance(cachedAttendance);
-                setFromCache(true);
-                setLoading(false);
-            }
-
-            // Fetch fresh if online
+            // TEMPORARILY DISABLED: Cache-first loading
             if (isOnline) {
                 const freshAttendance = await api.getAttendance(childId, days);
                 setAttendance(freshAttendance);
                 setFromCache(false);
-
-                // Update cache
-                await offlineCache.cacheAttendance(childId, freshAttendance);
             }
         } catch (error) {
             console.error('[useAttendance] Error:', error);
@@ -201,22 +170,11 @@ export function useActivities(childId: number, limit: number = 20) {
         if (!childId) return;
 
         try {
-            // Load from cache first
-            const cachedActivities = await offlineCache.getCachedActivities(childId, limit);
-            if (cachedActivities.length > 0) {
-                setActivities(cachedActivities);
-                setFromCache(true);
-                setLoading(false);
-            }
-
-            // Fetch fresh if online
+            // TEMPORARILY DISABLED: Cache-first loading
             if (isOnline) {
                 const freshActivities = await api.getDailyUpdates(childId);
                 setActivities(freshActivities);
                 setFromCache(false);
-
-                // Update cache
-                await offlineCache.cacheActivities(childId, freshActivities);
             }
         } catch (error) {
             console.error('[useActivities] Error:', error);

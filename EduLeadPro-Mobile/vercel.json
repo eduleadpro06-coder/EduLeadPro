@@ -1,12 +1,57 @@
 {
     "rewrites": [
         {
+            "source": "/assets/node_modules/expo-sqlite/web/wa-sqlite/:file",
+            "destination": "/assets/wasm/:file"
+        },
+        {
+            "source": "/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/:file",
+            "destination": "/assets/fonts/:file"
+        },
+        {
             "source": "/api/:path*",
             "destination": "https://edu-lead-pro.vercel.app/api/:path*"
         },
         {
-            "source": "/((?!assets/|.*\\..*).*)",
+            "source": "/((?!assets/|_expo/|.*\\..*).*)",
             "destination": "/index.html"
+        }
+    ],
+    "headers": [
+        {
+            "source": "/assets/(.*).wasm",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/wasm"
+                },
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=31536000, immutable"
+                }
+            ]
+        },
+        {
+            "source": "/assets/(.*).ttf",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "font/ttf"
+                },
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=31536000, immutable"
+                }
+            ]
+        },
+        {
+            "source": "/_expo/(.*)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=31536000, immutable"
+                }
+            ]
         }
     ]
 }
