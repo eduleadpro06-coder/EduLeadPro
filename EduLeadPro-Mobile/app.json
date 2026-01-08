@@ -33,8 +33,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "25f5b34a-4952-4dec-bdc3-45ce9fb48702"
       }
-    }
+    },
+    "owner": "educonnect06"
   }
 }
