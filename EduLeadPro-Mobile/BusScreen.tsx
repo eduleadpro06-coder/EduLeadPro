@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions, ActivityIndicator, Linking } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator, Linking } from 'react-native';
+import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from './services/api';
 import { colors, spacing, typography } from './src/theme';
 
-const { width } = Dimensions.get('window');
-
+const { width, height } = Dimensions.get('window');
 
 interface BusScreenProps {
     currentChild: any;
@@ -14,25 +14,88 @@ interface BusScreenProps {
 
 export default function BusScreen({ currentChild }: BusScreenProps) {
     const [busData, setBusData] = useState<any>(null);
+    const [liveLocation, setLiveLocation] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
+    const [isLive, setIsLive] = useState(false);
+    const mapRef = useRef<MapView>(null);
+    const updateInterval = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (currentChild) {
             fetchBusData();
+            startLiveUpdates();
         }
+
+        return () => {
+            if (updateInterval.current) {
+                clearInterval(updateInterval.current);
+            }
+        };
     }, [currentChild]);
 
     const fetchBusData = async () => {
         try {
             const data = await api.getBusLocation(currentChild.id);
             setBusData(data);
+
+            // If bus is assigned, fetch live location
+            if (data?.route?.id) {
+                await fetchLiveLocation(data.route.id);
+            }
         } catch (error) {
-            console.error('Failed to fetch bus location:', error);
+            console.error('Failed to fetch bus data:', error);
         } finally {
             setIsLoading(false);
-            setRefreshing(false);
         }
+    };
+
+    const fetchLiveLocation = async (routeId: number) => {
+        try {
+            const response = await api.get(`/v1/mobile/parent/bus/${routeId}/live-location`);
+            if (response.data.isLive && response.data.location) {
+                setLiveLocation(response.data.location);
+                setIsLive(true);
+
+                // Center map on bus location
+                if (mapRef.current && response.data.location) {
+                    mapRef.current.animateToRegion({
+                        latitude: response.data.location.latitude,
+                        longitude: response.data.location.longitude,
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                    }, 1000);
+                }
+            } else {
+                setIsLive(false);
+            }
+        } catch (error) {
+            console.error('Failed to fetch live location:', error);
+            setIsLive(false);
+        }
+    };
+
+    const startLiveUpdates = () => {
+        // Update location every 10 seconds
+        updateInterval.current = setInterval(() => {
+            if (busData?.route?.id) {
+                fetchLiveLocation(busData.route.id);
+            }
+        }, 10000);
+    };
+
+    const calculateETA = () => {
+        if (!liveLocation || !liveLocation.speed || liveLocation.speed === 0) {
+            return '~15 mins';
+        }
+
+        // Simple ETA calculation based on speed
+        // Assuming average distance of 5km to pickup point
+        const averageDistance = 5; // km
+        const speedKmh = liveLocation.speed;
+        const timeHours = averageDistance / speedKmh;
+        const timeMinutes = Math.round(timeHours * 60);
+
+        return timeMinutes > 0 ? `~${timeMinutes} mins` : 'Arriving soon';
     };
 
     if (!currentChild) {
@@ -53,64 +116,79 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
         );
     }
 
-    if (!busData || (!busData.isLive && !busData.assignment)) {
+    if (!busData || !busData.assignment) {
         return (
             <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
                 <View style={styles.emptyContainer}>
                     <View style={[styles.iconCircle, { backgroundColor: colors.background }]}>
-                        <Feather name="map-pin" size={40} color={colors.textSecondary} />
+                        <Feather name="alert-circle" size={48} color={colors.accent} />
                     </View>
-                    <Text style={styles.emptyTitle}>Bus Tracking Inactive</Text>
+                    <Text style={styles.emptyTitle}>No Bus Route Assigned</Text>
                     <Text style={styles.emptyText}>
-                        {busData?.message || 'The bus trip has not started yet or live tracking is unavailable for this route.'}
+                        This student is not currently assigned to a bus route. Please contact the school office for assistance.
                     </Text>
-
-                    {/* Fallback Static Info if available */}
-                    {(busData?.route || (busData?.assignment && busData?.route)) && (
-                        <View style={[styles.card, { marginTop: 24, width: '100%' }]}>
-                            <View style={styles.busHeader}>
-                                <Text style={styles.busNumber}>{busData.route?.routeName || 'Bus Route'}</Text>
-                                <View style={styles.currentTagContainer}>
-                                    <Text style={styles.currentTagText}>Assigned</Text>
-                                </View>
-                            </View>
-                            <Text style={styles.routeText}>{busData.route?.vehicleNumber || 'Bus Number N/A'}</Text>
-                        </View>
-                    )}
                 </View>
             </ScrollView>
         );
     }
 
     return (
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-            {/* Map Area */}
+        <View style={styles.container}>
+            {/* Live Map */}
             <View style={styles.mapContainer}>
-                <Image
-                    source={{ uri: 'https://img.freepik.com/free-vector/city-map-navigation-background-with-pins_23-2148813264.jpg' }}
-                    style={styles.mapImage}
-                />
-                <View style={styles.mapOverlay}>
-                    <View style={styles.liveTag}>
-                        <View style={styles.pulsingDot} />
-                        <Text style={styles.liveText}>LIVE TRACKING</Text>
+                <MapView
+                    ref={mapRef}
+                    provider={PROVIDER_DEFAULT}
+                    style={styles.map}
+                    initialRegion={{
+                        latitude: liveLocation?.latitude || 28.6139, // Default to Delhi
+                        longitude: liveLocation?.longitude || 77.2090,
+                        latitudeDelta: 0.02,
+                        longitudeDelta: 0.02,
+                    }}
+                    showsUserLocation={true}
+                    showsMyLocationButton={true}
+                >
+                    {liveLocation && isLive && (
+                        <Marker
+                            coordinate={{
+                                latitude: liveLocation.latitude,
+                                longitude: liveLocation.longitude,
+                            }}
+                            title="School Bus"
+                            description={`Speed: ${Math.round(liveLocation.speed)} km/h`}
+                        >
+                            <View style={styles.busMarker}>
+                                <Feather name="truck" size={24} color="white" />
+                            </View>
+                        </Marker>
+                    )}
+                </MapView>
+
+                {/* Live Indicator Overlay */}
+                {isLive && (
+                    <View style={styles.liveTagContainer}>
+                        <View style={styles.liveTag}>
+                            <View style={styles.pulsingDot} />
+                            <Text style={styles.liveText}>LIVE TRACKING</Text>
+                        </View>
                     </View>
-                    <View style={styles.busPin}>
-                        <Feather name="truck" size={20} color="white" />
-                    </View>
-                </View>
+                )}
             </View>
 
-            <View style={styles.contentContainer}>
+            {/* Info Cards */}
+            <ScrollView style={styles.contentContainer} showsVerticalScrollIndicator={false}>
                 {/* Bus Info Card */}
                 <View style={styles.card}>
                     <View style={styles.busHeader}>
                         <View>
-                            <Text style={styles.busNumber}>{busData.route?.vehicleNumber || busData.busNumber}</Text>
+                            <Text style={styles.busNumber}>{busData.route?.vehicleNumber || 'Bus'}</Text>
                             <Text style={styles.routeText}>{busData.route?.routeName || 'Route'} • {busData.route?.status || 'Active'}</Text>
                         </View>
-                        <View style={[styles.statusBadge, { backgroundColor: '#DCFCE7' }]}>
-                            <Text style={[styles.statusText, { color: colors.primary }]}>On Time</Text>
+                        <View style={[styles.statusBadge, { backgroundColor: isLive ? '#DCFCE7' : '#FEE2E2' }]}>
+                            <Text style={[styles.statusText, { color: isLive ? colors.primary : '#DC2626' }]}>
+                                {isLive ? 'On Time' : 'Inactive'}
+                            </Text>
                         </View>
                     </View>
 
@@ -159,94 +237,218 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
                         <Feather name="clock" size={20} color={colors.primary} />
                         <Text style={styles.etaTitle}>Estimated Arrival</Text>
                     </View>
-                    <Text style={styles.etaTime}>{busData.eta || '~15 mins'}</Text>
-                    <Text style={styles.etaSubtext}>Location last updated: {busData.lastUpdate ? new Date(busData.lastUpdate).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }) : 'Tracking not active'}</Text>
+                    <Text style={styles.etaTime}>{calculateETA()}</Text>
+                    <Text style={styles.etaSubtext}>
+                        Location last updated: {liveLocation ? new Date(liveLocation.timestamp).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }) : 'Tracking not active'}
+                    </Text>
+                    {liveLocation && isLive && (
+                        <View style={styles.speedInfo}>
+                            <Feather name="activity" size={16} color={colors.textSecondary} />
+                            <Text style={styles.speedText}>
+                                Current Speed: {Math.round(liveLocation.speed)} km/h
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
-                {/* Route Timeline - Hidden for now */}
-                <View style={{ height: 80 }} />
-            </View>
-        </ScrollView>
+                <View style={{ height: 40 }} />
+            </ScrollView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    mapContainer: { height: 250, width: '100%', position: 'relative' },
-    mapImage: { width: '100%', height: '100%', opacity: 0.9 },
-    mapOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.1)' },
-    mapPin: {
-        position: 'absolute',
-        padding: 8,
-        borderRadius: 8,
+    container: {
+        flex: 1,
+        backgroundColor: '#F9FAFB',
     },
-    currentTagContainer: {
-        backgroundColor: colors.success,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
+    mapContainer: {
+        height: height * 0.4,
+        position: 'relative',
+    },
+    map: {
+        flex: 1,
+    },
+    busMarker: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+    liveTagContainer: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+    },
+    liveTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    pulsingDot: {
+        width: 8,
+        height: 8,
         borderRadius: 4,
+        backgroundColor: colors.primary,
+        marginRight: 6,
+    },
+    liveText: {
+        ...typography.caption,
+        color: colors.primary,
+        fontWeight: '700',
+        fontSize: 11,
+    },
+    contentContainer: {
+        flex: 1,
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.lg,
+    },
+    card: {
+        backgroundColor: 'white',
+        borderRadius: 16,
+        padding: spacing.lg,
+        marginBottom: spacing.lg,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    busHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    busNumber: {
+        ...typography.h2,
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    routeText: {
+        ...typography.body,
+        color: colors.textSecondary,
+        marginTop: 4,
+    },
+    statusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    statusText: {
+        ...typography.caption,
+        fontWeight: '700',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#E5E7EB',
+        marginVertical: spacing.md,
+    },
+    driverRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    driverPhoto: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+    },
+    driverInfo: {
+        flex: 1,
+        marginLeft: spacing.md,
+    },
+    label: {
+        ...typography.caption,
+        color: colors.textSecondary,
+        textTransform: 'uppercase',
+        marginBottom: 2,
+    },
+    name: {
+        ...typography.body,
+        color: colors.textPrimary,
+        fontWeight: '600',
+    },
+    callButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    etaHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+    },
+    etaTitle: {
+        ...typography.body,
+        fontWeight: '700',
+        color: colors.textPrimary,
+        marginLeft: spacing.sm,
+    },
+    etaTime: {
+        ...typography.h1,
+        fontWeight: '700',
+        color: colors.primary,
+        marginBottom: spacing.xs,
+    },
+    etaSubtext: {
+        ...typography.caption,
+        color: colors.textSecondary,
+    },
+    speedInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: spacing.md,
+        paddingTop: spacing.md,
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+    },
+    speedText: {
+        ...typography.body,
+        color: colors.textSecondary,
+        marginLeft: spacing.sm,
     },
     emptyContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 40,
-        minHeight: 400,
+        padding: spacing.xl,
+    },
+    iconCircle: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: spacing.lg,
     },
     emptyTitle: {
-        fontSize: 20,
+        ...typography.h2,
         fontWeight: '700',
         color: colors.textPrimary,
-        marginTop: 16,
-    },
-    emptyText: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        marginTop: 8,
+        marginBottom: spacing.sm,
         textAlign: 'center',
     },
-    pulsingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'white' },
-    liveText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
-    busPin: { position: 'absolute', top: '50%', left: '50%', width: 40, height: 40, marginLeft: -20, marginTop: -20, backgroundColor: colors.primary, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'white', shadowColor: '#000', shadowOpacity: 0.3, elevation: 5 },
-
-    contentContainer: { marginTop: -spacing.lg, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.background, flex: 1, padding: spacing.lg },
-    card: { backgroundColor: 'white', borderRadius: 16, padding: spacing.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2, marginBottom: spacing.lg },
-    busHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-    busNumber: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
-    routeText: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-    statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-    statusText: { fontSize: 12, fontWeight: '600' },
-    divider: { height: 1, backgroundColor: colors.border, marginVertical: 16 },
-    driverRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    driverPhoto: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#E5E7EB' },
-    driverInfo: { flex: 1 },
-    label: { fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
-    name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-    ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-    rating: { fontSize: 12, color: colors.textSecondary },
-    callButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center' },
-
-    section: { marginBottom: spacing.lg },
-    sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 12 },
-    timelineCard: { backgroundColor: 'white', borderRadius: 16, padding: spacing.lg },
-    timelineItem: { flexDirection: 'row', height: 60 },
-    timelineLeft: { width: 70, alignItems: 'flex-end', paddingRight: 12 },
-    time: { fontSize: 12, color: colors.textSecondary, fontWeight: '500', paddingTop: 4 },
-    timelineCenter: { alignItems: 'center', width: 24 },
-    dot: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', zIndex: 2, borderWidth: 2, borderColor: 'white' },
-    dotCompleted: { backgroundColor: colors.primary },
-    dotCurrent: { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 4 },
-    innerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'white' },
-    line: { width: 2, flex: 1, backgroundColor: '#E5E7EB', position: 'absolute', top: 16, bottom: -16 },
-    lineCompleted: { backgroundColor: colors.primary },
-    timelineRight: { flex: 1, paddingLeft: 12, paddingTop: 2 },
-    stopName: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
-    stopNameCurrent: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
-    currentTagText: { fontSize: 11, color: colors.primary, marginTop: 2, fontWeight: '500' },
-    iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-    liveTag: { position: 'absolute', top: 16, right: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, zIndex: 10 },
-    etaHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-    etaTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginLeft: 8 },
-    etaTime: { fontSize: 32, fontWeight: '800', color: colors.primary },
-    etaSubtext: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+    emptyText: {
+        ...typography.body,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: 22,
+    },
 });

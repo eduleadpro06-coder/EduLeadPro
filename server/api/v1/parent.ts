@@ -466,4 +466,68 @@ router.get('/events', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * GET /api/v1/mobile/parent/bus/:routeId/live-location
+ * Get real-time bus location with latest GPS data
+ */
+router.get('/bus/:routeId/live-location', async (req: Request, res: Response) => {
+    try {
+        const routeId = parseInt(req.params.routeId);
+
+        if (isNaN(routeId)) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'INVALID_REQUEST',
+                    message: 'Invalid route ID'
+                }
+            });
+        }
+
+        // Get latest location from our location tracking table
+        const location = await storage.getLatestBusLocation(routeId);
+
+        if (!location) {
+            return res.json({
+                success: true,
+                data: {
+                    isLive: false,
+                    message: 'Bus is not currently tracking'
+                }
+            });
+        }
+
+        // Check if location is recent (within last 2 minutes)
+        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+        const locationTime = new Date(location.timestamp);
+        const isRecent = locationTime >= twoMinutesAgo;
+
+        res.json({
+            success: true,
+            data: {
+                isLive: isRecent && location.isActive,
+                location: {
+                    latitude: parseFloat(location.latitude),
+                    longitude: parseFloat(location.longitude),
+                    speed: parseFloat(location.speed || '0'),
+                    heading: parseFloat(location.heading || '0'),
+                    accuracy: parseFloat(location.accuracy || '0'),
+                    timestamp: location.timestamp
+                },
+                message: isRecent ? 'Live tracking active' : 'Last known location (tracking inactive)'
+            }
+        });
+    } catch (error) {
+        console.error('[Mobile API] Get live bus location error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'FETCH_LOCATION_ERROR',
+                message: 'Failed to fetch bus location'
+            }
+        });
+    }
+});
+
 export default router;
+
