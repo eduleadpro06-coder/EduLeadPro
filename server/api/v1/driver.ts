@@ -35,11 +35,15 @@ router.get('/dashboard', async (req: Request, res: Response) => {
         }
 
         // Get routes assigned to THIS driver
-        const { data: routes } = await supabase
+        const { data: routes, error: routesError } = await supabase
             .from('bus_routes')
-            .select('id, route_name, vehicle_number, helper_name, helper_phone')
+            .select('id, route_name, bus_number, helper_name, helper_phone')
             .eq('organization_id', organizationId)
             .eq('driver_id', staffId); // Filter by this driver's ID
+
+        if (routesError) {
+            console.error('[Mobile API] Supabase routes error:', routesError);
+        }
 
         const assignedRoute = routes && routes.length > 0 ? routes[0] : null;
 
@@ -48,6 +52,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
             searchDriverId: staffId,
             searchOrgId: organizationId,
             routesFound: routes?.length || 0,
+            error: routesError,
             firstRoute: routes?.[0] || 'none'
         };
 

@@ -141,7 +141,7 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
                                 <View style={styles.routeHeader}>
                                     <View>
                                         <Text style={styles.routeTitle}>{dashboardData.assignedRoute.route_name}</Text>
-                                        <Text style={styles.routeTime}>{dashboardData.assignedRoute.vehicle_number}</Text>
+                                        <Text style={styles.routeTime}>{dashboardData.assignedRoute.bus_number}</Text>
                                     </View>
                                     <Text style={styles.routeTime}>Active</Text>
                                 </View>
@@ -165,6 +165,12 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
                                 <Text style={{ ...typography.body, color: colors.textSecondary, marginTop: 10 }}>
                                     No routes assigned yet.
                                 </Text>
+                                {/* DEBUG INFO */}
+                                {dashboardData?.debug && (
+                                    <Text style={{ marginTop: 20, fontSize: 10, color: colors.textTertiary }}>
+                                        Debug: {JSON.stringify(dashboardData.debug, null, 2)}
+                                    </Text>
+                                )}
                             </View>
                         )}
                     </View>
