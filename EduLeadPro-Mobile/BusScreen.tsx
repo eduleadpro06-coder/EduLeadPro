@@ -53,7 +53,7 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
         );
     }
 
-    if (!busData || !busData.isLive) {
+    if (!busData || (!busData.isLive && !busData.assignment)) {
         return (
             <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
                 <View style={styles.emptyContainer}>
@@ -66,14 +66,15 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
                     </Text>
 
                     {/* Fallback Static Info if available */}
-                    {busData?.route && (
+                    {(busData?.route || (busData?.assignment && busData?.route)) && (
                         <View style={[styles.card, { marginTop: 24, width: '100%' }]}>
                             <View style={styles.busHeader}>
-                                <Text style={styles.busNumber}>{busData.route}</Text>
+                                <Text style={styles.busNumber}>{busData.route?.routeName || 'Bus Route'}</Text>
                                 <View style={styles.currentTagContainer}>
-                                    <Text style={styles.currentTagText}>Current Stop</Text>
+                                    <Text style={styles.currentTagText}>Assigned</Text>
                                 </View>
                             </View>
+                            <Text style={styles.routeText}>{busData.route?.vehicleNumber || 'Bus Number N/A'}</Text>
                         </View>
                     )}
                 </View>
@@ -105,8 +106,8 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
                 <View style={styles.card}>
                     <View style={styles.busHeader}>
                         <View>
-                            <Text style={styles.busNumber}>{busData.busNumber}</Text>
-                            <Text style={styles.routeText}>Route #12 • Afternoon Drop</Text>
+                            <Text style={styles.busNumber}>{busData.route?.vehicleNumber || busData.busNumber}</Text>
+                            <Text style={styles.routeText}>{busData.route?.routeName || 'Route'} • {busData.route?.status || 'Active'}</Text>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: '#DCFCE7' }]}>
                             <Text style={[styles.statusText, { color: colors.primary }]}>On Time</Text>

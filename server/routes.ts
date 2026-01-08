@@ -8,9 +8,7 @@ import PDFDocument from "pdfkit";
 import { db } from "./db.js";
 import { forecastEnrollments, generateMarketingRecommendations, predictAdmissionLikelihood } from "./ai.js";
 import aiComprehensiveRouter from "./api/ai-comprehensive.js";
-import { sql } from "drizzle-orm";
 import { registerDaycareRoutes } from "./daycareRoutes.js";
-import express from "express"; // Added for express.Request type
 import { cacheService } from "./cache-service.js"; // Performance optimization: caching layer
 import { getOrganizationId } from "./utils.js";
 import mobileApiV1 from "./api/v1/index.js"; // NEW: Mobile API v1
@@ -5616,7 +5614,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  return httpServer;
   // Get bus assignment for a student (Mobile App)
   app.get("/api/students/:id/bus-assignment", async (req, res) => {
     try {
@@ -5636,5 +5633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch bus assignment" });
     }
   });
+
+  return httpServer;
 
 }

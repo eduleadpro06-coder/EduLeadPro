@@ -357,7 +357,7 @@ class APIService {
     }
 
     async getBusLocation(childId: number): Promise<any> {
-        return await this.fetchWithAuth(`/v1/mobile/parent/child/${childId}/bus-tracking`);
+        return await this.fetchWithAuth(`/students/${childId}/bus-assignment`);
     }
 
     // Teacher Methods (V1 API)

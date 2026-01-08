@@ -1,12 +1,8 @@
-
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { parse } from "csv-parse/sync";
 import xlsx from "xlsx";
-import * as pdfLib from "pdf-parse";
-// @ts-ignore
-const pdf = pdfLib.default || pdfLib;
 import { InsertBankTransaction } from "../../../shared/schema.js";
 
 interface NormalizedRow {
@@ -94,20 +90,26 @@ export class NormalizationEngine {
     }
 
     private async parsePDF(filePath: string): Promise<NormalizedRow[]> {
-        const dataBuffer = fs.readFileSync(filePath);
-        const data = await pdf(dataBuffer);
-        const text = data.text;
+        try {
+            // Dynamic import to avoid Vercel crash on startup due to DOMMatrix missing
+            const pdfLib = await import("pdf-parse");
+            // @ts-ignore
+            const pdf = pdfLib.default || pdfLib;
 
-        const lines = text.split('\n').filter((line: string) => line.trim().length > 0);
-        const rows: NormalizedRow[] = [];
+            const dataBuffer = fs.readFileSync(filePath);
+            const data = await pdf(dataBuffer);
+            const text = data.text;
 
-        const dateRegex = /(\d{2}[\/\-]\d{2}[\/\-]\d{4})/;
-        // Money regex: numbers with commas and decimal
-        const moneyRegex = /([\d,]+\.\d{2})/;
+            const lines = text.split('\n').filter((line: string) => line.trim().length > 0);
+            const rows: NormalizedRow[] = [];
 
-        // Basic text parsing stub
-        console.warn("PDF parsing is experimental.");
-        return [];
+            // Basic text parsing stub
+            console.warn("PDF parsing is experimental.");
+            return [];
+        } catch (error) {
+            console.error("PDF parsing not supported in this environment:", error);
+            return [];
+        }
     }
 
     private detectColumns(headers: string[]) {
