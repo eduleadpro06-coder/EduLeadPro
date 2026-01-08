@@ -4988,6 +4988,31 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  // Bus Live Location Tracking Methods
+  async saveBusLocation(locationData: InsertBusLiveLocation) {
+    const [result] = await db.insert(schema.busLiveLocations).values(locationData).returning();
+    return result;
+  }
+
+  async getLatestBusLocation(routeId: number) {
+    const result = await db.select()
+      .from(schema.busLiveLocations)
+      .where(and(
+        eq(schema.busLiveLocations.routeId, routeId),
+        eq(schema.busLiveLocations.isActive, true)
+      ))
+      .orderBy(desc(schema.busLiveLocations.timestamp))
+      .limit(1);
+
+    return result[0];
+  }
+
+  async deactivateBusLocation(routeId: number) {
+    await db.update(schema.busLiveLocations)
+      .set({ isActive: false })
+      .where(eq(schema.busLiveLocations.routeId, routeId));
+  }
+
 }
 
 // Initialize database with admin user and CSV data

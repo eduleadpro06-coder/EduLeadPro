@@ -302,4 +302,149 @@ router.get('/trip/active', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * POST /api/v1/mobile/driver/location/start-tracking
+ * Start location tracking session
+ */
+router.post('/location/start-tracking', async (req: Request, res: Response) => {
+    try {
+        const { routeId } = req.body;
+        const staffId = req.user!.userId;
+
+        if (!routeId) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'INVALID_REQUEST',
+                    message: 'routeId is required'
+                }
+            });
+        }
+
+        // Mark route as actively being tracked
+        // For now, just respond success - tracking state managed by location updates
+        res.json({
+            success: true,
+            data: {
+                message: 'Tracking session started',
+                routeId,
+                driverId: staffId
+            }
+        });
+    } catch (error) {
+        console.error('[Mobile API] Start tracking error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'START_TRACKING_ERROR',
+                message: 'Failed to start tracking session'
+            }
+        });
+    }
+});
+
+/**
+ * POST /api/v1/mobile/driver/location/update
+ * Update bus GPS location (called every 30 seconds)
+ */
+router.post('/location/update', async (req: Request, res: Response) => {
+    try {
+        const {
+            routeId,
+            latitude,
+            longitude,
+            speed,
+            heading,
+            accuracy
+        } = req.body;
+        const staffId = req.user!.userId;
+
+        if (!routeId || latitude === undefined || longitude === undefined) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'INVALID_REQUEST',
+                    message: 'routeId, latitude, and longitude are required'
+                }
+            });
+        }
+
+        const { storage } = await import('../../../storage.js');
+
+        // Save location to database
+        await storage.saveBusLocation({
+            routeId,
+            driverId: staffId,
+            latitude: latitude.toString(),
+            longitude: longitude.toString(),
+            speed: speed ? speed.toString() : '0',
+            heading: heading ? heading.toString() : '0',
+            accuracy: accuracy ? accuracy.toString() : '0',
+            isActive: true
+        });
+
+        // TODO: Broadcast via WebSocket to connected parents
+        // io.to(`route-${routeId}`).emit('bus:location:update', { routeId, latitude, longitude });
+
+        res.json({
+            success: true,
+            data: {
+                message: 'Location updated successfully',
+                timestamp: new Date().toISOString()
+            }
+        });
+    } catch (error) {
+        console.error('[Mobile API] Update location error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'LOCATION_UPDATE_ERROR',
+                message: 'Failed to update location'
+            }
+        });
+    }
+});
+
+/**
+ * POST /api/v1/mobile/driver/location/stop-tracking
+ * Stop location tracking session
+ */
+router.post('/location/stop-tracking', async (req: Request, res: Response) => {
+    try {
+        const { routeId } = req.body;
+
+        if (!routeId) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'INVALID_REQUEST',
+                    message: 'routeId is required'
+                }
+            });
+        }
+
+        const { storage } = await import('../../../storage.js');
+
+        // Mark all locations for this route as inactive
+        await storage.deactivateBusLocation(routeId);
+
+        res.json({
+            success: true,
+            data: {
+                message: 'Tracking session stopped'
+            }
+        });
+    } catch (error) {
+        console.error('[Mobile API] Stop tracking error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'STOP_TRACKING_ERROR',
+                message: 'Failed to stop tracking session'
+            }
+        });
+    }
+});
+
 export default router;
+
