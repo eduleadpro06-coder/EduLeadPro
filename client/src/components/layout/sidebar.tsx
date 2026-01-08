@@ -30,8 +30,9 @@ const navigation = [
   { name: "Stock Management", href: "/inventory", icon: Package },
   { name: "Expenses", href: "/expenses", icon: Wallet },
   { name: "Reports", href: "/reports", icon: FileText },
-  { name: "Meta Marketing", href: "/meta-marketing", icon: Facebook, separator: true },
-  { name: "App Management", href: "/app-management", icon: Bus },
+  { name: "App Management", href: "/app-management", icon: Bus, separator: true },
+  { name: "Accounting", href: "/accounts", icon: Wallet },
+  { name: "Meta Marketing", href: "/meta-marketing", icon: Facebook },
 ];
 
 

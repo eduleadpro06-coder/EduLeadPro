@@ -1407,3 +1407,134 @@ export type InsertPreschoolAnnouncement = z.infer<typeof insertPreschoolAnnounce
 export type InsertPreschoolEvent = z.infer<typeof insertPreschoolEventSchema>;
 export type InsertParentTeacherMessage = z.infer<typeof insertParentTeacherMessageSchema>;
 export type InsertLeadPreschoolProfile = z.infer<typeof insertLeadPreschoolProfileSchema>;
+
+// =====================================================
+// BANK STATEMENT-DRIVEN ACCOUNTING MODULE
+// =====================================================
+
+// 1. Chart of Accounts (Account Master)
+export const accountMaster = pgTable("account_master", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 200 }).notNull(),
+  code: varchar("code", { length: 50 }), // Optional generic code
+  type: varchar("type", { length: 50 }).notNull(), // Asset, Liability, Equity, Income, Expense
+  parentId: integer("parent_id").references((): any => accountMaster.id),
+  isSystem: boolean("is_system").default(false), // System accounts cannot be deleted
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 2. Bank Statements (File Tracking)
+export const bankStatements = pgTable("bank_statements", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  originalFilename: varchar("original_filename", { length: 255 }).notNull(),
+  fileUrl: text("file_url").notNull(), // Storage path
+  status: varchar("status", { length: 50 }).default("pending"), // pending, parsing, processing, completed, failed
+  uploadedBy: integer("uploaded_by").references(() => users.id),
+  totalTransactions: integer("total_transactions").default(0),
+  processedTransactions: integer("processed_transactions").default(0),
+  errorLog: text("error_log"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 3. Bank Transactions (Parsed Raw Data)
+export const bankTransactions = pgTable("bank_transactions", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  statementId: integer("statement_id").notNull().references(() => bankStatements.id),
+  date: date("date").notNull(),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(), // Signed amount for bank lines
+  type: varchar("type", { length: 20 }).notNull(), // credit, debit
+  reference: varchar("reference", { length: 200 }),
+  balance: decimal("balance", { precision: 12, scale: 2 }), // Running balance
+
+  // Classification status
+  status: varchar("status", { length: 20 }).default("pending"), // pending, classified, posted
+  confidenceScore: decimal("confidence_score", { precision: 5, scale: 2 }),
+  suggestedAccountId: integer("suggested_account_id").references(() => accountMaster.id),
+  classificationReason: text("classification_reason"),
+
+  // Audit
+  rowHash: varchar("row_hash", { length: 64 }).notNull(), // Prevent duplicates
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 4. Ledger Entries (Double Entry System)
+export const ledgerEntries = pgTable("ledger_entries", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  transactionId: integer("transaction_id").references(() => bankTransactions.id), // Link to source
+  accountId: integer("account_id").notNull().references(() => accountMaster.id),
+  debit: decimal("debit", { precision: 12, scale: 2 }).default("0"),
+  credit: decimal("credit", { precision: 12, scale: 2 }).default("0"),
+  description: text("description"),
+  entryDate: date("entry_date").notNull(),
+  postedAt: timestamp("posted_at").defaultNow().notNull(),
+});
+
+// 5. Classification Rules
+export const classificationRules = pgTable("classification_rules", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 100 }).notNull(),
+  priority: integer("priority").default(0), // Higher runs first
+  ruleType: varchar("rule_type", { length: 50 }).default("keyword"), // keyword, regex, amount_range
+  pattern: text("pattern").notNull(), // "STARBUCKS", "^TXN.*", etc.
+  targetAccountId: integer("target_account_id").notNull().references(() => accountMaster.id),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 6. Classification Feedback (AI Learning)
+export const classificationFeedback = pgTable("classification_feedback", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  transactionDescription: text("transaction_description").notNull(),
+  correctAccountId: integer("correct_account_id").notNull().references(() => accountMaster.id),
+  userCorrection: boolean("user_correction").default(true), // Was this a manual correction?
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 7. Accounting Audit Logs
+export const accountingAuditLogs = pgTable("accounting_audit_logs", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  entityType: varchar("entity_type", { length: 50 }).notNull(), // transaction, rule, ledger
+  entityId: integer("entity_id").notNull(),
+  action: varchar("action", { length: 50 }).notNull(), // create, update, approve
+  changes: jsonb("changes"), // Old vs New values
+  performedBy: integer("performed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Insert Schemas
+export const insertAccountMasterSchema = createInsertSchema(accountMaster).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBankStatementSchema = createInsertSchema(bankStatements).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBankTransactionSchema = createInsertSchema(bankTransactions).omit({ id: true, createdAt: true });
+export const insertLedgerEntrySchema = createInsertSchema(ledgerEntries).omit({ id: true, postedAt: true });
+export const insertClassificationRuleSchema = createInsertSchema(classificationRules).omit({ id: true, createdAt: true });
+export const insertClassificationFeedbackSchema = createInsertSchema(classificationFeedback).omit({ id: true, createdAt: true });
+export const insertAccountingAuditLogSchema = createInsertSchema(accountingAuditLogs).omit({ id: true, createdAt: true });
+
+// Types
+export type AccountMaster = typeof accountMaster.$inferSelect;
+export type BankStatement = typeof bankStatements.$inferSelect;
+export type BankTransaction = typeof bankTransactions.$inferSelect;
+export type LedgerEntry = typeof ledgerEntries.$inferSelect;
+export type ClassificationRule = typeof classificationRules.$inferSelect;
+export type ClassificationFeedback = typeof classificationFeedback.$inferSelect;
+export type AccountingAuditLog = typeof accountingAuditLogs.$inferSelect;
+
+export type InsertAccountMaster = z.infer<typeof insertAccountMasterSchema>;
+export type InsertBankStatement = z.infer<typeof insertBankStatementSchema>;
+export type InsertBankTransaction = z.infer<typeof insertBankTransactionSchema>;
+export type InsertLedgerEntry = z.infer<typeof insertLedgerEntrySchema>;
+export type InsertClassificationRule = z.infer<typeof insertClassificationRuleSchema>;
+export type InsertClassificationFeedback = z.infer<typeof insertClassificationFeedbackSchema>;
+export type InsertAccountingAuditLog = z.infer<typeof insertAccountingAuditLogSchema>;

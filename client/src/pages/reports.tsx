@@ -162,7 +162,7 @@ export default function Reports() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b bg-gray-50/50 text-xs text-gray-500">
-                          <th className="px-2 py-2 text-left font-medium w-[160px]">Student / Phone</th>
+                          <th className="px-2 py-2 text-left font-medium w-[160px]">Student</th>
                           <th className="px-2 py-2 text-left font-medium w-[160px]">Father / Phone</th>
                           <th className="px-2 py-2 text-left font-medium">Program</th>
                           <th className="px-2 py-2 text-right font-medium whitespace-nowrap">Tuition Fee</th>
@@ -178,7 +178,6 @@ export default function Reports() {
                           <tr key={row.id} className="border-b hover:bg-gray-50/50 transition-colors text-sm">
                             <td className="px-2 py-2 align-top">
                               <div className="font-medium text-gray-900">{row.studentName}</div>
-                              <div className="text-xs text-gray-500 font-mono mt-0.5">{row.studentPhone || '-'}</div>
                             </td>
                             <td className="px-2 py-2 align-top">
                               <div className="text-gray-900">{row.fatherName}</div>

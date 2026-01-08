@@ -16,6 +16,7 @@ import { getOrganizationId } from "./utils.js";
 import mobileApiV1 from "./api/v1/index.js"; // NEW: Mobile API v1
 import { eq, inArray, sql, and, or } from 'drizzle-orm';
 import { pushTokens, users, leads } from "../shared/schema.js";
+import accountingRouter from "./routes/accounting.js";
 
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -24,6 +25,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // NEW: Mobile API v1 - Modern JWT-based API for mobile apps
   app.use("/api/v1/mobile", mobileApiV1);
   console.log("✅ Mounted Mobile API v1 at /api/v1/mobile");
+
+  // NEW: Accounting Module
+  app.use("/api/accounting", accountingRouter);
+  console.log("✅ Mounted Accounting API at /api/accounting");
 
   // Test route to verify routes are working
   app.get("/api/test", (req, res) => {

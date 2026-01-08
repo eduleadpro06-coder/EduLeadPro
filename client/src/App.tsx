@@ -28,6 +28,7 @@ import Daycare from "@/pages/daycare";
 import Sidebar from "@/components/layout/sidebar";
 import NotFound from "@/pages/not-found";
 import Expenses from "@/pages/expenses";
+import Accounts from "@/pages/accounts";
 import Communication from "@/pages/communication";
 import Inventory from "@/pages/inventory";
 import AddLeadPage from "@/pages/leads-add";
@@ -154,6 +155,18 @@ function Router() {
               <Sidebar />
               <div className="flex-1 ml-64">
                 <Expenses />
+              </div>
+            </div>
+          )} />
+        )}
+      </Route>
+      <Route path="/accounts">
+        {() => (
+          <ProtectedRoute component={() => (
+            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
+              <Sidebar />
+              <div className="flex-1 ml-64">
+                <Accounts />
               </div>
             </div>
           )} />
