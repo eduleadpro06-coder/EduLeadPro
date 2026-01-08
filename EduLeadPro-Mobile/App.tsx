@@ -219,7 +219,7 @@ function App() {
         </TouchableOpacity>
 
         <View style={{ alignItems: 'center' }}>
-          <Text style={styles.headerOrg}>{user.organizationName || 'EduLead Pro'}</Text>
+          <Text style={styles.headerOrg}>{user.organizationName || 'EduConnect'}</Text>
           <Text style={styles.headerTitle}>
             {activeTab === 'home' ? 'Overview' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
           </Text>

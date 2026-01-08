@@ -7,12 +7,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  MessageSquare, 
-  Mail, 
-  Send, 
-  Clock, 
-  Users, 
+import {
+  MessageSquare,
+  Mail,
+  Send,
+  Clock,
+  Users,
   Target,
   CheckCircle,
   AlertCircle,
@@ -59,7 +59,7 @@ export default function CampaignManager() {
     },
     scheduledAt: ""
   });
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -103,7 +103,7 @@ export default function CampaignManager() {
 
   const getTargetableLeads = () => {
     if (!leads) return [];
-    
+
     return leads.filter(lead => {
       if (activeTab === "whatsapp") {
         return lead.phone && (lead.status === "new" || lead.status === "contacted" || lead.status === "interested");
@@ -116,11 +116,11 @@ export default function CampaignManager() {
 
   const createCampaign = () => {
     // Get custom institute name from system settings
-    const customInstituteName = localStorage.getItem("customInstituteName") || "EduLead Pro";
-    
+    const customInstituteName = localStorage.getItem("customInstituteName") || "EduConnect";
+
     // Replace institute name in message
     const message = newCampaign.content.message.replace(/{{instituteName}}/g, customInstituteName);
-    
+
     createCampaignMutation.mutate({
       ...newCampaign,
       content: {
@@ -218,7 +218,7 @@ export default function CampaignManager() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <h3 className="font-medium text-white">Create WhatsApp Campaign</h3>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-white mb-2">
                       Campaign Name
@@ -345,7 +345,7 @@ export default function CampaignManager() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <h3 className="font-medium text-white">Create Email Campaign</h3>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-white mb-2">
                       Campaign Name

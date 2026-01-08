@@ -52,7 +52,7 @@ export default function LoginScreen() {
                 <View style={styles.content}>
                     {/* Header */}
                     <View style={styles.header}>
-                        <Text style={styles.title}>Education Connect</Text>
+                        <Text style={styles.title}>EduConnect</Text>
                         <Text style={styles.subtitle}>School Bus Tracking</Text>
                     </View>
 

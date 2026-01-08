@@ -151,7 +151,7 @@ const AnimatedJourneyPath = ({ progress }: { progress: number }) => (
 // RotatingTaglines: Rotates through AI-generated taglines
 const taglines = [
   "Did you know? Our AI predicts enrollments with 95% accuracy!",
-  "EduLead Pro adapts to your institution's unique needs.",
+  "EduConnect adapts to your institution's unique needs.",
   "AI-driven insights, real results.",
   "Admissions, reimagined for the future.",
   "Your growth, powered by intelligence."
@@ -190,7 +190,7 @@ const testimonials = [
   {
     name: "Priya S.",
     role: "Principal, Delhi Public School",
-    quote: "EduLead Pro transformed our admissions process. We saw a 35% increase in enrollments!",
+    quote: "EduConnect transformed our admissions process. We saw a 35% increase in enrollments!",
     avatar: "https://randomuser.me/api/portraits/women/68.jpg"
   },
   {
@@ -596,11 +596,11 @@ export default function Landing() {
 
   const faqItems = [
     {
-      question: "How quickly can we implement EduLead Pro in our institution?",
+      question: "How quickly can we implement EduConnect in our institution?",
       answer: "Most Indian institutions are up and running within 2-3 days. Our team provides complete setup assistance, data migration support, and comprehensive training tailored for Indian staff."
     },
     {
-      question: "Is EduLead Pro suitable for small educational institutions?",
+      question: "Is EduConnect suitable for small educational institutions?",
       answer: "Absolutely! Our Starter plan is designed specifically for Indian schools and coaching centers with up to 200 students. You can scale up as your institution grows without any migration hassles."
     },
     {
@@ -608,7 +608,7 @@ export default function Landing() {
       answer: "Our AI analyzes multiple data points including student demographics, engagement patterns, communication history, and behavioral indicators to predict enrollment likelihood with 95% accuracy for Indian admissions."
     },
     {
-      question: "Can EduLead Pro integrate with our existing systems?",
+      question: "Can EduConnect integrate with our existing systems?",
       answer: "Yes! We offer seamless integrations with popular Indian ERPs like Tally, Zoho, and more. Our API also allows custom integrations with any system you currently use."
     },
     {
@@ -616,7 +616,7 @@ export default function Landing() {
       answer: "We provide 24/7 customer support in English, Hindi, and regional languages, dedicated account managers for Enterprise clients, and regular training sessions for Indian institutions."
     },
     {
-      question: "Is our data secure with EduLead Pro?",
+      question: "Is our data secure with EduConnect?",
       answer: "Security is our top priority. We use enterprise-grade encryption, comply with Indian data protection standards, and undergo regular security audits to protect your sensitive information."
     }
   ];
@@ -890,7 +890,7 @@ export default function Landing() {
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">What Our Clients Say</h2>
               <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
-                Hear from educational leaders who have transformed their admissions with EduLead Pro.
+                Hear from educational leaders who have transformed their admissions with EduConnect.
               </p>
             </div>
             <TestimonialCarousel />
@@ -910,7 +910,7 @@ export default function Landing() {
                 Frequently Asked Questions
               </h2>
               <p className="text-xl text-slate-300 max-w-2xl mx-auto">
-                Everything you need to know about EduLead Pro
+                Everything you need to know about EduConnect
               </p>
             </motion.div>
             <div className="max-w-3xl mx-auto">
@@ -965,7 +965,7 @@ export default function Landing() {
                 Get in Touch
               </h2>
               <p className="text-xl text-white/80 max-w-2xl mx-auto">
-                Have questions about EduLead Pro? Our team is here to help you transform your institution's admissions process.
+                Have questions about EduConnect? Our team is here to help you transform your institution's admissions process.
               </p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -1120,7 +1120,7 @@ export default function Landing() {
                 Ready to Transform Your Institution?
               </h2>
               <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90 text-white">
-                Join 500+ educational institutions that have revolutionized their admissions process with EduLead Pro's AI-powered platform.
+                Join 500+ educational institutions that have revolutionized their admissions process with EduConnect's AI-powered platform.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
                 <Button size="lg" className="px-8 py-4 rounded-full bg-[#643ae5] hover:bg-[#7a4fff] text-white font-bold text-lg shadow-lg border-none transition-all duration-300 hover:scale-105" onClick={() => setLocation('/book-demo')}>
@@ -1143,7 +1143,7 @@ export default function Landing() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
               {/* About Section */}
               <div className="flex flex-col">
-                <h3 className="text-2xl font-bold text-white mb-4">EduLead Pro</h3>
+                <h3 className="text-2xl font-bold text-white mb-4">EduConnect</h3>
                 <p className="text-slate-400 mb-6 flex-grow">
                   Empowering educational institutions with AI-driven admissions, predictive analytics, and intelligent marketing.
                 </p>
@@ -1184,7 +1184,7 @@ export default function Landing() {
               {/* Newsletter */}
               <div>
                 <h4 className="font-semibold text-white mb-4 text-lg">Stay up to date</h4>
-                <p className="text-slate-400 mb-4">Get the latest news and updates from EduLead Pro.</p>
+                <p className="text-slate-400 mb-4">Get the latest news and updates from EduConnect.</p>
                 <form className="flex w-full items-center rounded-full bg-[#0e0f12] p-1 border border-white/20 max-w-sm">
                   <input
                     type="email"
@@ -1206,7 +1206,7 @@ export default function Landing() {
             </div>
 
             <div className="border-t border-white/10 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center text-slate-500">
-              <p className="mb-4 md:mb-0">&copy; {new Date().getFullYear()} EduLead Pro. All rights reserved.</p>
+              <p className="mb-4 md:mb-0">&copy; {new Date().getFullYear()} EduConnect. All rights reserved.</p>
               <div className="flex space-x-6">
                 <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
                 <a href="#" className="hover:text-white transition-colors">Terms of Service</a>

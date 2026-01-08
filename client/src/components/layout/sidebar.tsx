@@ -101,8 +101,7 @@ export default function Sidebar() {
           <Link href="/landing">
             <div className="flex flex-col items-start justify-center select-none" style={{ textShadow: '0 2px 8px #0008' }}>
               <span className="text-2xl font-extrabold tracking-tight">
-                <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">EduLead</span>
-                <span className="text-white"> Pro</span>
+                <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">EduConnect</span>
               </span>
               <span className="text-xs font-medium text-muted-foreground mt-1 ml-0">AI-Powered CRM</span>
             </div>

@@ -1547,7 +1547,7 @@ export default function StudentFees() {
       }
 
       // Use fetched organization data or fallback to settings/defaults
-      const orgName = orgData?.name || settings?.organizationName || settings?.name || user?.organizationName || "EduLead Pro Institute";
+      const orgName = orgData?.name || settings?.organizationName || settings?.name || user?.organizationName || "EduConnect Institute";
       const orgPhone = orgData?.phone || settings?.phone || settings?.contactPhone || "(555) 123-4567";
       const orgEmail = user?.email || settings?.email || settings?.contactEmail || "accounts@edulead.pro";
 

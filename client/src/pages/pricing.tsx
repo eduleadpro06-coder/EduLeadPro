@@ -37,7 +37,7 @@ function AnimatedNumber({ value, duration = 1.2, prefix = "", suffix = "" }: { v
 // RotatingTaglines (copied from landing page)
 const taglines = [
   "Did you know? Our AI predicts enrollments with 95% accuracy!",
-  "EduLead Pro adapts to your institution's unique needs.",
+  "EduConnect adapts to your institution's unique needs.",
   "AI-driven insights, real results.",
   "Admissions, reimagined for the future.",
   "Your growth, powered by intelligence."
@@ -158,8 +158,8 @@ const PricingPage = () => {
                 className="h-full"
               >
                 <div className={`relative h-full flex flex-col shadow-lg hover:shadow-2xl transition-all duration-300 backdrop-blur-sm rounded-xl hover:-translate-y-2 ${plan.popular
-                    ? 'border-2 border-orange-500 bg-slate-800/60 scale-105 z-10'
-                    : 'border border-slate-700 bg-slate-800/40 hover:border-slate-500'
+                  ? 'border-2 border-orange-500 bg-slate-800/60 scale-105 z-10'
+                  : 'border border-slate-700 bg-slate-800/40 hover:border-slate-500'
                   }`}>
                   {plan.popular && (
                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-20">
@@ -193,8 +193,8 @@ const PricingPage = () => {
                       <Link href="/book-demo">
                         <Button
                           className={`w-full text-white font-bold py-6 rounded-xl shadow-lg transition-transform hover:scale-105 active:scale-95 ${plan.popular
-                              ? 'bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 shadow-orange-500/20'
-                              : 'bg-[#643ae5] hover:bg-[#7a4fff] shadow-purple-500/20'
+                            ? 'bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 shadow-orange-500/20'
+                            : 'bg-[#643ae5] hover:bg-[#7a4fff] shadow-purple-500/20'
                             }`}
                         >
                           Start Free Trial
@@ -294,7 +294,7 @@ const PricingPage = () => {
                 Ready to Transform Your Institution?
               </h2>
               <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90 text-white">
-                Join 500+ educational institutions that have revolutionized their admissions process with EduLead Pro's AI-powered platform.
+                Join 500+ educational institutions that have revolutionized their admissions process with EduConnect's AI-powered platform.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
                 <Button size="lg" className="px-8 py-4 rounded-full bg-[#643ae5] hover:bg-[#7a4fff] text-white font-bold text-lg shadow-lg border-none transition-all duration-300 hover:scale-105" onClick={() => setLocation('/book-demo')}>

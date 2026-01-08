@@ -1086,7 +1086,7 @@ export default function StaffAI() {
 
   // WhatsApp message generator
   const getSalaryCreditedMessage = (staff: any, netSalary: number) => {
-    const instituteName = localStorage.getItem("customInstituteName") || "EduLead Pro";
+    const instituteName = localStorage.getItem("customInstituteName") || "EduConnect";
     return `Dear ${staff.name},\n\nYour salary of ₹${netSalary} has been credited to your account.\n\nThank you for your dedication and hard work.\n\nBest regards,\n${instituteName} Team`;
   };
 

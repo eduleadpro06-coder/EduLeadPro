@@ -52,12 +52,9 @@ const NavBar = ({ items, className, setLocation, user, loading, activeTab, setAc
         >
           {/* Use logo image if available, otherwise fallback to text */}
           {false ? (
-            <img src="/logo.svg" alt="EduLead Pro Logo" className="h-8 w-8 mr-2" />
+            <img src="/logo.png" alt="EduConnect Logo" className="h-8 w-8 mr-2" />
           ) : (
-            <>
-              <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">EduLead</span>
-              <span className="text-white">Pro</span>
-            </>
+            <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">EduConnect</span>
           )}
         </a>
         {items.filter(item => item.name !== "Home").map((item) => {

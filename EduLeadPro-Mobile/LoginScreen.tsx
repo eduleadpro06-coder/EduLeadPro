@@ -150,7 +150,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                     />
                 </View>
                 <Text style={styles.title}>Parent Portal</Text>
-                <Text style={styles.subtitle}>Powered by EduLead Pro</Text>
+                <Text style={styles.subtitle}>Powered by EduConnect</Text>
             </Animated.View>
 
             {/* Login Form Card */}

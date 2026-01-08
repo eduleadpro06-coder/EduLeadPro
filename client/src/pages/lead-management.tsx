@@ -356,7 +356,7 @@ export default function LeadManagement() {
 
   // Function to replace template variables with actual lead data
   const replaceTemplateVariables = (template: string, lead: LeadWithCounselor) => {
-    const instituteName = localStorage.getItem("customInstituteName") || "EduLead Pro";
+    const instituteName = localStorage.getItem("customInstituteName") || "EduConnect";
     const today = new Date().toLocaleDateString('en-IN');
 
     let text = template;
