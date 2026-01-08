@@ -1234,6 +1234,20 @@ export const studentBusAssignments = pgTable("student_bus_assignments", {
   assignedAt: timestamp("assigned_at").defaultNow().notNull(),
 });
 
+// Bus Live Locations - for real-time tracking
+export const busLiveLocations = pgTable("bus_live_locations", {
+  id: serial("id").primaryKey(),
+  routeId: integer("route_id").notNull().references(() => busRoutes.id),
+  driverId: integer("driver_id").references(() => staff.id),
+  latitude: decimal("latitude", { precision: 10, scale: 8 }).notNull(),
+  longitude: decimal("longitude", { precision: 11, scale: 8 }).notNull(),
+  speed: decimal("speed", { precision: 5, scale: 2 }), // km/h
+  heading: decimal("heading", { precision: 5, scale: 2 }), // degrees 0-360
+  accuracy: decimal("accuracy", { precision: 8, scale: 2 }), // meters
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  isActive: boolean("is_active").default(true),
+});
+
 // Insert Schemas
 export const insertBusRouteSchema = createInsertSchema(busRoutes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBusStopSchema = createInsertSchema(busStops).omit({ id: true, createdAt: true });
@@ -1243,15 +1257,18 @@ export const insertStudentBusAssignmentSchema = createInsertSchema(studentBusAss
     pickupStopId: z.number().nullable().optional(),
     dropStopId: z.number().nullable().optional()
   });
+export const insertBusLiveLocationSchema = createInsertSchema(busLiveLocations).omit({ id: true, timestamp: true });
 
 // Types
 export type BusRoute = typeof busRoutes.$inferSelect;
 export type BusStop = typeof busStops.$inferSelect;
 export type StudentBusAssignment = typeof studentBusAssignments.$inferSelect;
+export type BusLiveLocation = typeof busLiveLocations.$inferSelect;
 
 export type InsertBusRoute = z.infer<typeof insertBusRouteSchema>;
 export type InsertBusStop = z.infer<typeof insertBusStopSchema>;
 export type InsertStudentBusAssignment = z.infer<typeof insertStudentBusAssignmentSchema>;
+export type InsertBusLiveLocation = z.infer<typeof insertBusLiveLocationSchema>;
 
 
 // =====================================================

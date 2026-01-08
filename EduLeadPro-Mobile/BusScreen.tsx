@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions, ActivityIndicator, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from './services/api';
@@ -122,11 +122,16 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
                         </View>
                         <View style={styles.driverInfo}>
                             <Text style={styles.label}>Driver</Text>
-                            <Text style={styles.name}>Driver info unavailable</Text>
+                            <Text style={styles.name}>{busData.driver?.name || 'Driver info unavailable'}</Text>
                         </View>
-                        <TouchableOpacity style={styles.callButton}>
-                            <Feather name="phone" size={20} color="white" />
-                        </TouchableOpacity>
+                        {busData.driver?.phone && (
+                            <TouchableOpacity
+                                style={styles.callButton}
+                                onPress={() => Linking.openURL(`tel:${busData.driver.phone}`)}
+                            >
+                                <Feather name="phone" size={20} color="white" />
+                            </TouchableOpacity>
+                        )}
                     </View>
 
                     <View style={[styles.driverRow, { marginTop: 16 }]}>
@@ -135,8 +140,16 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
                         </View>
                         <View style={styles.driverInfo}>
                             <Text style={styles.label}>Attendant</Text>
-                            <Text style={styles.name}>Attendant info unavailable</Text>
+                            <Text style={styles.name}>{busData.route?.helperName || 'Attendant info unavailable'}</Text>
                         </View>
+                        {busData.route?.helperPhone && (
+                            <TouchableOpacity
+                                style={styles.callButton}
+                                onPress={() => Linking.openURL(`tel:${busData.route.helperPhone}`)}
+                            >
+                                <Feather name="phone" size={20} color="white" />
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
 
@@ -147,7 +160,7 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
                         <Text style={styles.etaTitle}>Estimated Arrival</Text>
                     </View>
                     <Text style={styles.etaTime}>{busData.eta || '~15 mins'}</Text>
-                    <Text style={styles.etaSubtext}>Location last updated: {new Date(busData.lastUpdate).toLocaleTimeString()}</Text>
+                    <Text style={styles.etaSubtext}>Location last updated: {busData.lastUpdate ? new Date(busData.lastUpdate).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }) : 'Tracking not active'}</Text>
                 </View>
 
                 {/* Route Timeline - Hidden for now */}
