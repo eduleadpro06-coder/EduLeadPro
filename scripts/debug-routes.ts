@@ -1,5 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
+import * as fs from 'fs';
 
 // Connection details (using public keys/url from env if possible, or hardcoded for this check if known, 
 // but asking user environment is better. I'll try to rely on env vars from .env file or just use the local db if I can access it via pg)
@@ -26,10 +27,10 @@ async function checkRoutes() {
         const columns = await sql`
         SELECT table_name, column_name, data_type 
         FROM information_schema.columns 
-        WHERE table_name IN ('bus_routes', 'student_bus_assignments', 'leads')
+        WHERE table_name IN ('active_bus_sessions', 'student_bus_assignments', 'leads')
     `;
-        console.log('\n🚌 Table Columns:');
-        console.table(columns);
+        fs.writeFileSync('table_columns.json', JSON.stringify(columns, null, 2));
+        console.log('✅ Columns written to table_columns.json');
 
         const routes = await sql`SELECT * FROM bus_routes`;
         console.log('\n🚌 Actual Bus Routes in DB:');

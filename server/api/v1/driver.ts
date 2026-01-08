@@ -59,18 +59,25 @@ router.get('/dashboard', async (req: Request, res: Response) => {
         // Get assigned students if route exists
         let assignedStudents: any[] = [];
         if (assignedRoute) {
-            const { data: assignments } = await supabase
+            const { data: assignments, error: assignError } = await supabase
                 .from('student_bus_assignments')
-                .select('lead_id')
+                .select('student_id')
                 .eq('route_id', assignedRoute.id);
 
+            if (assignError) {
+                console.error('[Mobile API] Assignment fetch error:', assignError);
+            }
+
             if (assignments && assignments.length > 0) {
-                const leadIds = assignments.map(a => a.lead_id);
-                const { data: students } = await supabase
+                const studentIds = assignments.map(a => a.student_id);
+                const { data: students, error: studError } = await supabase
                     .from('leads')
                     .select('id, name, class, parent_phone')
-                    .in('id', leadIds);
+                    .in('id', studentIds);
 
+                if (studError) {
+                    console.error('[Mobile API] Students fetch error:', studError);
+                }
                 assignedStudents = students || [];
             }
         }
@@ -87,13 +94,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
         });
     } catch (error) {
         console.error('[Mobile API] Driver dashboard error:', error);
-        res.status(500).json({
-            success: false,
-            error: {
-                code: 'DASHBOARD_ERROR',
-                message: 'Failed to fetch dashboard data'
-            }
-        });
+        res.status(500).json({ success: false, error: 'Failed to fetch dashboard' });
     }
 });
 
@@ -175,39 +176,47 @@ router.post('/trip/start', async (req: Request, res: Response) => {
 
         const staffId = req.user!.userId;
 
-        const { supabase } = await import('../../supabase.js');
-
-        // Check if there's already an active session
-        const { data: existingSession } = await supabase
-            .from('active_bus_sessions')
-            .select('id')
-            .eq('route_id', routeId)
-            .eq('status', 'active')
-            .single();
-
-        if (existingSession) {
+        if (!routeId) {
             return res.status(400).json({
                 success: false,
                 error: {
-                    code: 'SESSION_ALREADY_ACTIVE',
-                    message: 'A trip is already in progress for this route'
+                    code: 'INVALID_REQUEST',
+                    message: 'routeId is required'
                 }
             });
         }
 
-        // Create new session
+        const { supabase } = await import('../../supabase.js');
+
+        // End any existing sessions for this driver
+        await supabase
+            .from('active_bus_sessions')
+            .update({ status: 'completed', ended_at: new Date().toISOString() })
+            .eq('driver_id', staffId)
+            .eq('status', 'live');
+
+        // Start new session
         const { data: session, error } = await supabase
             .from('active_bus_sessions')
             .insert({
                 route_id: routeId,
                 driver_id: staffId,
-                start_time: new Date().toISOString(),
-                status: 'active'
+                started_at: new Date().toISOString(),
+                status: 'live'
             })
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error('[Mobile API] Start trip error:', error);
+            return res.status(500).json({
+                success: false,
+                error: {
+                    code: 'START_TRIP_ERROR',
+                    message: error.message
+                }
+            });
+        }
 
         res.json({
             success: true,
@@ -216,12 +225,12 @@ router.post('/trip/start', async (req: Request, res: Response) => {
             }
         });
     } catch (error) {
-        console.error('[Mobile API] Start trip error:', error);
+        console.error('[Mobile API] Start trip exception:', error);
         res.status(500).json({
             success: false,
             error: {
-                code: 'START_TRIP_ERROR',
-                message: 'Failed to start trip'
+                code: 'START_TRIP_SERVER_ERROR',
+                message: 'Internal server error while starting trip'
             }
         });
     }

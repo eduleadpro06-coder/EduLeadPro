@@ -1,0 +1,232 @@
+[
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "id",
+    "data_type": "uuid"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "route_id",
+    "data_type": "uuid"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "driver_id",
+    "data_type": "integer"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "last_updated",
+    "data_type": "timestamp without time zone"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "id",
+    "data_type": "integer"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "counselor_id",
+    "data_type": "integer"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "assigned_at",
+    "data_type": "timestamp without time zone"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "updated_at",
+    "data_type": "timestamp without time zone"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "last_contacted_at",
+    "data_type": "timestamp without time zone"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "deleted_at",
+    "data_type": "timestamp without time zone"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "organization_id",
+    "data_type": "integer"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "is_enrolled",
+    "data_type": "boolean"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "enrollment_date",
+    "data_type": "date"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "is_app_active",
+    "data_type": "boolean"
+  },
+  {
+    "table_name": "student_bus_assignments",
+    "column_name": "id",
+    "data_type": "integer"
+  },
+  {
+    "table_name": "student_bus_assignments",
+    "column_name": "student_id",
+    "data_type": "integer"
+  },
+  {
+    "table_name": "student_bus_assignments",
+    "column_name": "route_id",
+    "data_type": "integer"
+  },
+  {
+    "table_name": "student_bus_assignments",
+    "column_name": "pickup_stop_id",
+    "data_type": "integer"
+  },
+  {
+    "table_name": "student_bus_assignments",
+    "column_name": "drop_stop_id",
+    "data_type": "integer"
+  },
+  {
+    "table_name": "student_bus_assignments",
+    "column_name": "assigned_at",
+    "data_type": "timestamp without time zone"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "started_at",
+    "data_type": "timestamp without time zone"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "ended_at",
+    "data_type": "timestamp without time zone"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "current_latitude",
+    "data_type": "numeric"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "current_longitude",
+    "data_type": "numeric"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "current_speed",
+    "data_type": "numeric"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "current_heading",
+    "data_type": "numeric"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "current_stop_id",
+    "data_type": "uuid"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "session_type",
+    "data_type": "character varying"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "address",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "interested_program",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "batch",
+    "data_type": "character varying"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "app_password",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "section",
+    "data_type": "character varying"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "admission_likelihood",
+    "data_type": "text"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "status",
+    "data_type": "character varying"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "notes",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "parent_name",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "parent_phone",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "name",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "email",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "phone",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "class",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "stream",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "status",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "source",
+    "data_type": "text"
+  }
+]

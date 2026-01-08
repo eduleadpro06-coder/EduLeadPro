@@ -139,24 +139,38 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
                         {dashboardData?.assignedRoute ? (
                             <PremiumCard style={styles.routeCard}>
                                 <View style={styles.routeHeader}>
-                                    <View>
+                                    <View style={{ flex: 1 }}>
                                         <Text style={styles.routeTitle}>{dashboardData.assignedRoute.route_name}</Text>
-                                        <Text style={styles.routeTime}>{dashboardData.assignedRoute.bus_number}</Text>
+                                        <View style={styles.busBadge}>
+                                            <Feather name="truck" size={12} color={colors.primary} />
+                                            <Text style={styles.busNumber}>{dashboardData.assignedRoute.bus_number}</Text>
+                                        </View>
                                     </View>
-                                    <Text style={styles.routeTime}>Active</Text>
+                                    <View style={[styles.statusBadge, { backgroundColor: colors.success + '20' }]}>
+                                        <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
+                                        <Text style={[styles.statusText, { color: colors.success }]}>Active</Text>
+                                    </View>
                                 </View>
+
+                                <View style={styles.divider} />
+
                                 <View style={styles.routeInfo}>
-                                    <Feather name="users" size={16} color={colors.textSecondary} />
-                                    <Text style={styles.routeDetail}>{dashboardData.assignedStudents?.length || 0} Students</Text>
-                                    <View style={styles.dot} />
-                                    <Feather name="phone" size={16} color={colors.textSecondary} />
-                                    <Text style={styles.routeDetail}>{dashboardData.assignedRoute.helper_phone || 'No Helper'}</Text>
+                                    <View style={styles.infoItem}>
+                                        <Feather name="users" size={16} color={colors.textSecondary} />
+                                        <Text style={styles.routeDetail}>{dashboardData.assignedStudents?.length || 0} Students</Text>
+                                    </View>
+                                    <View style={styles.infoSeparator} />
+                                    <View style={styles.infoItem}>
+                                        <Feather name="phone" size={16} color={colors.textSecondary} />
+                                        <Text style={styles.routeDetail}>{dashboardData.assignedRoute.helper_phone || 'No Helper'}</Text>
+                                    </View>
                                 </View>
+
                                 <PremiumButton
                                     title="Start Trip"
                                     icon="play"
                                     onPress={() => handleStartTrip(dashboardData.assignedRoute.id)}
-                                    style={{ marginTop: 12 }}
+                                    style={{ marginTop: 16 }}
                                 />
                             </PremiumCard>
                         ) : (
@@ -213,13 +227,22 @@ const styles = StyleSheet.create({
 
     sectionTitle: { ...typography.h3, fontSize: 18, marginBottom: spacing.md, marginTop: spacing.md },
 
-    routeCard: { marginBottom: spacing.md },
-    routeHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-    routeTitle: { ...typography.h3, fontSize: 16 },
-    routeTime: { ...typography.caption, fontWeight: '700', color: colors.textPrimary },
-    routeInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-    routeDetail: { ...typography.caption, marginLeft: 4, marginRight: 8 },
-    dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.textTertiary, marginHorizontal: 4 },
+    routeCard: { marginBottom: spacing.md, padding: spacing.md },
+    routeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+    routeTitle: { ...typography.h3, fontSize: 18, color: colors.textPrimary },
+    busBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceHighlight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 4, alignSelf: 'flex-start' },
+    busNumber: { ...typography.caption, color: colors.primary, fontWeight: '700', marginLeft: 4 },
+
+    statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+    statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+    statusText: { ...typography.caption, fontWeight: '700', fontSize: 11, textTransform: 'uppercase' },
+
+    divider: { height: 1, backgroundColor: colors.surfaceHighlight, marginBottom: 16 },
+
+    routeInfo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    infoItem: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+    infoSeparator: { width: 1, height: 20, backgroundColor: colors.surfaceHighlight, marginHorizontal: 15 },
+    routeDetail: { ...typography.body, fontSize: 13, color: colors.textSecondary, marginLeft: 8 },
 
     bottomBarContainer: { position: 'absolute', bottom: 20, left: 20, right: 20 },
     bottomBar: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 10, borderRadius: 30 },
