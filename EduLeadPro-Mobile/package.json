@@ -9,7 +9,7 @@
     "web": "expo start --web",
     "build:web": "expo export -p web && node scripts/flatten-assets.js",
     "export:web": "expo export --platform web",
-    "postexport:web": "node scripts/flatten-assets.js && cp vercel.json dist/vercel.json",
+    "postexport:web": "node scripts/flatten-assets.js",
     "deploy": "npm run export:web && vercel dist --prod --yes"
   },
   "dependencies": {

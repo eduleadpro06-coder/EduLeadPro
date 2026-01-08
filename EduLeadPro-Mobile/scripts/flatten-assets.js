@@ -8,6 +8,17 @@ const path = require('path');
 
 const distDir = path.join(__dirname, '..', 'dist');
 const assetsDir = path.join(distDir, 'assets');
+const projectRoot = path.join(__dirname, '..');
+
+// Copy vercel.json to dist
+const vercelConfigPath = path.join(projectRoot, 'vercel.json');
+const distVercelConfigPath = path.join(distDir, 'vercel.json');
+if (fs.existsSync(vercelConfigPath)) {
+    fs.copyFileSync(vercelConfigPath, distVercelConfigPath);
+    console.log('✅ Copied vercel.json to dist');
+} else {
+    console.error('❌ vercel.json not found in project root!');
+}
 
 // Create flattened directories
 const fontsDir = path.join(assetsDir, 'fonts');

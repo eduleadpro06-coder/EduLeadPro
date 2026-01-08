@@ -45,8 +45,7 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
     const checkActiveTrip = async () => {
         setLoading(true);
         try {
-            // Ideally backend endpoint would return active trip status
-            const data = await api.getDriverDashboard(user.id || 0); // Assuming API signature
+            const data = await api.getDriverDashboard();
             setDashboardData(data);
             if (data?.activeTrip) setActiveTrip(data.activeTrip);
         } catch (error) {
@@ -56,19 +55,26 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
         }
     };
 
-    const handleStartTrip = async (routeId: string) => {
+    const handleStartTrip = async (routeId: number) => {
         try {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 Alert.alert('Permission Denied', 'Location access is required for trips.');
                 return;
             }
-            // Mock Starting trip locally if API not fully ready or for UI demo
+
+            // Start trip via API
+            await api.startTrip(routeId);
+
+            // Set local state
             const trip = { id: Date.now(), routeId, status: 'live' };
             setActiveTrip(trip);
-            // await api.startTrip(routeId); 
+
+            // Start location service (background logic handles this via activeTrip state usually, 
+            // but we might need to trigger it explicitly if not polling)
         } catch (error) {
-            Alert.alert('Error', 'Could not start trip');
+            console.error(error);
+            Alert.alert('Error', 'Could not start trip. Please try again.');
         }
     };
 
@@ -130,43 +136,37 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
                 ) : (
                     // Mock Routes if no data
                     <View>
-                        <PremiumCard style={styles.routeCard}>
-                            <View style={styles.routeHeader}>
-                                <Text style={styles.routeTitle}>Morning Pickup - Route A</Text>
-                                <Text style={styles.routeTime}>07:30 AM</Text>
+                        {dashboardData?.assignedRoute ? (
+                            <PremiumCard style={styles.routeCard}>
+                                <View style={styles.routeHeader}>
+                                    <View>
+                                        <Text style={styles.routeTitle}>{dashboardData.assignedRoute.route_name}</Text>
+                                        <Text style={styles.routeTime}>{dashboardData.assignedRoute.vehicle_number}</Text>
+                                    </View>
+                                    <Text style={styles.routeTime}>Active</Text>
+                                </View>
+                                <View style={styles.routeInfo}>
+                                    <Feather name="users" size={16} color={colors.textSecondary} />
+                                    <Text style={styles.routeDetail}>{dashboardData.assignedStudents?.length || 0} Students</Text>
+                                    <View style={styles.dot} />
+                                    <Feather name="phone" size={16} color={colors.textSecondary} />
+                                    <Text style={styles.routeDetail}>{dashboardData.assignedRoute.helper_phone || 'No Helper'}</Text>
+                                </View>
+                                <PremiumButton
+                                    title="Start Trip"
+                                    icon="play"
+                                    onPress={() => handleStartTrip(dashboardData.assignedRoute.id)}
+                                    style={{ marginTop: 12 }}
+                                />
+                            </PremiumCard>
+                        ) : (
+                            <View style={{ alignItems: 'center', padding: 20 }}>
+                                <Feather name="slash" size={40} color={colors.textTertiary} />
+                                <Text style={{ ...typography.body, color: colors.textSecondary, marginTop: 10 }}>
+                                    No routes assigned yet.
+                                </Text>
                             </View>
-                            <View style={styles.routeInfo}>
-                                <Feather name="users" size={16} color={colors.textSecondary} />
-                                <Text style={styles.routeDetail}>12 Students</Text>
-                                <View style={styles.dot} />
-                                <Feather name="map-pin" size={16} color={colors.textSecondary} />
-                                <Text style={styles.routeDetail}>8 Stops</Text>
-                            </View>
-                            <PremiumButton
-                                title="Start Trip"
-                                icon="play"
-                                onPress={() => handleStartTrip('1')}
-                                style={{ marginTop: 12 }}
-                            />
-                        </PremiumCard>
-
-                        <PremiumCard style={styles.routeCard}>
-                            <View style={styles.routeHeader}>
-                                <Text style={styles.routeTitle}>Afternoon Drop - Route A</Text>
-                                <Text style={styles.routeTime}>02:30 PM</Text>
-                            </View>
-                            <View style={styles.routeInfo}>
-                                <Feather name="users" size={16} color={colors.textSecondary} />
-                                <Text style={styles.routeDetail}>10 Students</Text>
-                            </View>
-                            <PremiumButton
-                                title="Start Trip"
-                                icon="play"
-                                variant="outline"
-                                onPress={() => handleStartTrip('2')}
-                                style={{ marginTop: 12 }}
-                            />
-                        </PremiumCard>
+                        )}
                     </View>
                 )}
             </ScrollView>

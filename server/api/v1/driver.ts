@@ -30,6 +30,10 @@ router.get('/dashboard', async (req: Request, res: Response) => {
             .eq('id', staffId)
             .single();
 
+        if (!driver) {
+            return res.status(404).json({ error: 'Driver not found' });
+        }
+
         // Get routes assigned to THIS driver
         const { data: routes } = await supabase
             .from('bus_routes')
@@ -38,6 +42,14 @@ router.get('/dashboard', async (req: Request, res: Response) => {
             .eq('driver_id', staffId); // Filter by this driver's ID
 
         const assignedRoute = routes && routes.length > 0 ? routes[0] : null;
+
+        // DEBUG: Return what we searched for
+        const debug = {
+            searchDriverId: staffId,
+            searchOrgId: organizationId,
+            routesFound: routes?.length || 0,
+            firstRoute: routes?.[0] || 'none'
+        };
 
         // Get assigned students if route exists
         let assignedStudents: any[] = [];
@@ -58,13 +70,15 @@ router.get('/dashboard', async (req: Request, res: Response) => {
             }
         }
 
-        res.json({
-            success: true,
-            data: {
-                driver: driver || { name: 'Driver', phone: '' },
-                route: assignedRoute,
-                assignedStudents
-            }
+        return res.json({
+            driver: {
+                id: driver.id,
+                name: driver.name,
+                phone: driver.phone
+            },
+            assignedRoute,
+            assignedStudents,
+            debug // Include debug info
         });
     } catch (error) {
         console.error('[Mobile API] Driver dashboard error:', error);
