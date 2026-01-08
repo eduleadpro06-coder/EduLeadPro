@@ -50,6 +50,7 @@ export default function AppManagement() {
     const [driverId, setDriverId] = useState("");
     const [helperName, setHelperName] = useState("");
     const [helperPhone, setHelperPhone] = useState("");
+    const [editingRouteId, setEditingRouteId] = useState<number | null>(null); // For editing existing routes
 
     // Bus Stop Form
     const [selectedRouteId, setSelectedRouteId] = useState<number | string>("");
@@ -1057,7 +1058,7 @@ export default function AppManagement() {
                                     </DialogTrigger>
                                     <DialogContent>
                                         <DialogHeader>
-                                            <DialogTitle>Add Bus Route</DialogTitle>
+                                            <DialogTitle>{editingRouteId ? 'Edit Bus Route' : 'Add Bus Route'}</DialogTitle>
                                         </DialogHeader>
                                         <div className="space-y-4 py-4">
                                             <div className="space-y-2">
@@ -1127,11 +1128,25 @@ export default function AppManagement() {
                                                         <span className="text-xs text-gray-500">{route.helperPhone}</span>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Button variant="ghost" size="sm" onClick={() => {
-                                                            if (confirm("Delete this route?")) deleteBusRouteMutation.mutate(route.id);
-                                                        }}>
-                                                            <Trash2 className="text-red-500" size={16} />
-                                                        </Button>
+                                                        <div className="flex gap-2">
+                                                            <Button variant="ghost" size="sm" onClick={() => {
+                                                                // Set form for editing
+                                                                setRouteName(route.routeName || '');
+                                                                setVehicleNumber(route.vehicleNumber || '');
+                                                                setDriverId(route.driverId?.toString() || '');
+                                                                setHelperName(route.helperName || '');
+                                                                setHelperPhone(route.helperPhone || '');
+                                                                setEditingRouteId(route.id);
+                                                                setBusRouteDialogOpen(true);
+                                                            }}>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
+                                                            </Button>
+                                                            <Button variant="ghost" size="sm" onClick={() => {
+                                                                if (confirm("Delete this route?")) deleteBusRouteMutation.mutate(route.id);
+                                                            }}>
+                                                                <Trash2 className="text-red-500" size={16} />
+                                                            </Button>
+                                                        </div>
                                                     </TableCell>
                                                 </TableRow>
                                             ))

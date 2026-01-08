@@ -30,12 +30,12 @@ router.get('/dashboard', async (req: Request, res: Response) => {
             .eq('id', staffId)
             .single();
 
-        // Get assigned routes
+        // Get routes assigned to THIS driver
         const { data: routes } = await supabase
             .from('bus_routes')
-            .select('id, route_name, route_number, start_time, end_time')
+            .select('id, route_name, vehicle_number, helper_name, helper_phone')
             .eq('organization_id', organizationId)
-            .limit(1); // For now, assume driver assigned to first route
+            .eq('driver_id', staffId); // Filter by this driver's ID
 
         const assignedRoute = routes && routes.length > 0 ? routes[0] : null;
 
