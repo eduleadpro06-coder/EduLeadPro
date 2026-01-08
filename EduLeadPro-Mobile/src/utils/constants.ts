@@ -3,13 +3,14 @@
  */
 
 // API Configuration
+// API Configuration
 export const API_BASE_URL = __DEV__
     ? 'http://localhost:5000/api/mobile'  // Development
-    : 'https://your-backend.vercel.app/api/mobile'; // Production
+    : 'https://edu-lead-pro.vercel.app/api/mobile'; // Production
 
 export const WEBSOCKET_URL = __DEV__
     ? 'ws://localhost:5000'
-    : 'wss://your-backend.vercel.app';
+    : 'wss://edu-lead-pro.vercel.app';
 
 // GPS Tracking Configuration
 export const GPS_CONFIG = {
