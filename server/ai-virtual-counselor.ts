@@ -151,8 +151,8 @@ export async function processVirtualCounselorQuery(
       escalationRequired: false,
       followUpRequired: aiResponse.followUpRequired,
       sentiment: sentiment.overall === 'very_negative' || sentiment.overall === 'negative' ? 'negative' :
-                sentiment.overall === 'very_positive' || sentiment.overall === 'positive' ? 'positive' :
-                sentiment.emotions.urgency > 0.7 ? 'urgent' : 'neutral'
+        sentiment.overall === 'very_positive' || sentiment.overall === 'positive' ? 'positive' :
+          sentiment.emotions.urgency > 0.7 ? 'urgent' : 'neutral'
     };
 
   } catch (error) {
@@ -228,22 +228,22 @@ function analyzeSentiment(message: string): SentimentAnalysis {
 
   // Positive indicators
   const positiveWords = ['good', 'great', 'excellent', 'satisfied', 'happy', 'thank', 'appreciate'];
-  const positiveScore = positiveWords.reduce((score, word) => 
+  const positiveScore = positiveWords.reduce((score, word) =>
     normalizedMessage.includes(word) ? score + 1 : score, 0);
 
   // Negative indicators
   const negativeWords = ['bad', 'terrible', 'angry', 'frustrated', 'disappointed', 'worst', 'hate'];
-  const negativeScore = negativeWords.reduce((score, word) => 
+  const negativeScore = negativeWords.reduce((score, word) =>
     normalizedMessage.includes(word) ? score + 1 : score, 0);
 
   // Urgency indicators
   const urgencyWords = ['urgent', 'asap', 'immediately', 'emergency', 'deadline', 'critical'];
-  const urgencyScore = urgencyWords.reduce((score, word) => 
+  const urgencyScore = urgencyWords.reduce((score, word) =>
     normalizedMessage.includes(word) ? score + 1 : score, 0);
 
   // Frustration indicators
   const frustrationWords = ['confused', 'stuck', 'unable', 'not working', 'problem', 'issue'];
-  const frustrationScore = frustrationWords.reduce((score, word) => 
+  const frustrationScore = frustrationWords.reduce((score, word) =>
     normalizedMessage.includes(word) ? score + 1 : score, 0);
 
   // Overall sentiment
@@ -275,7 +275,7 @@ function analyzeSentiment(message: string): SentimentAnalysis {
 function extractKeyPhrases(message: string): string[] {
   const phrases: string[] = [];
   const words = message.toLowerCase().split(/\s+/);
-  
+
   // Look for important bigrams and trigrams
   for (let i = 0; i < words.length - 1; i++) {
     const bigram = `${words[i]} ${words[i + 1]}`;
@@ -290,7 +290,7 @@ function extractKeyPhrases(message: string): string[] {
 // Get escalation triggers
 function getEscalationTriggers(message: string): string[] {
   const triggers: string[] = [];
-  
+
   const escalationKeywords = {
     'complaint': 'Customer complaint detected',
     'angry': 'Emotional escalation needed',
@@ -463,7 +463,7 @@ function generateEscalationMessage(routing: CounselorRouting): string {
   ];
 
   const baseMessage = messages[Math.floor(Math.random() * messages.length)];
-  
+
   if (routing.availableCounselors.length > 0) {
     return `${baseMessage} ${routing.availableCounselors[0].name} will be with you shortly. Estimated wait time: ${routing.estimatedWaitTime}.`;
   }
@@ -749,7 +749,7 @@ function getErrorResponse(): VirtualCounselorResponse {
 
     In the meantime, you can:
     📞 Call us directly at +91-XXXX-XXXX
-    📧 Email us at info@eduleadpro.com
+    📧 Email us at eduleadpro06@gmail.com
     💬 Use our live chat feature
     
     A counselor will be with you shortly.`,
@@ -794,7 +794,7 @@ export async function analyzeConversationSatisfaction(
   satisfactionScore += (resolutionRate - 0.5) * 20;
 
   // Check response relevance (based on intent matching)
-  const relevantResponses = aiMessages.filter(msg => 
+  const relevantResponses = aiMessages.filter(msg =>
     msg.message.length > 50 && !msg.message.includes('I don\'t understand')
   );
   const relevanceRate = relevantResponses.length / aiMessages.length;
