@@ -863,9 +863,18 @@ export default function AppManagement() {
                                                                     </Badge>
                                                                 </TableCell>
                                                                 <TableCell className="text-center">
-                                                                    <Badge variant="outline" className="text-gray-600">
-                                                                        Route Assignment TBD
-                                                                    </Badge>
+                                                                    {(() => {
+                                                                        const assignedRoute = busRoutes.find(route => route.driverId === driver.id);
+                                                                        return assignedRoute ? (
+                                                                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                                                                {assignedRoute.routeName}
+                                                                            </Badge>
+                                                                        ) : (
+                                                                            <Badge variant="outline" className="text-gray-600">
+                                                                                Not Assigned
+                                                                            </Badge>
+                                                                        );
+                                                                    })()}
                                                                 </TableCell>
                                                                 <TableCell>
                                                                     <div className="flex items-center gap-2">
