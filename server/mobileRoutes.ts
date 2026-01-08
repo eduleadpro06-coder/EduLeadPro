@@ -17,7 +17,53 @@ import { sql } from 'drizzle-orm';
 router.get('/auth/run-migration', async (_req, res) => {
     try {
         await db.execute(sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS app_password TEXT`);
-        res.send('Migration Success: app_password column added.');
+        await db.execute(sql`UPDATE leads SET is_app_active = false`);
+
+        // Bus Management Tables
+        await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS bus_routes (
+              id SERIAL PRIMARY KEY,
+              organization_id INTEGER NOT NULL REFERENCES organizations(id),
+              route_name VARCHAR(100) NOT NULL,
+              vehicle_number VARCHAR(50) NOT NULL,
+              driver_id INTEGER REFERENCES staff(id),
+              helper_name VARCHAR(100),
+              helper_phone VARCHAR(20),
+              capacity INTEGER,
+              start_time VARCHAR(10),
+              end_time VARCHAR(10),
+              status VARCHAR(20) DEFAULT 'active',
+              created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+              updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+            );
+        `);
+
+        await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS bus_stops (
+              id SERIAL PRIMARY KEY,
+              route_id INTEGER NOT NULL REFERENCES bus_routes(id),
+              stop_name VARCHAR(100) NOT NULL,
+              latitude DECIMAL(10, 8),
+              longitude DECIMAL(11, 8),
+              arrival_time VARCHAR(10),
+              pickup_price DECIMAL(10, 2) DEFAULT 0,
+              stop_order INTEGER NOT NULL,
+              created_at TIMESTAMP DEFAULT NOW() NOT NULL
+            );
+        `);
+
+        await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS student_bus_assignments (
+              id SERIAL PRIMARY KEY,
+              student_id INTEGER NOT NULL REFERENCES leads(id),
+              route_id INTEGER NOT NULL REFERENCES bus_routes(id),
+              pickup_stop_id INTEGER REFERENCES bus_stops(id),
+              drop_stop_id INTEGER REFERENCES bus_stops(id),
+              assigned_at TIMESTAMP DEFAULT NOW() NOT NULL
+            );
+        `);
+
+        res.send('Migration Success: app_password column added, leads set to inactive, and Bus tables created.');
     } catch (e: any) {
         res.status(500).send('Migration Failed: ' + e.message);
     }

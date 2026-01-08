@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Bus, MapPin, Users, Radio, Smartphone, Key, Search, RefreshCw, Megaphone, Calendar, ClipboardList, BookOpen, Trash2 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Lead, PreschoolAnnouncement, PreschoolEvent, DailyUpdate, PreschoolHomework } from "@shared/schema";
+import { Lead, PreschoolAnnouncement, PreschoolEvent, DailyUpdate, PreschoolHomework, BusRoute, BusStop, StudentBusAssignment } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,28 @@ export default function AppManagement() {
     const [studentPhone, setStudentPhone] = useState("");
     const [className, setClassName] = useState("");
     const [dueDate, setDueDate] = useState("");
+
+    // Bus Management State
+    const [busRouteDialogOpen, setBusRouteDialogOpen] = useState(false);
+    const [busStopDialogOpen, setBusStopDialogOpen] = useState(false);
+    const [busAssignmentDialogOpen, setBusAssignmentDialogOpen] = useState(false);
+
+    // Bus Route Form
+    const [routeName, setRouteName] = useState("");
+    const [vehicleNumber, setVehicleNumber] = useState("");
+    const [driverId, setDriverId] = useState("");
+    const [helperName, setHelperName] = useState("");
+    const [helperPhone, setHelperPhone] = useState("");
+
+    // Bus Stop Form
+    const [selectedRouteId, setSelectedRouteId] = useState<number | string>("");
+    const [stopName, setStopName] = useState("");
+    const [arrivalTime, setArrivalTime] = useState("");
+    const [pickupPrice, setPickupPrice] = useState("");
+
+    // Assignment Form
+    const [selectedStudentId, setSelectedStudentId] = useState<number | string>("");
+    const [selectedStopId, setSelectedStopId] = useState<number | string>("");
 
     // Staff Password State
     const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
@@ -155,6 +177,19 @@ export default function AppManagement() {
         queryKey: ['/api/homework']
     });
 
+    // Bus Management Queries
+    const { data: busRoutes = [], isLoading: isLoadingBusRoutes } = useQuery<BusRoute[]>({
+        queryKey: ['/api/bus/routes']
+    });
+    const { data: busStops = [], isLoading: isLoadingBusStops } = useQuery<BusStop[]>({
+        queryKey: ['/api/bus/routes', selectedRouteId, 'stops'],
+        enabled: !!selectedRouteId
+    });
+    const { data: busAssignments = [], isLoading: isLoadingBusAssignments } = useQuery<StudentBusAssignment[]>({
+        queryKey: ['/api/bus/assignments', selectedRouteId],
+        enabled: !!selectedRouteId || activeTab === "assignments"
+    });
+
     // Mutations for Mobile Content
     const createAnnouncementMutation = useMutation({
         mutationFn: async (data: any) => {
@@ -216,6 +251,79 @@ export default function AppManagement() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['/api/daily-updates'] });
             toast({ title: "Deleted", description: "Update removed" });
+        }
+    });
+
+    // Bus Management Mutations
+    const createBusRouteMutation = useMutation({
+        mutationFn: async (data: any) => {
+            const res = await apiRequest("POST", "/api/bus/routes", data);
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['/api/bus/routes'] });
+            setBusRouteDialogOpen(false);
+            setRouteName(""); setVehicleNumber(""); setDriverId(""); setHelperName(""); setHelperPhone("");
+            toast({ title: "Success", description: "Bus route created" });
+        },
+        onError: () => toast({ title: "Error", description: "Failed to create route", variant: "destructive" })
+    });
+
+    const deleteBusRouteMutation = useMutation({
+        mutationFn: async (id: number) => {
+            await apiRequest("DELETE", `/api/bus/routes/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['/api/bus/routes'] });
+            toast({ title: "Deleted", description: "Route deleted" });
+        }
+    });
+
+    const createBusStopMutation = useMutation({
+        mutationFn: async (data: any) => {
+            const res = await apiRequest("POST", "/api/bus/stops", data);
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['/api/bus/routes', selectedRouteId, 'stops'] });
+            setBusStopDialogOpen(false);
+            setStopName(""); setArrivalTime(""); setPickupPrice("");
+            toast({ title: "Success", description: "Bus stop added" });
+        },
+        onError: () => toast({ title: "Error", description: "Failed to add stop", variant: "destructive" })
+    });
+
+    const deleteBusStopMutation = useMutation({
+        mutationFn: async (id: number) => {
+            await apiRequest("DELETE", `/api/bus/stops/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['/api/bus/routes', selectedRouteId, 'stops'] });
+            toast({ title: "Deleted", description: "Stop removed" });
+        }
+    });
+
+    const createBusAssignmentMutation = useMutation({
+        mutationFn: async (data: any) => {
+            const res = await apiRequest("POST", "/api/bus/assignments", data);
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['/api/bus/assignments'] });
+            setBusAssignmentDialogOpen(false);
+            setSelectedStudentId(""); setSelectedStopId("");
+            toast({ title: "Success", description: "Student assigned to bus" });
+        },
+        onError: () => toast({ title: "Error", description: "Failed to assign student", variant: "destructive" })
+    });
+
+    const deleteBusAssignmentMutation = useMutation({
+        mutationFn: async (id: number) => {
+            await apiRequest("DELETE", `/api/bus/assignments/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['/api/bus/assignments'] });
+            toast({ title: "Deleted", description: "Assignment removed" });
         }
     });
 
@@ -756,17 +864,96 @@ export default function AppManagement() {
                                     <CardTitle>Bus Routes</CardTitle>
                                     <CardDescription>Manage your school bus routes and schedules</CardDescription>
                                 </div>
-                                <Button className="bg-purple-600 hover:bg-purple-700">
-                                    <Plus className="mr-2" size={18} />
-                                    Add Route
-                                </Button>
+                                <Dialog open={busRouteDialogOpen} onOpenChange={setBusRouteDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button className="bg-purple-600 hover:bg-purple-700">
+                                            <Plus className="mr-2" size={18} />
+                                            Add Route
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Add Bus Route</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4 py-4">
+                                            <div className="space-y-2">
+                                                <Label>Route Name</Label>
+                                                <Input value={routeName} onChange={(e) => setRouteName(e.target.value)} placeholder="e.g. Route 1 - North" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Vehicle Number</Label>
+                                                <Input value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="e.g. KA-01-AB-1234" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Driver</Label>
+                                                <select className="w-full border rounded-md p-2" value={driverId} onChange={(e) => setDriverId(e.target.value)}>
+                                                    <option value="">Select Driver...</option>
+                                                    {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label>Helper Name</Label>
+                                                    <Input value={helperName} onChange={(e) => setHelperName(e.target.value)} />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Helper Phone</Label>
+                                                    <Input value={helperPhone} onChange={(e) => setHelperPhone(e.target.value)} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button onClick={() => createBusRouteMutation.mutate({
+                                                routeName,
+                                                vehicleNumber,
+                                                driverId: driverId ? Number(driverId) : null,
+                                                helperName,
+                                                helperPhone
+                                            })}>
+                                                Create Route
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-center py-12 text-gray-500">
-                                    <Bus className="mx-auto mb-4 text-gray-400" size={48} />
-                                    <p className="text-lg font-medium">No routes yet</p>
-                                    <p className="text-sm">Click "Add Route" to create your first bus route</p>
-                                </div>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Route Name</TableHead>
+                                            <TableHead>Vehicle</TableHead>
+                                            <TableHead>Driver</TableHead>
+                                            <TableHead>Helper</TableHead>
+                                            <TableHead>Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {isLoadingBusRoutes ? (
+                                            <TableRow><TableCell colSpan={5} className="text-center py-8">Loading...</TableCell></TableRow>
+                                        ) : busRoutes.length === 0 ? (
+                                            <TableRow><TableCell colSpan={5} className="text-center text-gray-500 py-8">No routes found</TableCell></TableRow>
+                                        ) : (
+                                            busRoutes.map(route => (
+                                                <TableRow key={route.id}>
+                                                    <TableCell className="font-medium">{route.routeName}</TableCell>
+                                                    <TableCell>{route.vehicleNumber}</TableCell>
+                                                    <TableCell>{allStaff.find(s => s.id === route.driverId)?.name || '-'}</TableCell>
+                                                    <TableCell>
+                                                        {route.helperName}<br />
+                                                        <span className="text-xs text-gray-500">{route.helperPhone}</span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Button variant="ghost" size="sm" onClick={() => {
+                                                            if (confirm("Delete this route?")) deleteBusRouteMutation.mutate(route.id);
+                                                        }}>
+                                                            <Trash2 className="text-red-500" size={16} />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
                             </CardContent>
                         </Card>
                     )}
@@ -779,17 +966,96 @@ export default function AppManagement() {
                                     <CardTitle>Bus Stops</CardTitle>
                                     <CardDescription>Manage pickup and drop-off locations</CardDescription>
                                 </div>
-                                <Button className="bg-purple-600 hover:bg-purple-700">
-                                    <Plus className="mr-2" size={18} />
-                                    Add Stop
-                                </Button>
+                                <Dialog open={busStopDialogOpen} onOpenChange={setBusStopDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button className="bg-purple-600 hover:bg-purple-700" disabled={!selectedRouteId}>
+                                            <Plus className="mr-2" size={18} />
+                                            Add Stop
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Add Bus Stop</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4 py-4">
+                                            <div className="space-y-2">
+                                                <Label>Stop Name</Label>
+                                                <Input value={stopName} onChange={(e) => setStopName(e.target.value)} placeholder="e.g. Main Market" />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label>Arrival Time</Label>
+                                                    <Input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Pickup Price (Monthly)</Label>
+                                                    <Input type="number" value={pickupPrice} onChange={(e) => setPickupPrice(e.target.value)} placeholder="0.00" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button onClick={() => createBusStopMutation.mutate({
+                                                routeId: Number(selectedRouteId),
+                                                stopName,
+                                                arrivalTime,
+                                                pickupPrice: Number(pickupPrice || 0),
+                                                stopOrder: busStops.length + 1
+                                            })}>
+                                                Add Stop
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-center py-12 text-gray-500">
-                                    <MapPin className="mx-auto mb-4 text-gray-400" size={48} />
-                                    <p className="text-lg font-medium">No stops configured</p>
-                                    <p className="text-sm">Add bus stops with GPS coordinates and timing</p>
+                                <div className="mb-4">
+                                    <Label>Select Route to Manage Stops</Label>
+                                    <select
+                                        className="w-full max-w-md border rounded-md p-2 mt-1"
+                                        value={selectedRouteId}
+                                        onChange={(e) => setSelectedRouteId(e.target.value)}
+                                    >
+                                        <option value="">Select a route...</option>
+                                        {busRoutes.map(r => <option key={r.id} value={r.id}>{r.routeName} ({r.vehicleNumber})</option>)}
+                                    </select>
                                 </div>
+
+                                {selectedRouteId && (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Order</TableHead>
+                                                <TableHead>Stop Name</TableHead>
+                                                <TableHead>Arrival Time</TableHead>
+                                                <TableHead>Price</TableHead>
+                                                <TableHead>Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {isLoadingBusStops ? (
+                                                <TableRow><TableCell colSpan={5} className="text-center py-8">Loading...</TableCell></TableRow>
+                                            ) : busStops.length === 0 ? (
+                                                <TableRow><TableCell colSpan={5} className="text-center text-gray-500 py-8">No stops added to this route yet</TableCell></TableRow>
+                                            ) : (
+                                                busStops.map((stop) => (
+                                                    <TableRow key={stop.id}>
+                                                        <TableCell>{stop.stopOrder}</TableCell>
+                                                        <TableCell className="font-medium">{stop.stopName}</TableCell>
+                                                        <TableCell>{stop.arrivalTime}</TableCell>
+                                                        <TableCell>{stop.pickupPrice}</TableCell>
+                                                        <TableCell>
+                                                            <Button variant="ghost" size="sm" onClick={() => {
+                                                                if (confirm("Delete this stop?")) deleteBusStopMutation.mutate(stop.id);
+                                                            }}>
+                                                                <Trash2 className="text-red-500" size={16} />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                )}
                             </CardContent>
                         </Card>
                     )}
@@ -802,17 +1068,97 @@ export default function AppManagement() {
                                     <CardTitle>Student Assignments</CardTitle>
                                     <CardDescription>Assign students to bus routes and stops</CardDescription>
                                 </div>
-                                <Button className="bg-purple-600 hover:bg-purple-700">
-                                    <Plus className="mr-2" size={18} />
-                                    Assign Student
-                                </Button>
+                                <Dialog open={busAssignmentDialogOpen} onOpenChange={setBusAssignmentDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button className="bg-purple-600 hover:bg-purple-700" disabled={!selectedRouteId}>
+                                            <Plus className="mr-2" size={18} />
+                                            Assign Student
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Assign Student to Bus</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4 py-4">
+                                            <div className="space-y-2">
+                                                <Label>Select Student</Label>
+                                                <select className="w-full border rounded-md p-2" value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)}>
+                                                    <option value="">Select Student...</option>
+                                                    {leads.map(lead => <option key={lead.id} value={lead.id}>{lead.name} ({lead.phone})</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Pickup/Drop Stop</Label>
+                                                <select className="w-full border rounded-md p-2" value={selectedStopId} onChange={(e) => setSelectedStopId(e.target.value)}>
+                                                    <option value="">Select Stop...</option>
+                                                    {busStops.map(stop => <option key={stop.id} value={stop.id}>{stop.stopName}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button onClick={() => createBusAssignmentMutation.mutate({
+                                                studentId: Number(selectedStudentId),
+                                                routeId: Number(selectedRouteId),
+                                                pickupStopId: Number(selectedStopId),
+                                                dropStopId: Number(selectedStopId) // Assuming same stop for now
+                                            })}>
+                                                Assign Student
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-center py-12 text-gray-500">
-                                    <Users className="mx-auto mb-4 text-gray-400" size={48} />
-                                    <p className="text-lg font-medium">No assignments yet</p>
-                                    <p className="text-sm">Assign students to their pickup and drop stops</p>
+                                <div className="mb-4">
+                                    <Label>Select Route to View Assignments</Label>
+                                    <select
+                                        className="w-full max-w-md border rounded-md p-2 mt-1"
+                                        value={selectedRouteId}
+                                        onChange={(e) => setSelectedRouteId(e.target.value)}
+                                    >
+                                        <option value="">Select a route...</option>
+                                        {busRoutes.map(r => <option key={r.id} value={r.id}>{r.routeName} ({r.vehicleNumber})</option>)}
+                                    </select>
                                 </div>
+
+                                {selectedRouteId && (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Student Name</TableHead>
+                                                <TableHead>Stop Name</TableHead>
+                                                <TableHead>Assigned At</TableHead>
+                                                <TableHead>Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {isLoadingBusAssignments ? (
+                                                <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
+                                            ) : busAssignments.length === 0 ? (
+                                                <TableRow><TableCell colSpan={4} className="text-center text-gray-500 py-8">No students assigned to this route</TableCell></TableRow>
+                                            ) : (
+                                                busAssignments.map((assignment) => (
+                                                    <TableRow key={assignment.id}>
+                                                        <TableCell className="font-medium">
+                                                            {leads.find(l => l.id === assignment.studentId)?.name || `Student #${assignment.studentId}`}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {busStops.find(s => s.id === assignment.pickupStopId)?.stopName || 'Unknown Stop'}
+                                                        </TableCell>
+                                                        <TableCell>{assignment.assignedAt ? new Date(assignment.assignedAt).toLocaleDateString() : '-'}</TableCell>
+                                                        <TableCell>
+                                                            <Button variant="ghost" size="sm" onClick={() => {
+                                                                if (confirm("Remove this assignment?")) deleteBusAssignmentMutation.mutate(assignment.id);
+                                                            }}>
+                                                                <Trash2 className="text-red-500" size={16} />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                )}
                             </CardContent>
                         </Card>
                     )}

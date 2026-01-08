@@ -12,7 +12,8 @@ import type {
   CommunicationLog, InsertCommunicationLog, Organization, InsertOrganization,
   DailyUpdate, InsertDailyUpdate, StudentAttendance, InsertStudentAttendance,
   PreschoolHomework, InsertPreschoolHomework, PreschoolAnnouncement, InsertPreschoolAnnouncement,
-  PreschoolEvent, InsertPreschoolEvent
+  PreschoolEvent, InsertPreschoolEvent,
+  BusRoute, InsertBusRoute, BusStop, InsertBusStop, StudentBusAssignment, InsertStudentBusAssignment
 } from "../shared/schema.js";
 
 // Type definitions for complex queries
@@ -298,6 +299,21 @@ export interface IStorage {
   getHomeworkForAdmin(organizationId: number): Promise<PreschoolHomework[]>;
   createHomework(homework: InsertPreschoolHomework): Promise<PreschoolHomework>;
   deleteHomework(id: number): Promise<boolean>;
+
+  // Bus Management
+  getBusRoutes(organizationId: number): Promise<BusRoute[]>;
+  createBusRoute(route: InsertBusRoute): Promise<BusRoute>;
+  updateBusRoute(id: number, updates: Partial<BusRoute>): Promise<BusRoute | undefined>;
+  deleteBusRoute(id: number): Promise<void>;
+
+  getBusStops(routeId: number): Promise<BusStop[]>;
+  createBusStop(stop: InsertBusStop): Promise<BusStop>;
+  updateBusStop(id: number, updates: Partial<BusStop>): Promise<BusStop | undefined>;
+  deleteBusStop(id: number): Promise<void>;
+
+  getStudentAssignments(routeId?: number): Promise<StudentBusAssignment[]>;
+  assignStudentToBus(assignment: InsertStudentBusAssignment): Promise<StudentBusAssignment>;
+  removeStudentAssignment(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -443,6 +459,7 @@ export class DatabaseStorage implements IStorage {
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
         organizationId: schema.leads.organizationId,
+        isAppActive: schema.leads.isAppActive,
         counselor: schema.staff
       })
       .from(schema.leads)
@@ -482,6 +499,7 @@ export class DatabaseStorage implements IStorage {
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
         organizationId: schema.leads.organizationId,
+        isAppActive: schema.leads.isAppActive,
         counselor: schema.staff
       })
       .from(schema.leads)
@@ -544,6 +562,7 @@ export class DatabaseStorage implements IStorage {
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
         organizationId: schema.leads.organizationId,
+        isAppActive: schema.leads.isAppActive,
         counselor: schema.staff
       })
       .from(schema.leads)
@@ -581,6 +600,7 @@ export class DatabaseStorage implements IStorage {
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
         organizationId: schema.leads.organizationId,
+        isAppActive: schema.leads.isAppActive,
         counselor: schema.staff
       })
       .from(schema.leads)
@@ -618,6 +638,7 @@ export class DatabaseStorage implements IStorage {
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
         organizationId: schema.leads.organizationId,
+        isAppActive: schema.leads.isAppActive,
         counselor: schema.staff
       })
       .from(schema.leads)
@@ -653,6 +674,12 @@ export class DatabaseStorage implements IStorage {
           console.error("Error auto-assigning counselor:", counselorError);
           // Continue without auto-assignment if there's an error
         }
+      }
+
+      // Default isAppActive to false if not provided
+      // Use logic to retain value if explicitly passed (e.g. true or false), but default to false if undefined/null
+      if (leadData.isAppActive === undefined || leadData.isAppActive === null) {
+        leadData.isAppActive = false;
       }
 
       // CRITICAL: Only include fields with actual values (not undefined, null, or empty strings)
@@ -794,6 +821,7 @@ export class DatabaseStorage implements IStorage {
         address: schema.leads.address,
         deletedAt: schema.leads.deletedAt,
         organizationId: schema.leads.organizationId,
+        isAppActive: schema.leads.isAppActive,
         counselor: schema.staff
       })
       .from(schema.leads)
@@ -4790,6 +4818,59 @@ export class DatabaseStorage implements IStorage {
       categories: await this.getInventoryCategories(organizationId),
       suppliers: await this.getInventorySuppliers(organizationId)
     };
+  }
+
+  // Bus Management Implementation
+  async getBusRoutes(organizationId: number): Promise<BusRoute[]> {
+    return await db.select().from(schema.busRoutes).where(eq(schema.busRoutes.organizationId, organizationId));
+  }
+
+  async createBusRoute(insertBusRoute: InsertBusRoute): Promise<BusRoute> {
+    const result = await db.insert(schema.busRoutes).values(insertBusRoute).returning();
+    return result[0];
+  }
+
+  async updateBusRoute(id: number, updates: Partial<BusRoute>): Promise<BusRoute | undefined> {
+    const result = await db.update(schema.busRoutes).set({ ...updates, updatedAt: new Date() }).where(eq(schema.busRoutes.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteBusRoute(id: number): Promise<void> {
+    await db.delete(schema.busRoutes).where(eq(schema.busRoutes.id, id));
+  }
+
+  async getBusStops(routeId: number): Promise<BusStop[]> {
+    return await db.select().from(schema.busStops).where(eq(schema.busStops.routeId, routeId)).orderBy(schema.busStops.stopOrder);
+  }
+
+  async createBusStop(insertBusStop: InsertBusStop): Promise<BusStop> {
+    const result = await db.insert(schema.busStops).values(insertBusStop).returning();
+    return result[0];
+  }
+
+  async updateBusStop(id: number, updates: Partial<BusStop>): Promise<BusStop | undefined> {
+    const result = await db.update(schema.busStops).set(updates).where(eq(schema.busStops.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteBusStop(id: number): Promise<void> {
+    await db.delete(schema.busStops).where(eq(schema.busStops.id, id));
+  }
+
+  async getStudentAssignments(routeId?: number): Promise<StudentBusAssignment[]> {
+    if (routeId) {
+      return await db.select().from(schema.studentBusAssignments).where(eq(schema.studentBusAssignments.routeId, routeId));
+    }
+    return await db.select().from(schema.studentBusAssignments);
+  }
+
+  async assignStudentToBus(insertAssignment: InsertStudentBusAssignment): Promise<StudentBusAssignment> {
+    const result = await db.insert(schema.studentBusAssignments).values(insertAssignment).returning();
+    return result[0];
+  }
+
+  async removeStudentAssignment(id: number): Promise<void> {
+    await db.delete(schema.studentBusAssignments).where(eq(schema.studentBusAssignments.id, id));
   }
 
   async getStockValuation(organizationId: number) {

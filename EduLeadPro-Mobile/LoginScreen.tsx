@@ -78,9 +78,20 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             } else {
                 Alert.alert('Login Failed', response.error || 'Invalid credentials');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            Alert.alert('Connection Error', 'Please check your internet connection.');
+            const errorMessage = error?.message || 'Please check your internet connection.';
+
+            // Check for network/connection related errors
+            const isConnectionError = errorMessage.toLowerCase().includes('network') ||
+                errorMessage.toLowerCase().includes('connection') ||
+                errorMessage.toLowerCase().includes('fetch');
+
+            if (isConnectionError) {
+                Alert.alert('Connection Error', 'Please check your internet connection.');
+            } else {
+                Alert.alert('Login Failed', errorMessage);
+            }
         } finally {
             setLoading(false);
         }

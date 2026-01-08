@@ -5468,5 +5468,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // BUS MANAGEMENT ROUTES
+  // ============================================
+
+  // Get all routes
+  app.get("/api/bus/routes", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) return res.status(403).json({ message: "Unauthorized" });
+
+      const routes = await storage.getBusRoutes(organizationId);
+      res.json(routes);
+    } catch (error) {
+      console.error("Error fetching bus routes:", error);
+      res.status(500).json({ message: "Failed to fetch routes" });
+    }
+  });
+
+  // Create route
+  app.post("/api/bus/routes", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) return res.status(403).json({ message: "Unauthorized" });
+
+      const routeData = schema.insertBusRouteSchema.parse({ ...req.body, organizationId });
+      const route = await storage.createBusRoute(routeData);
+      res.json(route);
+    } catch (error) {
+      console.error("Error creating bus route:", error);
+      res.status(500).json({ message: "Failed to create route" });
+    }
+  });
+
+  // Delete route
+  app.delete("/api/bus/routes/:id", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) return res.status(403).json({ message: "Unauthorized" });
+
+      await storage.deleteBusRoute(parseInt(req.params.id));
+      res.json({ message: "Route deleted" });
+    } catch (error) {
+      console.error("Error deleting route:", error);
+      res.status(500).json({ message: "Failed to delete route" });
+    }
+  });
+
+  // Get stops for a route
+  app.get("/api/bus/routes/:id/stops", async (req, res) => {
+    try {
+      const stops = await storage.getBusStops(parseInt(req.params.id));
+      res.json(stops);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch stops" });
+    }
+  });
+
+  // Create stop
+  app.post("/api/bus/stops", async (req, res) => {
+    try {
+      const stopData = schema.insertBusStopSchema.parse(req.body);
+      const stop = await storage.createBusStop(stopData);
+      res.json(stop);
+    } catch (error) {
+      console.error("Error creating stop:", error);
+      res.status(500).json({ message: "Failed to create stop" });
+    }
+  });
+
+  // Delete stop
+  app.delete("/api/bus/stops/:id", async (req, res) => {
+    try {
+      await storage.deleteBusStop(parseInt(req.params.id));
+      res.json({ message: "Stop deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete stop" });
+    }
+  });
+
+  // Get assignments
+  app.get("/api/bus/assignments", async (req, res) => {
+    try {
+      // Optional query param routeId
+      const routeId = req.query.routeId ? parseInt(req.query.routeId as string) : undefined;
+      const assignments = await storage.getStudentAssignments(routeId);
+      res.json(assignments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
+  // Assign student
+  app.post("/api/bus/assignments", async (req, res) => {
+    try {
+      const assignmentData = schema.insertStudentBusAssignmentSchema.parse(req.body);
+      const assignment = await storage.assignStudentToBus(assignmentData);
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error assigning student:", error);
+      res.status(500).json({ message: "Failed to assign student" });
+    }
+  });
+
+  // Remove assignment
+  app.delete("/api/bus/assignments/:id", async (req, res) => {
+    try {
+      await storage.removeStudentAssignment(parseInt(req.params.id));
+      res.json({ message: "Assignment removed" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to remove assignment" });
+    }
+  });
+
   return httpServer;
 }

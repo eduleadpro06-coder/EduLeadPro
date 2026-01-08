@@ -1194,6 +1194,62 @@ export type InsertMetaLeadForm = z.infer<typeof insertMetaLeadFormSchema>;
 export type InsertMetaSyncedLead = z.infer<typeof insertMetaSyncedLeadSchema>;
 
 // =====================================================
+// BUS MANAGEMENT SYSTEM
+// =====================================================
+
+export const busRoutes = pgTable("bus_routes", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  routeName: varchar("route_name", { length: 100 }).notNull(),
+  vehicleNumber: varchar("vehicle_number", { length: 50 }).notNull(),
+  driverId: integer("driver_id").references(() => staff.id),
+  helperName: varchar("helper_name", { length: 100 }),
+  helperPhone: varchar("helper_phone", { length: 20 }),
+  capacity: integer("capacity"),
+  startTime: varchar("start_time", { length: 10 }), // e.g. "07:30 AM"
+  endTime: varchar("end_time", { length: 10 }),
+  status: varchar("status", { length: 20 }).default("active"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const busStops = pgTable("bus_stops", {
+  id: serial("id").primaryKey(),
+  routeId: integer("route_id").notNull().references(() => busRoutes.id),
+  stopName: varchar("stop_name", { length: 100 }).notNull(),
+  latitude: decimal("latitude", { precision: 10, scale: 8 }),
+  longitude: decimal("longitude", { precision: 11, scale: 8 }),
+  arrivalTime: varchar("arrival_time", { length: 10 }),
+  pickupPrice: decimal("pickup_price", { precision: 10, scale: 2 }).default("0"),
+  stopOrder: integer("stop_order").notNull(), // 1, 2, 3...
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const studentBusAssignments = pgTable("student_bus_assignments", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => leads.id),
+  routeId: integer("route_id").notNull().references(() => busRoutes.id),
+  pickupStopId: integer("pickup_stop_id").references(() => busStops.id),
+  dropStopId: integer("drop_stop_id").references(() => busStops.id),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+});
+
+// Insert Schemas
+export const insertBusRouteSchema = createInsertSchema(busRoutes).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBusStopSchema = createInsertSchema(busStops).omit({ id: true, createdAt: true });
+export const insertStudentBusAssignmentSchema = createInsertSchema(studentBusAssignments).omit({ id: true, assignedAt: true });
+
+// Types
+export type BusRoute = typeof busRoutes.$inferSelect;
+export type BusStop = typeof busStops.$inferSelect;
+export type StudentBusAssignment = typeof studentBusAssignments.$inferSelect;
+
+export type InsertBusRoute = z.infer<typeof insertBusRouteSchema>;
+export type InsertBusStop = z.infer<typeof insertBusStopSchema>;
+export type InsertStudentBusAssignment = z.infer<typeof insertStudentBusAssignmentSchema>;
+
+
+// =====================================================
 // MOBILE APP TABLES - for Parent/Teacher/Driver Apps
 // =====================================================
 
