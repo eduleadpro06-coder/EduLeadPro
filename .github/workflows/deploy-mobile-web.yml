@@ -1,0 +1,45 @@
+name: Deploy Mobile Web App to Vercel
+
+on:
+  push:
+    branches:
+      - School-App-and-Meta-Marketing
+      - main
+    paths:
+      - 'EduLeadPro-Mobile/**'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        working-directory: ./EduLeadPro-Mobile
+        run: npm install
+
+      - name: Export web build
+        working-directory: ./EduLeadPro-Mobile
+        run: npx expo export --platform web
+
+      - name: Copy vercel.json to dist
+        working-directory: ./EduLeadPro-Mobile
+        run: cp vercel.json dist/vercel.json
+
+      - name: Deploy to Vercel
+        working-directory: ./EduLeadPro-Mobile
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npm install -g vercel
+          vercel deploy dist --prod --token=$VERCEL_TOKEN --yes

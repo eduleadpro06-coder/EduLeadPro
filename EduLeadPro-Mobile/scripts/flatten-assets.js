@@ -1,37 +1,78 @@
+/**
+ * Post-build script to flatten Expo web build assets
+ * Fixes the deeply nested font/asset paths that cause 404s on Vercel
+ */
+
 const fs = require('fs');
 const path = require('path');
 
-console.log('📦 Flattening critical assets for Vercel deployment...');
+const distDir = path.join(__dirname, '..', 'dist');
+const assetsDir = path.join(distDir, 'assets');
 
-// Vercel ignores node_modules in deployments, so we need to move critical assets out
-const distPath = path.join(__dirname, '../dist');
-const assetsPath = path.join(distPath, 'assets');
+// Create flattened directories
+const fontsDir = path.join(assetsDir, 'fonts');
+const wasmDir = path.join(assetsDir, 'wasm');
 
-// Create flat asset directories
-const flatWasmDir = path.join(assetsPath, 'wasm');
-const flatFontsDir = path.join(assetsPath, 'fonts');
+if (!fs.existsSync(fontsDir)) {
+    fs.mkdirSync(fontsDir, { recursive: true });
+}
 
-if (!fs.existsSync(flatWasmDir)) fs.mkdirSync(flatWasmDir, { recursive: true });
-if (!fs.existsSync(flatFontsDir)) fs.mkdirSync(flatFontsDir, { recursive: true });
+if (!fs.existsSync(wasmDir)) {
+    fs.mkdirSync(wasmDir, { recursive: true });
+}
 
-// Copy WASM file
-const wasmSource = path.join(assetsPath, 'node_modules/expo-sqlite/web/wa-sqlite');
-if (fs.existsSync(wasmSource)) {
-    const wasmFiles = fs.readdirSync(wasmSource).filter(f => f.endsWith('.wasm'));
-    wasmFiles.forEach(file => {
-        fs.copyFileSync(path.join(wasmSource, file), path.join(flatWasmDir, file));
-        console.log(`✓ Copied ${file} to /assets/wasm/`);
+// Find and copy all font files to /assets/fonts/
+function findAndCopyFonts(dir, targetDir) {
+    if (!fs.existsSync(dir)) return;
+
+    const files = fs.readdirSync(dir, { withFileTypes: true });
+
+    files.forEach(file => {
+        const fullPath = path.join(dir, file.name);
+
+        if (file.isDirectory()) {
+            findAndCopyFonts(fullPath, targetDir);
+        } else if (file.name.endsWith('.ttf') || file.name.endsWith('.otf') || file.name.endsWith('.woff') || file.name.endsWith('.woff2')) {
+            const targetPath = path.join(targetDir, file.name);
+            if (!fs.existsSync(targetPath)) {
+                fs.copyFileSync(fullPath, targetPath);
+                console.log(`✅ Copied font: ${file.name}`);
+            }
+        }
     });
 }
 
-// Copy font files
-const fontsSource = path.join(assetsPath, 'node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts');
-if (fs.existsSync(fontsSource)) {
-    const fontFiles = fs.readdirSync(fontsSource).filter(f => f.endsWith('.ttf'));
-    fontFiles.forEach(file => {
-        fs.copyFileSync(path.join(fontsSource, file), path.join(flatFontsDir, file));
-        console.log(`✓ Copied ${file} to /assets/fonts/`);
+// Find and copy all WASM files to /assets/wasm/
+function findAndCopyWasm(dir, targetDir) {
+    if (!fs.existsSync(dir)) return;
+
+    const files = fs.readdirSync(dir, { withFileTypes: true });
+
+    files.forEach(file => {
+        const fullPath = path.join(dir, file.name);
+
+        if (file.isDirectory()) {
+            findAndCopyWasm(fullPath, targetDir);
+        } else if (file.name.endsWith('.wasm')) {
+            const targetPath = path.join(targetDir, file.name);
+            if (!fs.existsSync(targetPath)) {
+                fs.copyFileSync(fullPath, targetPath);
+                console.log(`✅ Copied WASM: ${file.name}`);
+            }
+        }
     });
 }
 
-console.log('✅ Asset flattening complete!');
+console.log('🚀 Flattening Expo web build assets...\n');
+
+// Copy fonts
+console.log('📝 Copying fonts...');
+findAndCopyFonts(assetsDir, fontsDir);
+
+// Copy WASM files
+console.log('\n🔧 Copying WASM files...');
+findAndCopyWasm(assetsDir, wasmDir);
+
+console.log('\n✅ Asset flattening complete!');
+console.log(`📁 Fonts location: /assets/fonts/`);
+console.log(`📁 WASM location: /assets/wasm/`);
