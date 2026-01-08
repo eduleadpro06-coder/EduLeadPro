@@ -1,12 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator, Linking } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator, Linking, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from './services/api';
 import { colors, spacing, typography } from './src/theme';
 
+// Conditionally import MapView only for native platforms (not web)
+let MapView: any = null;
+let Marker: any = null;
+let PROVIDER_DEFAULT: any = null;
+
+if (Platform.OS !== 'web') {
+    const mapModule = require('react-native-maps');
+    MapView = mapModule.default;
+    Marker = mapModule.Marker;
+    PROVIDER_DEFAULT = mapModule.PROVIDER_DEFAULT;
+}
+
 const { width, height } = Dimensions.get('window');
+
 
 interface BusScreenProps {
     currentChild: any;
@@ -17,7 +29,7 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
     const [liveLocation, setLiveLocation] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isLive, setIsLive] = useState(false);
-    const mapRef = useRef<MapView>(null);
+    const mapRef = useRef<any>(null); // Using any to avoid type issues with conditional import
     const updateInterval = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
@@ -136,34 +148,55 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
         <View style={styles.container}>
             {/* Live Map */}
             <View style={styles.mapContainer}>
-                <MapView
-                    ref={mapRef}
-                    provider={PROVIDER_DEFAULT}
-                    style={styles.map}
-                    initialRegion={{
-                        latitude: liveLocation?.latitude || 28.6139, // Default to Delhi
-                        longitude: liveLocation?.longitude || 77.2090,
-                        latitudeDelta: 0.02,
-                        longitudeDelta: 0.02,
-                    }}
-                    showsUserLocation={true}
-                    showsMyLocationButton={true}
-                >
-                    {liveLocation && isLive && (
-                        <Marker
-                            coordinate={{
-                                latitude: liveLocation.latitude,
-                                longitude: liveLocation.longitude,
-                            }}
-                            title="School Bus"
-                            description={`Speed: ${Math.round(liveLocation.speed)} km/h`}
-                        >
-                            <View style={styles.busMarker}>
-                                <Feather name="truck" size={24} color="white" />
+                {Platform.OS === 'web' ? (
+                    // Web fallback - show simple placeholder
+                    <View style={[styles.map, { backgroundColor: colors.surfaceHighlight, justifyContent: 'center', alignItems: 'center' }]}>
+                        <Feather name="map" size={48} color={colors.textSecondary} />
+                        <Text style={{ marginTop: 12, color: colors.textSecondary }}>
+                            Map view is available on mobile app only
+                        </Text>
+                        {liveLocation && (
+                            <View style={{ marginTop: 16, alignItems: 'center' }}>
+                                <Text style={{ color: colors.textPrimary, fontWeight: '600' }}>
+                                    Bus Location: {liveLocation.latitude.toFixed(4)}, {liveLocation.longitude.toFixed(4)}
+                                </Text>
+                                <Text style={{ color: colors.textSecondary, marginTop: 4 }}>
+                                    Speed: {Math.round(liveLocation.speed)} km/h
+                                </Text>
                             </View>
-                        </Marker>
-                    )}
-                </MapView>
+                        )}
+                    </View>
+                ) : (
+                    // Native platforms - show actual map
+                    <MapView
+                        ref={mapRef as any}
+                        provider={PROVIDER_DEFAULT}
+                        style={styles.map}
+                        initialRegion={{
+                            latitude: liveLocation?.latitude || 28.6139, // Default to Delhi
+                            longitude: liveLocation?.longitude || 77.2090,
+                            latitudeDelta: 0.02,
+                            longitudeDelta: 0.02,
+                        }}
+                        showsUserLocation={true}
+                        showsMyLocationButton={true}
+                    >
+                        {liveLocation && isLive && (
+                            <Marker
+                                coordinate={{
+                                    latitude: liveLocation.latitude,
+                                    longitude: liveLocation.longitude,
+                                }}
+                                title="School Bus"
+                                description={`Speed: ${Math.round(liveLocation.speed)} km/h`}
+                            >
+                                <View style={styles.busMarker}>
+                                    <Feather name="truck" size={24} color="white" />
+                                </View>
+                            </Marker>
+                        )}
+                    </MapView>
+                )}
 
                 {/* Live Indicator Overlay */}
                 {isLive && (
