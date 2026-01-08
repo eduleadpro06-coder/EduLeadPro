@@ -1,0 +1,464 @@
+[
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "route_id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "driver_id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "status",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "started_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "ended_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "current_latitude",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "current_longitude",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "current_speed",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "current_heading",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "active_bus_sessions",
+    "column_name": "last_updated",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "organization_id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "route_name",
+    "data_type": "character varying",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "bus_number",
+    "data_type": "character varying",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "driver_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "helper_name",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "helper_phone",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "capacity",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "start_time",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "end_time",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "status",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "bus_routes",
+    "column_name": "updated_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "email",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "phone",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "class",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "stream",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "source",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "counselor_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "assigned_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "updated_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "last_contacted_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "admission_likelihood",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "notes",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "parent_name",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "parent_phone",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "address",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "interested_program",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "deleted_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "organization_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "section",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "batch",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "is_enrolled",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "enrollment_date",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "app_password",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "is_app_active",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "employee_id",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "name",
+    "data_type": "character varying",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "email",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "phone",
+    "data_type": "character varying",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "role",
+    "data_type": "character varying",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "department",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "date_of_joining",
+    "data_type": "date",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "salary",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "is_active",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "address",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "emergency_contact",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "qualifications",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "bank_account_number",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "ifsc_code",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "pan_number",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "updated_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "organization_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "app_password",
+    "data_type": "character varying",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "student_bus_assignments",
+    "column_name": "id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "student_bus_assignments",
+    "column_name": "student_id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "student_bus_assignments",
+    "column_name": "route_id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "student_bus_assignments",
+    "column_name": "pickup_stop_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "student_bus_assignments",
+    "column_name": "drop_stop_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "student_bus_assignments",
+    "column_name": "assigned_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "NO"
+  }
+]

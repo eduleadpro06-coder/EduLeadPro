@@ -25,12 +25,14 @@ async function checkRoutes() {
 
     try {
         const columns = await sql`
-        SELECT table_name, column_name, data_type 
+        SELECT table_name, column_name, data_type, is_nullable
         FROM information_schema.columns 
-        WHERE table_name IN ('active_bus_sessions', 'student_bus_assignments', 'leads')
+        WHERE table_name IN ('active_bus_sessions', 'student_bus_assignments', 'leads', 'staff', 'bus_routes')
+        ORDER BY table_name, ordinal_position
     `;
-        fs.writeFileSync('table_columns.json', JSON.stringify(columns, null, 2));
-        console.log('✅ Columns written to table_columns.json');
+        console.table(columns);
+        fs.writeFileSync('table_columns_v2.json', JSON.stringify(columns, null, 2));
+        console.log('✅ Columns written to table_columns_v2.json');
 
         const routes = await sql`SELECT * FROM bus_routes`;
         console.log('\n🚌 Actual Bus Routes in DB:');

@@ -151,9 +151,7 @@ router.post('/location', async (req: Request, res: Response) => {
 
         res.json({
             success: true,
-            data: {
-                message: 'Location updated successfully'
-            }
+            message: 'Location updated successfully'
         });
     } catch (error) {
         console.error('[Mobile API] Update location error:', error);
@@ -231,18 +229,13 @@ router.post('/trip/start', async (req: Request, res: Response) => {
 
         res.json({
             success: true,
-            data: {
-                session
-            }
+            session
         });
     } catch (error) {
         console.error('[Mobile API] Start trip exception:', error);
         res.status(500).json({
             success: false,
-            error: {
-                code: 'START_TRIP_SERVER_ERROR',
-                message: 'Internal server error while starting trip'
-            }
+            error: 'Internal server error while starting trip'
         });
     }
 });
@@ -256,13 +249,7 @@ router.post('/trip/end', async (req: Request, res: Response) => {
         const { sessionId } = req.body;
 
         if (!sessionId) {
-            return res.status(400).json({
-                success: false,
-                error: {
-                    code: 'INVALID_REQUEST',
-                    message: 'sessionId is required'
-                }
-            });
+            return res.status(400).json({ success: false, error: 'sessionId is required' });
         }
 
         const { supabase } = await import('../../supabase.js');
@@ -271,8 +258,8 @@ router.post('/trip/end', async (req: Request, res: Response) => {
         const { error } = await supabase
             .from('active_bus_sessions')
             .update({
-                end_time: new Date().toISOString(),
-                status: 'completed'
+                status: 'completed',
+                ended_at: new Date().toISOString()
             })
             .eq('id', sessionId);
 
@@ -280,18 +267,13 @@ router.post('/trip/end', async (req: Request, res: Response) => {
 
         res.json({
             success: true,
-            data: {
-                message: 'Trip ended successfully'
-            }
+            message: 'Trip ended successfully'
         });
     } catch (error) {
         console.error('[Mobile API] End trip error:', error);
         res.status(500).json({
             success: false,
-            error: {
-                code: 'END_TRIP_ERROR',
-                message: 'Failed to end trip'
-            }
+            error: 'Failed to end trip'
         });
     }
 });
@@ -307,36 +289,36 @@ router.get('/trip/active', async (req: Request, res: Response) => {
         const { supabase } = await import('../../supabase.js');
 
         // Get active session for this driver
-        const { data: session } = await supabase
+        const { data: session, error } = await supabase
             .from('active_bus_sessions')
             .select(`
-        id,
-        route_id,
-        start_time,
-        status,
-        bus_routes (
-          id,
-          route_name,
-          route_number
-        )
-      `)
+                id,
+                route_id,
+                started_at,
+                status,
+                bus_routes (
+                    id,
+                    route_name,
+                    bus_number
+                )
+            `)
             .eq('driver_id', staffId)
-            .eq('status', 'active')
+            .eq('status', 'live')
             .single();
+
+        if (error || !session) {
+            return res.json({ success: true, activeTrip: null });
+        }
 
         res.json({
             success: true,
-            data: {
-                session: session || null
-            }
+            activeTrip: session
         });
     } catch (error) {
         // If no active session, return null
         res.json({
             success: true,
-            data: {
-                session: null
-            }
+            session: null
         });
     }
 });
