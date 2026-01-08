@@ -1201,7 +1201,7 @@ export const busRoutes = pgTable("bus_routes", {
   id: serial("id").primaryKey(),
   organizationId: integer("organization_id").notNull().references(() => organizations.id),
   routeName: varchar("route_name", { length: 100 }).notNull(),
-  vehicleNumber: varchar("vehicle_number", { length: 50 }).notNull(),
+  vehicleNumber: varchar("bus_number", { length: 50 }).notNull(),
   driverId: integer("driver_id").references(() => staff.id),
   helperName: varchar("helper_name", { length: 100 }),
   helperPhone: varchar("helper_phone", { length: 20 }),
@@ -1237,7 +1237,12 @@ export const studentBusAssignments = pgTable("student_bus_assignments", {
 // Insert Schemas
 export const insertBusRouteSchema = createInsertSchema(busRoutes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBusStopSchema = createInsertSchema(busStops).omit({ id: true, createdAt: true });
-export const insertStudentBusAssignmentSchema = createInsertSchema(studentBusAssignments).omit({ id: true, assignedAt: true });
+export const insertStudentBusAssignmentSchema = createInsertSchema(studentBusAssignments)
+  .omit({ id: true, assignedAt: true })
+  .extend({
+    pickupStopId: z.number().nullable().optional(),
+    dropStopId: z.number().nullable().optional()
+  });
 
 // Types
 export type BusRoute = typeof busRoutes.$inferSelect;

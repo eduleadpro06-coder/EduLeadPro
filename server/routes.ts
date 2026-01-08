@@ -3118,6 +3118,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/staff/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = { ...req.body };
+
+      // Explicitly handle boolean fields
+      if ('isActive' in updates) {
+        updates.isActive = Boolean(updates.isActive);
+      }
+
+      const staff = await storage.updateStaff(parseInt(id), updates);
+      if (!staff) {
+        return res.status(404).json({ message: "Staff not found" });
+      }
+
+      res.json(staff);
+    } catch (error) {
+      console.error("Update staff error:", error);
+      res.status(500).json({ message: "Failed to update staff" });
+    }
+  });
+
   app.delete("/api/staff/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -5556,10 +5578,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/bus/assignments", async (req, res) => {
     try {
       // Optional query param routeId
-      const routeId = req.query.routeId ? parseInt(req.query.routeId as string) : undefined;
+      let routeId: number | undefined;
+      if (req.query.routeId && req.query.routeId !== 'undefined' && req.query.routeId !== 'null') {
+        const parsed = parseInt(req.query.routeId as string);
+        if (!isNaN(parsed)) {
+          routeId = parsed;
+        }
+      }
+
       const assignments = await storage.getStudentAssignments(routeId);
       res.json(assignments);
     } catch (error) {
+      console.error("Error fetching assignments:", error);
       res.status(500).json({ message: "Failed to fetch assignments" });
     }
   });
@@ -5587,4 +5617,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   return httpServer;
+  // Get bus assignment for a student (Mobile App)
+  app.get("/api/students/:id/bus-assignment", async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.id);
+      if (isNaN(studentId)) {
+        return res.status(400).json({ message: "Invalid student ID" });
+      }
+
+      const assignment = await storage.getStudentBusAssignment(studentId);
+      if (!assignment) {
+        return res.status(404).json({ message: "No bus assignment found" });
+      }
+
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error fetching student bus assignment:", error);
+      res.status(500).json({ message: "Failed to fetch bus assignment" });
+    }
+  });
+
 }

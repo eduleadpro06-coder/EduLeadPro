@@ -1,4 +1,4 @@
-import { eq, and, ne, gte, lte, lt, sql, desc, or, isNull, isNotNull, not, asc, ilike } from "drizzle-orm";
+import { eq, and, ne, gte, lte, lt, sql, desc, or, isNull, isNotNull, not, asc, ilike, aliasedTable } from "drizzle-orm";
 import { db } from "./db.js";
 import * as schema from "../shared/schema.js";
 import type {
@@ -4965,6 +4965,27 @@ export class DatabaseStorage implements IStorage {
   async deleteHomework(id: number): Promise<boolean> {
     await db.delete(schema.preschoolHomework).where(eq(schema.preschoolHomework.id, id));
     return true;
+  }
+
+  async getStudentBusAssignment(studentId: number) {
+    const pickupStopApi = aliasedTable(schema.busStops, "pickup_stop");
+    const dropStopApi = aliasedTable(schema.busStops, "drop_stop");
+
+    const result = await db.select({
+      assignment: schema.studentBusAssignments,
+      route: schema.busRoutes,
+      pickupStop: pickupStopApi,
+      dropStop: dropStopApi,
+      driver: schema.staff
+    })
+      .from(schema.studentBusAssignments)
+      .innerJoin(schema.busRoutes, eq(schema.studentBusAssignments.routeId, schema.busRoutes.id))
+      .leftJoin(schema.staff, eq(schema.busRoutes.driverId, schema.staff.id))
+      .leftJoin(pickupStopApi, eq(schema.studentBusAssignments.pickupStopId, pickupStopApi.id))
+      .leftJoin(dropStopApi, eq(schema.studentBusAssignments.dropStopId, dropStopApi.id))
+      .where(eq(schema.studentBusAssignments.studentId, studentId));
+
+    return result[0];
   }
 
 }

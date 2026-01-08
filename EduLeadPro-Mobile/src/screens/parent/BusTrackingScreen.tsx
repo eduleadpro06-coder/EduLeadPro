@@ -45,30 +45,37 @@ export default function BusTrackingScreen() {
             // Get first child's bus assignment
             if (user?.children && user.children.length > 0) {
                 const firstChild = user.children[0];
-                if (firstChild.student_bus_assignments && firstChild.student_bus_assignments.length > 0) {
-                    const assignment = firstChild.student_bus_assignments[0];
-                    const routeId = assignment.route_id;
 
-                    setRouteId(routeId);
+                try {
+                    // Fetch fresh assignment from server
+                    const data = await busAPI.getStudentBusAssignment(firstChild.id);
 
-                    // Connect WebSocket
-                    webSocketService.connect();
+                    if (data && data.assignment) {
+                        const rId = data.assignment.routeId;
+                        setRouteId(String(rId));
 
-                    // Subscribe to bus updates
-                    webSocketService.subscribeToBus(routeId, user.id, (data) => {
-                        console.log('Bus location update:', data);
-                        setBusLocation({
-                            latitude: data.latitude,
-                            longitude: data.longitude,
-                            speed: data.speed,
-                            heading: data.heading,
+                        // Connect WebSocket
+                        webSocketService.connect();
+
+                        // Subscribe to bus updates
+                        webSocketService.subscribeToBus(String(rId), user.id, (locationData) => {
+                            console.log('Bus location update:', locationData);
+                            setBusLocation({
+                                latitude: locationData.latitude,
+                                longitude: locationData.longitude,
+                                speed: locationData.speed,
+                                heading: locationData.heading,
+                            });
                         });
-                    });
 
+                        setLoading(false);
+                    } else {
+                        setLoading(false);
+                        // Don't show alert immediately if checking async, but here we are done
+                    }
+                } catch (err) {
+                    console.log('No bus assignment found or error', err);
                     setLoading(false);
-                } else {
-                    setLoading(false);
-                    Alert.alert('No Bus Assigned', 'No bus route assigned to your child');
                 }
             } else {
                 setLoading(false);
@@ -77,7 +84,6 @@ export default function BusTrackingScreen() {
         } catch (error) {
             console.error('Error initializing tracking:', error);
             setLoading(false);
-            Alert.alert('Error', 'Failed to initialize bus tracking');
         }
     };
 

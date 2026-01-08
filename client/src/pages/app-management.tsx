@@ -66,6 +66,14 @@ export default function AppManagement() {
     const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
     const [newPassword, setNewPassword] = useState("");
 
+    // Driver Management State
+    const [addDriverDialogOpen, setAddDriverDialogOpen] = useState(false);
+    const [driverName, setDriverName] = useState("");
+    const [driverPhone, setDriverPhone] = useState("");
+    const [driverEmail, setDriverEmail] = useState("");
+    const [driverEmployeeId, setDriverEmployeeId] = useState("");
+    const [driverJoiningDate, setDriverJoiningDate] = useState(new Date().toISOString().split('T')[0]);
+
     // Fetch Leads (Parents)
     const { data: leads = [], isLoading } = useQuery<Lead[]>({
         queryKey: ['/api/leads']
@@ -81,7 +89,7 @@ export default function AppManagement() {
     );
 
     const drivers = allStaff.filter(staff =>
-        staff.role?.toLowerCase().includes('driver') && staff.isActive
+        staff.role?.toLowerCase().includes('driver')
     );
 
     // Fetch Teacher Assignments
@@ -159,6 +167,29 @@ export default function AppManagement() {
             toast({
                 title: "Error",
                 description: error.message || "Failed to update password.",
+                variant: "destructive"
+            });
+        }
+    });
+
+    const updateStaffStatusMutation = useMutation({
+        mutationFn: async (data: { id: number, isActive: boolean }) => {
+            const res = await apiRequest("PATCH", `/api/staff/${data.id}`, {
+                isActive: data.isActive
+            });
+            return res.json();
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+            toast({
+                title: "Status Updated",
+                description: `Driver has been ${variables.isActive ? 'activated' : 'deactivated'}.`,
+            });
+        },
+        onError: (error: any) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to update status.",
                 variant: "destructive"
             });
         }
@@ -345,6 +376,44 @@ export default function AppManagement() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['/api/homework'] });
             toast({ title: "Deleted", description: "Homework removed" });
+        }
+    });
+
+    // Staff Management Mutations
+    const createStaffMutation = useMutation({
+        mutationFn: async (data: any) => {
+            const res = await apiRequest("POST", "/api/staff", data);
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+            setAddDriverDialogOpen(false);
+            setDriverName(""); setDriverPhone(""); setDriverEmail(""); setDriverEmployeeId("");
+            toast({ title: "Success", description: "Driver added successfully" });
+        },
+        onError: (error: any) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to add driver",
+                variant: "destructive"
+            });
+        }
+    });
+
+    const deleteStaffMutation = useMutation({
+        mutationFn: async (id: number) => {
+            await apiRequest("DELETE", `/api/staff/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+            toast({ title: "Deleted", description: "Staff member removed" });
+        },
+        onError: (error: any) => {
+            toast({
+                title: "Error",
+                description: "Failed to delete staff member. They might be assigned to active records.",
+                variant: "destructive"
+            });
         }
     });
 
@@ -728,92 +797,214 @@ export default function AppManagement() {
 
                     {/* Drivers Tab */}
                     {activeTab === "drivers" && (
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <CardTitle>Drivers (Mobile Access)</CardTitle>
-                                        <CardDescription>
-                                            View all drivers who can access the mobile app
-                                        </CardDescription>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                                            <Input
-                                                placeholder="Search drivers..."
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="pl-10 w-64"
-                                            />
+                        <>
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <CardTitle>Drivers (Mobile Access)</CardTitle>
+                                            <CardDescription>
+                                                View all drivers who can access the mobile app
+                                            </CardDescription>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="relative">
+                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                                                <Input
+                                                    placeholder="Search drivers..."
+                                                    value={searchTerm}
+                                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                                    className="pl-10 w-64"
+                                                />
+                                            </div>
+                                            <Button onClick={() => setAddDriverDialogOpen(true)}>
+                                                <Plus className="mr-2 h-4 w-4" />
+                                                Add Driver
+                                            </Button>
                                         </div>
                                     </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="rounded-md border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Name</TableHead>
-                                                <TableHead>Phone</TableHead>
-                                                <TableHead>Email</TableHead>
-                                                <TableHead>Role</TableHead>
-                                                <TableHead className="text-center">Assigned Route</TableHead>
-                                                <TableHead>Status</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {drivers.length === 0 ? (
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="rounded-md border">
+                                        <Table>
+                                            <TableHeader>
                                                 <TableRow>
-                                                    <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                                                        No drivers found. Create staff members with "Driver" role in Staff Management.
-                                                    </TableCell>
+                                                    <TableHead>Name</TableHead>
+                                                    <TableHead>Phone</TableHead>
+                                                    <TableHead>Email</TableHead>
+                                                    <TableHead>Role</TableHead>
+                                                    <TableHead className="text-center">Assigned Route</TableHead>
+                                                    <TableHead>Status</TableHead>
                                                 </TableRow>
-                                            ) : (
-                                                drivers
-                                                    .filter(driver =>
-                                                        !searchTerm ||
-                                                        driver.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                        driver.phone?.includes(searchTerm)
-                                                    )
-                                                    .map((driver: any) => (
-                                                        <TableRow key={driver.id}>
-                                                            <TableCell className="font-medium">{driver.name}</TableCell>
-                                                            <TableCell>{driver.phone}</TableCell>
-                                                            <TableCell className="text-gray-600">{driver.email || 'N/A'}</TableCell>
-                                                            <TableCell>
-                                                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                                                                    {driver.role}
-                                                                </Badge>
-                                                            </TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Badge variant="outline" className="text-gray-600">
-                                                                    Route Assignment TBD
-                                                                </Badge>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Badge variant={driver.appPassword ? "default" : "secondary"}>
-                                                                    {driver.appPassword ? 'Active' : 'Default'}
-                                                                </Badge>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                {drivers.length > 0 && (
-                                    <div className="mt-4 text-sm text-gray-600">
-                                        Showing {drivers.filter(d =>
-                                            !searchTerm ||
-                                            d.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            d.phone?.includes(searchTerm)
-                                        ).length} of {drivers.length} drivers
+                                            </TableHeader>
+                                            <TableBody>
+                                                {drivers.length === 0 ? (
+                                                    <TableRow>
+                                                        <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                                                            No drivers found. Create staff members with "Driver" role in Staff Management.
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ) : (
+                                                    drivers
+                                                        .filter(driver =>
+                                                            !searchTerm ||
+                                                            driver.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                            driver.phone?.includes(searchTerm)
+                                                        )
+                                                        .map((driver: any) => (
+                                                            <TableRow key={driver.id}>
+                                                                <TableCell className="font-medium">{driver.name}</TableCell>
+                                                                <TableCell>{driver.phone}</TableCell>
+                                                                <TableCell className="text-gray-600">{driver.email || 'N/A'}</TableCell>
+                                                                <TableCell>
+                                                                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                                                        {driver.role}
+                                                                    </Badge>
+                                                                </TableCell>
+                                                                <TableCell className="text-center">
+                                                                    <Badge variant="outline" className="text-gray-600">
+                                                                        Route Assignment TBD
+                                                                    </Badge>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Switch
+                                                                            checked={driver.isActive}
+                                                                            onCheckedChange={(checked) => updateStaffStatusMutation.mutate({
+                                                                                id: driver.id,
+                                                                                isActive: checked
+                                                                            })}
+                                                                        />
+                                                                        <span className="text-sm text-gray-500">
+                                                                            {driver.isActive ? 'Active' : 'Inactive'}
+                                                                        </span>
+                                                                    </div>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))
+                                                )}
+                                            </TableBody>
+                                        </Table>
                                     </div>
-                                )}
-                            </CardContent>
-                        </Card>
+                                    {drivers.length > 0 && (
+                                        <div className="mt-4 text-sm text-gray-600">
+                                            Showing {drivers.filter(d =>
+                                                !searchTerm ||
+                                                d.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                d.phone?.includes(searchTerm)
+                                            ).length} of {drivers.length} drivers
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Add Driver Dialog */}
+                            <Dialog open={addDriverDialogOpen} onOpenChange={setAddDriverDialogOpen}>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Add New Driver</DialogTitle>
+                                        <DialogDescription>
+                                            Create a new staff account with Driver role.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="driverName">Full Name</Label>
+                                            <Input
+                                                id="driverName"
+                                                value={driverName}
+                                                onChange={(e) => setDriverName(e.target.value)}
+                                                placeholder="Enter driver's name"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="driverPhone">Phone Number</Label>
+                                                <Input
+                                                    id="driverPhone"
+                                                    value={driverPhone}
+                                                    onChange={(e) => setDriverPhone(e.target.value)}
+                                                    placeholder="10-digit number"
+                                                    maxLength={10}
+                                                />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="driverEmail">Email (Optional)</Label>
+                                                <Input
+                                                    id="driverEmail"
+                                                    type="email"
+                                                    value={driverEmail}
+                                                    onChange={(e) => setDriverEmail(e.target.value)}
+                                                    placeholder="driver@example.com"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="driverEmployeeId">Employee ID</Label>
+                                                <Input
+                                                    id="driverEmployeeId"
+                                                    value={driverEmployeeId}
+                                                    onChange={(e) => setDriverEmployeeId(e.target.value)}
+                                                    placeholder="e.g. DRV-001"
+                                                />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="driverDate">Date of Joining</Label>
+                                                <Input
+                                                    id="driverDate"
+                                                    type="date"
+                                                    value={driverJoiningDate}
+                                                    onChange={(e) => setDriverJoiningDate(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => setAddDriverDialogOpen(false)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            onClick={() => {
+                                                if (!driverName || !driverPhone || !driverJoiningDate) {
+                                                    toast({
+                                                        title: "Missing Fields",
+                                                        description: "Name, Phone, and Date of Joining are required.",
+                                                        variant: "destructive"
+                                                    });
+                                                    return;
+                                                }
+
+                                                if (driverPhone.length !== 10) {
+                                                    toast({
+                                                        title: "Invalid Phone",
+                                                        description: "Phone number must be exactly 10 digits.",
+                                                        variant: "destructive"
+                                                    });
+                                                    return;
+                                                }
+
+                                                createStaffMutation.mutate({
+                                                    name: driverName,
+                                                    phone: driverPhone,
+                                                    email: driverEmail || undefined,
+                                                    employeeId: driverEmployeeId || undefined,
+                                                    dateOfJoining: driverJoiningDate,
+                                                    role: "Driver",
+                                                    isActive: true
+                                                });
+                                            }}
+                                            disabled={createStaffMutation.isPending}
+                                        >
+                                            {createStaffMutation.isPending ? "Creating..." : "Create Driver"}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </>
                     )}
                 </div>
             )}
@@ -830,14 +1021,7 @@ export default function AppManagement() {
                             <Bus className="mr-2 h-4 w-4" />
                             Routes
                         </Button>
-                        <Button
-                            variant={activeTab === "stops" ? "default" : "ghost"}
-                            onClick={() => setActiveTab("stops")}
-                            className="rounded-b-none"
-                        >
-                            <MapPin className="mr-2 h-4 w-4" />
-                            Stops
-                        </Button>
+
                         <Button
                             variant={activeTab === "assignments" ? "default" : "ghost"}
                             onClick={() => setActiveTab("assignments")}
@@ -958,107 +1142,7 @@ export default function AppManagement() {
                         </Card>
                     )}
 
-                    {/* Stops Tab */}
-                    {activeTab === "stops" && (
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <div>
-                                    <CardTitle>Bus Stops</CardTitle>
-                                    <CardDescription>Manage pickup and drop-off locations</CardDescription>
-                                </div>
-                                <Dialog open={busStopDialogOpen} onOpenChange={setBusStopDialogOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button className="bg-purple-600 hover:bg-purple-700" disabled={!selectedRouteId}>
-                                            <Plus className="mr-2" size={18} />
-                                            Add Stop
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Add Bus Stop</DialogTitle>
-                                        </DialogHeader>
-                                        <div className="space-y-4 py-4">
-                                            <div className="space-y-2">
-                                                <Label>Stop Name</Label>
-                                                <Input value={stopName} onChange={(e) => setStopName(e.target.value)} placeholder="e.g. Main Market" />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label>Arrival Time</Label>
-                                                    <Input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Pickup Price (Monthly)</Label>
-                                                    <Input type="number" value={pickupPrice} onChange={(e) => setPickupPrice(e.target.value)} placeholder="0.00" />
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button onClick={() => createBusStopMutation.mutate({
-                                                routeId: Number(selectedRouteId),
-                                                stopName,
-                                                arrivalTime,
-                                                pickupPrice: Number(pickupPrice || 0),
-                                                stopOrder: busStops.length + 1
-                                            })}>
-                                                Add Stop
-                                            </Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="mb-4">
-                                    <Label>Select Route to Manage Stops</Label>
-                                    <select
-                                        className="w-full max-w-md border rounded-md p-2 mt-1"
-                                        value={selectedRouteId}
-                                        onChange={(e) => setSelectedRouteId(e.target.value)}
-                                    >
-                                        <option value="">Select a route...</option>
-                                        {busRoutes.map(r => <option key={r.id} value={r.id}>{r.routeName} ({r.vehicleNumber})</option>)}
-                                    </select>
-                                </div>
 
-                                {selectedRouteId && (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Order</TableHead>
-                                                <TableHead>Stop Name</TableHead>
-                                                <TableHead>Arrival Time</TableHead>
-                                                <TableHead>Price</TableHead>
-                                                <TableHead>Actions</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {isLoadingBusStops ? (
-                                                <TableRow><TableCell colSpan={5} className="text-center py-8">Loading...</TableCell></TableRow>
-                                            ) : busStops.length === 0 ? (
-                                                <TableRow><TableCell colSpan={5} className="text-center text-gray-500 py-8">No stops added to this route yet</TableCell></TableRow>
-                                            ) : (
-                                                busStops.map((stop) => (
-                                                    <TableRow key={stop.id}>
-                                                        <TableCell>{stop.stopOrder}</TableCell>
-                                                        <TableCell className="font-medium">{stop.stopName}</TableCell>
-                                                        <TableCell>{stop.arrivalTime}</TableCell>
-                                                        <TableCell>{stop.pickupPrice}</TableCell>
-                                                        <TableCell>
-                                                            <Button variant="ghost" size="sm" onClick={() => {
-                                                                if (confirm("Delete this stop?")) deleteBusStopMutation.mutate(stop.id);
-                                                            }}>
-                                                                <Trash2 className="text-red-500" size={16} />
-                                                            </Button>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
 
                     {/* Student Assignments Tab */}
                     {activeTab === "assignments" && (
@@ -1084,24 +1168,42 @@ export default function AppManagement() {
                                                 <Label>Select Student</Label>
                                                 <select className="w-full border rounded-md p-2" value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)}>
                                                     <option value="">Select Student...</option>
-                                                    {leads.map(lead => <option key={lead.id} value={lead.id}>{lead.name} ({lead.phone})</option>)}
+                                                    {leads
+                                                        .filter(lead =>
+                                                            lead.status === 'enrolled' ||
+                                                            lead.interestedProgram?.toLowerCase().includes('daycare')
+                                                        )
+                                                        .map(lead => <option key={lead.id} value={lead.id}>{lead.name} ({lead.phone})</option>)}
                                                 </select>
                                             </div>
                                             <div className="space-y-2">
-                                                <Label>Pickup/Drop Stop</Label>
+                                                <Label>Pickup/Drop Stop (Optional)</Label>
                                                 <select className="w-full border rounded-md p-2" value={selectedStopId} onChange={(e) => setSelectedStopId(e.target.value)}>
-                                                    <option value="">Select Stop...</option>
+                                                    <option value="">No specific stop (Direct Route)</option>
                                                     {busStops.map(stop => <option key={stop.id} value={stop.id}>{stop.stopName}</option>)}
                                                 </select>
                                             </div>
                                         </div>
                                         <DialogFooter>
-                                            <Button onClick={() => createBusAssignmentMutation.mutate({
-                                                studentId: Number(selectedStudentId),
-                                                routeId: Number(selectedRouteId),
-                                                pickupStopId: Number(selectedStopId),
-                                                dropStopId: Number(selectedStopId) // Assuming same stop for now
-                                            })}>
+                                            <Button onClick={() => {
+                                                const rId = Number(selectedRouteId);
+                                                const sId = Number(selectedStudentId);
+                                                if (!rId || isNaN(rId)) {
+                                                    toast({ title: "Error", description: "Invalid Route ID", variant: "destructive" });
+                                                    return;
+                                                }
+                                                if (!sId || isNaN(sId)) {
+                                                    toast({ title: "Error", description: "Please select a student", variant: "destructive" });
+                                                    return;
+                                                }
+
+                                                createBusAssignmentMutation.mutate({
+                                                    studentId: sId,
+                                                    routeId: rId,
+                                                    pickupStopId: selectedStopId ? Number(selectedStopId) : undefined,
+                                                    dropStopId: selectedStopId ? Number(selectedStopId) : undefined
+                                                });
+                                            }}>
                                                 Assign Student
                                             </Button>
                                         </DialogFooter>
@@ -1143,7 +1245,7 @@ export default function AppManagement() {
                                                             {leads.find(l => l.id === assignment.studentId)?.name || `Student #${assignment.studentId}`}
                                                         </TableCell>
                                                         <TableCell>
-                                                            {busStops.find(s => s.id === assignment.pickupStopId)?.stopName || 'Unknown Stop'}
+                                                            {assignment.pickupStopId ? (busStops.find(s => s.id === assignment.pickupStopId)?.stopName || 'Unknown Stop') : <span className="text-gray-400 italic">Direct Route</span>}
                                                         </TableCell>
                                                         <TableCell>{assignment.assignedAt ? new Date(assignment.assignedAt).toLocaleDateString() : '-'}</TableCell>
                                                         <TableCell>
