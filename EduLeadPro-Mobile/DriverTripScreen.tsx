@@ -21,35 +21,53 @@ import PremiumButton from './src/components/ui/PremiumButton';
 
 interface DriverTripScreenProps {
     route: { id: string; name: string };
+    students?: any[];
     onTripEnd: () => void;
 }
 
-export default function DriverTripScreen({ route, onTripEnd }: DriverTripScreenProps) {
+export default function DriverTripScreen({ route, students: initialStudents, onTripEnd }: DriverTripScreenProps) {
     const [students, setStudents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
 
     useEffect(() => {
-        // Imitate fetching students for this route
-        const mockStudents = [
-            { id: 101, name: 'Aarav Sharma', status: 'pending', stop: 'Sector 4' },
-            { id: 102, name: 'Vivaan Gupta', status: 'pending', stop: 'Market Road' },
-            { id: 103, name: 'Siya Patel', status: 'boarded', stop: 'City Park' },
-        ];
-        setTimeout(() => {
-            setStudents(mockStudents);
+        if (initialStudents) {
+            setStudents(initialStudents.map(s => ({
+                id: s.id,
+                name: s.name,
+                stop: s.class || 'Pickup', // Or some other reasonable fallback
+                status: 'pending'
+            })));
             setLoading(false);
-        }, 1000);
+        } else {
+            // Fallback just in case
+            setStudents([]);
+            setLoading(false);
+        }
 
-        // Start Location Tracking
+        // Start Location Tracking & Send to Backend
         const interval = setInterval(async () => {
-            const loc = await Location.getCurrentPositionAsync({});
-            setLocation(loc);
-            // api.updateBusLocation(...)
-        }, 10000);
+            try {
+                const loc = await Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.Balanced
+                });
+                setLocation(loc);
+
+                // Real-time update to backend
+                await api.updateBusLocation(
+                    parseInt(route.id),
+                    loc.coords.latitude,
+                    loc.coords.longitude,
+                    loc.coords.speed || 0,
+                    loc.coords.heading || 0
+                );
+            } catch (err) {
+                console.warn('Location update failed', err);
+            }
+        }, 15000);
 
         return () => clearInterval(interval);
-    }, []);
+    }, [initialStudents]);
 
     const toggleStatus = (studentId: number) => {
         setStudents(prev => prev.map(s => {
@@ -112,7 +130,7 @@ export default function DriverTripScreen({ route, onTripEnd }: DriverTripScreenP
             </View>
 
             <View style={styles.infoBar}>
-                <Text style={styles.infoText}>Next Stop: <Text style={{ fontWeight: '700' }}>Sector 4</Text></Text>
+                <Text style={styles.infoText}>Route: <Text style={{ fontWeight: '700' }}>{route.name}</Text></Text>
                 <Text style={styles.infoText}>{students.filter(s => s.status === 'boarded').length} Onboard</Text>
             </View>
 

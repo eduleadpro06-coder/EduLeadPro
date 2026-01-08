@@ -36,9 +36,14 @@ async function checkRoutes() {
         console.log('\n🚌 Actual Bus Routes in DB:');
         routes.forEach(r => console.log(JSON.stringify(r)));
 
-        const allRoles = await sql`SELECT DISTINCT role FROM staff`;
-        console.log('\n🎭 All Roles in Staff Table:');
-        console.table(allRoles);
+        const assignments = await sql`SELECT * FROM student_bus_assignments`;
+        console.log('\n🎒 Student Bus Assignments count:', assignments.length);
+        if (assignments.length > 0) {
+            console.log('Sample assignment:', JSON.stringify(assignments[0]));
+            const firstStudentId = assignments[0].student_id;
+            const lead = await sql`SELECT id, name FROM leads WHERE id = ${firstStudentId}`;
+            console.log(`\n🔍 Lead check for ID ${firstStudentId}:`, lead.length > 0 ? lead[0] : 'NOT FOUND');
+        }
 
         const madan = await sql`SELECT id, name, role FROM staff WHERE name ILIKE '%Madan%'`;
         console.log('\n👤 Madan Search Result:');

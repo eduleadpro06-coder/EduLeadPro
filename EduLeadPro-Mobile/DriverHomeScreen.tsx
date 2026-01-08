@@ -63,30 +63,52 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
                 return;
             }
 
+            setLoading(true);
             // Start trip via API
-            await api.startTrip(routeId);
+            const response: any = await api.startTrip(routeId);
 
-            // Set local state
-            const trip = { id: Date.now(), routeId, status: 'live' };
-            setActiveTrip(trip);
-
-            // Start location service (background logic handles this via activeTrip state usually, 
-            // but we might need to trigger it explicitly if not polling)
-        } catch (error) {
+            if (response.success) {
+                // Set local state with data from API
+                const session = response.data?.session || response.session;
+                setActiveTrip({
+                    id: session.id,
+                    routeId,
+                    status: 'live',
+                    routeName: dashboardData?.assignedRoute?.route_name || 'Active Route',
+                    students: dashboardData?.assignedStudents || []
+                });
+            } else {
+                throw new Error(response.error || 'Failed to start trip');
+            }
+        } catch (error: any) {
             console.error(error);
-            Alert.alert('Error', 'Could not start trip. Please try again.');
+            Alert.alert('Error', error.message || 'Could not start trip. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
-    const handleEndTrip = () => {
-        setActiveTrip(null);
-        // await api.endTrip(activeTrip.id);
+    const handleEndTrip = async () => {
+        try {
+            if (activeTrip?.id) {
+                await api.endTrip(activeTrip.id);
+            }
+            setActiveTrip(null);
+            checkActiveTrip(); // Refresh dashboard
+        } catch (error) {
+            console.error(error);
+            setActiveTrip(null);
+        }
     };
 
     if (activeTrip && activeTab === 'dashboard') {
         return (
             <DriverTripScreen
-                route={{ id: activeTrip.routeId, name: 'Morning Route (Active)' }} // Pass real data
+                route={{
+                    id: activeTrip.routeId.toString(),
+                    name: activeTrip.routeName
+                }}
+                students={activeTrip.students}
                 onTripEnd={handleEndTrip}
             />
         );
@@ -116,77 +138,101 @@ export default function DriverHomeScreen({ user, onLogout }: DriverHomeScreenPro
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
+                {activeTab === 'dashboard' && (
+                    <>
+                        {/* Status Card */}
+                        <PremiumCard style={{ marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface }}>
+                            <View style={[styles.statusIcon, { backgroundColor: activeTrip ? colors.successBg : colors.surfaceHighlight }]}>
+                                <Feather name={activeTrip ? "navigation" : "map"} size={24} color={activeTrip ? colors.success : colors.textSecondary} />
+                            </View>
+                            <View>
+                                <Text style={styles.statusTitle}>{activeTrip ? 'Trip in Progress' : 'Ready for Trip'}</Text>
+                                <Text style={styles.statusSub}>{activeTrip ? 'Tracking is active' : 'Select a route to start'}</Text>
+                            </View>
+                        </PremiumCard>
 
-                {/* Status Card */}
-                <PremiumCard style={{ marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface }}>
-                    <View style={[styles.statusIcon, { backgroundColor: activeTrip ? colors.successBg : colors.surfaceHighlight }]}>
-                        <Feather name={activeTrip ? "navigation" : "map"} size={24} color={activeTrip ? colors.success : colors.textSecondary} />
-                    </View>
-                    <View>
-                        <Text style={styles.statusTitle}>{activeTrip ? 'Trip in Progress' : 'Ready for Trip'}</Text>
-                        <Text style={styles.statusSub}>{activeTrip ? 'Tracking is active' : 'Select a route to start'}</Text>
-                    </View>
-                </PremiumCard>
+                        {/* Today's Routes */}
+                        <Text style={styles.sectionTitle}>Assigned Routes</Text>
 
-                {/* Today's Routes */}
-                <Text style={styles.sectionTitle}>Assigned Routes</Text>
-
-                {loading ? (
-                    <ActivityIndicator color={colors.primary} />
-                ) : (
-                    // Mock Routes if no data
-                    <View>
-                        {dashboardData?.assignedRoute ? (
-                            <PremiumCard style={styles.routeCard}>
-                                <View style={styles.routeHeader}>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.routeTitle}>{dashboardData.assignedRoute.route_name}</Text>
-                                        <View style={styles.busBadge}>
-                                            <Feather name="truck" size={12} color={colors.primary} />
-                                            <Text style={styles.busNumber}>{dashboardData.assignedRoute.bus_number}</Text>
-                                        </View>
-                                    </View>
-                                    <View style={[styles.statusBadge, { backgroundColor: colors.success + '20' }]}>
-                                        <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
-                                        <Text style={[styles.statusText, { color: colors.success }]}>Active</Text>
-                                    </View>
-                                </View>
-
-                                <View style={styles.divider} />
-
-                                <View style={styles.routeInfo}>
-                                    <View style={styles.infoItem}>
-                                        <Feather name="users" size={16} color={colors.textSecondary} />
-                                        <Text style={styles.routeDetail}>{dashboardData.assignedStudents?.length || 0} Students</Text>
-                                    </View>
-                                    <View style={styles.infoSeparator} />
-                                    <View style={styles.infoItem}>
-                                        <Feather name="phone" size={16} color={colors.textSecondary} />
-                                        <Text style={styles.routeDetail}>{dashboardData.assignedRoute.helper_phone || 'No Helper'}</Text>
-                                    </View>
-                                </View>
-
-                                <PremiumButton
-                                    title="Start Trip"
-                                    icon="play"
-                                    onPress={() => handleStartTrip(dashboardData.assignedRoute.id)}
-                                    style={{ marginTop: 16 }}
-                                />
-                            </PremiumCard>
+                        {loading ? (
+                            <ActivityIndicator color={colors.primary} />
                         ) : (
-                            <View style={{ alignItems: 'center', padding: 20 }}>
-                                <Feather name="slash" size={40} color={colors.textTertiary} />
-                                <Text style={{ ...typography.body, color: colors.textSecondary, marginTop: 10 }}>
-                                    No routes assigned yet.
-                                </Text>
-                                {/* DEBUG INFO */}
-                                {dashboardData?.debug && (
-                                    <Text style={{ marginTop: 20, fontSize: 10, color: colors.textTertiary }}>
-                                        Debug: {JSON.stringify(dashboardData.debug, null, 2)}
-                                    </Text>
+                            <View>
+                                {dashboardData?.assignedRoute ? (
+                                    <PremiumCard style={styles.routeCard}>
+                                        <View style={styles.routeHeader}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.routeTitle}>{dashboardData.assignedRoute.route_name}</Text>
+                                                <View style={styles.busBadge}>
+                                                    <Feather name="truck" size={12} color={colors.primary} />
+                                                    <Text style={styles.busNumber}>{dashboardData.assignedRoute.bus_number}</Text>
+                                                </View>
+                                            </View>
+                                            <View style={[styles.statusBadge, { backgroundColor: colors.success + '20' }]}>
+                                                <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
+                                                <Text style={[styles.statusText, { color: colors.success }]}>Active</Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.divider} />
+
+                                        <View style={styles.routeInfo}>
+                                            <View style={styles.infoItem}>
+                                                <Feather name="users" size={16} color={colors.textSecondary} />
+                                                <Text style={styles.routeDetail}>{dashboardData.assignedStudents?.length || 0} Students</Text>
+                                            </View>
+                                            <View style={styles.infoSeparator} />
+                                            <View style={styles.infoItem}>
+                                                <Feather name="phone" size={16} color={colors.textSecondary} />
+                                                <Text style={styles.routeDetail}>{dashboardData.assignedRoute.helper_phone || 'No Helper'}</Text>
+                                            </View>
+                                        </View>
+
+                                        <PremiumButton
+                                            title="Start Trip"
+                                            icon="play"
+                                            onPress={() => handleStartTrip(dashboardData.assignedRoute.id)}
+                                            style={{ marginTop: 16 }}
+                                        />
+                                    </PremiumCard>
+                                ) : (
+                                    <View style={{ alignItems: 'center', padding: 20 }}>
+                                        <Feather name="slash" size={40} color={colors.textTertiary} />
+                                        <Text style={{ ...typography.body, color: colors.textSecondary, marginTop: 10 }}>
+                                            No routes assigned yet.
+                                        </Text>
+                                        {/* DEBUG INFO */}
+                                        {dashboardData?.debug && (
+                                            <Text style={{ marginTop: 20, fontSize: 10, color: colors.textTertiary }}>
+                                                Debug: {JSON.stringify(dashboardData.debug, null, 2)}
+                                            </Text>
+                                        )}
+                                    </View>
                                 )}
                             </View>
                         )}
+                    </>
+                )}
+
+                {activeTab === 'routes' && (
+                    <View>
+                        <Text style={styles.sectionTitle}>All Routes</Text>
+                        {dashboardData?.assignedRoute ? (
+                            <PremiumCard style={styles.routeCard}>
+                                <Text style={styles.routeTitle}>{dashboardData.assignedRoute.route_name}</Text>
+                                <Text style={styles.statusSub}>Bus: {dashboardData.assignedRoute.bus_number}</Text>
+                            </PremiumCard>
+                        ) : (
+                            <Text style={styles.statusSub}>No routes found.</Text>
+                        )}
+                    </View>
+                )}
+
+                {activeTab === 'history' && (
+                    <View style={{ alignItems: 'center', marginTop: 40 }}>
+                        <Feather name="clock" size={48} color={colors.textTertiary} />
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Trip History</Text>
+                        <Text style={styles.statusSub}>History feature coming soon.</Text>
                     </View>
                 )}
             </ScrollView>

@@ -1,23 +1,18 @@
 [
   {
     "table_name": "active_bus_sessions",
-    "column_name": "id",
-    "data_type": "uuid"
+    "column_name": "last_updated",
+    "data_type": "timestamp without time zone"
   },
   {
     "table_name": "active_bus_sessions",
     "column_name": "route_id",
-    "data_type": "uuid"
+    "data_type": "integer"
   },
   {
     "table_name": "active_bus_sessions",
     "column_name": "driver_id",
     "data_type": "integer"
-  },
-  {
-    "table_name": "active_bus_sessions",
-    "column_name": "last_updated",
-    "data_type": "timestamp without time zone"
   },
   {
     "table_name": "leads",
@@ -136,18 +131,13 @@
   },
   {
     "table_name": "active_bus_sessions",
-    "column_name": "current_stop_id",
-    "data_type": "uuid"
+    "column_name": "id",
+    "data_type": "integer"
   },
   {
     "table_name": "active_bus_sessions",
-    "column_name": "session_type",
+    "column_name": "status",
     "data_type": "character varying"
-  },
-  {
-    "table_name": "leads",
-    "column_name": "address",
-    "data_type": "text"
   },
   {
     "table_name": "leads",
@@ -173,11 +163,6 @@
     "table_name": "leads",
     "column_name": "admission_likelihood",
     "data_type": "text"
-  },
-  {
-    "table_name": "active_bus_sessions",
-    "column_name": "status",
-    "data_type": "character varying"
   },
   {
     "table_name": "leads",
@@ -227,6 +212,11 @@
   {
     "table_name": "leads",
     "column_name": "source",
+    "data_type": "text"
+  },
+  {
+    "table_name": "leads",
+    "column_name": "address",
     "data_type": "text"
   }
 ]

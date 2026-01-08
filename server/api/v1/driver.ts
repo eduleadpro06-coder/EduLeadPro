@@ -58,11 +58,19 @@ router.get('/dashboard', async (req: Request, res: Response) => {
 
         // Get assigned students if route exists
         let assignedStudents: any[] = [];
+        let assignmentsDebug: any = null;
+
         if (assignedRoute) {
             const { data: assignments, error: assignError } = await supabase
                 .from('student_bus_assignments')
                 .select('student_id')
                 .eq('route_id', assignedRoute.id);
+
+            assignmentsDebug = {
+                count: assignments?.length || 0,
+                error: assignError,
+                sample: assignments?.[0]
+            };
 
             if (assignError) {
                 console.error('[Mobile API] Assignment fetch error:', assignError);
@@ -90,7 +98,10 @@ router.get('/dashboard', async (req: Request, res: Response) => {
             },
             assignedRoute,
             assignedStudents,
-            debug // Include debug info
+            debug: {
+                ...debug,
+                assignments: assignmentsDebug
+            }
         });
     } catch (error) {
         console.error('[Mobile API] Driver dashboard error:', error);
