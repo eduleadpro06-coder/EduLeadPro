@@ -1,0 +1,1 @@
+ALTER TABLE leads ADD COLUMN is_app_active BOOLEAN DEFAULT TRUE;

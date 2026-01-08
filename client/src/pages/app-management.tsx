@@ -18,8 +18,13 @@ import { Lead, PreschoolAnnouncement, PreschoolEvent, DailyUpdate, PreschoolHome
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import Header from "@/components/layout/header";
+import { TeacherAssignmentDropdown } from "@/components/teacher-assignment-dropdown";
+import { Switch } from "@/components/ui/switch";
+
 
 export default function AppManagement() {
+    const [mainTab, setMainTab] = useState("users");
     const [activeTab, setActiveTab] = useState("parents");
     const [searchTerm, setSearchTerm] = useState("");
     const { toast } = useToast();
@@ -33,6 +38,11 @@ export default function AppManagement() {
     const [studentPhone, setStudentPhone] = useState("");
     const [className, setClassName] = useState("");
     const [dueDate, setDueDate] = useState("");
+
+    // Staff Password State
+    const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+    const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
+    const [newPassword, setNewPassword] = useState("");
 
     // Fetch Leads (Parents)
     const { data: leads = [], isLoading } = useQuery<Lead[]>({
@@ -51,6 +61,11 @@ export default function AppManagement() {
     const drivers = allStaff.filter(staff =>
         staff.role?.toLowerCase().includes('driver') && staff.isActive
     );
+
+    // Fetch Teacher Assignments
+    const { data: assignments = [] } = useQuery<any[]>({
+        queryKey: ['/api/teacher-assignments']
+    });
 
     // Reset Password Mutation
     const resetPasswordMutation = useMutation({
@@ -71,6 +86,57 @@ export default function AppManagement() {
             toast({
                 title: "Error",
                 description: "Failed to reset password.",
+                variant: "destructive"
+            });
+        }
+    });
+
+    const toggleAppAccessMutation = useMutation({
+        mutationFn: async (data: { id: number, isAppActive: boolean }) => {
+            const res = await apiRequest("PATCH", `/api/leads/${data.id}/app-access`, {
+                isAppActive: data.isAppActive
+            });
+            return res.json();
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
+            toast({
+                title: variables.isAppActive ? "Access Enabled" : "Access Disabled",
+                description: `Parent app access has been ${variables.isAppActive ? 'enabled' : 'disabled'}.`,
+            });
+        },
+        onError: (error: any) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to update access.",
+                variant: "destructive"
+            });
+        }
+    });
+
+    // Update Staff Password Mutation
+    const updateStaffPasswordMutation = useMutation({
+        mutationFn: async (data: { id: number, appPassword: string | null }) => {
+            const res = await apiRequest("PATCH", `/api/staff/${data.id}/password`, {
+                appPassword: data.appPassword
+            });
+            return res.json();
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+            setPasswordDialogOpen(false);
+            setNewPassword("");
+            toast({
+                title: variables.appPassword === null ? "Password Reset" : "Password Set",
+                description: variables.appPassword === null
+                    ? "Teacher password reset to default."
+                    : "Teacher password has been set successfully.",
+            });
+        },
+        onError: (error: any) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to update password.",
                 variant: "destructive"
             });
         }
@@ -185,113 +251,96 @@ export default function AppManagement() {
     );
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50">
-            <div className="max-w-7xl mx-auto p-6">
-                {/* Header */}
-                <div className="mb-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                                <Smartphone className="text-purple-600" size={32} />
-                                App Management
-                            </h1>
-                            <p className="text-gray-600 mt-2">
-                                Manage parent access, bus features, and mobile app settings
-                            </p>
-                        </div>
+        <div className="min-h-screen bg-gray-50/50">
+            <Header
+                title="App Management"
+                subtitle="Manage mobile app users, bus operations, and content"
+            />
+
+            <div className="px-6 pt-6">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b">
+                    {/* Tab Navigation - Daycare Style */}
+                    <div className="flex gap-2 -mb-px w-full">
+                        <Button
+                            variant={mainTab === "users" ? "default" : "ghost"}
+                            onClick={() => {
+                                setMainTab("users");
+                                setActiveTab("parents");
+                            }}
+                            className="rounded-b-none flex-1"
+                        >
+                            <Users className="h-4 w-4 mr-2" />
+                            Mobile Users
+                        </Button>
+                        <Button
+                            variant={mainTab === "bus" ? "default" : "ghost"}
+                            onClick={() => {
+                                setMainTab("bus");
+                                setActiveTab("routes");
+                            }}
+                            className="rounded-b-none flex-1"
+                        >
+                            <Bus className="h-4 w-4 mr-2" />
+                            Bus Management
+                        </Button>
+                        <Button
+                            variant={mainTab === "content" ? "default" : "ghost"}
+                            onClick={() => {
+                                setMainTab("content");
+                                setActiveTab("announcements");
+                            }}
+                            className="rounded-b-none flex-1"
+                        >
+                            <Megaphone className="h-4 w-4 mr-2" />
+                            Mobile Content
+                        </Button>
                     </div>
                 </div>
+            </div>
 
-                {/* Tabs */}
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                    <TabsList className="bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
-                        <TabsTrigger
-                            value="parents"
-                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
+            {/* Mobile Users Tab */}
+            {mainTab === "users" && (
+                <div className="px-4 py-6 space-y-6">
+                    <div className="flex gap-2 -mb-px border-b mb-6">
+                        <Button
+                            variant={activeTab === "parents" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("parents")}
+                            className="rounded-b-none"
                         >
-                            <Key className="mr-2" size={18} />
-                            Parent Access
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="teachers"
-                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
+                            <Key className="mr-2 h-4 w-4" />
+                            Parents
+                        </Button>
+                        <Button
+                            variant={activeTab === "teachers" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("teachers")}
+                            className="rounded-b-none"
                         >
-                            <Users className="mr-2" size={18} />
+                            <Users className="mr-2 h-4 w-4" />
                             Teachers
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="drivers"
-                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
+                        </Button>
+                        <Button
+                            variant={activeTab === "drivers" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("drivers")}
+                            className="rounded-b-none"
                         >
-                            <Bus className="mr-2" size={18} />
+                            <Bus className="mr-2 h-4 w-4" />
                             Drivers
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="routes"
-                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
-                        >
-                            <Bus className="mr-2" size={18} />
-                            Bus Routes
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="stops"
-                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
-                        >
-                            <MapPin className="mr-2" size={18} />
-                            Stops
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="assignments"
-                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
-                        >
-                            <Users className="mr-2" size={18} />
-                            Assignments
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="tracking"
-                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
-                        >
-                            <Radio className="mr-2" size={18} />
-                            Live Tracking
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="announcements"
-                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
-                        >
-                            <Megaphone className="mr-2" size={18} />
-                            Announcements
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="holidays"
-                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
-                        >
-                            <Calendar className="mr-2" size={18} />
-                            Public Holidays
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="updates"
-                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
-                        >
-                            <ClipboardList className="mr-2" size={18} />
-                            Daily Updates
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="homework"
-                            className="data-[state=active]:bg-purple-600 data-[state=active]:text-white px-6 py-2.5 rounded-md transition-all"
-                        >
-                            <BookOpen className="mr-2" size={18} />
-                            Homework
-                        </TabsTrigger>
-                    </TabsList>
+                        </Button>
+                    </div>
 
-                    {/* Parents Tab */}
-                    <TabsContent value="parents">
+                    {/* Parents Sub-Tab */}
+                    {activeTab === "parents" && (
                         <Card>
                             <CardHeader>
                                 <div className="flex justify-between items-center">
                                     <div>
                                         <CardTitle>Registered Parents</CardTitle>
-                                        <CardDescription>Manage mobile app access for parents</CardDescription>
+                                        <CardDescription>
+                                            Manage mobile app access for parents.
+                                            <span className="font-medium text-emerald-600 ml-1">
+                                                Note: Default password is '1234'.
+                                            </span>
+                                        </CardDescription>
                                     </div>
                                     <div className="relative w-72">
                                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
@@ -312,18 +361,19 @@ export default function AppManagement() {
                                                 <TableHead>Student Name</TableHead>
                                                 <TableHead>Parent Name</TableHead>
                                                 <TableHead>Phone Number</TableHead>
-                                                <TableHead>App Status</TableHead>
+                                                <TableHead>Assigned Teacher</TableHead>
+                                                <TableHead>App Access</TableHead>
                                                 <TableHead className="text-right">Actions</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {isLoading ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={5} className="text-center py-8">Loading...</TableCell>
+                                                    <TableCell colSpan={6} className="text-center py-8">Loading...</TableCell>
                                                 </TableRow>
                                             ) : parents.length === 0 ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">No parents found matching your search</TableCell>
+                                                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">No parents found matching your search</TableCell>
                                                 </TableRow>
                                             ) : (
                                                 parents.map((lead) => (
@@ -339,9 +389,26 @@ export default function AppManagement() {
                                                             </div>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Badge variant={lead.appPassword ? "default" : "secondary"}>
-                                                                {lead.appPassword ? 'Active' : 'Default (1234)'}
-                                                            </Badge>
+                                                            <TeacherAssignmentDropdown
+                                                                leadId={lead.id}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center space-x-2">
+                                                                <Switch
+                                                                    checked={lead.isAppActive !== false} // Default to true if undefined
+                                                                    onCheckedChange={(checked) => {
+                                                                        toggleAppAccessMutation.mutate({
+                                                                            id: lead.id,
+                                                                            isAppActive: checked
+                                                                        });
+                                                                    }}
+                                                                    disabled={toggleAppAccessMutation.isPending}
+                                                                />
+                                                                <span className="text-sm text-gray-500">
+                                                                    {lead.isAppActive !== false ? 'Active' : 'Inactive'}
+                                                                </span>
+                                                            </div>
                                                         </TableCell>
                                                         <TableCell className="text-right">
                                                             <Button
@@ -352,7 +419,7 @@ export default function AppManagement() {
                                                                         resetPasswordMutation.mutate(lead.id);
                                                                     }
                                                                 }}
-                                                                disabled={!lead.appPassword || resetPasswordMutation.isPending}
+                                                                disabled={resetPasswordMutation.isPending}
                                                             >
                                                                 <RefreshCw className="mr-2 h-4 w-4" />
                                                                 Reset Password
@@ -366,105 +433,193 @@ export default function AppManagement() {
                                 </div>
                             </CardContent>
                         </Card>
-                    </TabsContent>
+                    )}
 
                     {/* Teachers Tab */}
-                    <TabsContent value="teachers">
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <CardTitle>Teachers (Mobile Access)</CardTitle>
-                                        <CardDescription>
-                                            View all teachers who can access the mobile app
-                                        </CardDescription>
+                    {/* Teachers Tab */}
+                    {activeTab === "teachers" && (
+                        <>
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <CardTitle>Teachers (Mobile Access)</CardTitle>
+                                            <CardDescription>
+                                                View all teachers who can access the mobile app
+                                            </CardDescription>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="relative">
+                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                                                <Input
+                                                    placeholder="Search teachers..."
+                                                    value={searchTerm}
+                                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                                    className="pl-10 w-64"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="rounded-md border">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Name</TableHead>
+                                                    <TableHead>Phone</TableHead>
+                                                    <TableHead>Role</TableHead>
+                                                    <TableHead className="text-center">Assigned Students</TableHead>
+                                                    <TableHead>Status</TableHead>
+                                                    <TableHead className="text-right">Actions</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {teachers.length === 0 ? (
+                                                    <TableRow>
+                                                        <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                                                            No teachers found. Create staff members with "Teacher" role in Staff Management.
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ) : (
+                                                    teachers
+                                                        .filter(teacher =>
+                                                            !searchTerm ||
+                                                            teacher.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                            teacher.phone?.includes(searchTerm)
+                                                        )
+                                                        .map((teacher: any) => {
+                                                            const assignedStudents = leads.filter(l =>
+                                                                // Filter by whether specific assignment exists for this teacher and student
+                                                                assignments.some(a => {
+                                                                    const match = Number(a.teacher_staff_id) === Number(teacher.id) && Number(a.student_lead_id) === Number(l.id);
+                                                                    // Debugging only for first few to avoid spam
+                                                                    // if (match) console.log('Match found:', teacher.name, l.name);
+                                                                    return match;
+                                                                })
+                                                            );
+
+                                                            // Console log debugging
+                                                            // console.log(`Teacher: ${teacher.name} (${teacher.id}), Assignments:`, assignments.filter(a => Number(a.teacher_staff_id) === Number(teacher.id)));
+
+                                                            const studentCount = assignedStudents.length;
+
+                                                            return (
+                                                                <TableRow key={teacher.id}>
+                                                                    <TableCell className="font-medium">{teacher.name}</TableCell>
+                                                                    <TableCell>{teacher.phone}</TableCell>
+                                                                    <TableCell>
+                                                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                                                            {teacher.role}
+                                                                        </Badge>
+                                                                    </TableCell>
+                                                                    <TableCell className="text-center font-semibold">
+                                                                        {/* Placeholder for actual assignment count if needed, currently shows total enrolled */}
+                                                                        <span title="Total Active Students">{studentCount}</span>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <Badge variant={teacher.appPassword ? "default" : "secondary"}>
+                                                                            {teacher.appPassword ? 'Active' : 'Default'}
+                                                                        </Badge>
+                                                                    </TableCell>
+                                                                    <TableCell className="text-right">
+                                                                        <div className="flex justify-end items-center gap-2">
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                onClick={() => {
+                                                                                    setSelectedStaffId(teacher.id);
+                                                                                    setNewPassword("");
+                                                                                    setPasswordDialogOpen(true);
+                                                                                }}
+                                                                            >
+                                                                                <Key className="mr-2 h-4 w-4" />
+                                                                                Set Password
+                                                                            </Button>
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                                onClick={() => {
+                                                                                    if (confirm(`Reset password for ${teacher.name} to default?`)) {
+                                                                                        updateStaffPasswordMutation.mutate({
+                                                                                            id: teacher.id,
+                                                                                            appPassword: null
+                                                                                        });
+                                                                                    }
+                                                                                }}
+                                                                                disabled={updateStaffPasswordMutation.isPending}
+                                                                            >
+                                                                                Reset
+                                                                            </Button>
+                                                                        </div>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            );
+                                                        })
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Set Teacher Password</DialogTitle>
+                                        <DialogDescription>
+                                            Create a new password for this teacher to access the mobile application.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="password">New Password</Label>
                                             <Input
-                                                placeholder="Search teachers..."
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="pl-10 w-64"
+                                                id="password"
+                                                type="text"
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                placeholder="Enter new password"
                                             />
                                         </div>
                                     </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="rounded-md border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Name</TableHead>
-                                                <TableHead>Phone</TableHead>
-                                                <TableHead>Email</TableHead>
-                                                <TableHead>Role</TableHead>
-                                                <TableHead className="text-center">Students</TableHead>
-                                                <TableHead>Status</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {teachers.length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                                                        No teachers found. Create staff members with "Teacher" role in Staff Management.
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                teachers
-                                                    .filter(teacher =>
-                                                        !searchTerm ||
-                                                        teacher.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                        teacher.phone?.includes(searchTerm)
-                                                    )
-                                                    .map((teacher: any) => {
-                                                        const studentCount = leads.filter(l =>
-                                                            l.organizationId === teacher.organizationId &&
-                                                            l.status === 'enrolled'
-                                                        ).length;
-
-                                                        return (
-                                                            <TableRow key={teacher.id}>
-                                                                <TableCell className="font-medium">{teacher.name}</TableCell>
-                                                                <TableCell>{teacher.phone}</TableCell>
-                                                                <TableCell className="text-gray-600">{teacher.email || 'N/A'}</TableCell>
-                                                                <TableCell>
-                                                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                                                        {teacher.role}
-                                                                    </Badge>
-                                                                </TableCell>
-                                                                <TableCell className="text-center font-semibold">
-                                                                    {studentCount}
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                                                                        Mobile Enabled
-                                                                    </Badge>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        );
-                                                    })
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                {teachers.length > 0 && (
-                                    <div className="mt-4 text-sm text-gray-600">
-                                        Showing {teachers.filter(t =>
-                                            !searchTerm ||
-                                            t.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            t.phone?.includes(searchTerm)
-                                        ).length} of {teachers.length} teachers
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
+                                    <DialogFooter>
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => setPasswordDialogOpen(false)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            onClick={() => {
+                                                if (!newPassword.trim()) {
+                                                    toast({
+                                                        title: "Error",
+                                                        description: "Password cannot be empty",
+                                                        variant: "destructive"
+                                                    });
+                                                    return;
+                                                }
+                                                if (selectedStaffId) {
+                                                    updateStaffPasswordMutation.mutate({
+                                                        id: selectedStaffId,
+                                                        appPassword: newPassword
+                                                    });
+                                                }
+                                            }}
+                                            disabled={updateStaffPasswordMutation.isPending || !newPassword.trim()}
+                                        >
+                                            {updateStaffPasswordMutation.isPending ? "Saving..." : "Set Password"}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </>
+                    )}
 
                     {/* Drivers Tab */}
-                    <TabsContent value="drivers">
+                    {activeTab === "drivers" && (
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center justify-between">
@@ -530,8 +685,8 @@ export default function AppManagement() {
                                                                 </Badge>
                                                             </TableCell>
                                                             <TableCell>
-                                                                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                                                                    Mobile Enabled
+                                                                <Badge variant={driver.appPassword ? "default" : "secondary"}>
+                                                                    {driver.appPassword ? 'Active' : 'Default'}
                                                                 </Badge>
                                                             </TableCell>
                                                         </TableRow>
@@ -551,10 +706,50 @@ export default function AppManagement() {
                                 )}
                             </CardContent>
                         </Card>
-                    </TabsContent>
+                    )}
+                </div>
+            )}
 
-                    {/* Routes Tab */}
-                    <TabsContent value="routes">
+            {/* Bus Management Tab */}
+            {mainTab === "bus" && (
+                <div className="px-4 py-6 space-y-6">
+                    <div className="flex gap-2 -mb-px border-b mb-6">
+                        <Button
+                            variant={activeTab === "routes" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("routes")}
+                            className="rounded-b-none"
+                        >
+                            <Bus className="mr-2 h-4 w-4" />
+                            Routes
+                        </Button>
+                        <Button
+                            variant={activeTab === "stops" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("stops")}
+                            className="rounded-b-none"
+                        >
+                            <MapPin className="mr-2 h-4 w-4" />
+                            Stops
+                        </Button>
+                        <Button
+                            variant={activeTab === "assignments" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("assignments")}
+                            className="rounded-b-none"
+                        >
+                            <Users className="mr-2 h-4 w-4" />
+                            Assignments
+                        </Button>
+                        <Button
+                            variant={activeTab === "tracking" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("tracking")}
+                            className="rounded-b-none"
+                        >
+                            <Radio className="mr-2 h-4 w-4" />
+                            Live Tracking
+                        </Button>
+                    </div>
+
+                    {/* Routes Sub-Tab */}
+                    {activeTab === "routes" && (
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <div>
@@ -574,10 +769,10 @@ export default function AppManagement() {
                                 </div>
                             </CardContent>
                         </Card>
-                    </TabsContent>
+                    )}
 
                     {/* Stops Tab */}
-                    <TabsContent value="stops">
+                    {activeTab === "stops" && (
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <div>
@@ -597,10 +792,10 @@ export default function AppManagement() {
                                 </div>
                             </CardContent>
                         </Card>
-                    </TabsContent>
+                    )}
 
                     {/* Student Assignments Tab */}
-                    <TabsContent value="assignments">
+                    {activeTab === "assignments" && (
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <div>
@@ -620,10 +815,10 @@ export default function AppManagement() {
                                 </div>
                             </CardContent>
                         </Card>
-                    </TabsContent>
+                    )}
 
                     {/* Live Tracking Tab */}
-                    <TabsContent value="tracking">
+                    {activeTab === "tracking" && (
                         <Card>
                             <CardHeader>
                                 <CardTitle>Live Bus Tracking</CardTitle>
@@ -637,9 +832,42 @@ export default function AppManagement() {
                                 </div>
                             </CardContent>
                         </Card>
-                    </TabsContent>
-                    {/* Announcements Tab */}
-                    <TabsContent value="announcements">
+                    )}
+                </div>
+            )}
+
+            {/* Mobile Content Tab */}
+            {mainTab === "content" && (
+                <div className="px-4 py-6 space-y-6">
+                    <div className="flex gap-2 -mb-px border-b mb-6">
+                        <Button
+                            variant={activeTab === "announcements" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("announcements")}
+                            className="rounded-b-none"
+                        >
+                            <Megaphone className="mr-2 h-4 w-4" />
+                            Announcements
+                        </Button>
+                        <Button
+                            variant={activeTab === "holidays" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("holidays")}
+                            className="rounded-b-none"
+                        >
+                            <Calendar className="mr-2 h-4 w-4" />
+                            Events & Holidays
+                        </Button>
+                        <Button
+                            variant={activeTab === "updates" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("updates")}
+                            className="rounded-b-none"
+                        >
+                            <ClipboardList className="mr-2 h-4 w-4" />
+                            Daily Updates
+                        </Button>
+                    </div>
+
+                    {/* Announcements Sub-Tab */}
+                    {activeTab === "announcements" && (
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <div>
@@ -715,7 +943,6 @@ export default function AppManagement() {
                                                     // If I map to `expiresAt`, it auto-hides. Users might not want that.
                                                     // I'll map to `expiresAt` for now as it's the only date field in schema besides `published_at`.
                                                     // AND `priority`.
-                                                    priority,
                                                     expiresAt: date || null,
                                                     publishedAt: new Date().toISOString()
                                                 })}>
@@ -759,11 +986,11 @@ export default function AppManagement() {
                                 </Table>
                             </CardContent>
                         </Card>
-                    </TabsContent>
+                    )}
 
                     {/* Events Tab */}
                     {/* Holidays Tab */}
-                    <TabsContent value="holidays">
+                    {activeTab === "holidays" && (
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <div>
@@ -843,10 +1070,10 @@ export default function AppManagement() {
                                 </Table>
                             </CardContent>
                         </Card>
-                    </TabsContent>
+                    )}
 
                     {/* Daily Updates Tab */}
-                    <TabsContent value="updates">
+                    {activeTab === "updates" && (
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <div>
@@ -945,117 +1172,9 @@ export default function AppManagement() {
                                 </Table>
                             </CardContent>
                         </Card>
-                    </TabsContent>
-
-                    {/* Homework Tab */}
-                    <TabsContent value="homework">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <div>
-                                    <CardTitle>Homework Assignments</CardTitle>
-                                    <CardDescription>Assign tasks to specific classes</CardDescription>
-                                </div>
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => { setClassName(""); setTitle(""); setContent(""); setDueDate(""); }}>
-                                            <Plus className="mr-2" size={18} />
-                                            New Homework
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Assign Homework</DialogTitle>
-                                        </DialogHeader>
-                                        <div className="space-y-4 py-4">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="hw-class">Class Name</Label>
-                                                <Input id="hw-class" value={className} onChange={(e) => setClassName(e.target.value)} placeholder="e.g. Nursery-A" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="hw-title">Subject/Topic</Label>
-                                                <Input id="hw-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Number Practice" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="hw-due">Due Date</Label>
-                                                <Input id="hw-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="hw-content">Instructions</Label>
-                                                <Textarea id="hw-content" value={content} onChange={(e) => setContent(e.target.value)} placeholder="Describe the homework..." />
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <DialogClose asChild>
-                                                <Button onClick={() => createHomeworkMutation.mutate({ className, title, description: content, dueDate, postedAt: new Date().toISOString() })}>
-                                                    Assign Homework
-                                                </Button>
-                                            </DialogClose>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                            </CardHeader>
-                            <CardContent>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Class</TableHead>
-                                            <TableHead>Topic</TableHead>
-                                            <TableHead>Due Date</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {isLoadingHomework ? (
-                                            <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
-                                        ) : homeworks.length === 0 ? (
-                                            <TableRow><TableCell colSpan={4} className="text-center text-gray-500 py-8">No homework assigned</TableCell></TableRow>
-                                        ) : (
-                                            homeworks.map((hw) => (
-                                                <TableRow key={hw.id}>
-                                                    <TableCell className="font-semibold">{hw.className}</TableCell>
-                                                    <TableCell>{hw.title}</TableCell>
-                                                    <TableCell><Badge variant="outline">{hw.dueDate}</Badge></TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Button variant="ghost" size="sm" onClick={() => {
-                                                            if (confirm("Remove this homework?")) deleteHomeworkMutation.mutate(hw.id);
-                                                        }}>
-                                                            <Trash2 className="text-red-500" size={16} />
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
-
-                {/* Database Migration Notice */}
-                <Card className="mt-6 border-purple-200 bg-purple-50">
-                    <CardHeader>
-                        <CardTitle className="text-purple-900 flex items-center gap-2">
-                            ⚠️ Setup Required
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-3 text-sm text-purple-800">
-                            <p>
-                                <strong>Backend is ready!</strong> To start using Bus Management features:
-                            </p>
-                            <ol className="list-decimal list-inside space-y-2 ml-4">
-                                <li>Apply the database migration in Supabase (see <code className="bg-purple-100 px-2 py-1 rounded">database_migration_guide.md</code>)</li>
-                                <li>Restart the backend server</li>
-                                <li>Use the mobile app for parents and drivers to track buses in real-time</li>
-                            </ol>
-                            <p className="mt-4 pt-4 border-t border-purple-200">
-                                <strong>Mobile App:</strong> Parents can track their child's bus in real-time, and drivers can send GPS updates from their phones.
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

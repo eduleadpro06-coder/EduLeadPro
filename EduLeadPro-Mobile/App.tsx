@@ -64,9 +64,7 @@ const mockData = {
 
 function App() {
   const [fontsLoaded] = useFonts({
-    'Feather': Platform.OS === 'web'
-      ? { uri: 'https://unpkg.com/@expo/vector-icons@latest/build/vendor/react-native-vector-icons/Fonts/Feather.ttf' }
-      : require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf'),
+    ...Feather.font,
   });
 
   const [user, setUser] = useState<any>(null);

@@ -90,17 +90,45 @@ router.get('/dashboard', async (req: Request, res: Response) => {
  */
 router.get('/students', async (req: Request, res: Response) => {
     try {
+        const staffId = req.user!.userId;
         const organizationId = req.user!.organizationId;
         const classFilter = req.query.class as string;
 
         const { supabase } = await import('../../supabase.js');
 
-        let query = supabase
-            .from('leads')
-            .select('id, name, class, parent_name, parent_phone')
-            .eq('organization_id', organizationId)
-            .eq('status', 'enrolled')
-            .order('class', { ascending: true });
+        // First check if this teacher has any assignments
+        const { data: assignments, error: assignmentError } = await supabase
+            .from('teacher_student_assignments')
+            .select('student_lead_id')
+            .eq('teacher_staff_id', staffId)
+            .eq('organization_id', organizationId);
+
+        if (assignmentError) {
+            console.error('[Teacher API] Error checking assignments:', assignmentError);
+        }
+
+        let query;
+
+        if (assignments && assignments.length > 0) {
+            // Teacher has assignments - only show assigned students
+            const assignedStudentIds = assignments.map(a => a.student_lead_id);
+
+            query = supabase
+                .from('leads')
+                .select('id, student_name as name, class, parent_name, phone as parent_phone, section')
+                .eq('organization_id', organizationId)
+                .eq('status', 'enrolled')
+                .in('id', assignedStudentIds)
+                .order('class', { ascending: true });
+        } else {
+            // No assignments - show all students (legacy behavior)
+            query = supabase
+                .from('leads')
+                .select('id, student_name as name, class, parent_name, phone as parent_phone, section')
+                .eq('organization_id', organizationId)
+                .eq('status', 'enrolled')
+                .order('class', { ascending: true });
+        }
 
         if (classFilter) {
             query = query.eq('class', classFilter);
@@ -113,7 +141,8 @@ router.get('/students', async (req: Request, res: Response) => {
         res.json({
             success: true,
             data: {
-                students: students || []
+                students: students || [],
+                filteredByAssignments: !!(assignments && assignments.length > 0)
             }
         });
     } catch (error) {

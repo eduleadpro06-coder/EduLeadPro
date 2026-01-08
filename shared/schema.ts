@@ -57,6 +57,7 @@ export const leads = pgTable("leads", {
   deletedAt: timestamp("deleted_at"),
   organizationId: integer("organization_id").references(() => organizations.id),
   appPassword: text("app_password"),
+  isAppActive: boolean("is_app_active").default(true),
 });
 
 export const followUps = pgTable("follow_ups", {

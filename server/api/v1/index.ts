@@ -9,6 +9,7 @@ import parentRouter from './parent.js';
 import teacherRouter from './teacher.js';
 import driverRouter from './driver.js';
 import commonRouter from './common.js';
+import teacherAssignments from './teacher-assignments.js';
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ router.use('/parent', parentRouter);
 router.use('/teacher', teacherRouter);
 router.use('/driver', driverRouter);
 router.use('/common', commonRouter);
+router.use('/teacher-assignments', teacherAssignments);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

@@ -145,7 +145,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
         // If not staff, check for PARENT (existing logic)
         const { data: students, error: fetchError } = await supabase
             .from('leads')
-            .select('id, name, class, status, parent_name, parent_phone, phone, app_password, organization_id')
+            .select('id, name, class, status, parent_name, parent_phone, phone, app_password, organization_id, is_app_active')
             .or(`parent_phone.eq."${phone}",phone.eq."${phone}"`);
 
         if (fetchError) {
@@ -153,10 +153,16 @@ router.post('/auth/login', async (req: Request, res: Response) => {
             throw fetchError;
         }
 
-        if (fetchError) throw fetchError;
-
         if (!students || students.length === 0) {
             return res.status(404).json({ error: 'No account found with this phone number' });
+        }
+
+        // Check if any student record associated with this phone number is active
+        // If all are inactive, then deny login
+        const hasActiveAccount = students.some(s => s.is_app_active !== false); // Default to true if null
+
+        if (!hasActiveAccount) {
+            return res.status(403).json({ error: 'Account deactivated. Please contact administration.' });
         }
 
         // Check Password

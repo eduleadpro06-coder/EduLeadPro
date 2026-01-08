@@ -5361,6 +5361,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // STAFF MANAGEMENT ROUTES
+  // ============================================
+
+  // Update staff app password
+  app.patch("/api/staff/:id/password", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const { id } = req.params;
+      const { appPassword } = req.body;
+
+      // Allow null (reset) or string (set)
+      if (appPassword !== null && typeof appPassword !== 'string') {
+        return res.status(400).json({ message: "Invalid password format" });
+      }
+
+      // Update staff
+      const { eq, and } = await import('drizzle-orm');
+
+      await db
+        .update(schema.staff)
+        .set({ appPassword: appPassword })
+        .where(
+          and(
+            eq(schema.staff.id, parseInt(id)),
+            eq(schema.staff.organizationId, organizationId)
+          )
+        );
+
+      res.json({ message: "Staff password updated successfully" });
+    } catch (error) {
+      console.error("Error updating staff password:", error);
+      res.status(500).json({ message: "Failed to update staff password" });
+    }
+  });
+
+  // ============================================
+  // TEACHER ASSIGNMENT ROUTES
+  // ============================================
+  const teacherAssignmentsRouter = await import('./api/v1/teacher-assignments.js');
+  app.use('/api/teacher-assignments', teacherAssignmentsRouter.default);
+
+  // ============================================
   // DAYCARE MANAGEMENT ROUTES
   // ============================================
   registerDaycareRoutes(app);
@@ -5387,6 +5433,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const BusTrackingWebSocket = (await import('./websocket.js')).default;
   const busTracking = new BusTrackingWebSocket(httpServer);
   console.log('✅ WebSocket server initialized for bus tracking');
+
+  // Toggle lead app access
+  app.patch("/api/leads/:id/app-access", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const { id } = req.params;
+      const { isAppActive } = req.body;
+
+      if (typeof isAppActive !== 'boolean') {
+        return res.status(400).json({ message: "Invalid status format" });
+      }
+
+      const { eq, and } = await import('drizzle-orm');
+
+      await db
+        .update(schema.leads)
+        .set({ isAppActive: isAppActive })
+        .where(
+          and(
+            eq(schema.leads.id, parseInt(id)),
+            eq(schema.leads.organizationId, organizationId)
+          )
+        );
+
+      res.json({ message: "App access updated successfully" });
+    } catch (error) {
+      console.error("Error updating app access:", error);
+      res.status(500).json({ message: "Failed to update app access" });
+    }
+  });
 
   return httpServer;
 }
