@@ -10,7 +10,7 @@
         },
         {
             "source": "/api/:path*",
-            "destination": "https://edu-lead-pro.vercel.app/api/:path*"
+            "destination": "https://eduleadconnect.vercel.app/api/:path*"
         },
         {
             "source": "/((?!assets/|_expo/|.*\\..*).*)",
