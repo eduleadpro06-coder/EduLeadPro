@@ -194,11 +194,11 @@ export default function ParentFeesScreen({ currentChild }: ParentFeesScreenProps
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     centerContent: { justifyContent: 'center', alignItems: 'center', padding: 40 },
-    header: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md, backgroundColor: colors.surface },
+    header: { paddingHorizontal: spacing.md, paddingTop: spacing.xl, paddingBottom: spacing.md, backgroundColor: colors.surface },
     headerTitle: { ...typography.h2, color: colors.textPrimary },
     headerSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: 4 },
 
-    content: { flex: 1, padding: spacing.lg },
+    content: { flex: 1, paddingVertical: spacing.md, paddingHorizontal: spacing.sm },
 
     // Standardized padding for cards
     summaryCard: { padding: spacing.md, marginBottom: spacing.lg, backgroundColor: colors.surface, borderRadius: spacing.borderRadius.md }, // Changed to md to match others if needed, or keep lg for hero feel.
