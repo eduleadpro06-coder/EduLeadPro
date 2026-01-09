@@ -474,11 +474,15 @@ class APIService {
 
     // Parent Bus Tracking Methods
     async getBusLocation(studentId: number): Promise<any> {
-        return await this.fetchWithAuth(`/students/${studentId}/bus-assignment`);
+        return await this.fetchWithAuth(`/v1/mobile/parent/child/${studentId}/bus-assignment`);
     }
 
-    async getLiveBusLocation(routeId: number): Promise<any> {
-        return await this.fetchWithAuth(`/v1/mobile/parent/bus/${routeId}/live-location`);
+    async getLiveBusLocation(routeId: number, studentId?: number): Promise<any> {
+        let url = `/v1/mobile/parent/bus/${routeId}/live-location`;
+        if (studentId) {
+            url += `?studentId=${studentId}`;
+        }
+        return await this.fetchWithAuth(url);
     }
 
     // Generic GET method for flexibility

@@ -63,6 +63,18 @@ router.get('/auth/run-migration', async (_req, res) => {
             );
         `);
 
+        await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS student_trip_status (
+              id SERIAL PRIMARY KEY,
+              student_id INTEGER NOT NULL REFERENCES leads(id),
+              route_id INTEGER NOT NULL REFERENCES bus_routes(id),
+              session_id INTEGER,
+              status VARCHAR(20) NOT NULL, -- 'boarded', 'dropped', 'pending'
+              updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
+              date DATE DEFAULT CURRENT_DATE
+            );
+        `);
+
         res.send('Migration Success: app_password column added, leads set to inactive, and Bus tables created.');
     } catch (e: any) {
         res.status(500).send('Migration Failed: ' + e.message);
@@ -995,13 +1007,29 @@ router.get('/students/:studentId/bus-assignment', async (req: Request, res: Resp
     try {
         const { studentId } = req.params;
 
+        // Perform a join to get necessary details
         const { data: assignments, error } = await supabase
             .from('student_bus_assignments')
             .select(`
-        *,
-        bus_routes(id, route_name, bus_number, route_type),
-        bus_stops(id, stop_name, stop_address, latitude, longitude, estimated_arrival_time)
-      `)
+                *,
+                bus_routes (
+                    id, 
+                    route_name, 
+                    bus_number, 
+                    route_type,
+                    driver_id,
+                    helper_name,
+                    helper_phone
+                ),
+                bus_stops (
+                    id, 
+                    stop_name, 
+                    stop_address, 
+                    latitude, 
+                    longitude, 
+                    estimated_arrival_time
+                )
+            `)
             .eq('student_id', studentId)
             .eq('active', true);
 
@@ -1009,9 +1037,113 @@ router.get('/students/:studentId/bus-assignment', async (req: Request, res: Resp
             throw error;
         }
 
-        res.json({ assignments });
+        // Manually fetch driver details if needed since nested joins can be complex/limited
+        // or if staff table is separate
+        const enhancedAssignments = await Promise.all((assignments || []).map(async (assignment) => {
+            let driverName = 'Driver';
+            let driverPhone = '';
+
+            if (assignment.bus_routes?.driver_id) {
+                const { data: driver } = await supabase
+                    .from('staff')
+                    .select('name, phone')
+                    .eq('id', assignment.bus_routes.driver_id)
+                    .single();
+
+                if (driver) {
+                    driverName = driver.name;
+                    driverPhone = driver.phone;
+                }
+            }
+
+            return {
+                ...assignment,
+                driver_name: driverName,
+                driver_phone: driverPhone
+            };
+        }));
+
+        res.json({ assignments: enhancedAssignments });
     } catch (error) {
         console.error('Error fetching bus assignment:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * Get Live Bus Location (Parent)
+ * GET /api/mobile/parent/bus/:routeId/live-location
+ */
+router.get('/parent/bus/:routeId/live-location', async (req: Request, res: Response) => {
+    try {
+        const routeId = parseInt(req.params.routeId);
+
+        // Get recent location history
+        const { data: locationHistory } = await supabase
+            .from('bus_location_history')
+            .select('latitude, longitude, speed, heading, recorded_at')
+            .eq('route_id', routeId)
+            .order('recorded_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        // Get student status from active session if available
+        // We might want to pass studentId to this endpoint if we want specific student status
+        // For now, let's keep it generic for the bus
+
+        // Active session check
+        const { data: activeSession } = await supabase
+            .from('active_bus_sessions')
+            .select('id, status')
+            .eq('route_id', routeId)
+            .eq('status', 'active')
+            .single();
+
+        const isLive = !!activeSession && !!locationHistory;
+
+        // Check if data is stale (older than 5 mins)
+        if (locationHistory) {
+            const lastUpdate = new Date(locationHistory.recorded_at).getTime();
+            const now = new Date().getTime();
+            if (now - lastUpdate > 5 * 60 * 1000) {
+                // isLive = false; // Optional: mark not live if stale
+            }
+        }
+
+        const responseJson = {
+            isLive,
+            location: locationHistory ? {
+                latitude: locationHistory.latitude,
+                longitude: locationHistory.longitude,
+                speed: locationHistory.speed,
+                heading: locationHistory.heading,
+                timestamp: locationHistory.recorded_at
+            } : null,
+        };
+
+        if (req.query.studentId) {
+            const studentId = parseInt(req.query.studentId as string);
+            const today = new Date().toISOString().split('T')[0];
+
+            const { data: statusData } = await supabase
+                .from('student_trip_status')
+                .select('status, updated_at')
+                .eq('student_id', studentId)
+                .eq('date', today)
+                .order('updated_at', { ascending: false }) // Get latest
+                .limit(1)
+                .single();
+
+            if (statusData) {
+                (responseJson as any).studentStatus = statusData.status;
+                (responseJson as any).statusTime = statusData.updated_at;
+            }
+        }
+
+        res.json(responseJson);
+
+    } catch (error) {
+        console.error('Error fetching live bus location:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -1069,6 +1201,60 @@ router.get('/driver/routes', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Error fetching driver routes:', error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * Update Student Trip Status (Boarded/Dropped)
+ * POST /api/mobile/driver/student-status
+ */
+router.post('/driver/student-status', async (req: Request, res: Response) => {
+    try {
+        const { studentId, sessionId, routeId, status } = req.body;
+
+        if (!studentId || !status) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        // Insert or update status for today
+        const today = new Date().toISOString().split('T')[0];
+
+        // Check if record exists for today/session
+        const { data: existing } = await supabase
+            .from('student_trip_status')
+            .select('id')
+            .eq('student_id', studentId)
+            .eq('date', today)
+            .single();
+
+        if (existing) {
+            const { error } = await supabase
+                .from('student_trip_status')
+                .update({
+                    status,
+                    session_id: sessionId,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', existing.id);
+            if (error) throw error;
+        } else {
+            const { error } = await supabase
+                .from('student_trip_status')
+                .insert({
+                    student_id: studentId,
+                    route_id: routeId,
+                    session_id: sessionId,
+                    status,
+                    date: today,
+                    updated_at: new Date().toISOString()
+                });
+            if (error) throw error;
+        }
+
+        res.json({ success: true, status });
+    } catch (error) {
+        console.error('Error updating student status:', error);
+        res.status(500).json({ error: 'Failed to update status' });
     }
 });
 

@@ -174,6 +174,97 @@ router.get('/child/:childId/activities', async (req: Request, res: Response) => 
     }
 });
 
+
+/**
+ * GET /api/v1/mobile/parent/child/:childId/bus-assignment
+ * Get bus assignment details for a child
+ */
+router.get('/child/:childId/bus-assignment', async (req: Request, res: Response) => {
+    try {
+        const childId = parseInt(req.params.childId);
+
+        // Verify child belongs to this parent's organization
+        const { supabase } = await import('../../supabase.js');
+        const { data: child } = await supabase
+            .from('leads')
+            .select('organization_id')
+            .eq('id', childId)
+            .single();
+
+        if (!child || child.organization_id !== req.user!.organizationId) {
+            return res.status(403).json({
+                success: false,
+                error: {
+                    code: 'FORBIDDEN',
+                    message: 'Access denied'
+                }
+            });
+        }
+
+        const { data: assignments, error } = await supabase
+            .from('student_bus_assignments')
+            .select(`
+                *,
+                bus_routes (
+                    id, 
+                    route_name, 
+                    bus_number, 
+                    driver_id,
+                    helper_name,
+                    helper_phone,
+                    status
+                ),
+                pickup_stop:bus_stops!student_bus_assignments_pickup_stop_id_fkey (
+                    id, 
+                    stop_name, 
+                    latitude, 
+                    longitude, 
+                    arrival_time
+                ),
+                drop_stop:bus_stops!student_bus_assignments_drop_stop_id_fkey (
+                    id, 
+                    stop_name, 
+                    latitude, 
+                    longitude, 
+                    arrival_time
+                )
+            `)
+            .eq('student_id', childId);
+
+        if (error) throw error;
+
+        // Enhance with driver details
+        const enhancedAssignments = await Promise.all((assignments || []).map(async (assignment) => {
+            let driverName = 'Driver';
+            let driverPhone = '';
+
+            if (assignment.bus_routes?.driver_id) {
+                const { data: driver } = await supabase
+                    .from('staff')
+                    .select('name, phone')
+                    .eq('id', assignment.bus_routes.driver_id)
+                    .single();
+
+                if (driver) {
+                    driverName = driver.name;
+                    driverPhone = driver.phone;
+                }
+            }
+
+            return {
+                ...assignment,
+                driver_name: driverName,
+                driver_phone: driverPhone
+            };
+        }));
+
+        res.json({ success: true, assignments: enhancedAssignments });
+    } catch (error) {
+        console.error('[Mobile API] Get bus assignment error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch bus assignment' });
+    }
+});
+
 /**
  * GET /api/v1/mobile/parent/child/:id/fees
  * Get fee status and payment history for a child
@@ -501,15 +592,22 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
         }
 
         // 2. Get latest student boarding status for this route
-        // We look for any lead_id that matches the authenticated parent's child
-        // For now, we'll just get the latest event for this route
-        const { data: studentEvent } = await supabase
-            .from('bus_trip_passenger_events')
-            .select('status, event_time')
-            .eq('route_id', routeId)
-            .order('event_time', { ascending: false })
-            .limit(1)
-            .single();
+
+
+        // 2. Get latest student boarding status for filters
+        let studentEvent = null;
+        if (req.query.studentId) {
+            const studentId = parseInt(req.query.studentId as string);
+            const { data: event } = await supabase
+                .from('bus_trip_passenger_events')
+                .select('status, event_time')
+                .eq('route_id', routeId)
+                .eq('student_id', studentId) // Filter by student
+                .order('event_time', { ascending: false })
+                .limit(1)
+                .single();
+            studentEvent = event;
+        }
 
         // Check if location is recent (within last 5 minutes)
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);

@@ -52,12 +52,36 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
 
     const fetchBusData = async () => {
         try {
-            const data = await api.getBusLocation(currentChild.id);
-            setBusData(data);
+            const response = await api.getBusLocation(currentChild.id);
+            // API returns { assignments: [...] }
+            // We need to extract the first active assignment
 
-            // If bus is assigned, fetch live location
-            if (data?.route?.id) {
-                await fetchLiveLocation(data.route.id);
+            if (response && response.assignments && response.assignments.length > 0) {
+                const assignment = response.assignments[0];
+                const processedData = {
+                    assignment: assignment,
+                    route: {
+                        id: assignment.route_id,
+                        routeName: assignment.bus_routes?.route_name,
+                        vehicleNumber: assignment.bus_routes?.bus_number,
+                        status: assignment.bus_routes?.route_type || 'Active', // Fallback
+                        helperName: assignment.bus_routes?.helper_name || 'Attendant',
+                        helperPhone: assignment.bus_routes?.helper_phone
+                    },
+                    driver: {
+                        name: assignment.driver_name || 'Driver', // Will be enhanced in backend
+                        phone: assignment.driver_phone
+                    }
+                };
+
+                setBusData(processedData);
+
+                // If bus is assigned, fetch live location
+                if (assignment.route_id) {
+                    await fetchLiveLocation(assignment.route_id, currentChild.id);
+                }
+            } else {
+                setBusData(null);
             }
         } catch (error) {
             console.error('Failed to fetch bus data:', error);
@@ -67,9 +91,9 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
         }
     };
 
-    const fetchLiveLocation = async (routeId: number) => {
+    const fetchLiveLocation = async (routeId: number, studentId?: number) => {
         try {
-            const response = await api.getLiveBusLocation(routeId);
+            const response = await api.getLiveBusLocation(routeId, studentId);
             if (response.success && response.data) {
                 if (response.data.location) {
                     const newLocation = {
@@ -229,7 +253,11 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
             </View>
 
             {/* Info Cards */}
-            <ScrollView style={styles.contentContainer} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                style={styles.contentContainer}
+                contentContainerStyle={{ paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Bus Info Card */}
                 <View style={styles.card}>
                     <View style={styles.busHeader}>
