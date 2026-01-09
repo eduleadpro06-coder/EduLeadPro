@@ -235,24 +235,38 @@ class APIService {
 
     // Authentication
     async login(phone: string, password: string): Promise<LoginResponse> {
-        const response = await fetch(`${this.baseURL}/mobile/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, password }),
-        });
+        const url = `${this.baseURL}/mobile/auth/login`;
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone, password }),
+            });
 
-        const data = await response.json();
+            const text = await response.text();
 
-        if (!response.ok) {
-            throw new Error(data.error || 'Login failed');
+            let data: any;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                console.error('JSON Parse Error. Raw response:', text);
+                throw new Error(`Server returned non-JSON response. First 100 chars: ${text.substring(0, 100)}`);
+            }
+
+            if (!response.ok) {
+                throw new Error(data.error || `Login failed: ${response.status} ${response.statusText}`);
+            }
+
+            // Store tokens if present (new JWT flow)
+            if (data.accessToken && data.refreshToken) {
+                await this.storeTokens(data.accessToken, data.refreshToken);
+            }
+
+            return data;
+        } catch (error: any) {
+            console.error('Login Error:', error);
+            throw error;
         }
-
-        // Store tokens if present (new JWT flow)
-        if (data.accessToken && data.refreshToken) {
-            await this.storeTokens(data.accessToken, data.refreshToken);
-        }
-
-        return data;
     }
 
     async changePassword(phone: string, newPassword: string): Promise<any> {

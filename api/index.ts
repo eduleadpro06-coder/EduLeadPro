@@ -58,7 +58,7 @@ app.use((req, res, next) => {
 });
 
 // Register API routes
-registerRoutes(app);
+let appInitialized = false;
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
@@ -68,6 +68,21 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   logger.error(err);
 });
 
-export default function handler(req: any, res: any) {
-  return (app as any)(req, res);
+export default async function handler(req: any, res: any) {
+  try {
+    if (!appInitialized) {
+      console.log("Initializing API routes...");
+      await registerRoutes(app);
+      appInitialized = true;
+      console.log("API routes initialized successfully");
+    }
+    return (app as any)(req, res);
+  } catch (error: any) {
+    console.error("Critical API Initialization Error:", error);
+    res.status(500).json({
+      error: "Server Initialization Failed",
+      details: error.message,
+      stack: error.stack
+    });
+  }
 }
