@@ -13,7 +13,7 @@ import {
     Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import LeafletMap from '../../components/LeafletMap';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../../store/authStore';
 import webSocketService from '../../services/websocket/socket.service';
@@ -109,31 +109,18 @@ export default function BusTrackingScreen() {
 
             {/* Map */}
             {busLocation ? (
-                <MapView
-                    provider={PROVIDER_GOOGLE}
-                    style={styles.map}
-                    initialRegion={{
+                <LeafletMap
+                    latitude={busLocation.latitude}
+                    longitude={busLocation.longitude}
+                    markers={[{
                         latitude: busLocation.latitude,
                         longitude: busLocation.longitude,
-                        latitudeDelta: 0.02,
-                        longitudeDelta: 0.02,
-                    }}
-                    showsUserLocation
-                    showsMyLocationButton
-                >
-                    <Marker
-                        coordinate={{
-                            latitude: busLocation.latitude,
-                            longitude: busLocation.longitude,
-                        }}
-                        title="School Bus"
-                        description={`Speed: ${busLocation.speed || 0} km/h`}
-                    >
-                        <View style={styles.busMarker}>
-                            <Text style={styles.busMarkerText}>🚌</Text>
-                        </View>
-                    </Marker>
-                </MapView>
+                        title: "School Bus",
+                        description: `Speed: ${busLocation.speed || 0} km/h`,
+                        icon: 'bus'
+                    }]}
+                    height={500} // Adjust height as needed
+                />
             ) : (
                 <View style={styles.noDataContainer}>
                     <Text style={styles.noDataText}>🚌</Text>

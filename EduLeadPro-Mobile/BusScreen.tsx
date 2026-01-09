@@ -5,17 +5,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { api } from './services/api';
 import { colors, spacing, typography } from './src/theme';
 
-// Conditionally import MapView only for native platforms (not web)
-let MapView: any = null;
-let Marker: any = null;
-let PROVIDER_DEFAULT: any = null;
+import LeafletMap from './src/components/LeafletMap';
 
-if (Platform.OS !== 'web') {
-    const mapModule = require('react-native-maps');
-    MapView = mapModule.default;
-    Marker = mapModule.Marker;
-    PROVIDER_DEFAULT = mapModule.PROVIDER_DEFAULT;
-}
+// MapView conditional import removed as we use LeafletMap (WebView) now
 
 const { width, height } = Dimensions.get('window');
 
@@ -192,53 +184,37 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
             {/* Live Map */}
             <View style={styles.mapContainer}>
                 {Platform.OS === 'web' ? (
-                    // Web fallback - show simple placeholder
-                    <View style={[styles.map, { backgroundColor: colors.surfaceHighlight, justifyContent: 'center', alignItems: 'center' }]}>
-                        <Feather name="map" size={48} color={colors.textSecondary} />
-                        <Text style={{ marginTop: 12, color: colors.textSecondary }}>
-                            Map view is available on mobile app only
-                        </Text>
-                        {liveLocation && (
-                            <View style={{ marginTop: 16, alignItems: 'center' }}>
-                                <Text style={{ color: colors.textPrimary, fontWeight: '600' }}>
-                                    Bus Location: {liveLocation.latitude.toFixed(4)}, {liveLocation.longitude.toFixed(4)}
-                                </Text>
-                                <Text style={{ color: colors.textSecondary, marginTop: 4 }}>
-                                    Speed: {Math.round(liveLocation.speed)} km/h
-                                </Text>
-                            </View>
-                        )}
+                    // Web fallback - using LeafletMap for web too since it's web-based
+                    <View style={styles.map}>
+                        <LeafletMap
+                            latitude={liveLocation?.latitude || 28.6139}
+                            longitude={liveLocation?.longitude || 77.2090}
+                            markers={liveLocation && isLive ? [{
+                                latitude: liveLocation.latitude,
+                                longitude: liveLocation.longitude,
+                                title: "School Bus",
+                                description: `Speed: ${Math.round(liveLocation.speed)} km/h`,
+                                icon: 'bus'
+                            }] : []}
+                            height={height * 0.4}
+                        />
                     </View>
                 ) : (
-                    // Native platforms - show actual map
-                    <MapView
-                        ref={mapRef as any}
-                        provider={PROVIDER_DEFAULT}
-                        style={styles.map}
-                        initialRegion={{
-                            latitude: liveLocation?.latitude || 28.6139, // Default to Delhi
-                            longitude: liveLocation?.longitude || 77.2090,
-                            latitudeDelta: 0.02,
-                            longitudeDelta: 0.02,
-                        }}
-                        showsUserLocation={true}
-                        showsMyLocationButton={true}
-                    >
-                        {liveLocation && isLive && (
-                            <Marker
-                                coordinate={{
-                                    latitude: liveLocation.latitude,
-                                    longitude: liveLocation.longitude,
-                                }}
-                                title="School Bus"
-                                description={`Speed: ${Math.round(liveLocation.speed)} km/h`}
-                            >
-                                <View style={styles.busMarker}>
-                                    <Feather name="truck" size={24} color="white" />
-                                </View>
-                            </Marker>
-                        )}
-                    </MapView>
+                    // Native platforms - using LeafletMap via WebView
+                    <View style={styles.map}>
+                        <LeafletMap
+                            latitude={liveLocation?.latitude || 28.6139}
+                            longitude={liveLocation?.longitude || 77.2090}
+                            markers={liveLocation && isLive ? [{
+                                latitude: liveLocation.latitude,
+                                longitude: liveLocation.longitude,
+                                title: "School Bus",
+                                description: `Speed: ${Math.round(liveLocation.speed)} km/h`,
+                                icon: 'bus'
+                            }] : []}
+                            height={height * 0.4}
+                        />
+                    </View>
                 )}
 
                 {/* Live Indicator Overlay */}
