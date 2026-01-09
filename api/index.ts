@@ -8,6 +8,36 @@ import logger from '../server/config/logger.js';
 
 const app = express();
 
+// CORS Middleware - MUST BE FIRST
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  // Allow all expo.app subdomains and localhost
+  const allowedOrigins = [
+    /^https:\/\/educonnect--.*\.expo\.app$/,
+    /^http:\/\/localhost:/,
+    /^https:\/\/.*\.vercel\.app$/
+  ];
+
+  if (origin) {
+    const isAllowed = allowedOrigins.some(pattern => pattern.test(origin));
+    if (isAllowed) {
+      res.header("Access-Control-Allow-Origin", origin);
+    }
+  }
+
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+
+  // Handle preflight requests explicitly
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  next();
+});
+
 // Cookie parser middleware
 app.use(cookieParser());
 
@@ -23,24 +53,6 @@ app.use(session({
     sameSite: 'strict'
   }
 }));
-
-// CORS Middleware
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.header("Access-Control-Allow-Origin", origin);
-  }
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-  res.header("Access-Control-Allow-Credentials", "true");
-
-  // Handle preflight requests explicitly
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-  next();
-});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
