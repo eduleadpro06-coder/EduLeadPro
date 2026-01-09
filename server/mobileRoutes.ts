@@ -85,11 +85,27 @@ router.get('/auth/run-migration', async (_req, res) => {
 router.post('/media/upload', express.json({ limit: '50mb' }), async (req: Request, res: Response) => {
     try {
         const { image, folder } = req.body;
-        if (!image) return res.status(400).json({ error: 'No image data provided' });
+
+        console.log('[Media Upload] Request received:', {
+            hasImage: !!image,
+            folder: folder || 'activities',
+            imagePrefix: image ? image.substring(0, 50) : 'none'
+        });
+
+        if (!image) {
+            console.error('[Media Upload] No image data provided');
+            return res.status(400).json({ error: 'No image data provided' });
+        }
 
         // Upload to Supabase Storage
         const buffer = Buffer.from(image.replace(/^data:image\/\w+;base64,/, ""), 'base64');
         const fileName = `${folder || 'activities'}/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+
+        console.log('[Media Upload] Attempting upload:', {
+            fileName,
+            bufferSize: buffer.length,
+            bucket: 'media'
+        });
 
         const { data, error } = await supabase.storage
             .from('media')
@@ -98,16 +114,37 @@ router.post('/media/upload', express.json({ limit: '50mb' }), async (req: Reques
                 upsert: false
             });
 
-        if (error) throw error;
+        if (error) {
+            console.error('[Media Upload] Supabase storage error:', {
+                message: error.message,
+                statusCode: error.statusCode || error.status,
+                errorCode: error.error || error.code,
+                fullError: JSON.stringify(error, null, 2)
+            });
+            throw error;
+        }
+
+        console.log('[Media Upload] Upload successful:', { fileName, path: data?.path });
 
         const { data: { publicUrl } } = supabase.storage
             .from('media')
             .getPublicUrl(fileName);
 
+        console.log('[Media Upload] Public URL generated:', publicUrl);
+
         res.json({ success: true, url: publicUrl });
     } catch (error: any) {
-        console.error('Upload error:', error);
-        res.status(500).json({ error: 'Failed to upload media' });
+        console.error('[Media Upload] Fatal error:', {
+            message: error?.message || 'Unknown error',
+            statusCode: error?.statusCode || error?.status,
+            errorCode: error?.error || error?.code,
+            stack: error?.stack
+        });
+        res.status(500).json({
+            error: 'Failed to upload media',
+            details: error?.message || 'Unknown error',
+            code: error?.statusCode || error?.status || 500
+        });
     }
 });
 
