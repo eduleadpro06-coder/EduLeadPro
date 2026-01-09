@@ -13,6 +13,70 @@ router.use(jwtMiddleware);
 router.use(roleGuard(['teacher']));
 
 /**
+ * GET /api/v1/mobile/teacher/holidays
+ * Get organization holidays for attendance validation
+ */
+router.get('/holidays', async (req: Request, res: Response) => {
+    try {
+        const organizationId = req.user!.organizationId;
+
+        const { supabase } = await import('../../supabase.js');
+
+        const today = new Date().toISOString().split('T')[0];
+
+        const { data: holidays, error } = await supabase
+            .from('organization_holidays')
+            .select('holiday_date, holiday_name, is_repeating')
+            .eq('organization_id', organizationId)
+            .gte('holiday_date', today) // Only today and future holidays
+            .order('holiday_date', { ascending: true });
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            data: { holidays: holidays || [] }
+        });
+    } catch (error) {
+        console.error('Get holidays error:', error);
+        res.status(500).json({ error: 'Failed to fetch holidays' });
+    }
+});
+
+/**
+ * GET /api/v1/mobile/teacher/student/:studentId/attendance
+ * Get attendance history for a specific student
+ */
+router.get('/student/:studentId/attendance', async (req: Request, res: Response) => {
+    try {
+        const { studentId } = req.params;
+        const days = parseInt(req.query.days as string) || 30;
+
+        const { supabase } = await import('../../supabase.js');
+
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+
+        const { data: attendance, error } = await supabase
+            .from('student_attendance')
+            .select('id, date, status, check_in_time, marked_by')
+            .eq('lead_id', studentId)
+            .gte('date', startDate.toISOString().split('T')[0])
+            .order('date', { ascending: false });
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            data: attendance || []
+        });
+    } catch (error) {
+        console.error('Get student attendance error:', error);
+        res.status(500).json({ error: 'Failed to fetch attendance history' });
+    }
+});
+
+/**
  * GET /api/v1/mobile/teacher/dashboard
  * Get teacher dashboard summary
  */
@@ -42,7 +106,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
 
         // Count present/absent/not marked
         const attendanceSummary = {
-            present: todayAttendance?.filter(a => a.status === 'present').length || 0,
+            present: todayAttendance?.filter(a => a.status === 'present' || a.status === 'late').length || 0,
             absent: todayAttendance?.filter(a => a.status === 'absent').length || 0,
             total: todayAttendance?.length || 0
         };
@@ -115,7 +179,7 @@ router.get('/students', async (req: Request, res: Response) => {
 
             query = supabase
                 .from('leads')
-                .select('id, student_name as name, class, parent_name, phone as parent_phone, section')
+                .select('id, name, class, section')
                 .eq('organization_id', organizationId)
                 .eq('status', 'enrolled')
                 .in('id', assignedStudentIds)
@@ -124,7 +188,7 @@ router.get('/students', async (req: Request, res: Response) => {
             // No assignments - show all students (legacy behavior)
             query = supabase
                 .from('leads')
-                .select('id, student_name as name, class, parent_name, phone as parent_phone, section')
+                .select('id, name, class, section')
                 .eq('organization_id', organizationId)
                 .eq('status', 'enrolled')
                 .order('class', { ascending: true });

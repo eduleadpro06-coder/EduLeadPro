@@ -356,9 +356,7 @@ class APIService {
         }));
     }
 
-    async getBusLocation(childId: number): Promise<any> {
-        return await this.fetchWithAuth(`/students/${childId}/bus-assignment`);
-    }
+
 
     // Teacher Methods (V1 API)
     async getTeacherDashboard(): Promise<any> {
@@ -409,6 +407,32 @@ class APIService {
 
     async getTodayAttendanceAll(): Promise<any> {
         return await this.fetchWithAuth('/v1/mobile/teacher/attendance/today');
+    }
+
+    async getStudentAttendanceHistory(studentId: number, days: number = 30): Promise<any[]> {
+        const data = await this.fetchWithAuth<any[]>(
+            `/v1/mobile/teacher/student/${studentId}/attendance?days=${days}`
+        );
+        console.log('Attendance History Response:', JSON.stringify(data, null, 2));
+        // fetchWithAuth already unwraps 'data' property if present
+        return (Array.isArray(data) ? data : []).map((a: any) => ({
+            id: a.id,
+            date: a.date,
+            status: a.status,
+            checkInTime: a.check_in_time,
+            markedBy: a.marked_by
+        }));
+    }
+
+    async getOrganizationHolidays(): Promise<any[]> {
+        const data = await this.fetchWithAuth<{ holidays: any[] }>(
+            '/v1/mobile/teacher/holidays'
+        );
+        return (data.holidays || []).map((h: any) => ({
+            date: h.holiday_date,
+            name: h.holiday_name,
+            isRepeating: h.is_repeating
+        }));
     }
 
     // Driver Methods (V1 API)

@@ -559,6 +559,46 @@ router.post('/attendance/mark', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * Post Daily Update
+ * POST /api/mobile/daily-updates/post
+ */
+router.post('/daily-updates/post', async (req: Request, res: Response) => {
+    try {
+        const { leadIds, activityType, content, mediaUrl, teacherName, organizationId } = req.body;
+
+        if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
+            return res.status(400).json({ error: 'Lead IDs are required' });
+        }
+
+        if (!activityType || !content) {
+            return res.status(400).json({ error: 'Activity type and content are required' });
+        }
+
+        // Insert daily updates for each student
+        const updates = leadIds.map(leadId => ({
+            organization_id: organizationId,
+            lead_id: leadId,
+            activity_type: activityType,
+            content,
+            media_url: mediaUrl || null,
+            teacher_name: teacherName,
+            posted_at: new Date().toISOString()
+        }));
+
+        const { error } = await supabase
+            .from('daily_updates')
+            .insert(updates);
+
+        if (error) throw error;
+
+        res.json({ success: true, message: `Daily update posted for ${leadIds.length} student(s)` });
+    } catch (error) {
+        console.error('Post daily update error:', error);
+        res.status(500).json({ error: 'Failed to post daily update' });
+    }
+});
+
 // =====================================================
 // DRIVER ENDPOINTS
 // =====================================================

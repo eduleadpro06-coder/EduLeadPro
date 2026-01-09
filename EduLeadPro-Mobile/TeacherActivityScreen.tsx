@@ -8,7 +8,8 @@ import {
     TouchableOpacity,
     Alert,
     Platform,
-    KeyboardAvoidingView
+    KeyboardAvoidingView,
+    TextInput
 } from 'react-native';
 import { Camera, CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -27,11 +28,12 @@ interface ActivityScreenProps {
 
 export default function TeacherActivityScreen({ onBack }: ActivityScreenProps) {
     const [students, setStudents] = useState<Child[]>([]);
-    const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+    const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [activityType, setActivityType] = useState('Learning');
     const [mood, setMood] = useState('Happy');
+    const [searchQuery, setSearchQuery] = useState('');
 
     const [permission, requestPermission] = useCameraPermissions();
     const [cameraVisible, setCameraVisible] = useState(false);
@@ -47,7 +49,6 @@ export default function TeacherActivityScreen({ onBack }: ActivityScreenProps) {
         try {
             const data = await api.getTeacherStudents('');
             setStudents(data);
-            if (data.length > 0) setSelectedStudentId(data[0].id);
         } catch (error) {
             console.error(error);
         }
@@ -85,9 +86,32 @@ export default function TeacherActivityScreen({ onBack }: ActivityScreenProps) {
         }
     };
 
+    const toggleStudent = (studentId: number) => {
+        const newSet = new Set(selectedStudentIds);
+        if (newSet.has(studentId)) {
+            newSet.delete(studentId);
+        } else {
+            newSet.add(studentId);
+        }
+        setSelectedStudentIds(newSet);
+    };
+
+    const selectAll = () => {
+        if (selectedStudentIds.size === students.length) {
+            setSelectedStudentIds(new Set());
+        } else {
+            setSelectedStudentIds(new Set(students.map(s => s.id)));
+        }
+    };
+
     const handleSubmit = async () => {
-        if (!selectedStudentId || !title || !description) {
-            Alert.alert('Incomplete', 'Please fill all required fields');
+        if (selectedStudentIds.size === 0) {
+            Alert.alert('No Students Selected', 'Please select at least one student');
+            return;
+        }
+
+        if (!title || !description) {
+            Alert.alert('Incomplete', 'Please fill title and description');
             return;
         }
 
@@ -114,18 +138,24 @@ export default function TeacherActivityScreen({ onBack }: ActivityScreenProps) {
                 }
             }
 
-            await api.postActivity(selectedStudentId, {
-                type: activityType,
-                title,
-                content: description,
-                mood: mood,
-                mediaUrls
-            });
+            // Post activity to each selected student
+            const promises = Array.from(selectedStudentIds).map(studentId =>
+                api.postActivity(studentId, {
+                    type: activityType,
+                    title,
+                    content: description,
+                    mood: mood,
+                    mediaUrls
+                })
+            );
 
-            Alert.alert('Success', 'Activity posted to timeline!', [
+            await Promise.all(promises);
+
+            Alert.alert('Success', `Activity posted to ${selectedStudentIds.size} student(s)!`, [
                 { text: 'OK', onPress: () => onBack?.() }
             ]);
         } catch (error) {
+            console.error(error);
             Alert.alert('Error', 'Failed to post activity');
         } finally {
             setUploading(false);
@@ -212,24 +242,53 @@ export default function TeacherActivityScreen({ onBack }: ActivityScreenProps) {
                     style={{ height: 100, textAlignVertical: 'top', paddingTop: 12 }}
                 />
 
-                {/* Student Selector (Chips) */}
-                <Text style={styles.label}>Tag Student</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-                    {students.map(student => {
-                        const isSelected = selectedStudentId === student.id;
-                        return (
-                            <TouchableOpacity
-                                key={student.id}
-                                style={[styles.chip, isSelected && styles.chipSelected]}
-                                onPress={() => setSelectedStudentId(student.id)}
-                            >
-                                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                                    {student.name.split(' ')[0]}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
+                {/* Student Selector (Vertical List with Search) */}
+                <View style={styles.studentSection}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={styles.label}>Select Students ({selectedStudentIds.size} selected)</Text>
+                        <TouchableOpacity onPress={selectAll} style={styles.selectAllBtn}>
+                            <Text style={styles.selectAllText}>
+                                {selectedStudentIds.size === students.length ? 'Deselect All' : 'Select All'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Search Bar */}
+                    <View style={styles.searchContainer}>
+                        <Feather name="search" size={16} color={colors.textSecondary} />
+                        <TextInput
+                            placeholder="Search students..."
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            style={styles.searchInput}
+                            placeholderTextColor={colors.textSecondary}
+                        />
+                    </View>
+
+                    {/* Student List */}
+                    <ScrollView style={styles.studentListContainer} nestedScrollEnabled>
+                        {students
+                            .filter(s => searchQuery ? s.name.toLowerCase().includes(searchQuery.toLowerCase()) : true)
+                            .map(student => {
+                                const isSelected = selectedStudentIds.has(student.id);
+                                return (
+                                    <TouchableOpacity
+                                        key={student.id}
+                                        style={styles.studentListItem}
+                                        onPress={() => toggleStudent(student.id)}
+                                    >
+                                        <View style={[styles.studentCheckbox, isSelected && styles.studentCheckboxSelected]}>
+                                            {isSelected && <Feather name="check" size={14} color="white" />}
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.studentListName}>{student.name}</Text>
+                                            <Text style={styles.studentListClass}>{student.class}</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                    </ScrollView>
+                </View>
 
                 {/* Mood Selector */}
                 <Text style={styles.label}>Mood</Text>
@@ -284,9 +343,101 @@ const styles = StyleSheet.create({
     removeMedia: { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.6)', padding: 6, borderRadius: 15 },
 
     label: { ...typography.caption, fontWeight: '700', color: colors.textSecondary, marginBottom: 8, marginTop: 16 },
+    studentSection: { marginTop: 16 },
+    selectAllBtn: {
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        backgroundColor: colors.primary,
+        borderRadius: 6,
+    },
+    selectAllText: {
+        fontSize: 11,
+        color: 'white',
+        fontWeight: '600',
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.surface,
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 12,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 14,
+        color: colors.textPrimary,
+        padding: 0,
+    },
+    studentListContainer: {
+        maxHeight: 200,
+        backgroundColor: colors.surface,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    studentListItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+    },
+    studentCheckbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: colors.textSecondary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    studentCheckboxSelected: {
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
+    },
+    studentListName: {
+        ...typography.body,
+        fontWeight: '600',
+        color: colors.textPrimary,
+    },
+    studentListClass: {
+        ...typography.caption,
+        color: colors.textSecondary,
+        marginTop: 2,
+    },
     chipRow: { flexDirection: 'row', marginBottom: 8 },
-    chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.surfaceHighlight, marginRight: 8, borderWidth: 1, borderColor: 'transparent' },
+    chip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: colors.surfaceHighlight,
+        marginRight: 8,
+        borderWidth: 1,
+        borderColor: 'transparent'
+    },
     chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+    chipCheckbox: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: colors.textSecondary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    chipCheckboxSelected: {
+        backgroundColor: 'white',
+        borderColor: 'white',
+    },
     chipText: { fontSize: 13, color: colors.textSecondary },
     chipTextSelected: { color: colors.textInverted, fontWeight: '600' },
 

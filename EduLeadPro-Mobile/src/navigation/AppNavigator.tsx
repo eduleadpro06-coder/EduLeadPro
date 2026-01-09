@@ -8,11 +8,14 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useAuthStore } from '../store/authStore';
 
-// Import screens (we'll create these next)
+// Import screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import ParentHomeScreen from '../screens/parent/ParentHomeScreen';
 import BusTrackingScreen from '../screens/parent/BusTrackingScreen';
 import DriverHomeScreen from '../screens/driver/DriverHomeScreen';
+import TeacherHomeScreen from '../screens/teacher/TeacherHomeScreen';
+import MarkAttendanceScreen from '../screens/teacher/MarkAttendanceScreen';
+import PostUpdateScreen from '../screens/teacher/PostUpdateScreen';
 
 const Stack = createStackNavigator();
 
@@ -34,7 +37,8 @@ export default function AppNavigator() {
         );
     }
 
-    // Authenticated Stack - Different for Parent vs Driver
+    // Authenticated Stack - Different for Parent vs Teacher vs Driver
+    const isTeacher = user?.role === 'teacher';
     const isDriver = user?.role === 'driver';
 
     return (
@@ -44,7 +48,13 @@ export default function AppNavigator() {
                     headerShown: false,
                 }}
             >
-                {isDriver ? (
+                {isTeacher ? (
+                    <>
+                        <Stack.Screen name="TeacherHome" component={TeacherHomeScreen} />
+                        <Stack.Screen name="MarkAttendance" component={MarkAttendanceScreen} />
+                        <Stack.Screen name="PostUpdate" component={PostUpdateScreen} />
+                    </>
+                ) : isDriver ? (
                     <>
                         <Stack.Screen name="DriverHome" component={DriverHomeScreen} />
                     </>

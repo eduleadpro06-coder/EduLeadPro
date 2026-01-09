@@ -21,20 +21,20 @@ import { spacing, borderRadius } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
 export default function LoginScreen() {
-    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const { login } = useAuthStore();
 
     const handleLogin = async () => {
-        if (!email || !password) {
-            Alert.alert('Error', 'Please enter email and password');
+        if (!phone || !password) {
+            Alert.alert('Error', 'Please enter phone number and password');
             return;
         }
 
         try {
             setLoading(true);
-            await login(email, password);
+            await login(phone, password);
             // Navigation happens automatically via AppNavigator
         } catch (error: any) {
             Alert.alert('Login Failed', error.response?.data?.error || 'Invalid credentials');
@@ -59,14 +59,14 @@ export default function LoginScreen() {
                     {/* Login Form */}
                     <View style={styles.form}>
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Email</Text>
+                            <Text style={styles.label}>Phone Number</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Enter your email"
+                                placeholder="Enter your phone number"
                                 placeholderTextColor={colors.text.light}
-                                value={email}
-                                onChangeText={setEmail}
-                                keyboardType="email-address"
+                                value={phone}
+                                onChangeText={setPhone}
+                                keyboardType="phone-pad"
                                 autoCapitalize="none"
                                 autoCorrect={false}
                                 editable={!loading}

@@ -4,9 +4,10 @@
 
 export interface User {
     id: string;
+    userId: number;
     name: string;
     email: string;
-    role: 'parent' | 'driver' | 'admin';
+    role: 'parent' | 'teacher' | 'driver' | 'admin';
     organizationId: number;
     children?: Student[];
 }
@@ -30,7 +31,7 @@ export interface BusAssignment {
 }
 
 export interface LoginRequest {
-    email: string;
+    phone: string;
     password: string;
 }
 
