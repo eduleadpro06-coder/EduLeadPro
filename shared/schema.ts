@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, decimal, varchar, date, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, varchar, date, jsonb, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1206,7 +1206,7 @@ export const busRoutes = pgTable("bus_routes", {
   helperName: varchar("helper_name", { length: 100 }),
   helperPhone: varchar("helper_phone", { length: 20 }),
   capacity: integer("capacity"),
-  startTime: varchar("start_time", { length: 10 }), // e.g. "07:30 AM"
+  startTime: varchar("start_time", { length: 10 }),
   endTime: varchar("end_time", { length: 10 }),
   status: varchar("status", { length: 20 }).default("active"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1221,7 +1221,7 @@ export const busStops = pgTable("bus_stops", {
   longitude: decimal("longitude", { precision: 11, scale: 8 }),
   arrivalTime: varchar("arrival_time", { length: 10 }),
   pickupPrice: decimal("pickup_price", { precision: 10, scale: 2 }).default("0"),
-  stopOrder: integer("stop_order").notNull(), // 1, 2, 3...
+  stopOrder: integer("stop_order").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1241,21 +1241,21 @@ export const busLiveLocations = pgTable("bus_live_locations", {
   driverId: integer("driver_id").references(() => staff.id),
   latitude: decimal("latitude", { precision: 10, scale: 8 }).notNull(),
   longitude: decimal("longitude", { precision: 11, scale: 8 }).notNull(),
-  speed: decimal("speed", { precision: 5, scale: 2 }), // km/h
-  heading: decimal("heading", { precision: 5, scale: 2 }), // degrees 0-360
-  accuracy: decimal("accuracy", { precision: 8, scale: 2 }), // meters
+  speed: decimal("speed", { precision: 5, scale: 2 }),
+  heading: decimal("heading", { precision: 5, scale: 2 }),
+  accuracy: decimal("accuracy", { precision: 8, scale: 2 }),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
   isActive: boolean("is_active").default(true),
 });
 
-// Bus Location History - historical tracking data
+// Bus Location History - historical tracking data  
 export const busLocationHistory = pgTable("bus_location_history", {
   id: serial("id").primaryKey(),
   routeId: integer("route_id").notNull().references(() => busRoutes.id),
   latitude: decimal("latitude", { precision: 10, scale: 8 }).notNull(),
   longitude: decimal("longitude", { precision: 11, scale: 8 }).notNull(),
-  speed: integer("speed").default(0),
-  heading: integer("heading").default(0),
+  speed: decimal("speed", { precision: 5, scale: 2 }),
+  heading: decimal("heading", { precision: 5, scale: 2 }),
   recordedAt: timestamp("recorded_at").defaultNow().notNull(),
 });
 

@@ -5703,8 +5703,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               currentLocation: {
                 latitude: parseFloat(latestLocation.latitude as string),
                 longitude: parseFloat(latestLocation.longitude as string),
-                speed: latestLocation.speed || 0,
-                heading: latestLocation.heading || 0
+                speed: parseFloat(latestLocation.speed as string) || 0,
+                heading: parseFloat(latestLocation.heading as string) || 0
               },
               lastUpdated: latestLocation.recordedAt,
               isActive: true
@@ -5727,5 +5727,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   return httpServer;
-
 }
