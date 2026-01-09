@@ -79,6 +79,7 @@ export default function BusTrackingScreen() {
                 try {
                     // Fetch fresh assignment from server
                     const data = await busAPI.getStudentBusAssignment(firstChild.id);
+                    console.log('[BusTracking] Assignment Data:', JSON.stringify(data, null, 2));
 
                     if (data && data.assignment) {
                         const rId = data.assignment.routeId;
@@ -86,11 +87,13 @@ export default function BusTrackingScreen() {
 
                         // Set pickup stop location for static map
                         if (data.assignment.pickupStop) {
-                            setPickupStop({
+                            const stop = {
                                 latitude: parseFloat(data.assignment.pickupStop.latitude),
                                 longitude: parseFloat(data.assignment.pickupStop.longitude),
                                 name: data.assignment.pickupStop.name || 'Pickup Stop'
-                            });
+                            };
+                            console.log('[BusTracking] Pickup Stop Set:', stop);
+                            setPickupStop(stop);
                         }
 
                         // Connect WebSocket
@@ -175,6 +178,12 @@ export default function BusTrackingScreen() {
             icon: 'bus'
         });
     }
+
+    console.log('[BusTracking] Map Markers:', JSON.stringify(mapMarkers, null, 2));
+    console.log('[BusTracking] Map Center:', {
+        lat: busLocation?.latitude || pickupStop?.latitude,
+        lng: busLocation?.longitude || pickupStop?.longitude
+    });
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>

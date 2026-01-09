@@ -42,7 +42,31 @@ const LeafletMap = ({ latitude, longitude, markers = [], height = 300, zoom = 15
     <body>
         <div id="map"></div>
         <script>
-            var map = L.map('map').setView([${latitude}, ${longitude}], ${zoom});
+            // Relay logs to React Native
+            (function() {
+                var originalLog = console.log;
+                var originalWarn = console.warn;
+                var originalError = console.error;
+                
+                function relay(type, args) {
+                    if (window.ReactNativeWebView) {
+                        window.ReactNativeWebView.postMessage(JSON.stringify({
+                            type: 'log',
+                            level: type,
+                            data: Array.prototype.slice.call(args).join(' ')
+                        }));
+                    }
+                }
+
+                console.log = function() { originalLog.apply(console, arguments); relay('log', arguments); };
+                console.warn = function() { originalWarn.apply(console, arguments); relay('warn', arguments); };
+                console.error = function() { originalError.apply(console, arguments); relay('error', arguments); };
+            })();
+
+            console.log('[Leaflet] Map script started');
+            var initialLat = ${latitude || 20.5937};
+            var initialLng = ${longitude || 78.9629};
+            var map = L.map('map').setView([initialLat, initialLng], ${zoom});
             
             var tileUrl = '${MAP_CONFIG.PROVIDER === 'ola' ? MAP_CONFIG.URLS.OLA : MAP_CONFIG.URLS.OSM}';
             var attribution = '${MAP_CONFIG.PROVIDER === 'ola' ? MAP_CONFIG.ATTRIBUTION.OLA : MAP_CONFIG.ATTRIBUTION.OSM}';
@@ -53,24 +77,43 @@ const LeafletMap = ({ latitude, longitude, markers = [], height = 300, zoom = 15
                 id: 'ola-maps' // Optional
             }).addTo(map);
 
+            console.log('[Leaflet] Map ready');
+
             var markers = [];
 
             function updateMap(lat, lng, zoomLevel) {
+                console.log('[Leaflet] Updating view to:', lat, lng, zoomLevel);
                 map.setView([lat, lng], zoomLevel);
             }
 
             function updateMarkers(newMarkers) {
+                console.log('[Leaflet] Updating markers:', JSON.stringify(newMarkers));
                 // Remove existing markers
                 markers.forEach(m => map.removeLayer(m));
                 markers = [];
 
                 // Add new markers
                 newMarkers.forEach(m => {
+                    console.log('[Leaflet] Adding marker:', m.title, 'at', m.latitude, m.longitude);
                     var iconColor = m.icon === 'bus' ? 'red' : 'blue';
-                    // Simple custom icon could be added here, using default for now
-                    var marker = L.marker([m.latitude, m.longitude])
+                    // Using a simpler marker style to avoid icon loading issues
+                    var marker = L.circleMarker([m.latitude, m.longitude], {
+                        radius: 8,
+                        fillColor: iconColor,
+                        color: "#fff",
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    })
                         .addTo(map)
                         .bindPopup('<b>' + (m.title || '') + '</b><br>' + (m.description || ''));
+                   
+                   // Fallback for L.marker if circleMarker is not desired
+                   /*
+                   var marker = L.marker([m.latitude, m.longitude])
+                        .addTo(map)
+                        .bindPopup('<b>' + (m.title || '') + '</b><br>' + (m.description || ''));
+                   */
                     
                     if (m.icon === 'bus') {
                         marker.openPopup();
@@ -79,6 +122,7 @@ const LeafletMap = ({ latitude, longitude, markers = [], height = 300, zoom = 15
                 });
             }
 
+            console.log('[Leaflet] Map initialized at:', ${latitude}, ${longitude});
             // Initial markers
             updateMarkers(${JSON.stringify(markers)});
         </script>
@@ -114,13 +158,23 @@ const LeafletMap = ({ latitude, longitude, markers = [], height = 300, zoom = 15
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
                 mixedContentMode="always"
+                onMessage={(event) => {
+                    try {
+                        const message = JSON.parse(event.nativeEvent.data);
+                        if (message.type === 'log') {
+                            console.log('[WebView Log]', message.data);
+                        }
+                    } catch (e) {
+                        console.log('[WebView Message]', event.nativeEvent.data);
+                    }
+                }}
                 onError={(syntheticEvent) => {
                     const { nativeEvent } = syntheticEvent;
-                    console.warn('WebView error: ', nativeEvent);
+                    console.warn('[Leaflet] WebView error:', nativeEvent);
                 }}
                 onHttpError={(syntheticEvent) => {
                     const { nativeEvent } = syntheticEvent;
-                    console.warn('WebView HTTP error: ', nativeEvent);
+                    console.warn('[Leaflet] WebView HTTP error:', nativeEvent);
                 }}
             />
         </View>
