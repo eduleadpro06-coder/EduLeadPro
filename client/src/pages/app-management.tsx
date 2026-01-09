@@ -1484,13 +1484,13 @@ export default function AppManagement() {
                                                     </select>
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label htmlFor="ann-date">Expiration Date (Optional)</Label>
+                                                    <Label htmlFor="ann-date">Expiration Date *</Label>
                                                     <Input
                                                         id="ann-date"
                                                         type="date"
                                                         value={date}
                                                         onChange={(e) => setDate(e.target.value)}
-                                                        placeholder="Leave empty for no expiration"
+                                                        required
                                                     />
                                                 </div>
                                             </div>
@@ -1501,31 +1501,39 @@ export default function AppManagement() {
                                         </div>
                                         <DialogFooter>
                                             <DialogClose asChild>
-                                                <Button onClick={() => createAnnouncementMutation.mutate({
-                                                    title,
-                                                    content,
-                                                    priority,
-                                                    // Only send date if selected, mapped to expiresAt or handled by backend? 
-                                                    // Actually schema has published_at (now) and expires_at. 
-                                                    // "Date" in announcement often means "This is concerning date X".
-                                                    // If "not mandatory", I'll send it if present. 
-                                                    // Previous backend logic for announcements:
-                                                    // .or(`expires_at.is.null,expires_at.gt."${now}"`)
-                                                    // So if I map this to expiresAt, and they pick a past date, it disappears.
-                                                    // If they mean "Event Date", maybe I should put it in content?
-                                                    // Or maybe they just want a reference date.
-                                                    // Given the "School Events" context, "Announcements" might be "School Closed on X".
-                                                    // I'll stick to mapping it to a dedicated field if available, or just sending it.
-                                                    // Wait, `createAnnouncement` on server expects what?
-                                                    // I should check existing mutation or server endpoint.
-                                                    // Assuming I can pass it. I'll pass `eventDate: date` or `expiresAt: date`.
-                                                    // Let's assume `expiresAt` due to schema, but user says "date not mandatory". 
-                                                    // If I map to `expiresAt`, it auto-hides. Users might not want that.
-                                                    // I'll map to `expiresAt` for now as it's the only date field in schema besides `published_at`.
-                                                    // AND `priority`.
-                                                    expiresAt: date || null,
-                                                    publishedAt: new Date().toISOString()
-                                                })}>
+                                                <Button
+                                                    onClick={() => {
+                                                        if (!date) {
+                                                            alert('Please select an expiration date');
+                                                            return;
+                                                        }
+                                                        createAnnouncementMutation.mutate({
+                                                            title,
+                                                            content,
+                                                            priority,
+                                                            // Only send date if selected, mapped to expiresAt or handled by backend? 
+                                                            // Actually schema has published_at (now) and expires_at. 
+                                                            // "Date" in announcement often means "This is concerning date X".
+                                                            // If "not mandatory", I'll send it if present. 
+                                                            // Previous backend logic for announcements:
+                                                            // .or(`expires_at.is.null,expires_at.gt."${now}"`)
+                                                            // So if I map this to expiresAt, and they pick a past date, it disappears.
+                                                            // If they mean "Event Date", maybe I should put it in content?
+                                                            // Or maybe they just want a reference date.
+                                                            // Given the "School Events" context, "Announcements" might be "School Closed on X".
+                                                            // I'll stick to mapping it to a dedicated field if available, or just sending it.
+                                                            // Wait, `createAnnouncement` on server expects what?
+                                                            // I should check existing mutation or server endpoint.
+                                                            // Assuming I can pass it. I'll pass `eventDate: date` or `expiresAt: date`.
+                                                            // Let's assume `expiresAt` due to schema, but user says "date not mandatory". 
+                                                            // If I map to `expiresAt`, it auto-hides. Users might not want that.
+                                                            // I'll map to `expiresAt` for now as it's the only date field in schema besides `published_at`.
+                                                            // AND `priority`.
+                                                            expiresAt: date,
+                                                            publishedAt: new Date().toISOString()
+                                                        });
+                                                    }}
+                                                >
                                                     Post Announcement
                                                 </Button>
                                             </DialogClose>
@@ -1539,19 +1547,21 @@ export default function AppManagement() {
                                         <TableRow>
                                             <TableHead>Title</TableHead>
                                             <TableHead>Posted Date</TableHead>
+                                            <TableHead>Expiration Date</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {isLoadingAnnouncements ? (
-                                            <TableRow><TableCell colSpan={3} className="text-center py-8">Loading...</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
                                         ) : announcements.length === 0 ? (
-                                            <TableRow><TableCell colSpan={3} className="text-center text-gray-500 py-8">No announcements yet</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={4} className="text-center text-gray-500 py-8">No announcements yet</TableCell></TableRow>
                                         ) : (
                                             announcements.map((ann) => (
                                                 <TableRow key={ann.id}>
                                                     <TableCell className="font-medium">{ann.title}</TableCell>
                                                     <TableCell>{new Date(ann.publishedAt!).toLocaleDateString()}</TableCell>
+                                                    <TableCell>{ann.expiresAt ? new Date(ann.expiresAt).toLocaleDateString() : '-'}</TableCell>
                                                     <TableCell className="text-right">
                                                         <Button variant="ghost" size="sm" onClick={() => {
                                                             if (confirm("Delete this announcement?")) deleteAnnouncementMutation.mutate(ann.id);
