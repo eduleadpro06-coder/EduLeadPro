@@ -8,8 +8,9 @@ export const MAP_CONFIG = {
     // Tile URLs
     URLS: {
         OSM: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        // OLA Maps tile URL with API key
-        OLA: `https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard/{z}/{x}/{y}.png?api_key=nN7MyyjOHt7LqUdRFNYcfadYtFEw7cqdProAtSD0`
+        // OLA Maps raster tile URL (for Leaflet/WebView compatibility)
+        // Using the places API tile endpoint which provides raster tiles
+        OLA: 'https://api.olamaps.io/places/v1/tiles/default-light-standard/{z}/{x}/{y}.png?api_key=nN7MyyjOHt7LqUdRFNYcfadYtFEw7cqdProAtSD0'
     },
 
     ATTRIBUTION: {
