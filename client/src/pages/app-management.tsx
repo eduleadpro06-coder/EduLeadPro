@@ -1484,12 +1484,13 @@ export default function AppManagement() {
                                                     </select>
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label htmlFor="ann-date">Date (Optional)</Label>
+                                                    <Label htmlFor="ann-date">Expiration Date (Optional)</Label>
                                                     <Input
                                                         id="ann-date"
                                                         type="date"
                                                         value={date}
                                                         onChange={(e) => setDate(e.target.value)}
+                                                        placeholder="Leave empty for no expiration"
                                                     />
                                                 </div>
                                             </div>
