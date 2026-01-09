@@ -33,6 +33,10 @@ const LeafletMap = ({ latitude, longitude, markers = [], height = 300, zoom = 15
         <style>
             body { margin: 0; padding: 0; height: 100vh; width: 100vw; }
             #map { height: 100%; width: 100%; }
+            /* Hide Leaflet attribution badge */
+            .leaflet-control-attribution {
+                display: none !important;
+            }
         </style>
     </head>
     <body>

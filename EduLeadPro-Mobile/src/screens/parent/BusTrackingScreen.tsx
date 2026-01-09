@@ -27,7 +27,10 @@ export default function BusTrackingScreen() {
     const { user } = useAuthStore();
     const [loading, setLoading] = useState(true);
     const [busLocation, setBusLocation] = useState<any>(null);
+    const [pickupStop, setPickupStop] = useState<any>(null);
     const [routeId, setRouteId] = useState<string | null>(null);
+    const [eta, setEta] = useState<string | null>(null);
+    const [travelTime, setTravelTime] = useState<number | null>(null); // in minutes
 
     useEffect(() => {
         initializeTracking();
@@ -39,6 +42,33 @@ export default function BusTrackingScreen() {
             }
         };
     }, []);
+
+    const calculateETA = async (busLat: number, busLng: number, stopLat: number, stopLng: number) => {
+        try {
+            const OLA_API_KEY = 'nN7MyyjOHt7LqUdRFNYcfadYtFEw7cqdProAtSD0';
+            const url = `https://api.olakrutrim.com/routing/v1/directions?origin=${busLat},${busLng}&destination=${stopLat},${stopLng}&mode=driving&api_key=${OLA_API_KEY}`;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const result = await response.json();
+
+            if (result.routes && result.routes.length > 0) {
+                const durationSeconds = result.routes[0].legs[0].duration;
+                const durationMinutes = Math.round(durationSeconds / 60);
+
+                setTravelTime(durationMinutes);
+
+                // Calculate ETA time string
+                const etaTime = new Date(Date.now() + durationSeconds * 1000);
+                setEta(etaTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+            }
+        } catch (error) {
+            console.log('Error calculating ETA:', error);
+        }
+    };
 
     const initializeTracking = async () => {
         try {
@@ -54,6 +84,15 @@ export default function BusTrackingScreen() {
                         const rId = data.assignment.routeId;
                         setRouteId(String(rId));
 
+                        // Set pickup stop location for static map
+                        if (data.assignment.pickupStop) {
+                            setPickupStop({
+                                latitude: parseFloat(data.assignment.pickupStop.latitude),
+                                longitude: parseFloat(data.assignment.pickupStop.longitude),
+                                name: data.assignment.pickupStop.name || 'Pickup Stop'
+                            });
+                        }
+
                         // Connect WebSocket
                         webSocketService.connect();
 
@@ -66,12 +105,21 @@ export default function BusTrackingScreen() {
                                 speed: locationData.speed,
                                 heading: locationData.heading,
                             });
+
+                            // Trigger ETA calculation when bus location updates
+                            if (data.assignment.pickupStop) {
+                                calculateETA(
+                                    locationData.latitude,
+                                    locationData.longitude,
+                                    parseFloat(data.assignment.pickupStop.latitude),
+                                    parseFloat(data.assignment.pickupStop.longitude)
+                                );
+                            }
                         });
 
                         setLoading(false);
                     } else {
                         setLoading(false);
-                        // Don't show alert immediately if checking async, but here we are done
                     }
                 } catch (err) {
                     console.log('No bus assignment found or error', err);
@@ -96,6 +144,38 @@ export default function BusTrackingScreen() {
         );
     }
 
+    // Prepare markers for the map
+    const mapMarkers: {
+        latitude: number;
+        longitude: number;
+        title: string;
+        description: string;
+        icon: 'bus' | 'school' | 'stop';
+    }[] = [];
+    const mapCenter = pickupStop || { latitude: 20.5937, longitude: 78.9629 }; // Default India center
+
+    // Add pickup stop marker
+    if (pickupStop) {
+        mapMarkers.push({
+            latitude: pickupStop.latitude,
+            longitude: pickupStop.longitude,
+            title: pickupStop.name,
+            description: "Your pickup location",
+            icon: 'stop'
+        });
+    }
+
+    // Add bus marker if tracking is active
+    if (busLocation) {
+        mapMarkers.push({
+            latitude: busLocation.latitude,
+            longitude: busLocation.longitude,
+            title: "School Bus",
+            description: `Speed: ${busLocation.speed || 0} km/h`,
+            icon: 'bus'
+        });
+    }
+
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             {/* Header */}
@@ -107,46 +187,54 @@ export default function BusTrackingScreen() {
                 <View style={styles.placeholder} />
             </View>
 
-            {/* Map */}
-            {busLocation ? (
+            {/* Map - Only show if we have pickup location or active bus */}
+            {(pickupStop || busLocation) ? (
                 <LeafletMap
-                    latitude={busLocation.latitude}
-                    longitude={busLocation.longitude}
-                    markers={[{
-                        latitude: busLocation.latitude,
-                        longitude: busLocation.longitude,
-                        title: "School Bus",
-                        description: `Speed: ${busLocation.speed || 0} km/h`,
-                        icon: 'bus'
-                    }]}
-                    height={500} // Adjust height as needed
+                    latitude={busLocation?.latitude || pickupStop?.latitude}
+                    longitude={busLocation?.longitude || pickupStop?.longitude}
+                    markers={mapMarkers}
+                    height={500}
+                    zoom={busLocation ? 15 : 14}
                 />
             ) : (
                 <View style={styles.noDataContainer}>
                     <Text style={styles.noDataText}>🚌</Text>
-                    <Text style={styles.noDataTitle}>No Live Tracking</Text>
+                    <Text style={styles.noDataTitle}>No Bus Assignment</Text>
                     <Text style={styles.noDataSubtitle}>
-                        Bus tracking will appear here when the driver starts the trip
+                        No bus route assigned to your child
                     </Text>
                 </View>
             )}
 
             {/* Info Card */}
-            {busLocation && (
-                <View style={styles.infoCard}>
-                    <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Status:</Text>
-                        <Text style={styles.infoValue}>🟢 Active</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Speed:</Text>
-                        <Text style={styles.infoValue}>{busLocation.speed || 0} km/h</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>ETA:</Text>
-                        <Text style={styles.infoValue}>Calculating...</Text>
-                    </View>
+            <View style={styles.infoCard}>
+                <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Status:</Text>
+                    <Text style={styles.infoValue}>
+                        {busLocation ? '🟢 Live Tracking' : pickupStop ? '⚪ Waiting for Bus' : '⚪ No Route Assigned'}
+                    </Text>
                 </View>
+                {busLocation && (
+                    <>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Speed:</Text>
+                            <Text style={styles.infoValue}>{busLocation.speed || 0} km/h</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>ETA:</Text>
+                            <Text style={styles.infoValue}>
+                                {travelTime ? `${travelTime} mins (${eta})` : 'Calculating...'}
+                            </Text>
+                        </View>
+                    </>
+                )}
+                {!busLocation && (
+                    <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Pickup Stop:</Text>
+                        <Text style={styles.infoValue}>{pickupStop.name}</Text>
+                    </View>
+                )}
+            </View>
             )}
         </SafeAreaView>
     );

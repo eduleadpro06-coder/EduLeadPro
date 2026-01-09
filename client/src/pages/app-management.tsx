@@ -21,8 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import Header from "@/components/layout/header";
 import { TeacherAssignmentDropdown } from "@/components/teacher-assignment-dropdown";
 import { Switch } from "@/components/ui/switch";
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import { useEffect, useRef, useMemo } from 'react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -84,9 +84,9 @@ function LiveBusTrackingMap() {
                                 center={mapCenter}
                                 zoom={13}
                                 style={{ height: '100%', width: '100%' }}
+                                attributionControl={false}
                             >
                                 <TileLayer
-                                    attribution='© Ola Maps'
                                     url={OLA_MAPS_TILE_URL}
                                 />
                                 {activeBuses.map((bus) => (
@@ -174,6 +174,7 @@ export default function AppManagement() {
     // Bus Stop Form
     const [selectedRouteId, setSelectedRouteId] = useState<number | string>("");
     const [stopName, setStopName] = useState("");
+    const [location, setLocation] = useState<{ latitude: string, longitude: string }>({ latitude: "", longitude: "" });
     const [arrivalTime, setArrivalTime] = useState("");
     const [pickupPrice, setPickupPrice] = useState("");
 
@@ -333,8 +334,12 @@ export default function AppManagement() {
         queryKey: ['/api/bus/routes']
     });
     const { data: busStops = [], isLoading: isLoadingBusStops } = useQuery<BusStop[]>({
-        queryKey: ['/api/bus/routes', selectedRouteId, 'stops'],
-        enabled: !!selectedRouteId
+        queryKey: ['/api/bus/stops', selectedRouteId],
+        queryFn: async () => {
+            const res = await apiRequest("GET", `/api/bus/routes/${selectedRouteId}/stops`);
+            return res.json();
+        },
+        enabled: Number(selectedRouteId) > 0
     });
     const { data: busAssignments = [], isLoading: isLoadingBusAssignments } = useQuery<StudentBusAssignment[]>({
         queryKey: ['/api/bus/assignments', selectedRouteId],
@@ -436,9 +441,9 @@ export default function AppManagement() {
             return res.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['/api/bus/routes', selectedRouteId, 'stops'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/bus/stops', selectedRouteId] });
             setBusStopDialogOpen(false);
-            setStopName(""); setArrivalTime(""); setPickupPrice("");
+            setStopName(""); setArrivalTime(""); setPickupPrice(""); setLocation({ latitude: "", longitude: "" });
             toast({ title: "Success", description: "Bus stop added" });
         },
         onError: () => toast({ title: "Error", description: "Failed to add stop", variant: "destructive" })
@@ -1274,6 +1279,13 @@ export default function AppManagement() {
                                                             }}>
                                                                 <Trash2 className="text-red-500" size={16} />
                                                             </Button>
+                                                            <Button variant="outline" size="sm" onClick={() => {
+                                                                setSelectedRouteId(route.id);
+                                                                setBusStopDialogOpen(true);
+                                                            }}>
+                                                                <MapPin size={16} className="mr-2" />
+                                                                Stops
+                                                            </Button>
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
@@ -1281,6 +1293,132 @@ export default function AppManagement() {
                                         )}
                                     </TableBody>
                                 </Table>
+
+                                {/* Manage Bus Stops Dialog */}
+                                <Dialog open={busStopDialogOpen} onOpenChange={setBusStopDialogOpen}>
+                                    <DialogContent className="max-w-3xl">
+                                        <DialogHeader>
+                                            <DialogTitle>Manage Bus Stops - {busRoutes.find(r => r.id === selectedRouteId)?.routeName}</DialogTitle>
+                                            <CardDescription>Add or remove stops for this route</CardDescription>
+                                        </DialogHeader>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {/* Add New Stop Form */}
+                                            <div className="space-y-4 border-r pr-4">
+                                                <h3 className="font-semibold">Add New Stop</h3>
+                                                <div className="space-y-2">
+                                                    <Label>Stop Name</Label>
+                                                    <Input value={stopName} onChange={(e) => setStopName(e.target.value)} placeholder="e.g. Main Square" />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="space-y-2">
+                                                        <Label>Latitude</Label>
+                                                        <Input value={location.latitude} onChange={(e) => setLocation({ ...location, latitude: e.target.value })} placeholder="20.5937" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Longitude</Label>
+                                                        <Input value={location.longitude} onChange={(e) => setLocation({ ...location, longitude: e.target.value })} placeholder="78.9629" />
+                                                    </div>
+                                                </div>
+                                                <div className="text-xs text-blue-600 mb-2">
+                                                    <a href="https://www.google.com/maps" target="_blank" rel="noreferrer">Open Google Maps to find coordinates</a>
+                                                </div>
+
+                                                {/* Interactive Map - Temporarily disabled due to library conflict */}
+                                                {/* <div className="h-[200px] w-full rounded-md overflow-hidden border mb-4 relative z-0">
+                                                    <MapContainer
+                                                        center={[
+                                                            parseFloat(location.latitude) || 20.5937,
+                                                            parseFloat(location.longitude) || 78.9629
+                                                        ]}
+                                                        zoom={5}
+                                                        style={{ height: '100%', width: '100%' }}
+                                                        attributionControl={false}
+                                                    >
+                                                        <TileLayer url={OLA_MAPS_TILE_URL} />
+                                                        <Marker
+                                                            position={[
+                                                                parseFloat(location.latitude) || 20.5937,
+                                                                parseFloat(location.longitude) || 78.9629
+                                                            ]}
+                                                            draggable={true}
+                                                            eventHandlers={{
+                                                                dragend: (e) => {
+                                                                    const marker = e.target;
+                                                                    const position = marker.getLatLng();
+                                                                    setLocation({
+                                                                        latitude: position.lat.toFixed(6),
+                                                                        longitude: position.lng.toFixed(6)
+                                                                    });
+                                                                },
+                                                            }}
+                                                        >
+                                                            <Popup>Drag me to the bus stop location!</Popup>
+                                                        </Marker>
+                                                    </MapContainer>
+                                                </div>
+                                                <div className="text-xs text-center text-gray-500 mb-4">
+                                                    👆 Drag the pin to set precise location
+                                                </div> */}
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="space-y-2">
+                                                        <Label>Arrival Time</Label>
+                                                        <Input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Price (₹)</Label>
+                                                        <Input type="number" value={pickupPrice} onChange={(e) => setPickupPrice(e.target.value)} placeholder="0" />
+                                                    </div>
+                                                </div>
+                                                <Button className="w-full" onClick={() => {
+                                                    if (!selectedRouteId) return;
+                                                    createBusStopMutation.mutate({
+                                                        routeId: Number(selectedRouteId),
+                                                        stopName,
+                                                        latitude: location.latitude ? String(location.latitude) : null,
+                                                        longitude: location.longitude ? String(location.longitude) : null,
+                                                        arrivalTime,
+                                                        pickupPrice: pickupPrice ? String(pickupPrice) : "0",
+                                                        stopOrder: busStops.length + 1
+                                                    });
+                                                }}>
+                                                    Add Stop
+                                                </Button>
+                                            </div>
+
+                                            {/* List Existing Stops */}
+                                            <div className="space-y-4">
+                                                <h3 className="font-semibold">Existing Stops</h3>
+                                                <div className="max-h-[400px] overflow-y-auto space-y-2">
+                                                    {isLoadingBusStops ? (
+                                                        <div className="text-center py-4">Loading stops...</div>
+                                                    ) : busStops.length === 0 ? (
+                                                        <div className="text-center py-4 text-gray-500">No stops added yet</div>
+                                                    ) : (
+                                                        busStops.map((stop, index) => (
+                                                            <div key={stop.id} className="flex items-center justify-between p-3 border rounded-md bg-gray-50">
+                                                                <div>
+                                                                    <div className="font-medium">
+                                                                        <span className="bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded-full mr-2">#{index + 1}</span>
+                                                                        {stop.stopName}
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-500 mt-1">
+                                                                        {stop.arrivalTime || '--:--'} • ₹{stop.pickupPrice || 0}
+                                                                    </div>
+                                                                </div>
+                                                                <Button variant="ghost" size="sm" onClick={() => {
+                                                                    if (confirm("Delete this stop?")) deleteBusStopMutation.mutate(stop.id);
+                                                                }}>
+                                                                    <Trash2 className="text-red-500" size={14} />
+                                                                </Button>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
                             </CardContent>
                         </Card>
                     )}
