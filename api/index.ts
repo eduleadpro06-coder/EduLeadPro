@@ -12,18 +12,10 @@ const app = express();
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  // Allow all expo.app subdomains and localhost
-  const allowedOrigins = [
-    /^https:\/\/educonnect--.*\.expo\.app$/,
-    /^http:\/\/localhost:/,
-    /^https:\/\/.*\.vercel\.app$/
-  ];
-
+  // Allow ALL origins by echoing back the origin header
+  // This effectively disables CORS restrictions restrictions for any client
   if (origin) {
-    const isAllowed = allowedOrigins.some(pattern => pattern.test(origin));
-    if (isAllowed) {
-      res.header("Access-Control-Allow-Origin", origin);
-    }
+    res.header("Access-Control-Allow-Origin", origin);
   }
 
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
