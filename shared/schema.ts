@@ -1248,6 +1248,17 @@ export const busLiveLocations = pgTable("bus_live_locations", {
   isActive: boolean("is_active").default(true),
 });
 
+// Bus Location History - historical tracking data
+export const busLocationHistory = pgTable("bus_location_history", {
+  id: serial("id").primaryKey(),
+  routeId: integer("route_id").notNull().references(() => busRoutes.id),
+  latitude: decimal("latitude", { precision: 10, scale: 8 }).notNull(),
+  longitude: decimal("longitude", { precision: 11, scale: 8 }).notNull(),
+  speed: integer("speed").default(0),
+  heading: integer("heading").default(0),
+  recordedAt: timestamp("recorded_at").defaultNow().notNull(),
+});
+
 // Insert Schemas
 export const insertBusRouteSchema = createInsertSchema(busRoutes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBusStopSchema = createInsertSchema(busStops).omit({ id: true, createdAt: true });
@@ -1258,17 +1269,20 @@ export const insertStudentBusAssignmentSchema = createInsertSchema(studentBusAss
     dropStopId: z.number().nullable().optional()
   });
 export const insertBusLiveLocationSchema = createInsertSchema(busLiveLocations).omit({ id: true, timestamp: true });
+export const insertBusLocationHistorySchema = createInsertSchema(busLocationHistory).omit({ id: true, recordedAt: true });
 
 // Types
 export type BusRoute = typeof busRoutes.$inferSelect;
 export type BusStop = typeof busStops.$inferSelect;
 export type StudentBusAssignment = typeof studentBusAssignments.$inferSelect;
 export type BusLiveLocation = typeof busLiveLocations.$inferSelect;
+export type BusLocationHistory = typeof busLocationHistory.$inferSelect;
 
 export type InsertBusRoute = z.infer<typeof insertBusRouteSchema>;
 export type InsertBusStop = z.infer<typeof insertBusStopSchema>;
 export type InsertStudentBusAssignment = z.infer<typeof insertStudentBusAssignmentSchema>;
 export type InsertBusLiveLocation = z.infer<typeof insertBusLiveLocationSchema>;
+export type InsertBusLocationHistory = z.infer<typeof insertBusLocationHistorySchema>;
 
 
 // =====================================================
