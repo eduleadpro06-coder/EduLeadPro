@@ -26,7 +26,10 @@ app.use(session({
 
 // CORS Middleware
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  if (origin) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
   res.header("Access-Control-Allow-Credentials", "true");
@@ -62,7 +65,7 @@ app.use((req, res, next) => {
         logLine = logLine.slice(0, 79) + "…";
       }
 
-      logger.info(logLine);
+      // logger.info(logLine); // disabled for Vercel noise reduction
     }
   });
 
@@ -91,10 +94,21 @@ export default async function handler(req: any, res: any) {
     return (app as any)(req, res);
   } catch (error: any) {
     console.error("Critical API Initialization Error:", error);
-    res.status(500).json({
+
+    // Use native Node.js methods since 'res' might not be an Express response yet
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
+    // Manually add CORS headers to the error response
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    }
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+
+    res.end(JSON.stringify({
       error: "Server Initialization Failed",
       details: error.message,
       stack: error.stack
-    });
+    }));
   }
 }
