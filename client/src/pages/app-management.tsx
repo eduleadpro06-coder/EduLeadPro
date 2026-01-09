@@ -1629,7 +1629,6 @@ export default function AppManagement() {
                                                 <Button onClick={() => createEventMutation.mutate({ title, description: content, eventDate: date, eventType: type })}>
                                                     Add {type === 'holiday' ? 'Holiday' : 'Event'}
                                                 </Button>
-                                                </Button>
                                             </DialogClose>
                                         </DialogFooter>
                                     </DialogContent>
@@ -1672,112 +1671,112 @@ export default function AppManagement() {
                                 </Table>
                             </CardContent>
                         </Card>
-            )}
+                    )}
 
-            {/* Daily Updates Tab */}
-            {activeTab === "updates" && (
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <div>
-                            <CardTitle>Daily Activity Updates</CardTitle>
-                            <CardDescription>Post food, sleep, and activity updates for specific students</CardDescription>
-                        </div>
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => { setStudentPhone(""); setContent(""); setType("activity"); }}>
-                                    <Plus className="mr-2" size={18} />
-                                    Post Update
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Student Activity Update</DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-4 py-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="up-student">Select Student</Label>
-                                        <select
-                                            id="up-student"
-                                            className="w-full border rounded-md p-2"
-                                            value={studentPhone} // Using studentPhone state for leadId temporarily
-                                            onChange={(e) => setStudentPhone(e.target.value)}
-                                        >
-                                            <option value="">Select a student...</option>
-                                            {parents.map(p => (
-                                                <option key={p.id} value={p.id}>{p.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="up-type">Activity Type</Label>
-                                        <select id="up-type" className="w-full border rounded-md p-2" value={type} onChange={(e) => setType(e.target.value)}>
-                                            <option value="activity">General Activity</option>
-                                            <option value="food">Meal/Food</option>
-                                            <option value="sleep">Sleep/Nap</option>
-                                            <option value="photo">Photo Update</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="up-content">Update Content</Label>
-                                        <Textarea id="up-content" value={content} onChange={(e) => setContent(e.target.value)} placeholder="e.g. Finished all lunch, slept for 1 hour." />
-                                    </div>
+                    {/* Daily Updates Tab */}
+                    {activeTab === "updates" && (
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <div>
+                                    <CardTitle>Daily Activity Updates</CardTitle>
+                                    <CardDescription>Post food, sleep, and activity updates for specific students</CardDescription>
                                 </div>
-                                <DialogFooter>
-                                    <DialogClose asChild>
-                                        <Button onClick={() => createUpdateMutation.mutate({
-                                            leadId: Number(studentPhone),
-                                            activityType: type,
-                                            content,
-                                            postedAt: new Date().toISOString()
-                                        })}>
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => { setStudentPhone(""); setContent(""); setType("activity"); }}>
+                                            <Plus className="mr-2" size={18} />
                                             Post Update
                                         </Button>
-                                    </DialogClose>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Student</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Content</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {isLoadingUpdates ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
-                                ) : dailyUpdates.length === 0 ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center text-gray-500 py-8">No updates posted today</TableCell></TableRow>
-                                ) : (
-                                    dailyUpdates.map((up) => (
-                                        <TableRow key={up.id}>
-                                            <TableCell className="font-medium">
-                                                {parents.find(p => p.id === up.leadId)?.name || `Student #${up.leadId}`}
-                                            </TableCell>
-                                            <TableCell><Badge variant="secondary">{up.activityType}</Badge></TableCell>
-                                            <TableCell className="max-w-xs truncate">{up.content}</TableCell>
-                                            <TableCell className="text-right">
-                                                <Button variant="ghost" size="sm" onClick={() => {
-                                                    if (confirm("Delete this update?")) deleteUpdateMutation.mutate(up.id);
-                                                }}>
-                                                    <Trash2 className="text-red-500" size={16} />
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Student Activity Update</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4 py-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="up-student">Select Student</Label>
+                                                <select
+                                                    id="up-student"
+                                                    className="w-full border rounded-md p-2"
+                                                    value={studentPhone} // Using studentPhone state for leadId temporarily
+                                                    onChange={(e) => setStudentPhone(e.target.value)}
+                                                >
+                                                    <option value="">Select a student...</option>
+                                                    {parents.map(p => (
+                                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="up-type">Activity Type</Label>
+                                                <select id="up-type" className="w-full border rounded-md p-2" value={type} onChange={(e) => setType(e.target.value)}>
+                                                    <option value="activity">General Activity</option>
+                                                    <option value="food">Meal/Food</option>
+                                                    <option value="sleep">Sleep/Nap</option>
+                                                    <option value="photo">Photo Update</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="up-content">Update Content</Label>
+                                                <Textarea id="up-content" value={content} onChange={(e) => setContent(e.target.value)} placeholder="e.g. Finished all lunch, slept for 1 hour." />
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <DialogClose asChild>
+                                                <Button onClick={() => createUpdateMutation.mutate({
+                                                    leadId: Number(studentPhone),
+                                                    activityType: type,
+                                                    content,
+                                                    postedAt: new Date().toISOString()
+                                                })}>
+                                                    Post Update
                                                 </Button>
-                                            </TableCell>
+                                            </DialogClose>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Student</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead>Content</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            )}
-        </div>
-    )
-}
+                                    </TableHeader>
+                                    <TableBody>
+                                        {isLoadingUpdates ? (
+                                            <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
+                                        ) : dailyUpdates.length === 0 ? (
+                                            <TableRow><TableCell colSpan={4} className="text-center text-gray-500 py-8">No updates posted today</TableCell></TableRow>
+                                        ) : (
+                                            dailyUpdates.map((up) => (
+                                                <TableRow key={up.id}>
+                                                    <TableCell className="font-medium">
+                                                        {parents.find(p => p.id === up.leadId)?.name || `Student #${up.leadId}`}
+                                                    </TableCell>
+                                                    <TableCell><Badge variant="secondary">{up.activityType}</Badge></TableCell>
+                                                    <TableCell className="max-w-xs truncate">{up.content}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Button variant="ghost" size="sm" onClick={() => {
+                                                            if (confirm("Delete this update?")) deleteUpdateMutation.mutate(up.id);
+                                                        }}>
+                                                            <Trash2 className="text-red-500" size={16} />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            )
+            }
         </div >
     );
 }
