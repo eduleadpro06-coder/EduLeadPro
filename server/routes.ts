@@ -5639,6 +5639,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Live Bus Tracking for Admin Panel
+  app.get("/api/bus/live-tracking", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      // Get all active bus routes for this organization
+      const routes = await storage.getBusRoutes(organizationId);
+
+      if (!routes || routes.length === 0) {
+        return res.json({ routes: [] });
+      }
+
+      // For each route, get the latest location update
+      const liveRoutes = await Promise.all(
+        routes.map(async (route) => {
+          try {
+            // Get latest location from bus_location_history for this route
+            // Only consider locations updated within last 15 minutes (active)
+            const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+
+            const locationResult = await db
+              .select()
+              .from(schema.busLocationHistory)
+              .where(
+                and(
+                  eq(schema.busLocationHistory.routeId, route.id),
+                  sql`${schema.busLocationHistory.recordedAt} > ${fifteenMinutesAgo}`
+                )
+              )
+              .orderBy(sql`${schema.busLocationHistory.recordedAt} DESC`)
+              .limit(1);
+
+            const latestLocation = locationResult[0];
+
+            if (!latestLocation) {
+              // No recent location data
+              return null;
+            }
+
+            // Get driver information
+            let driverName = 'Unknown Driver';
+            if (route.driverId) {
+              const driverResult = await db
+                .select()
+                .from(schema.staff)
+                .where(eq(schema.staff.id, route.driverId))
+                .limit(1);
+
+              if (driverResult[0]) {
+                driverName = driverResult[0].name;
+              }
+            }
+
+            return {
+              routeId: route.id,
+              routeName: route.routeName,
+              vehicleNumber: route.vehicleNumber,
+              driverName,
+              currentLocation: {
+                latitude: parseFloat(latestLocation.latitude as string),
+                longitude: parseFloat(latestLocation.longitude as string),
+                speed: latestLocation.speed || 0,
+                heading: latestLocation.heading || 0
+              },
+              lastUpdated: latestLocation.recordedAt,
+              isActive: true
+            };
+          } catch (error) {
+            console.error(`Error fetching location for route ${route.id}:`, error);
+            return null;
+          }
+        })
+      );
+
+      // Filter out null values (routes without recent location data)
+      const activeRoutes = liveRoutes.filter(route => route !== null);
+
+      res.json({ routes: activeRoutes });
+    } catch (error) {
+      console.error("Live tracking API error:", error);
+      res.status(500).json({ message: "Failed to fetch live bus locations" });
+    }
+  });
+
   return httpServer;
 
 }

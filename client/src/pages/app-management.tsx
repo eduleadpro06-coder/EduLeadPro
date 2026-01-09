@@ -21,6 +21,125 @@ import { Badge } from "@/components/ui/badge";
 import Header from "@/components/layout/header";
 import { TeacherAssignmentDropdown } from "@/components/teacher-assignment-dropdown";
 import { Switch } from "@/components/ui/switch";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { useEffect } from 'react';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Fix Leaflet default marker icon issue
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// OLA Maps Configuration
+const OLA_MAPS_API_KEY = 'nN7MyyjOHt7LqUdRFNYcfadYtFEw7cqdProAtSD0';
+const OLA_MAPS_TILE_URL = `https://api.olakrutrim.com/places/v1/tiles/default-light-standard/{z}/{x}/{y}.png?api_key=${OLA_MAPS_API_KEY}`;
+
+// Live Bus Tracking Map Component
+function LiveBusTrackingMap() {
+    const { data: trackingData, refetch } = useQuery<{ routes: any[] }>({
+        queryKey: ['/api/bus/live-tracking'],
+        refetchInterval: 10000, // Auto-refresh every 10 seconds
+    });
+
+    const activeBuses = trackingData?.routes || [];
+
+    // Default center (India center, will be overridden if buses exist)
+    const defaultCenter: [number, number] = [20.5937, 78.9629];
+    const mapCenter = activeBuses.length > 0
+        ? [activeBuses[0].currentLocation.latitude, activeBuses[0].currentLocation.longitude] as [number, number]
+        : defaultCenter;
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Live Bus Tracking</CardTitle>
+                    <CardDescription>Monitor all active bus trips in real-time</CardDescription>
+                </div>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refetch()}
+                >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh
+                </Button>
+            </CardHeader>
+            <CardContent>
+                {activeBuses.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                        <Radio className="mx-auto mb-4 text-gray-400 animate-pulse" size={48} />
+                        <p className="text-lg font-medium">No active tracking sessions</p>
+                        <p className="text-sm">Live bus locations will appear here when drivers start their trips</p>
+                    </div>
+                ) : (
+                    <div>
+                        {/* Map Container */}
+                        <div style={{ height: '500px', width: '100%', borderRadius: '8px', overflow: 'hidden' }}>
+                            <MapContainer
+                                center={mapCenter}
+                                zoom={13}
+                                style={{ height: '100%', width: '100%' }}
+                            >
+                                <TileLayer
+                                    attribution='© Ola Maps'
+                                    url={OLA_MAPS_TILE_URL}
+                                />
+                                {activeBuses.map((bus) => (
+                                    <Marker
+                                        key={bus.routeId}
+                                        position={[bus.currentLocation.latitude, bus.currentLocation.longitude]}
+                                    >
+                                        <Popup>
+                                            <div className="p-2">
+                                                <h3 className="font-bold text-purple-700">{bus.routeName}</h3>
+                                                <p className="text-sm"><strong>Vehicle:</strong> {bus.vehicleNumber}</p>
+                                                <p className="text-sm"><strong>Driver:</strong> {bus.driverName}</p>
+                                                <p className="text-sm"><strong>Speed:</strong> {bus.currentLocation.speed} km/h</p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Last updated: {new Date(bus.lastUpdated).toLocaleTimeString()}
+                                                </p>
+                                            </div>
+                                        </Popup>
+                                    </Marker>
+                                ))}
+                            </MapContainer>
+                        </div>
+
+                        {/* Active Buses List */}
+                        <div className="mt-4">
+                            <h4 className="font-medium mb-2">Active Buses ({activeBuses.length})</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {activeBuses.map((bus) => (
+                                    <div key={bus.routeId} className="border rounded-lg p-3 bg-gray-50">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="font-medium text-purple-700">{bus.routeName}</p>
+                                                <p className="text-sm text-gray-600">{bus.vehicleNumber}</p>
+                                            </div>
+                                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                                Live
+                                            </Badge>
+                                        </div>
+                                        <div className="mt-2 text-xs text-gray-500">
+                                            <p>Driver: {bus.driverName}</p>
+                                            <p>Speed: {bus.currentLocation.speed} km/h</p>
+                                            <p>Updated: {new Date(bus.lastUpdated).toLocaleTimeString()}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
 
 
 export default function AppManagement() {
@@ -1291,19 +1410,7 @@ export default function AppManagement() {
 
                     {/* Live Tracking Tab */}
                     {activeTab === "tracking" && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Live Bus Tracking</CardTitle>
-                                <CardDescription>Monitor all active bus trips in real-time</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-center py-12 text-gray-500">
-                                    <Radio className="mx-auto mb-4 text-gray-400 animate-pulse" size={48} />
-                                    <p className="text-lg font-medium">No active tracking sessions</p>
-                                    <p className="text-sm">Live bus locations will appear here when drivers start their trips</p>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <LiveBusTrackingMap />
                     )}
                 </div>
             )}
