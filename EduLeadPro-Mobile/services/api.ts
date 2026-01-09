@@ -12,7 +12,7 @@ const getBaseUrl = () => {
             const localhost = 'localhost';
             return `http://${localhost}:5000/api`;
         }
-        return 'https://edu-lead-pro.vercel.app/api';
+        return 'https://eduleadapp.vercel.app/api';
     }
 
     if (__DEV__) {
@@ -24,7 +24,7 @@ const getBaseUrl = () => {
         }
     }
 
-    return 'https://edu-lead-pro.vercel.app/api';
+    return 'https://eduleadapp.vercel.app/api';
 };
 
 const API_BASE_URL = getBaseUrl();
