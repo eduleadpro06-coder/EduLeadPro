@@ -6,7 +6,14 @@ import Constants from 'expo-constants';
 // V1 API with token-based auth and auto-refresh
 
 const getBaseUrl = () => {
-    if (Platform.OS === 'web') return '/api';
+    // For web, we can't use relative '/api' because the frontend is on Expo (different domain)
+    if (Platform.OS === 'web') {
+        if (__DEV__) {
+            const localhost = 'localhost';
+            return `http://${localhost}:5000/api`;
+        }
+        return 'https://edu-lead-pro.vercel.app/api';
+    }
 
     if (__DEV__) {
         const debuggerHost = Constants.expoConfig?.hostUri;
