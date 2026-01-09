@@ -107,6 +107,17 @@ const LeafletMap = ({ latitude, longitude, markers = [], height = 300, zoom = 15
                 source={{ html: htmlContent }}
                 style={{ flex: 1 }}
                 scrollEnabled={false}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                mixedContentMode="always"
+                onError={(syntheticEvent) => {
+                    const { nativeEvent } = syntheticEvent;
+                    console.warn('WebView error: ', nativeEvent);
+                }}
+                onHttpError={(syntheticEvent) => {
+                    const { nativeEvent } = syntheticEvent;
+                    console.warn('WebView HTTP error: ', nativeEvent);
+                }}
             />
         </View>
     );
