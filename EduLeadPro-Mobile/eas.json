@@ -25,7 +25,8 @@
             "autoIncrement": true,
             "env": {
                 "EXPO_PUBLIC_API_URL": "https://eduleadconnect.vercel.app/api/mobile",
-                "EXPO_PUBLIC_WS_URL": "wss://eduleadconnect.vercel.app"
+                "EXPO_PUBLIC_WS_URL": "wss://eduleadconnect.vercel.app",
+                "EXPO_PUBLIC_OLA_MAPS_KEY": "nN7MyyjOHt7LqUdRFNYcfadYtFEw7cqdProAtSD0"
             }
         }
     },
