@@ -22,7 +22,7 @@ router.get('/holidays', async (req: Request, res: Response) => {
 
         const { supabase } = await import('../../supabase.js');
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         const { data: holidays, error } = await supabase
             .from('organization_holidays')
@@ -94,8 +94,8 @@ router.get('/dashboard', async (req: Request, res: Response) => {
             .eq('id', staffId)
             .single();
 
-        // Get today's date
-        const today = new Date().toISOString().split('T')[0];
+        // Get today's date in IST
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         // Get today's attendance summary
         const { data: todayAttendance } = await supabase
@@ -242,7 +242,7 @@ router.post('/attendance/bulk', async (req: Request, res: Response) => {
 
         const organizationId = req.user!.organizationId;
         const markedBy = req.user!.username;
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         const { supabase } = await import('../../supabase.js');
 
@@ -321,64 +321,105 @@ router.post('/attendance/bulk', async (req: Request, res: Response) => {
     }
 });
 
-/**
- * POST /api/v1/mobile/teacher/activity
- * Post a daily activity update
- */
 router.post('/activity', async (req: Request, res: Response) => {
     try {
         const {
-            leadId,
+            leadIds, // Array of IDs
+            leadId,  // Legacy support (optional)
             title,
             content,
             activityType,
             mood,
-            mediaUrls
+            mediaUrls, // Array of strings (optional)
+            image      // Base64 string (optional)
         } = req.body;
 
-        if (!leadId || !content) {
+        // Normalize leads
+        let targetLeadIds: number[] = [];
+        if (Array.isArray(leadIds)) {
+            targetLeadIds = leadIds;
+        } else if (leadId) {
+            targetLeadIds = [leadId];
+        }
+
+        if (targetLeadIds.length === 0 || !content) {
             return res.status(400).json({
                 success: false,
                 error: {
                     code: 'INVALID_REQUEST',
-                    message: 'leadId and content are required'
+                    message: 'At least one student and content are required'
                 }
             });
         }
 
         const organizationId = req.user!.organizationId;
-
-        // Get teacher name from staff table
         const { supabase } = await import('../../supabase.js');
+
+        // Handle Image Upload if 'image' (base64) is provided
+        let finalMediaUrls = Array.isArray(mediaUrls) ? mediaUrls : [];
+
+        if (image) {
+            try {
+                // remove header if present (e.g. "data:image/jpeg;base64,")
+                const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+                const buffer = Buffer.from(base64Data, 'base64');
+                const fileName = `updates/${organizationId}/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('uploads') // Assuming 'uploads' bucket exists
+                    .upload(fileName, buffer, {
+                        contentType: 'image/jpeg',
+                        upsert: true
+                    });
+
+                if (!uploadError) {
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('uploads')
+                        .getPublicUrl(fileName);
+
+                    finalMediaUrls.push(publicUrl);
+                } else {
+                    console.error('Supabase upload error:', uploadError);
+                    // Fallback: If upload fails (e.g. no bucket), maybe don't fail the whole request?
+                    // We simply continue without the image or log it.
+                }
+            } catch (imgError) {
+                console.error('Image processing error:', imgError);
+            }
+        }
+
+        // Get teacher name
         const { data: teacher } = await supabase
             .from('staff')
             .select('name')
             .eq('id', req.user!.userId)
             .single();
 
-        // Insert daily update
-        const { data: activity, error } = await supabase
+        // Create records for all students
+        const updatesToInsert = targetLeadIds.map(id => ({
+            organization_id: organizationId,
+            lead_id: id,
+            title: title || 'Activity Update',
+            content,
+            activity_type: activityType || 'general',
+            mood: mood || 'happy',
+            teacher_name: teacher?.name || 'Teacher',
+            media_urls: finalMediaUrls,
+            posted_at: new Date().toISOString()
+        }));
+
+        const { data: activities, error } = await supabase
             .from('daily_updates')
-            .insert({
-                organization_id: organizationId,
-                lead_id: leadId,
-                title: title || 'Activity Update',
-                content,
-                activity_type: activityType || 'general',
-                mood: mood || 'happy',
-                teacher_name: teacher?.name || 'Teacher',
-                media_urls: mediaUrls || [],
-                posted_at: new Date().toISOString()
-            })
-            .select()
-            .single();
+            .insert(updatesToInsert)
+            .select();
 
         if (error) throw error;
 
         res.json({
             success: true,
             data: {
-                activity
+                count: activities?.length || 0,
+                activities
             }
         });
     } catch (error) {
@@ -400,7 +441,7 @@ router.post('/activity', async (req: Request, res: Response) => {
 router.get('/attendance/today', async (req: Request, res: Response) => {
     try {
         const organizationId = req.user!.organizationId;
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         const { supabase } = await import('../../supabase.js');
 

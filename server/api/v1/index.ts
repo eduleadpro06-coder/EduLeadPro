@@ -11,9 +11,14 @@ import driverRouter from './driver.js';
 import commonRouter from './common.js';
 import teacherAssignments from './teacher-assignments.js';
 
+import authRouter from './auth.js';
+
 const router = express.Router();
 
-// Auth endpoint - token refresh (no JWT required for this endpoint)
+// Mount mobile auth endpoints
+router.use('/auth', authRouter);
+
+// Auth endpoint - token refresh (legacy/direct access if needed)
 router.post('/auth/refresh-token', refreshTokenHandler);
 
 // Mount role-specific routers

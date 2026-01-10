@@ -1,6 +1,4 @@
-/**
- * User and Authentication Types
- */
+import { BusRoute, BusStop } from './bus.types';
 
 export interface User {
     id: string;
@@ -37,7 +35,8 @@ export interface LoginRequest {
 
 export interface LoginResponse {
     success: boolean;
-    token: string;
+    accessToken: string;
+    token?: string; // Kept for legacy compatibility if any
     refreshToken: string;
     user: User;
 }

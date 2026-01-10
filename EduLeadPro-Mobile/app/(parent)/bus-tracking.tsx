@@ -1,31 +1,41 @@
+/**
+ * Bus Tracking Screen - Premium Design with Expo Router
+ * Based on premium BusScreen.tsx with Ola Maps integration
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator, Linking, Platform } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    Dimensions,
+    ActivityIndicator,
+    Linking,
+    StatusBar,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { api } from './services/api';
-import { colors, spacing, typography } from './src/theme';
-
-import LeafletMap from './src/components/LeafletMap';
-
-// MapView conditional import removed as we use LeafletMap (WebView) now
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { useAuthStore } from '../../src/store/authStore';
+import OlaMapView from '../../src/components/maps/OlaMapView';
+import { api } from '../../services/api';
+import { colors, spacing, typography, shadows } from '../../src/theme';
+import PremiumCard from '../../src/components/ui/PremiumCard';
 
 const { width, height } = Dimensions.get('window');
 
+export default function BusTrackingScreen() {
+    const router = useRouter();
+    const { user } = useAuthStore();
+    const currentChild = user?.children?.[0];
 
-interface BusScreenProps {
-    currentChild: any;
-}
-
-export default function BusScreen({ currentChild }: BusScreenProps) {
     const [busData, setBusData] = useState<any>(null);
     const [liveLocation, setLiveLocation] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isLive, setIsLive] = useState(false);
     const [studentStatus, setStudentStatus] = useState<string>('pending');
-    const [statusTime, setStatusTime] = useState<string | null>(null);
-    const mapRef = useRef<any>(null); // Using any to avoid type issues with conditional import
-    const [markerRotation, setMarkerRotation] = useState<number>(0);
-    const [followBus, setFollowBus] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const updateInterval = useRef<NodeJS.Timeout | null>(null);
 
@@ -33,6 +43,10 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
         if (currentChild) {
             fetchBusData();
             startLiveUpdates();
+        } else {
+            // Stop loading if no child is found
+            setIsLoading(false);
+            setError('No student information found.');
         }
 
         return () => {
@@ -44,9 +58,7 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
 
     const fetchBusData = async () => {
         try {
-            const response = await api.getBusLocation(currentChild.id);
-            // API returns { assignments: [...] }
-            // We need to extract the first active assignment
+            const response = await api.getBusLocation(currentChild?.id ? Number(currentChild.id) : 0);
 
             if (response && response.assignments && response.assignments.length > 0) {
                 const assignment = response.assignments[0];
@@ -56,21 +68,20 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
                         id: assignment.route_id,
                         routeName: assignment.bus_routes?.route_name,
                         vehicleNumber: assignment.bus_routes?.bus_number,
-                        status: assignment.bus_routes?.route_type || 'Active', // Fallback
+                        status: assignment.bus_routes?.route_type || 'Active',
                         helperName: assignment.bus_routes?.helper_name || 'Attendant',
                         helperPhone: assignment.bus_routes?.helper_phone
                     },
                     driver: {
-                        name: assignment.driver_name || 'Driver', // Will be enhanced in backend
+                        name: assignment.driver_name || 'Driver',
                         phone: assignment.driver_phone
                     }
                 };
 
                 setBusData(processedData);
 
-                // If bus is assigned, fetch live location
                 if (assignment.route_id) {
-                    await fetchLiveLocation(assignment.route_id, currentChild.id);
+                    await fetchLiveLocation(assignment.route_id, currentChild?.id ? Number(currentChild.id) : undefined);
                 }
             } else {
                 setBusData(null);
@@ -88,27 +99,14 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
             const response = await api.getLiveBusLocation(routeId, studentId);
             if (response.success && response.data) {
                 if (response.data.location) {
-                    const newLocation = {
+                    setLiveLocation({
                         latitude: response.data.location.latitude,
                         longitude: response.data.location.longitude,
                         speed: response.data.location.speed,
                         timestamp: response.data.location.timestamp,
-                    };
-                    setLiveLocation(newLocation);
-                    setMarkerRotation(response.data.location.heading || 0);
+                    });
                     setIsLive(response.data.isLive);
-
-                    // Update student status
                     setStudentStatus(response.data.studentStatus || 'pending');
-                    setStatusTime(response.data.statusTime);
-
-                    if (followBus && mapRef.current) {
-                        mapRef.current.animateToRegion({
-                            ...newLocation,
-                            latitudeDelta: 0.01,
-                            longitudeDelta: 0.01,
-                        }, 1000);
-                    }
                 } else {
                     setIsLive(false);
                     setStudentStatus(response.data.studentStatus || 'pending');
@@ -116,108 +114,92 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
             }
         } catch (err) {
             console.error("Error fetching live location:", err);
-            setError('Failed to fetch live location.');
             setIsLive(false);
         }
     };
 
     const startLiveUpdates = () => {
-        // Update location every 10 seconds
         updateInterval.current = setInterval(() => {
             if (busData?.route?.id) {
-                fetchLiveLocation(busData.route.id);
+                fetchLiveLocation(busData.route.id, currentChild?.id ? Number(currentChild.id) : undefined);
             }
-        }, 10000);
+        }, 10000) as any;
     };
 
     const calculateETA = () => {
         if (!liveLocation || !liveLocation.speed || liveLocation.speed === 0) {
             return '~15 mins';
         }
-
-        // Simple ETA calculation based on speed
-        // Assuming average distance of 5km to pickup point
-        const averageDistance = 5; // km
+        const averageDistance = 5;
         const speedKmh = liveLocation.speed;
         const timeHours = averageDistance / speedKmh;
         const timeMinutes = Math.round(timeHours * 60);
-
         return timeMinutes > 0 ? `~${timeMinutes} mins` : 'Arriving soon';
     };
 
-    if (!currentChild) {
-        return (
-            <View style={[styles.container, styles.emptyContainer]}>
-                <Feather name="user-x" size={64} color={colors.textSecondary} />
-                <Text style={styles.emptyTitle}>No Student Selected</Text>
-                <Text style={styles.emptyText}>Please select a student to view their bus status.</Text>
-            </View>
-        );
-    }
+    // Map markers
+    const mapMarkers = liveLocation && isLive ? [{
+        coordinate: { latitude: liveLocation.latitude, longitude: liveLocation.longitude },
+        title: "School Bus",
+        description: `Speed: ${Math.round(liveLocation.speed)} km/h`,
+        icon: 'bus' as const
+    }] : [];
 
     if (isLoading) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+            <View style={[styles.container, styles.centerContent]}>
                 <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.loadingText}>Loading bus data...</Text>
             </View>
         );
     }
 
     if (!busData || !busData.assignment) {
         return (
-            <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+            <SafeAreaView style={styles.container}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                        <Feather name="arrow-left" size={24} color={colors.textPrimary} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Bus Tracking</Text>
+                    <View style={{ width: 40 }} />
+                </View>
                 <View style={styles.emptyContainer}>
-                    <View style={[styles.iconCircle, { backgroundColor: colors.background }]}>
+                    <View style={styles.iconCircle}>
                         <Feather name="alert-circle" size={48} color={colors.accent} />
                     </View>
                     <Text style={styles.emptyTitle}>No Bus Route Assigned</Text>
                     <Text style={styles.emptyText}>
-                        This student is not currently assigned to a bus route. Please contact the school office for assistance.
+                        This student is not currently assigned to a bus route. Please contact the school office.
                     </Text>
                 </View>
-            </ScrollView>
+            </SafeAreaView>
         );
     }
 
     return (
         <View style={styles.container}>
-            {/* Live Map */}
-            <View style={styles.mapContainer}>
-                {Platform.OS === 'web' ? (
-                    // Web fallback - using LeafletMap for web too since it's web-based
-                    <View style={styles.map}>
-                        <LeafletMap
-                            latitude={liveLocation?.latitude || 28.6139}
-                            longitude={liveLocation?.longitude || 77.2090}
-                            markers={liveLocation && isLive ? [{
-                                latitude: liveLocation.latitude,
-                                longitude: liveLocation.longitude,
-                                title: "School Bus",
-                                description: `Speed: ${Math.round(liveLocation.speed)} km/h`,
-                                icon: 'bus'
-                            }] : []}
-                            height={height * 0.4}
-                        />
-                    </View>
-                ) : (
-                    // Native platforms - using LeafletMap via WebView
-                    <View style={styles.map}>
-                        <LeafletMap
-                            latitude={liveLocation?.latitude || 28.6139}
-                            longitude={liveLocation?.longitude || 77.2090}
-                            markers={liveLocation && isLive ? [{
-                                latitude: liveLocation.latitude,
-                                longitude: liveLocation.longitude,
-                                title: "School Bus",
-                                description: `Speed: ${Math.round(liveLocation.speed)} km/h`,
-                                icon: 'bus'
-                            }] : []}
-                            height={height * 0.4}
-                        />
-                    </View>
-                )}
+            <StatusBar barStyle="dark-content" />
 
-                {/* Live Indicator Overlay */}
+            {/* Map Section */}
+            <View style={styles.mapContainer}>
+                <OlaMapView
+                    center={liveLocation || { latitude: 28.6139, longitude: 77.2090 }}
+                    zoom={15}
+                    markers={mapMarkers}
+                    showUserLocation={false}
+                    style={styles.map}
+                />
+
+                {/* Back Button Overlay */}
+                <TouchableOpacity
+                    style={styles.mapBackBtn}
+                    onPress={() => router.back()}
+                >
+                    <Feather name="arrow-left" size={24} color={colors.textPrimary} />
+                </TouchableOpacity>
+
+                {/* Live Indicator */}
                 {isLive && (
                     <View style={styles.liveTagContainer}>
                         <View style={styles.liveTag}>
@@ -235,19 +217,21 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
                 showsVerticalScrollIndicator={false}
             >
                 {/* Bus Info Card */}
-                <View style={styles.card}>
+                <PremiumCard style={styles.card}>
                     <View style={styles.busHeader}>
                         <View>
                             <Text style={styles.busNumber}>{busData.route?.vehicleNumber || 'Bus'}</Text>
-                            <Text style={styles.routeText}>{busData.route?.routeName || 'Route'} • {busData.route?.status || 'Active'}</Text>
+                            <Text style={styles.routeText}>{busData.route?.routeName || 'Route'}</Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <View style={styles.statusBadge}>
-                                <View style={[styles.statusDot, { backgroundColor: isLive ? '#4CAF50' : '#F44336' }]} />
-                                <Text style={styles.statusText}>{isLive ? 'Live Tracking' : 'Inactive'}</Text>
+                            <View style={[styles.statusBadge, { backgroundColor: isLive ? '#DCFCE7' : '#FEE2E2' }]}>
+                                <View style={[styles.statusDot, { backgroundColor: isLive ? '#22C55E' : '#EF4444' }]} />
+                                <Text style={[styles.statusText, { color: isLive ? '#22C55E' : '#EF4444' }]}>
+                                    {isLive ? 'Live' : 'Offline'}
+                                </Text>
                             </View>
-                            <View style={[styles.statusBadge, { marginLeft: 10, backgroundColor: '#E3F2FD' }]}>
-                                <Text style={[styles.statusText, { color: '#1976D2', textTransform: 'capitalize' }]}>
+                            <View style={[styles.statusBadge, { marginLeft: 8, backgroundColor: '#E0F2FE' }]}>
+                                <Text style={[styles.statusText, { color: '#0284C7' }]}>
                                     {studentStatus === 'boarded' ? '✅ Boarded' :
                                         studentStatus === 'dropped' ? '🏠 Dropped' : '⏳ Waiting'}
                                 </Text>
@@ -257,64 +241,69 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
 
                     <View style={styles.divider} />
 
-                    <View style={styles.driverRow}>
-                        <View style={[styles.driverPhoto, { backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' }]}>
-                            <Feather name="user" size={24} color={colors.textSecondary} />
+                    {/* Driver Row */}
+                    <View style={styles.contactRow}>
+                        <View style={styles.avatarCircle}>
+                            <Feather name="user" size={20} color={colors.textSecondary} />
                         </View>
-                        <View style={styles.driverInfo}>
-                            <Text style={styles.label}>Driver</Text>
-                            <Text style={styles.name}>{busData.driver?.name || 'Driver info unavailable'}</Text>
+                        <View style={styles.contactInfo}>
+                            <Text style={styles.contactLabel}>Driver</Text>
+                            <Text style={styles.contactName}>{busData.driver?.name}</Text>
                         </View>
                         {busData.driver?.phone && (
                             <TouchableOpacity
                                 style={styles.callButton}
                                 onPress={() => Linking.openURL(`tel:${busData.driver.phone}`)}
                             >
-                                <Feather name="phone" size={20} color="white" />
+                                <Feather name="phone" size={18} color="white" />
                             </TouchableOpacity>
                         )}
                     </View>
 
-                    <View style={[styles.driverRow, { marginTop: 16 }]}>
-                        <View style={[styles.driverPhoto, { backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' }]}>
-                            <Feather name="user" size={24} color={colors.textSecondary} />
+                    {/* Helper Row */}
+                    <View style={[styles.contactRow, { marginTop: 12 }]}>
+                        <View style={styles.avatarCircle}>
+                            <Feather name="user" size={20} color={colors.textSecondary} />
                         </View>
-                        <View style={styles.driverInfo}>
-                            <Text style={styles.label}>Attendant</Text>
-                            <Text style={styles.name}>{busData.route?.helperName || 'Attendant info unavailable'}</Text>
+                        <View style={styles.contactInfo}>
+                            <Text style={styles.contactLabel}>Attendant</Text>
+                            <Text style={styles.contactName}>{busData.route?.helperName}</Text>
                         </View>
                         {busData.route?.helperPhone && (
                             <TouchableOpacity
                                 style={styles.callButton}
                                 onPress={() => Linking.openURL(`tel:${busData.route.helperPhone}`)}
                             >
-                                <Feather name="phone" size={20} color="white" />
+                                <Feather name="phone" size={18} color="white" />
                             </TouchableOpacity>
                         )}
                     </View>
-                </View>
+                </PremiumCard>
 
                 {/* ETA Card */}
-                <View style={styles.card}>
+                <PremiumCard style={styles.card}>
                     <View style={styles.etaHeader}>
                         <Feather name="clock" size={20} color={colors.primary} />
                         <Text style={styles.etaTitle}>Estimated Arrival</Text>
                     </View>
                     <Text style={styles.etaTime}>{calculateETA()}</Text>
                     <Text style={styles.etaSubtext}>
-                        Location last updated: {liveLocation ? new Date(liveLocation.timestamp).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }) : 'Tracking not active'}
+                        {liveLocation ? (() => {
+                            const diffInSeconds = Math.floor((Date.now() - new Date(liveLocation.timestamp).getTime()) / 1000);
+                            if (diffInSeconds < 60) return `Updated: ${diffInSeconds}s ago`;
+                            if (diffInSeconds < 3600) return `Updated: ${Math.floor(diffInSeconds / 60)}m ago`;
+                            return `Updated: ${new Date(liveLocation.timestamp).toLocaleTimeString()}`;
+                        })() : 'Tracking not active'}
                     </Text>
                     {liveLocation && isLive && (
                         <View style={styles.speedInfo}>
                             <Feather name="activity" size={16} color={colors.textSecondary} />
                             <Text style={styles.speedText}>
-                                Current Speed: {Math.round(liveLocation.speed)} km/h
+                                Speed: {Math.round(liveLocation.speed)} km/h
                             </Text>
                         </View>
                     )}
-                </View>
-
-                <View style={{ height: 40 }} />
+                </PremiumCard>
             </ScrollView>
         </View>
     );
@@ -323,7 +312,35 @@ export default function BusScreen({ currentChild }: BusScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: colors.background,
+    },
+    centerContent: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        ...typography.body,
+        color: colors.textSecondary,
+        marginTop: spacing.md,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
+    },
+    backBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: colors.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerTitle: {
+        ...typography.h3,
+        color: colors.textPrimary,
     },
     mapContainer: {
         height: height * 0.4,
@@ -332,22 +349,21 @@ const styles = StyleSheet.create({
     map: {
         flex: 1,
     },
-    busMarker: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: colors.primary,
+    mapBackBtn: {
+        position: 'absolute',
+        top: 50,
+        left: 16,
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: 'white',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 5,
+        ...shadows.md,
     },
     liveTagContainer: {
         position: 'absolute',
-        top: 16,
+        top: 50,
         right: 16,
     },
     liveTag: {
@@ -357,45 +373,36 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        ...shadows.sm,
     },
     pulsingDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: colors.primary,
+        backgroundColor: '#22C55E',
         marginRight: 6,
     },
     liveText: {
         ...typography.caption,
-        color: colors.primary,
+        color: '#22C55E',
         fontWeight: '700',
         fontSize: 11,
     },
     contentContainer: {
         flex: 1,
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.lg,
+        marginTop: -20,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        backgroundColor: colors.background,
     },
     card: {
-        backgroundColor: 'white',
-        borderRadius: 16,
-        padding: spacing.lg,
-        marginBottom: spacing.lg,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        marginTop: spacing.lg,
     },
     busHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-start',
     },
     busNumber: {
         ...typography.h2,
@@ -405,51 +412,56 @@ const styles = StyleSheet.create({
     routeText: {
         ...typography.body,
         color: colors.textSecondary,
-        marginTop: 4,
+        marginTop: 2,
     },
     statusBadge: {
-        paddingHorizontal: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 12,
     },
+    statusDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        marginRight: 6,
+    },
     statusText: {
         ...typography.caption,
-        fontWeight: '700',
-    },
-    statusDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        marginRight: 6,
+        fontWeight: '600',
+        fontSize: 11,
     },
     divider: {
         height: 1,
-        backgroundColor: '#E5E7EB',
+        backgroundColor: colors.border,
         marginVertical: spacing.md,
     },
-    driverRow: {
+    contactRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    driverPhoto: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+    avatarCircle: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: colors.background,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    driverInfo: {
+    contactInfo: {
         flex: 1,
         marginLeft: spacing.md,
     },
-    label: {
+    contactLabel: {
         ...typography.caption,
         color: colors.textSecondary,
         textTransform: 'uppercase',
-        marginBottom: 2,
     },
-    name: {
+    contactName: {
         ...typography.body,
-        color: colors.textPrimary,
         fontWeight: '600',
+        color: colors.textPrimary,
     },
     callButton: {
         width: 40,
@@ -466,7 +478,7 @@ const styles = StyleSheet.create({
     },
     etaTitle: {
         ...typography.body,
-        fontWeight: '700',
+        fontWeight: '600',
         color: colors.textPrimary,
         marginLeft: spacing.sm,
     },
@@ -474,11 +486,11 @@ const styles = StyleSheet.create({
         ...typography.h1,
         fontWeight: '700',
         color: colors.primary,
-        marginBottom: spacing.xs,
     },
     etaSubtext: {
         ...typography.caption,
         color: colors.textSecondary,
+        marginTop: spacing.xs,
     },
     speedInfo: {
         flexDirection: 'row',
@@ -486,7 +498,7 @@ const styles = StyleSheet.create({
         marginTop: spacing.md,
         paddingTop: spacing.md,
         borderTopWidth: 1,
-        borderTopColor: '#E5E7EB',
+        borderTopColor: colors.border,
     },
     speedText: {
         ...typography.body,
@@ -500,16 +512,16 @@ const styles = StyleSheet.create({
         padding: spacing.xl,
     },
     iconCircle: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: colors.background,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: spacing.lg,
     },
     emptyTitle: {
         ...typography.h2,
-        fontWeight: '700',
         color: colors.textPrimary,
         marginBottom: spacing.sm,
         textAlign: 'center',

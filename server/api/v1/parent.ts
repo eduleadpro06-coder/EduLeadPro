@@ -13,6 +13,84 @@ const router = express.Router();
 router.use(jwtMiddleware);
 router.use(roleGuard(['parent']));
 
+// Register push token
+router.post('/register-push-token', async (req: Request, res: Response) => {
+    try {
+        const { token, deviceType } = req.body;
+        const leadId = req.user!.userId;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                error: 'Token is required'
+            });
+        }
+
+        // Check if token already exists
+        const { pushTokens } = await import('../../../shared/schema.js');
+        const { eq } = await import('drizzle-orm');
+        const { db } = await import('../../db.js');
+
+        const existing = await db.query.pushTokens.findFirst({
+            where: eq(pushTokens.token, token)
+        });
+
+        if (existing) {
+            await db.update(pushTokens)
+                .set({
+                    leadId,
+                    userId: null,
+                    updatedAt: new Date()
+                })
+                .where(eq(pushTokens.id, existing.id));
+        } else {
+            await db.insert(pushTokens).values({
+                leadId,
+                token,
+                deviceType: deviceType || 'unknown'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Push token registered successfully'
+        });
+    } catch (error) {
+        console.error('[Mobile API] Push token registration error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to register push token'
+        });
+    }
+});
+
+// Get organization details
+router.get('/organization', async (req: Request, res: Response) => {
+    try {
+        const organizationId = req.user!.organizationId;
+        const org = await storage.getOrganization(organizationId);
+
+        if (!org) {
+            return res.status(404).json({ message: 'Organization not found' });
+        }
+
+        res.json({
+            id: org.id,
+            name: org.name,
+            phone: org.phone,
+            address: org.address,
+            city: org.city,
+            state: org.state,
+            pincode: org.pincode,
+            email: org.email || (org.settings as any)?.supportEmail || (org.settings as any)?.email || '',
+            website: (org.settings as any)?.website || ''
+        });
+    } catch (error) {
+        console.error('Failed to fetch organization details:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
 /**
  * GET /api/v1/mobile/parent/children
  * Get all children for authenticated parent
@@ -353,33 +431,77 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
         // 2. Get Payment History & Calculate Paid Amount
         const { data: payments, error: paymentsError } = await supabase
             .from('fee_payments')
-            .select('id, amount, payment_date, payment_mode, receipt_number, status')
+            .select('id, amount, payment_date, payment_mode, receipt_number, status, installment_number, payment_category')
             .eq('lead_id', childId)
             .eq('status', 'completed')
             .order('payment_date', { ascending: false });
 
         if (paymentsError) throw paymentsError;
 
-        const totalPaid = (payments || []).reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+        const tuitionPaid = (payments || []).filter(p => !p.payment_category || p.payment_category === 'fee_payment').reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+        const additionalPaid = (payments || []).filter(p => p.payment_category === 'additional_charge').reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+        const totalPaid = tuitionPaid + additionalPaid;
+
+        // Dynamic Status Calculation to fix rounding issues
+        if (emiDetails && emiDetails.installments.length > 0) {
+            // Calculate explicit down payment (Total - Sum of Installments)
+            const sumInstallments = emiDetails.installments.reduce((sum: number, i: any) => sum + parseFloat(i.amount), 0);
+            const implicitDownPayment = Math.max(0, totalFees - sumInstallments);
+
+            // Start checking coverage from down payment
+            let coveredAmount = implicitDownPayment;
+
+            // Tolerance for rounding errors (e.g. ₹1 difference)
+            const TOLERANCE = 10;
+
+            emiDetails.installments = emiDetails.installments.map((inst: any) => {
+                const amount = parseFloat(inst.amount);
+                const requiredTotal = coveredAmount + amount;
+
+                // If total paid covers this installment (within tolerance)
+                if (totalPaid >= (requiredTotal - TOLERANCE)) {
+                    // Update covered amount for next iteration
+                    coveredAmount += amount;
+                    return { ...inst, status: 'paid' };
+                }
+
+                // If partial coverage or strictly pending
+                // Keep original status unless we want to show partial? 
+                // For now, adhere to "paid" vs "pending" based on full coverage
+                coveredAmount += amount; // Still increment to check next segments correctly in sequential logic
+                return inst;
+            });
+        }
 
         // Format payments for frontend (camelCase)
         const formattedPayments = (payments || []).map((p: any) => ({
             id: p.id,
-            amount: p.amount,
+            amount: Math.round(parseFloat(p.amount)),
             date: p.payment_date,
             mode: p.payment_mode,
             receiptNumber: p.receipt_number,
-            status: p.status
+            status: p.status,
+            installmentNumber: p.installment_number,
+            paymentCategory: p.payment_category
         }));
 
         res.json({
             success: true,
             data: {
-                totalFees,
-                totalPaid,
-                balance: Math.max(0, totalFees - totalPaid),
+                totalFees: Math.round(totalFees),
+                totalPaid: Math.round(totalPaid),
+                tuitionPaid: Math.round(tuitionPaid),
+                additionalPaid: Math.round(additionalPaid),
+                balance: Math.round(Math.max(0, totalFees - tuitionPaid)),
                 payments: formattedPayments,
-                emiDetails
+                emiDetails: emiDetails ? {
+                    ...emiDetails,
+                    totalAmount: Math.round(emiDetails.totalAmount),
+                    installments: emiDetails.installments.map((inst: any) => ({
+                        ...inst,
+                        amount: Math.round(parseFloat(inst.amount))
+                    }))
+                } : null
             }
         });
     } catch (error) {
@@ -578,9 +700,10 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
         const { supabase } = await import('../../supabase.js');
 
         // 1. Get latest location from the synchronized table
+        // Use a SQL query that calculates recency using DB time (NOW() - interval)
         const { data: location, error: locError } = await supabase
             .from('bus_live_locations')
-            .select('*')
+            .select('*, (timestamp > NOW() - INTERVAL \'5 minutes\') as is_recent_db')
             .eq('route_id', routeId)
             .eq('is_active', true)
             .order('timestamp', { ascending: false })
@@ -609,9 +732,8 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
             studentEvent = event;
         }
 
-        // Check if location is recent (within last 5 minutes)
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-        const isRecent = location ? new Date(location.timestamp) >= fiveMinutesAgo : false;
+        // Use the DB-calculated recency flag if available, otherwise fallback
+        const isRecent = location?.is_recent_db ?? false;
 
         res.json({
             success: true,

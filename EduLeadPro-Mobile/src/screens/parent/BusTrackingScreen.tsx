@@ -192,7 +192,7 @@ export default function BusTrackingScreen() {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Text style={styles.backButtonText}>‹ Back</Text>
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Bus Tracking</Text>
+                <Text style={styles.headerTitle}>School Bus</Text>
                 <View style={styles.placeholder} />
             </View>
 
@@ -244,7 +244,6 @@ export default function BusTrackingScreen() {
                     </View>
                 )}
             </View>
-            )}
         </SafeAreaView>
     );
 }

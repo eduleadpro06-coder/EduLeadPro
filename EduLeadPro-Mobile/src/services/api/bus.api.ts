@@ -36,7 +36,7 @@ export const busAPI = {
      * Get student's bus assignment
      */
     async getStudentBusAssignment(studentId: string): Promise<any> {
-        return await apiClient.get(`/students/${studentId}/bus-assignment`);
+        return await apiClient.get(`/parent/child/${studentId}/bus-assignment`);
     },
 
     /**
@@ -51,6 +51,19 @@ export const busAPI = {
      */
     async getDriverHistory(limit: number = 20): Promise<{ sessions: ActiveBusSession[] }> {
         return await apiClient.get(`/driver/history?limit=${limit}`);
+    },
+
+    /**
+     * Update bus location (real-time tracking)
+     */
+    async updateLocation(data: {
+        routeId: number;
+        latitude: number;
+        longitude: number;
+        speed?: number;
+        heading?: number;
+    }): Promise<{ success: boolean }> {
+        return await apiClient.post('/driver/location', data);
     },
 };
 

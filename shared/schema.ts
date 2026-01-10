@@ -12,6 +12,7 @@ export const organizations = pgTable("organizations", {
   city: varchar("city", { length: 100 }), // City
   state: varchar("state", { length: 100 }), // State
   pincode: varchar("pincode", { length: 10 }), // PIN code
+  email: varchar("email", { length: 255 }), // Organization official email
   settings: jsonb("settings"), // JSON for logo, timezone, billing config, etc.
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

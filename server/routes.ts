@@ -363,7 +363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
-      const { phone, address, city, state, pincode } = req.body;
+      const { phone, address, city, state, pincode, email } = req.body;
 
       // Validate required fields
       if (!phone || !address) {
@@ -381,7 +381,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         address,
         city: city || null,
         state: state || null,
-        pincode: pincode || null
+        pincode: pincode || null,
+        email: email || null
       });
 
       if (!updated) {
@@ -4608,7 +4609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const totalFee = classFees.reduce((sum, f) => sum + Number(f.amount), 0);
 
               // Replace variables
-              personalizedMessage = personalizedMessage.replace(/{{total_fee}}/g, totalFee.toFixed(2));
+              personalizedMessage = personalizedMessage.replace(/{{total_fee}}/g, Math.round(totalFee).toString());
 
               if (personalizedMessage.includes("{{fee_breakdown}}")) {
                 const breakdown = classFees.map(f => `- ${f.feeType}: ${f.amount} (${f.frequency})`).join("\\n");
@@ -5647,51 +5648,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "No organization assigned" });
       }
 
-      // Get all active bus routes for this organization
+      // Get all bus routes for this organization
       const routes = await storage.getBusRoutes(organizationId);
 
       if (!routes || routes.length === 0) {
         return res.json({ routes: [] });
       }
 
-      // For each route, get the latest location update
+      // Import Supabase client (same as driver.ts uses)
+      const { supabase } = await import('./supabase.js');
+
+      // For each route, check if it has an active session AND recent location
       const liveRoutes = await Promise.all(
         routes.map(async (route) => {
           try {
-            // Get latest location from bus_location_history for this route
-            // Only consider locations updated within last 15 minutes (active)
-            const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-
-            const locationResult = await db
-              .select()
-              .from(schema.busLocationHistory)
-              .where(
-                and(
-                  eq(schema.busLocationHistory.routeId, route.id),
-                  sql`${schema.busLocationHistory.recordedAt} > ${fifteenMinutesAgo}`
-                )
-              )
-              .orderBy(sql`${schema.busLocationHistory.recordedAt} DESC`)
+            // 1. Check for active session for this route using Supabase
+            const { data: sessions } = await supabase
+              .from('active_bus_sessions')
+              .select('*')
+              .eq('route_id', route.id)
+              .eq('status', 'live')
+              .order('started_at', { ascending: false })
               .limit(1);
 
-            const latestLocation = locationResult[0];
+            const activeSession = sessions?.[0];
+            if (!activeSession) {
+              return null; // No active trip for this route
+            }
+
+            // 2. Get latest location from bus_live_locations using Supabase
+            const { data: locations } = await supabase
+              .from('bus_live_locations')
+              .select('*')
+              .eq('route_id', route.id)
+              .eq('is_active', true)
+              .order('timestamp', { ascending: false })
+              .limit(1);
+
+            const latestLocation = locations?.[0];
 
             if (!latestLocation) {
-              // No recent location data
+              // Active session but no location yet (driver just started, GPS pending)
               return null;
             }
 
-            // Get driver information
+            // 3. Get driver information using Supabase
             let driverName = 'Unknown Driver';
             if (route.driverId) {
-              const driverResult = await db
-                .select()
-                .from(schema.staff)
-                .where(eq(schema.staff.id, route.driverId))
+              const { data: drivers } = await supabase
+                .from('staff')
+                .select('name')
+                .eq('id', route.driverId)
                 .limit(1);
 
-              if (driverResult[0]) {
-                driverName = driverResult[0].name;
+              if (drivers?.[0]) {
+                driverName = drivers[0].name;
               }
             }
 
@@ -5701,12 +5712,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               vehicleNumber: route.vehicleNumber,
               driverName,
               currentLocation: {
-                latitude: parseFloat(latestLocation.latitude as string),
-                longitude: parseFloat(latestLocation.longitude as string),
-                speed: parseFloat(latestLocation.speed as string) || 0,
-                heading: parseFloat(latestLocation.heading as string) || 0
+                latitude: parseFloat(latestLocation.latitude),
+                longitude: parseFloat(latestLocation.longitude),
+                speed: parseFloat(latestLocation.speed) || 0,
+                heading: parseFloat(latestLocation.heading) || 0
               },
-              lastUpdated: latestLocation.recordedAt,
+              lastUpdated: latestLocation.timestamp,
+              sessionStartedAt: activeSession.started_at,
               isActive: true
             };
           } catch (error) {
@@ -5716,7 +5728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      // Filter out null values (routes without recent location data)
+      // Filter out null values (routes without active trips or location data)
       const activeRoutes = liveRoutes.filter(route => route !== null);
 
       res.json({ routes: activeRoutes });

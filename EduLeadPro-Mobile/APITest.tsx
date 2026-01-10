@@ -1,7 +1,7 @@
 // Simple test component to verify API connection
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet, ScrollView } from 'react-native';
-import { api } from './services/api';
+import { api } from './src/services/api';
 
 export default function APITest() {
     const [loading, setLoading] = useState(true);
@@ -18,7 +18,7 @@ export default function APITest() {
             setError(null);
 
             // Test fetching children
-            const children = await api.getChildren('gaurav.kachwaha16@gmail.com');
+            const children = await api.getChildren();
 
             // Test fetching announcements
             const announcements = await api.getAnnouncements(1);

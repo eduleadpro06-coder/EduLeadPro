@@ -1,37 +1,11 @@
-import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import { setItemAsync, getItemAsync, deleteItemAsync } from 'expo-secure-store';
+import { API_BASE_URL, STORAGE_KEYS } from '../src/utils/constants';
+import { router } from 'expo-router';
+import { useAuthStore } from '../src/store/authStore';
 
 // API Service for Mobile App with JWT Authentication
 // V1 API with token-based auth and auto-refresh
 
-const getBaseUrl = () => {
-    // For web, we can't use relative '/api' because the frontend is on Expo (different domain)
-    if (Platform.OS === 'web') {
-        if (__DEV__) {
-            const localhost = 'localhost';
-            return `http://${localhost}:5000/api`;
-        }
-        return 'https://eduleadapp.vercel.app/api';
-    }
-
-    if (__DEV__) {
-        const debuggerHost = Constants.expoConfig?.hostUri;
-        const localhost = debuggerHost?.split(':')[0];
-
-        if (localhost) {
-            return `http://${localhost}:5000/api`;
-        }
-    }
-
-    return 'https://eduleadapp.vercel.app/api';
-};
-
-const API_BASE_URL = getBaseUrl();
-
-// Storage keys for tokens
-const ACCESS_TOKEN_KEY = '@eduleadpro:accessToken';
-const REFRESH_TOKEN_KEY = '@eduleadpro:refreshToken';
 
 export interface Child {
     id: number;
@@ -91,8 +65,7 @@ export interface Event {
 
 class APIService {
     private baseURL: string;
-    private isRefreshing: boolean = false;
-    private refreshSubscribers: Array<(token: string) => void> = [];
+    private isLoggingOut = false;
 
     constructor(baseURL: string = API_BASE_URL) {
         this.baseURL = baseURL;
@@ -101,10 +74,10 @@ class APIService {
     // Token management
     async storeTokens(accessToken: string, refreshToken: string): Promise<void> {
         try {
-            await AsyncStorage.multiSet([
-                [ACCESS_TOKEN_KEY, accessToken],
-                [REFRESH_TOKEN_KEY, refreshToken]
-            ]);
+            await setItemAsync(STORAGE_KEYS.AUTH_TOKEN, accessToken);
+            // We store refresh token but don't actively use it for auto-refresh anymore
+            // since access tokens are 365d long-lived for mobile
+            await setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
         } catch (error) {
             console.error('Failed to store tokens:', error);
         }
@@ -112,7 +85,9 @@ class APIService {
 
     async getAccessToken(): Promise<string | null> {
         try {
-            return await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+            const token = await getItemAsync(STORAGE_KEYS.AUTH_TOKEN);
+            // console.log('[API] Get Access Token:', token ? `Found (${token.substring(0, 10)}...)` : 'Missing');
+            return token;
         } catch (error) {
             console.error('Failed to get access token:', error);
             return null;
@@ -121,7 +96,7 @@ class APIService {
 
     async getRefreshToken(): Promise<string | null> {
         try {
-            return await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+            return await getItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
         } catch (error) {
             console.error('Failed to get refresh token:', error);
             return null;
@@ -130,50 +105,14 @@ class APIService {
 
     async clearTokens(): Promise<void> {
         try {
-            await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
+            await deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
+            await deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
         } catch (error) {
             console.error('Failed to clear tokens:', error);
         }
     }
 
-    // Token refresh logic
-    private async refreshAccessToken(): Promise<string> {
-        const refreshToken = await this.getRefreshToken();
-        if (!refreshToken) {
-            throw new Error('No refresh token available');
-        }
-
-        const response = await fetch(`${this.baseURL}/v1/mobile/auth/refresh-token`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken })
-        });
-
-        if (!response.ok) {
-            // Refresh token invalid - clear tokens and force re-login
-            await this.clearTokens();
-            throw new Error('Refresh token expired');
-        }
-
-        const data = await response.json();
-        const newAccessToken = data.data.accessToken;
-
-        // Store new access token
-        await AsyncStorage.setItem(ACCESS_TOKEN_KEY, newAccessToken);
-
-        return newAccessToken;
-    }
-
-    private onAccessTokenFetched(token: string) {
-        this.refreshSubscribers.forEach(callback => callback(token));
-        this.refreshSubscribers = [];
-    }
-
-    private addRefreshSubscriber(callback: (token: string) => void) {
-        this.refreshSubscribers.push(callback);
-    }
-
-    // Fetch with automatic token refresh
+    // Fetch with simplified auth handling (No auto-refresh loop)
     private async fetchWithAuth<T>(endpoint: string, options?: RequestInit): Promise<T> {
         const accessToken = await this.getAccessToken();
 
@@ -184,51 +123,68 @@ class APIService {
 
         if (accessToken) {
             headers['Authorization'] = `Bearer ${accessToken}`;
+        } else {
+            console.warn(`[API] Warning: Request to ${endpoint} missing Access Token`);
         }
 
-        const url = `${this.baseURL}${endpoint}`;
-        let response = await fetch(url, {
-            ...options,
-            headers
-        });
+        // Sanitize endpoint to prevent double-prefixing
+        let sanitizedEndpoint = endpoint;
+        if (sanitizedEndpoint.startsWith('/v1/mobile')) {
+            sanitizedEndpoint = sanitizedEndpoint.replace('/v1/mobile', '');
+        }
 
-        // Handle 401 - try to refresh token
-        if (response.status === 401) {
-            if (!this.isRefreshing) {
-                this.isRefreshing = true;
-                try {
-                    const newToken = await this.refreshAccessToken();
-                    this.isRefreshing = false;
-                    this.onAccessTokenFetched(newToken);
-                } catch (error) {
-                    this.isRefreshing = false;
-                    throw error;
-                }
-            }
+        const url = `${this.baseURL}${sanitizedEndpoint}`;
 
-            // Wait for token refresh if already in progress
-            const newToken = await new Promise<string>((resolve) => {
-                this.addRefreshSubscriber((token: string) => {
-                    resolve(token);
-                });
-            });
-
-            // Retry request with new token
-            headers['Authorization'] = `Bearer ${newToken}`;
-            response = await fetch(`${this.baseURL}${endpoint}`, {
+        try {
+            console.log(`[API] Requesting: ${url}`);
+            const response = await fetch(url, {
                 ...options,
                 headers
             });
-        }
 
-        if (!response.ok) {
-            console.error(`API Error ${response.status} at ${url}: ${response.statusText}`);
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error?.message || `API Error: ${response.status} ${response.statusText}`);
-        }
+            // Handle 401 - Immediate Logout (Simplified Strategy)
+            if (response.status === 401) {
+                if (this.isLoggingOut) {
+                    console.log(`[API] 401 at ${url} - Logout already in progress. Debouncing.`);
+                    // Return empty object or throw handled error to prevent crashes
+                    throw new Error('Session expired (Debounced).');
+                }
 
-        const data = await response.json();
-        return data.data || data; // Handle both v1 (data wrapper) and legacy formats
+                console.warn(`[API] 401 Unauthorized at ${url} - Triggering Logout`);
+                this.isLoggingOut = true;
+
+                await this.clearTokens();
+                useAuthStore.getState().reset();
+                router.replace('/(auth)/login');
+
+                // Reset flag after delay
+                setTimeout(() => { this.isLoggingOut = false; }, 3000);
+
+                throw new Error('Session expired. Please login again.');
+            }
+
+            if (!response.ok) {
+                console.error(`API Error ${response.status} at ${url}: ${response.statusText}`);
+                const errorData = await response.json().catch(() => ({}));
+                const errorMessage = typeof errorData.error === 'string'
+                    ? errorData.error
+                    : (errorData.error?.message || errorData.message || `API Error: ${response.status} ${response.statusText}`);
+
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            return data.data || data; // Handle both v1 (data wrapper) and legacy formats
+
+        } catch (error) {
+            // Rethrow unless it's a debounced error we want to swallow UI-wise
+            const msg = error instanceof Error ? error.message : String(error);
+            if (msg.includes('Debounced')) {
+                // Swallow debounced errors to prevent UI toast spam
+                return {} as T;
+            }
+            throw error;
+        }
     }
 
     // Generic POST method
@@ -242,8 +198,9 @@ class APIService {
 
     // Authentication
     async login(phone: string, password: string): Promise<LoginResponse> {
-        const url = `${this.baseURL}/mobile/auth/login`;
+        const url = `${this.baseURL}/auth/login`;
         try {
+            console.log(`[API] Attempting login at: ${url}`);
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -265,8 +222,12 @@ class APIService {
             }
 
             // Store tokens if present (new JWT flow)
+            // Note: server response is { accessToken, refreshToken, user, success }
             if (data.accessToken && data.refreshToken) {
                 await this.storeTokens(data.accessToken, data.refreshToken);
+            } else if (data.token && data.refreshToken) {
+                // Secondary check for 'token' alias if server sends that
+                await this.storeTokens(data.token, data.refreshToken);
             }
 
             return data;
@@ -277,26 +238,16 @@ class APIService {
     }
 
     async changePassword(phone: string, newPassword: string): Promise<any> {
-        const res = await fetch(`${this.baseURL}/mobile/auth/change-password`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, newPassword }),
-        });
-        return res.json();
+        return this.post('/auth/change-password', { phone, newPassword });
     }
 
     async changePasswordStaff(phone: string, newPassword: string, oldPassword?: string): Promise<any> {
-        const res = await fetch(`${this.baseURL}/mobile/auth/change-password-staff`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, newPassword, oldPassword }),
-        });
-        return res.json();
+        return this.post('/auth/change-password-staff', { phone, newPassword, oldPassword });
     }
 
     // Parent Methods (V1 API)
     async getChildren(): Promise<Child[]> {
-        const data = await this.fetchWithAuth<{ children: any[] }>('/v1/mobile/parent/children');
+        const data = await this.fetchWithAuth<{ children: any[] }>('/parent/children');
         return (data.children || []).map(c => ({
             id: c.id,
             name: c.name,
@@ -310,7 +261,7 @@ class APIService {
 
     async getAttendance(childId: number, days: number = 30): Promise<Attendance[]> {
         const data = await this.fetchWithAuth<{ attendance: any[] }>(
-            `/v1/mobile/parent/child/${childId}/attendance?days=${days}`
+            `/parent/child/${childId}/attendance?days=${days}`
         );
         return (data.attendance || []).map(a => ({
             id: a.id,
@@ -323,7 +274,7 @@ class APIService {
 
     async getDailyUpdates(childId: number): Promise<DailyUpdate[]> {
         const data = await this.fetchWithAuth<{ activities: any[] }>(
-            `/v1/mobile/parent/child/${childId}/activities?limit=20`
+            `/parent/child/${childId}/activities?limit=20`
         );
         return (data.activities || []).map(u => ({
             id: u.id,
@@ -338,13 +289,22 @@ class APIService {
     }
 
     async getStudentFees(childId: number): Promise<any> {
-        return this.fetchWithAuth(`/v1/mobile/parent/child/${childId}/fees`);
+        return this.fetchWithAuth(`/parent/child/${childId}/fees`);
     }
 
     async getTodayAttendance(childId: number): Promise<Attendance | null> {
         try {
             const allAttendance = await this.getAttendance(childId, 1);
-            return allAttendance.length > 0 ? allAttendance[0] : null;
+            if (allAttendance.length > 0) {
+                const latest = allAttendance[0];
+                const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // Force IST check
+                const recordDate = latest.date.split('T')[0];
+
+                if (recordDate === today) {
+                    return latest;
+                }
+            }
+            return null;
         } catch (error) {
             return null;
         }
@@ -352,7 +312,7 @@ class APIService {
 
     async getAnnouncements(organizationId: number): Promise<Announcement[]> {
         const data = await this.fetchWithAuth<{ announcements: any[] }>(
-            `/v1/mobile/parent/announcements?limit=10`
+            `/parent/announcements?limit=10`
         );
         return (data.announcements || []).map(a => ({
             id: a.id,
@@ -365,7 +325,7 @@ class APIService {
 
     async getEvents(organizationId: number): Promise<Event[]> {
         const data = await this.fetchWithAuth<{ events: any[] }>(
-            `/v1/mobile/parent/events`
+            `/parent/events`
         );
         return (data.events || []).map(e => ({
             id: e.id,
@@ -381,19 +341,19 @@ class APIService {
 
     // Teacher Methods (V1 API)
     async getTeacherDashboard(): Promise<any> {
-        return await this.fetchWithAuth('/v1/mobile/teacher/dashboard');
+        return await this.fetchWithAuth('/teacher/dashboard');
     }
 
     async getTeacherStudents(classFilter?: string): Promise<any[]> {
         const queryParam = classFilter ? `?class=${encodeURIComponent(classFilter)}` : '';
         const data = await this.fetchWithAuth<{ students: any[] }>(
-            `/v1/mobile/teacher/students${queryParam}`
+            `/teacher/students${queryParam}`
         );
         return data.students || [];
     }
 
     async markAttendanceBulk(attendanceRecords: Array<{ leadId: number; status: string; checkInTime?: string }>): Promise<any> {
-        return await this.fetchWithAuth('/v1/mobile/teacher/attendance/bulk', {
+        return await this.fetchWithAuth('/teacher/attendance/bulk', {
             method: 'POST',
             body: JSON.stringify({ attendanceRecords })
         });
@@ -405,7 +365,7 @@ class APIService {
         mood?: string;
         mediaUrls?: string[];
     }): Promise<any> {
-        return await this.fetchWithAuth('/v1/mobile/teacher/activity', {
+        return await this.fetchWithAuth('/teacher/activity', {
             method: 'POST',
             body: JSON.stringify({
                 leadId,
@@ -427,12 +387,12 @@ class APIService {
     }
 
     async getTodayAttendanceAll(): Promise<any> {
-        return await this.fetchWithAuth('/v1/mobile/teacher/attendance/today');
+        return await this.fetchWithAuth('/teacher/attendance/today');
     }
 
     async getStudentAttendanceHistory(studentId: number, days: number = 30): Promise<any[]> {
         const data = await this.fetchWithAuth<any[]>(
-            `/v1/mobile/teacher/student/${studentId}/attendance?days=${days}`
+            `/teacher/student/${studentId}/attendance?days=${days}`
         );
         console.log('Attendance History Response:', JSON.stringify(data, null, 2));
         // fetchWithAuth already unwraps 'data' property if present
@@ -447,7 +407,7 @@ class APIService {
 
     async getOrganizationHolidays(): Promise<any[]> {
         const data = await this.fetchWithAuth<{ holidays: any[] }>(
-            '/v1/mobile/teacher/holidays'
+            '/teacher/holidays'
         );
         return (data.holidays || []).map((h: any) => ({
             date: h.holiday_date,
@@ -458,36 +418,36 @@ class APIService {
 
     // Driver Methods (V1 API)
     async getDriverDashboard(): Promise<any> {
-        return await this.fetchWithAuth('/v1/mobile/driver/dashboard');
+        return await this.fetchWithAuth('/driver/dashboard');
     }
 
     async updateBusLocation(routeId: number, latitude: number, longitude: number, speed?: number, heading?: number): Promise<any> {
-        return await this.fetchWithAuth('/v1/mobile/driver/location', {
+        return await this.fetchWithAuth('/driver/location', {
             method: 'POST',
             body: JSON.stringify({ routeId, latitude, longitude, speed, heading })
         });
     }
 
     async startTrip(routeId: number): Promise<any> {
-        return await this.fetchWithAuth('/v1/mobile/driver/trip/start', {
+        return await this.fetchWithAuth('/driver/trip/start', {
             method: 'POST',
             body: JSON.stringify({ routeId })
         });
     }
 
     async endTrip(sessionId: number): Promise<any> {
-        return await this.fetchWithAuth('/v1/mobile/driver/trip/end', {
+        return await this.fetchWithAuth('/driver/trip/end', {
             method: 'POST',
             body: JSON.stringify({ sessionId })
         });
     }
 
     async getActiveTrip(): Promise<any> {
-        return await this.fetchWithAuth('/v1/mobile/driver/trip/active');
+        return await this.fetchWithAuth('/driver/trip/active');
     }
 
     async updateStudentTripStatus(studentId: number, sessionId: number, routeId: number, status: 'boarded' | 'dropped' | 'pending'): Promise<any> {
-        return await this.fetchWithAuth('/v1/mobile/driver/student-status', {
+        return await this.fetchWithAuth('/driver/student-status', {
             method: 'POST',
             body: JSON.stringify({ studentId, sessionId, routeId, status })
         });
@@ -495,11 +455,11 @@ class APIService {
 
     // Parent Bus Tracking Methods
     async getBusLocation(studentId: number): Promise<any> {
-        return await this.fetchWithAuth(`/v1/mobile/parent/child/${studentId}/bus-assignment`);
+        return await this.fetchWithAuth(`/parent/child/${studentId}/bus-assignment`);
     }
 
     async getLiveBusLocation(routeId: number, studentId?: number): Promise<any> {
-        let url = `/v1/mobile/parent/bus/${routeId}/live-location`;
+        let url = `/parent/bus/${routeId}/live-location`;
         if (studentId) {
             url += `?studentId=${studentId}`;
         }

@@ -180,7 +180,8 @@ interface EmiPlan {
 }
 
 // EMI Payment Progress Component
-function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, status }: { planId: number; totalInstallments: number; installmentAmount: string; status?: string }) {
+// EMI Payment Progress Component
+function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, status, totalAmount }: { planId: number; totalInstallments: number; installmentAmount: string; status?: string, totalAmount?: string }) {
   const queryClient = useQueryClient();
   const { data: payments, isLoading } = useQuery({
     queryKey: [`/api/emi-plans/${planId}/payments`],
@@ -201,14 +202,36 @@ function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, stat
     }
   });
 
-  const paidInstallments = new Set(payments?.filter((p: any) => p.installmentNumber && p.installmentNumber > 0).map((p: any) => p.installmentNumber) || []);
-  const progress = (paidInstallments.size / totalInstallments) * 100;
+  // Dynamic calculation based on amount with tolerance
+  const totalPaid = payments?.reduce((sum: number, p: any) => sum + parseFloat(p.amount || 0), 0) || 0;
+  const instAmount = parseFloat(installmentAmount);
+  const totalCost = parseFloat(totalAmount || "0");
+  const TOLERANCE = 10;
+
+  // Calculate down payment (difference between total cost and sum of installments)
+  const totalInstallmentCost = instAmount * totalInstallments;
+  // Use a small epsilon for float comparison if needed, but Math.max(0) handles negatives
+  const downPayment = Math.max(0, totalCost - totalInstallmentCost);
+
+  // Effective paid amount towards installments (after covering down payment)
+  const effectivePaid = Math.max(0, totalPaid - downPayment);
+
+  let paidCount = 0;
+  if (instAmount > 0) {
+    paidCount = Math.floor((effectivePaid + TOLERANCE) / instAmount);
+  }
+  // Cap at totalInstallments
+  paidCount = Math.min(paidCount, totalInstallments);
+
+  const progress = (paidCount / totalInstallments) * 100;
 
   useEffect(() => {
-    if (!isLoading && progress === 100 && status !== 'completed') {
+    // Check if covered total cost
+    const isFullyPaid = totalPaid >= (totalCost - TOLERANCE);
+    if (!isLoading && (progress === 100 || isFullyPaid) && status !== 'completed') {
       updateStatusMutation.mutate();
     }
-  }, [isLoading, progress, status, updateStatusMutation]);
+  }, [isLoading, progress, status, updateStatusMutation, totalPaid, totalCost]);
 
   if (isLoading) {
     return <div className="text-sm text-gray-500">Loading...</div>;
@@ -217,10 +240,10 @@ function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, stat
   return (
     <div className="space-y-1">
       <div className="text-sm">
-        <span className="text-gray-500">EMI Amount:</span> ₹{parseFloat(installmentAmount).toLocaleString()}
+        <span className="text-gray-500">EMI Amount:</span> ₹{Math.round(instAmount).toLocaleString()}
       </div>
       <div className="text-sm">
-        <span className="text-gray-500">Progress:</span> {paidInstallments.size}/{totalInstallments} installments
+        <span className="text-gray-500">Progress:</span> {paidCount}/{totalInstallments} installments
       </div>
       <div className="w-full bg-gray-200 rounded-full h-2">
         <div
@@ -243,10 +266,13 @@ function RecordPaymentButton({ plan, onClick }: { plan: any; onClick: () => void
     }
   });
 
-  // Filter out down payments (installmentNumber: 0) when checking EMI completion
-  const emiPayments = payments?.filter((p: any) => p.installmentNumber && p.installmentNumber > 0) || [];
-  const paidInstallments = new Set(emiPayments.map((p: any) => p.installmentNumber));
-  const allPaid = paidInstallments.size >= plan.numberOfInstallments;
+  // Check if fully paid efficiently using amounts with tolerance
+  const totalPaid = payments?.reduce((sum: number, p: any) => sum + parseFloat(p.amount || 0), 0) || 0;
+  const totalPlanAmount = parseFloat(plan.totalAmount || 0);
+  const TOLERANCE = 10;
+
+  // Also check explicit "all installments paid" logic if needed, but amount is safer for rounding
+  const allPaid = totalPaid >= (totalPlanAmount - TOLERANCE);
 
   return (
     <Button
@@ -773,26 +799,26 @@ export default function StudentFees() {
   };
 
   const calculatePaidAmount = (payments: FeePayment[]) => {
-    return payments.reduce((sum: number, payment: FeePayment) => sum + parseFloat(payment.amount), 0);
+    return Math.round(payments.reduce((sum, p) => sum + parseFloat(p.amount), 0));
   };
 
   const calculateTuitionPaidAmount = (payments: FeePayment[]) => {
-    return payments
-      .filter(p => !p.paymentCategory || p.paymentCategory === 'fee_payment')
-      .reduce((sum: number, payment: FeePayment) => sum + parseFloat(payment.amount), 0);
+    return Math.round(payments
+      .filter(p => p.paymentCategory === 'fee_payment' || !p.paymentCategory)
+      .reduce((sum, p) => sum + parseFloat(p.amount), 0));
   };
 
   const calculateAdditionalPaidAmount = (payments: FeePayment[]) => {
-    return payments
+    return Math.round(payments
       .filter(p => p.paymentCategory === 'additional_charge')
-      .reduce((sum: number, payment: FeePayment) => sum + parseFloat(payment.amount), 0);
+      .reduce((sum, p) => sum + parseFloat(p.amount), 0));
   };
 
   const calculateOutstanding = (student: Student | CombinedStudent) => {
     const fees = getStudentFeesWithGlobal(student);
     const payments = getStudentPayments(student.id);
 
-    const totalFees = calculateTotalFees(fees);
+    const totalFees = Math.round(fees.reduce((sum, fee) => sum + parseFloat(fee.amount), 0));
     // Only count tuition payments towards outstanding
     const totalPaid = calculateTuitionPaidAmount(payments);
 
@@ -1266,9 +1292,9 @@ export default function StudentFees() {
         .reduce((sum, fee) => sum + parseFloat(fee.amount), 0);
       setEmiFormData(prev => ({
         ...prev,
-        totalAmount: total ? total.toString() : '',
+        totalAmount: total ? Math.round(total).toString() : '',
         emiAmount: prev.emiPeriod && total
-          ? ((parseFloat(total.toString()) - (parseFloat(prev.registrationFee) || 0)) / parseInt(prev.emiPeriod)).toFixed(2)
+          ? Math.round((parseFloat(total.toString()) - (parseFloat(prev.registrationFee) || 0)) / parseInt(prev.emiPeriod)).toString()
           : ''
       }));
     } else {
@@ -1305,7 +1331,7 @@ export default function StudentFees() {
 
           newInstallments.push({
             installmentNumber: i + 1,
-            amount: amount.toFixed(2),
+            amount: Math.round(amount).toString(),
             dueDate: dueDate.toISOString().split('T')[0]
           });
         }
@@ -2232,7 +2258,7 @@ export default function StudentFees() {
                                 </TableCell>
                                 <TableCell>
                                   {plan.numberOfInstallments > 1 ? (
-                                    <EMIPaymentProgress planId={plan.id} totalInstallments={plan.numberOfInstallments} installmentAmount={plan.installmentAmount} status={plan.status} />
+                                    <EMIPaymentProgress planId={plan.id} totalInstallments={plan.numberOfInstallments} installmentAmount={plan.installmentAmount} status={plan.status} totalAmount={plan.totalAmount} />
                                   ) : (
                                     <div className="text-sm text-gray-500">Full payment</div>
                                   )}
@@ -2488,7 +2514,7 @@ export default function StudentFees() {
                                       ...prev,
                                       discount,
                                       emiAmount: prev.totalAmount && prev.emiPeriod
-                                        ? ((parseFloat(prev.totalAmount) - (parseFloat(prev.registrationFee) || 0) - (parseFloat(discount) || 0)) / parseInt(prev.emiPeriod)).toFixed(2)
+                                        ? Math.round((parseFloat(prev.totalAmount) - (parseFloat(prev.registrationFee) || 0) - (parseFloat(discount) || 0)) / parseInt(prev.emiPeriod)).toString()
                                         : ''
                                     }));
                                   }}
@@ -2515,7 +2541,7 @@ export default function StudentFees() {
                                           ...prev,
                                           registrationFee,
                                           emiAmount: prev.totalAmount && prev.emiPeriod
-                                            ? ((parseFloat(prev.totalAmount) - (parseFloat(registrationFee) || 0) - (parseFloat(prev.discount) || 0)) / parseInt(prev.emiPeriod)).toFixed(2)
+                                            ? Math.round((parseFloat(prev.totalAmount) - (parseFloat(registrationFee) || 0) - (parseFloat(prev.discount) || 0)) / parseInt(prev.emiPeriod)).toString()
                                             : ''
                                         }));
                                       }}
@@ -2548,7 +2574,7 @@ export default function StudentFees() {
                                           ...prev,
                                           emiPeriod: value,
                                           emiAmount: emiFormData.totalAmount && value
-                                            ? ((parseFloat(emiFormData.totalAmount) - (parseFloat(emiFormData.registrationFee) || 0) - (parseFloat(emiFormData.discount) || 0)) / parseInt(value)).toFixed(2)
+                                            ? Math.round((parseFloat(emiFormData.totalAmount) - (parseFloat(emiFormData.registrationFee) || 0) - (parseFloat(emiFormData.discount) || 0)) / parseInt(value)).toString()
                                             : ''
                                         }));
                                       }}
@@ -2672,7 +2698,7 @@ export default function StudentFees() {
                                             const discount = parseFloat(emiFormData.discount) || 0;
                                             const months = parseInt(emiFormData.emiPeriod) || 0;
                                             if (months > 0 && total - fee - discount > 0) {
-                                              return ((total - fee - discount) / months).toFixed(2);
+                                              return Math.round((total - fee - discount) / months).toString();
                                             }
                                             return '0';
                                           })()}
@@ -2691,7 +2717,7 @@ export default function StudentFees() {
                                             const discount = parseFloat(emiFormData.discount) || 0;
                                             const months = parseInt(emiFormData.emiPeriod) || 0;
                                             if (months > 0 && total - fee - discount > 0) {
-                                              return (total - fee - discount).toFixed(2);
+                                              return Math.round(total - fee - discount).toString();
                                             }
                                             return '0.00';
                                           })()}

@@ -4,11 +4,11 @@
 
 // API Configuration
 export const API_BASE_URL = __DEV__
-    ? 'http://192.168.29.16:5000/api/mobile'  // Development (use your PC's IP)
+    ? 'http://192.168.29.166:5000/api/v1/mobile'  // Development (use your PC's IP)
     : 'https://edu-lead-pro.vercel.app/api/mobile'; // Production
 
 export const WEBSOCKET_URL = __DEV__
-    ? 'ws://localhost:5000'
+    ? 'ws://192.168.29.166:5000'
     : 'wss://edu-lead-pro.vercel.app';
 
 // GPS Tracking Configuration

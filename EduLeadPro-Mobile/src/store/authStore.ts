@@ -9,6 +9,7 @@ import authAPI from '../services/api/auth.api';
 interface AuthStore extends AuthState {
     login: (phone: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
+    reset: () => void; // Local cleanup without API call
     loadUser: () => Promise<void>;
     setUser: (user: User | null) => void;
 }
@@ -54,7 +55,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
             if (response.success) {
                 set({
                     user: response.user,
-                    token: response.token,
+                    token: response.accessToken || (response as any).token,
                     isAuthenticated: true,
                     isLoading: false,
                 });
@@ -83,6 +84,18 @@ export const useAuthStore = create<AuthStore>((set) => ({
                 isLoading: false,
             });
         }
+    },
+
+    /**
+     * Reset auth state locally (used when token refresh fails)
+     */
+    reset: () => {
+        set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            isLoading: false,
+        });
     },
 
     /**

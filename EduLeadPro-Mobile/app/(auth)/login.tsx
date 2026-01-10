@@ -1,3 +1,8 @@
+/**
+ * Login Screen - Premium UI with Expo Router
+ * Combines premium design from root LoginScreen.tsx with Expo Router navigation
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
     View,
@@ -13,20 +18,19 @@ import {
     Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
-import { api, type Child } from './services/api';
-import { colors, spacing, typography, shadows, layout } from './src/theme';
-import PremiumButton from './src/components/ui/PremiumButton';
-import PremiumInput from './src/components/ui/PremiumInput';
-import PremiumCard from './src/components/ui/PremiumCard';
+import { useRouter } from 'expo-router';
+import { useAuthStore } from '../../src/store/authStore';
+import { colors, spacing, typography, shadows, layout } from '../../src/theme';
+import PremiumButton from '../../src/components/ui/PremiumButton';
+import PremiumInput from '../../src/components/ui/PremiumInput';
+import PremiumCard from '../../src/components/ui/PremiumCard';
 
-const { width, height } = layout;
+const { width, height } = Dimensions.get('window');
 
-interface LoginScreenProps {
-    onLoginSuccess: (user: any, students: Child[]) => void;
-}
+export default function LoginScreen() {
+    const router = useRouter();
+    const { login } = useAuthStore();
 
-export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -40,7 +44,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [changeLoading, setChangeLoading] = useState(false);
-    const [tempUserRole, setTempUserRole] = useState('');
 
     useEffect(() => {
         // Entrance Animation
@@ -67,20 +70,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         setLoading(true);
         try {
-            const response = await api.login(phone, password);
-            if (response.success && response.user) {
-                if (response.requiresPasswordChange) {
-                    setTempUserRole(response.user.role || '');
-                    setShowChangePassword(true);
-                } else {
-                    onLoginSuccess(response.user, response.students || []);
-                }
-            } else {
-                Alert.alert('Login Failed', response.error || 'Invalid credentials');
-            }
+            await login(phone, password);
+            // Navigation happens automatically via _layout.tsx auth state
         } catch (error: any) {
             console.error(error);
-            const errorMessage = error?.message || 'Please check your internet connection.';
+            const errorMessage = error?.response?.data?.error || error?.message || 'Invalid credentials';
 
             // Check for network/connection related errors
             const isConnectionError = errorMessage.toLowerCase().includes('network') ||
@@ -94,38 +88,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             }
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleChangePassword = async () => {
-        if (!newPassword || !confirmPassword) {
-            Alert.alert('Error', 'Please fill all fields');
-            return;
-        }
-        if (newPassword !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
-            return;
-        }
-
-        setChangeLoading(true);
-        try {
-            const isStaff = tempUserRole && (tempUserRole === 'teacher' || tempUserRole === 'driver' || tempUserRole === 'staff');
-            const result = isStaff
-                ? await api.changePasswordStaff(phone, newPassword, password)
-                : await api.changePassword(phone, newPassword);
-
-            if (result.success) {
-                Alert.alert('Success', 'Password updated! Logging you in...');
-                setShowChangePassword(false);
-                const response = await api.login(phone, newPassword);
-                if (response.success) onLoginSuccess(response.user, response.students || []);
-            } else {
-                Alert.alert('Update Failed', result.message || 'Could not update password');
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Failed to change password. Try again.');
-        } finally {
-            setChangeLoading(false);
         }
     };
 
@@ -144,7 +106,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
                 <View style={styles.logoContainer}>
                     <Image
-                        source={require('./assets/logo.png')}
+                        source={require('../../assets/logo.png')}
                         style={styles.logoImage}
                         resizeMode="cover"
                     />
@@ -210,34 +172,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                     </PremiumCard>
                 </Animated.View>
             </KeyboardAvoidingView>
-
-            {/* Change Password Modal (Simplified for brevity, reusing styles) */}
-            <Modal visible={showChangePassword} transparent animationType="fade">
-                <View style={styles.modalOverlay}>
-                    <PremiumCard style={{ width: '90%' }}>
-                        <Text style={styles.cardTitle}>Set New Password</Text>
-                        <Text style={[styles.cardSub, { marginBottom: 20 }]}>Secure your account</Text>
-
-                        <PremiumInput
-                            label="New Password"
-                            icon="lock"
-                            secureTextEntry
-                            value={newPassword}
-                            onChangeText={setNewPassword}
-                        />
-                        <PremiumInput
-                            label="Confirm Password"
-                            icon="check-circle"
-                            secureTextEntry
-                            value={confirmPassword}
-                            onChangeText={setConfirmPassword}
-                        />
-
-                        <View style={{ height: 20 }} />
-                        <PremiumButton title="Update Password" onPress={handleChangePassword} loading={changeLoading} />
-                    </PremiumCard>
-                </View>
-            </Modal>
         </View>
     );
 }
@@ -250,7 +184,7 @@ const styles = StyleSheet.create({
     background: {
         position: 'absolute',
         left: 0, right: 0, top: 0,
-        height: height * 0.6, // Gradient covers top 60%
+        height: height * 0.6,
     },
     header: {
         marginTop: height * 0.12,
@@ -327,10 +261,4 @@ const styles = StyleSheet.create({
         color: colors.textTertiary,
         marginHorizontal: spacing.sm,
     },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    }
 });

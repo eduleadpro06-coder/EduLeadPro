@@ -1,13 +1,12 @@
 // Mobile App Configuration
-// Update this with your computer's IP address
+// Uses environment variables from app.config.js
 
-// To find your IP:
-// Windows: Run 'ipconfig' in terminal, look for IPv4 Address
-// Example: 192.168.1.5 or 192.168.29.x
+import Constants from 'expo-constants';
 
-// IMPORTANT: Using your PC's IP for phone access
-export const API_BASE_URL = 'http://192.168.29.16:5000/api/mobile';
-// The IP 192.168.29.16 is your PC. Phone can access this on same WiFi.
+// Get API URL from environment
+export const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:5000/api/mobile';
+export const WS_URL = Constants.expoConfig?.extra?.wsUrl || 'ws://localhost:5000';
+export const OLA_MAPS_API_KEY = Constants.expoConfig?.extra?.olaMapsApiKey || '';
 
 // API endpoints
 export const API = {
@@ -29,3 +28,4 @@ export const colors = {
     success: '#10b981',
     danger: '#ef4444',
 };
+

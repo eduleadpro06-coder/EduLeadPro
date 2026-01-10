@@ -124,6 +124,7 @@ router.post('/location', async (req: Request, res: Response) => {
         } = req.body;
 
         if (!routeId || latitude === undefined || longitude === undefined) {
+            console.error('[Driver API] Invalid location request:', req.body);
             return res.status(400).json({
                 success: false,
                 error: {
@@ -133,23 +134,40 @@ router.post('/location', async (req: Request, res: Response) => {
             });
         }
 
-        const { supabase } = await import('../../supabase.js');
-        // Update BOTH tables for parent/admin visibility
-        // Table 1: bus_live_locations (used by parent portal map)
-        const { error: liveError } = await supabase
-            .from('bus_live_locations')
-            .upsert({
-                route_id: routeId,
-                driver_id: req.user?.userId, // Keep driver_id as it was in the original code
-                latitude,
-                longitude,
-                speed,
-                heading,
-                is_active: true,
-                timestamp: new Date().toISOString()
-            }, { onConflict: 'route_id' });
+        console.log(`[Driver API] Updating location for Route ${routeId}: ${latitude}, ${longitude}`);
 
-        if (liveError) console.error('[Driver API] Live location error:', liveError);
+        const { supabase } = await import('../../supabase.js');
+
+        // Use raw SQL with NOW() to ensure database time is used
+        // Supabase RPC has issues with custom functions, so we use pg directly
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+        const { Pool } = await import('pg');
+        const pool = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false }
+        });
+
+        try {
+            await pool.query(`
+                INSERT INTO bus_live_locations (route_id, driver_id, latitude, longitude, speed, heading, is_active, timestamp)
+                VALUES ($1, $2, $3, $4, $5, $6, true, NOW() AT TIME ZONE 'Asia/Kolkata')
+                ON CONFLICT (route_id) 
+                DO UPDATE SET
+                    driver_id = EXCLUDED.driver_id,
+                    latitude = EXCLUDED.latitude,
+                    longitude = EXCLUDED.longitude,
+                    speed = EXCLUDED.speed,
+                    heading = EXCLUDED.heading,
+                    is_active = true,
+                    timestamp = NOW() AT TIME ZONE 'Asia/Kolkata'
+            `, [routeId, req.user?.userId, latitude, longitude, speed || 0, heading || 0]);
+
+            console.log('[Driver API] Location updated via raw SQL with DB timestamp (NOW)');
+        } catch (dbError) {
+            console.error('[Driver API] Raw SQL error:', dbError);
+        } finally {
+            await pool.end();
+        }
 
         // Table 2: active_bus_sessions (used for current status/dashboard)
         const { error: sessionError } = await supabase
@@ -204,11 +222,12 @@ router.post('/student-status', async (req: Request, res: Response) => {
         if (error) throw error;
 
         res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
         console.error('[Driver API] Update student status error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to update student status'
+            error: error.message || 'Failed to update student status',
+            details: error
         });
     }
 });
@@ -220,6 +239,7 @@ router.post('/student-status', async (req: Request, res: Response) => {
 router.post('/trip/start', async (req: Request, res: Response) => {
     try {
         const { routeId } = req.body;
+        console.log(`[Driver API] Start Trip Request for Route: ${routeId} by User: ${req.user?.userId}`);
 
         if (!routeId) {
             return res.status(400).json({

@@ -15,9 +15,11 @@ export const authAPI = {
         const response: LoginResponse = await apiClient.post('/auth/login', credentials);
 
         // Store tokens and user data securely
-        if (response.success && response.token) {
-            await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, response.token);
-            await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, response.refreshToken);
+        if (response.success && response.accessToken) {
+            await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, response.accessToken);
+            if (response.refreshToken) {
+                await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, response.refreshToken);
+            }
             await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(response.user));
         }
 

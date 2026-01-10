@@ -139,7 +139,6 @@ export default function PremiumDrawer({
                         <Feather name="log-out" size={20} color={colors.danger} />
                         <Text style={styles.logoutText}>Sign Out</Text>
                     </TouchableOpacity>
-                    <Text style={styles.version}>v1.0.2 Premium</Text>
                 </View>
             </Animated.View>
         </View>
@@ -240,11 +239,5 @@ const styles = StyleSheet.create({
         ...typography.button,
         color: colors.danger,
         marginLeft: 12,
-    },
-    version: {
-        ...typography.caption,
-        textAlign: 'center',
-        marginTop: spacing.md,
-        color: colors.textTertiary,
     },
 });

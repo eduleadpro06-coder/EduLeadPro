@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { offlineCache } from '../services/offline-cache';
-import { api } from '../../services/api';
+import { api } from '../services/api';
 
 export function useOffline() {
     const [isOnline, setIsOnline] = useState(true);
@@ -16,7 +16,7 @@ export function useOffline() {
     // Monitor network status
     useEffect(() => {
         const unsubscribe = NetInfo.addEventListener(state => {
-            const online = state.isConnected && state.isInternetReachable !== false;
+            const online = !!state.isConnected && state.isInternetReachable !== false;
             setIsOnline(online);
 
             // Auto-sync when coming back online
@@ -68,13 +68,13 @@ export function useOffline() {
                 await api.postActivity(payload.leadId, payload.content, payload.options);
                 break;
             case 'update_location':
-                await api.updateBusLocation(
-                    payload.routeId,
-                    payload.latitude,
-                    payload.longitude,
-                    payload.speed,
-                    payload.heading
-                );
+                await api.updateLocation({
+                    routeId: payload.routeId,
+                    latitude: payload.latitude,
+                    longitude: payload.longitude,
+                    speed: payload.speed,
+                    heading: payload.heading
+                });
                 break;
             default:
                 console.warn(`[Offline] Unknown action type: ${actionType}`);

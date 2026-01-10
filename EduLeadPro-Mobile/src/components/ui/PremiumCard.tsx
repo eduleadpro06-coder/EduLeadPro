@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle, Platform } from 'react-native';
+import { View, StyleSheet, ViewStyle, Platform, StyleProp } from 'react-native';
 import { colors, shadows, spacing } from '../../theme';
 
 interface PremiumCardProps {
     children: React.ReactNode;
     variant?: 'elevated' | 'flat' | 'outlined';
-    style?: ViewStyle;
+    style?: StyleProp<ViewStyle>;
 }
 
 export default function PremiumCard({

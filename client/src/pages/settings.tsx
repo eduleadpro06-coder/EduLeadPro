@@ -43,6 +43,7 @@ export default function Settings() {
     city: "",
     state: "",
     pincode: "",
+    email: "",
   });
 
   // Fetch organization data
@@ -62,6 +63,7 @@ export default function Settings() {
         city: org.city || "",
         state: org.state || "",
         pincode: org.pincode || "",
+        email: org.email || "",
       });
     }
   }, [organizationData]);
@@ -371,15 +373,16 @@ export default function Settings() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="org-email" className="text-sm font-semibold">Email</Label>
+                        <Label htmlFor="org-email" className="text-sm font-semibold">Support Email</Label>
                         <Input
                           id="org-email"
                           type="email"
-                          value={user?.email || ""}
-                          disabled
-                          className="bg-gray-100"
+                          value={orgProfile.email}
+                          onChange={(e) => setOrgProfile({ ...orgProfile, email: e.target.value })}
+                          placeholder="Enter support email address"
+                          className="transition-all focus:ring-2 focus:ring-blue-500"
                         />
-                        <p className="text-xs text-muted-foreground">Using your account email</p>
+                        <p className="text-xs text-muted-foreground">This email will be visible to parents on the support screen</p>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 gap-6">

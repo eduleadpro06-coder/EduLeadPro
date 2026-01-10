@@ -44,40 +44,14 @@ class APIClient {
             }
         );
 
-        // Response interceptor - Handle errors and token refresh
+        // Response interceptor - Handle errors
         this.client.interceptors.response.use(
             (response) => response,
             async (error) => {
-                const originalRequest = error.config;
-
-                // If 401 and haven't retried yet, try to refresh token
-                if (error.response?.status === 401 && !originalRequest._retry) {
-                    originalRequest._retry = true;
-
-                    try {
-                        const refreshToken = await SecureStore.getItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
-
-                        if (refreshToken) {
-                            const response = await axios.post(
-                                `${API_BASE_URL}/auth/refresh`,
-                                { refreshToken }
-                            );
-
-                            const { token: newToken } = response.data;
-                            await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, newToken);
-
-                            // Retry original request with new token
-                            originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                            return this.client(originalRequest);
-                        }
-                    } catch (refreshError) {
-                        // Refresh failed - logout user
-                        await this.clearAuth();
-                        // Navigate to login (handled by auth context)
-                        return Promise.reject(refreshError);
-                    }
+                if (error.response?.status === 401) {
+                    console.warn('[Axios] 401 Unauthorized - Session Expired');
+                    // Tokens are cleared by APIService if it hits a 401 as well
                 }
-
                 return Promise.reject(error);
             }
         );

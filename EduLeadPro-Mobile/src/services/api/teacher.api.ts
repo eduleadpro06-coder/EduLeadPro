@@ -9,27 +9,130 @@ import {
     PostUpdateRequest,
     StudentInfo,
 } from '../../types/teacher.types';
+import { supabase } from '../../lib/supabase';
+import { decode } from 'base64-arraybuffer';
+
+// Helper to upload base64/URI image to Supabase
+const uploadToSupabase = async (uriOrBase64: string): Promise<string | null> => {
+    if (!uriOrBase64) return null;
+
+    // Check if it's already a remote URL
+    if (uriOrBase64.startsWith('http')) return uriOrBase64;
+
+    try {
+        console.log('Starting Supabase upload...');
+        const timestamp = new Date().getTime();
+        const randomId = Math.random().toString(36).substring(7);
+        const fileName = `upload_${timestamp}_${randomId}.jpg`;
+        // Policy requires "public" folder
+        const filePath = `public/activity_uploads/${fileName}`;
+
+        let base64Data = uriOrBase64;
+        if (uriOrBase64.startsWith('data:image')) {
+            base64Data = uriOrBase64.split(',')[1];
+        }
+
+        const { data, error } = await supabase.storage
+            .from('media')
+            .upload(filePath, decode(base64Data), {
+                contentType: 'image/jpeg',
+                upsert: false
+            });
+
+        if (error) {
+            console.error('Supabase upload error:', error);
+            throw error;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('media')
+            .getPublicUrl(filePath);
+
+        console.log('Upload success, public URL:', publicUrl);
+        return publicUrl;
+    } catch (error: any) {
+        console.error('Failed to upload image manually:', error);
+        return null;
+    }
+};
 
 export const teacherAPI = {
     /**
      * Get teacher dashboard data
      */
-    async getDashboard(staffId: number): Promise<TeacherDashboard> {
-        return await apiClient.get(`/teacher/dashboard/${staffId}`);
+    async getDashboard(): Promise<TeacherDashboard> {
+        const response = await apiClient.get('/teacher/dashboard');
+        return response.data;
+    },
+
+    // Alias for index.tsx compatibility
+    async getTeacherDashboard(): Promise<TeacherDashboard> {
+        return this.getDashboard();
     },
 
     /**
-     * Mark student attendance
+     * Mark student attendance in bulk
      */
-    async markAttendance(data: MarkAttendanceRequest): Promise<{ success: boolean; message: string }> {
-        return await apiClient.post('/attendance/mark', data);
+    async markAttendanceBulk(attendanceRecords: any[]): Promise<any> {
+        const response = await apiClient.post('/teacher/attendance/bulk', { attendanceRecords });
+        return response.data;
     },
 
     /**
      * Post daily update/activity
      */
     async postDailyUpdate(data: PostUpdateRequest): Promise<{ success: boolean; message: string }> {
-        return await apiClient.post('/daily-updates/post', data);
+        return await apiClient.post('/teacher/activity', data);
+    },
+
+    /**
+     * Post activity (alias for postDailyUpdate or specific implementation)
+     */
+    async postActivity(leadIds: number[] | number, content: string, options: any = {}): Promise<any> {
+        let localImages = options.images || []; // Array of local URIs
+        // Legacy support for single image property
+        if (options.image && !localImages.includes(options.image)) {
+            localImages.push(options.image);
+        }
+
+        let mediaUrls = options.mediaUrls || [];
+
+        // Upload all local images
+        if (localImages.length > 0) {
+            console.log(`Processing ${localImages.length} images for upload...`);
+
+            // Upload in parallel
+            const uploadPromises = localImages.map(async (imgUri: string) => {
+                if (!imgUri || imgUri.startsWith('http')) return imgUri; // Skip if already remote
+                return await uploadToSupabase(imgUri);
+            });
+
+            const uploadedUrls = await Promise.all(uploadPromises);
+
+            // Filter out failures (nulls) and add to mediaUrls
+            const validUrls = uploadedUrls.filter((url: string | null) => url !== null);
+            mediaUrls = [...mediaUrls, ...validUrls];
+
+            console.log(`Successfully uploaded ${validUrls.length} images.`);
+        }
+
+        const payload: any = {
+            ...options, // Spread first so specific keys override it
+            content,
+            title: options.title || 'Activity Update',
+            activityType: options.activityType || 'general',
+            image: null, // Explicitly set to null to prevent backend upload
+            mediaUrls: mediaUrls, // Send the updated array
+            mood: options.mood,
+        };
+
+        if (Array.isArray(leadIds)) {
+            payload.leadIds = leadIds;
+        } else {
+            payload.leadId = leadIds;
+        }
+
+        return await this.postDailyUpdate(payload);
     },
 
     /**
@@ -48,14 +151,29 @@ export const teacherAPI = {
     },
 
     /**
+     * Get students for the logged-in teacher
+     */
+    async getTeacherStudents(classFilter?: string): Promise<StudentInfo[]> {
+        const params = new URLSearchParams();
+        if (classFilter) params.append('class', classFilter);
+
+        const response = await apiClient.get(`/teacher/students?${params.toString()}`);
+        return response.data?.students || [];
+    },
+
+    /**
      * Get attendance history for a student
      */
-    async getAttendanceHistory(studentId: number, startDate?: string, endDate?: string): Promise<any> {
-        const params = new URLSearchParams();
-        if (startDate) params.append('startDate', startDate);
-        if (endDate) params.append('endDate', endDate);
+    async getAttendanceHistory(studentId: number, days: number = 30): Promise<any> {
+        return await apiClient.get(`/teacher/student/${studentId}/attendance?days=${days}`);
+    },
 
-        return await apiClient.get(`/student/${studentId}/attendance?${params.toString()}`);
+    /**
+     * Get today's attendance for all students
+     */
+    async getTodayAttendanceAll(): Promise<any> {
+        const response = await apiClient.get('/teacher/attendance/today');
+        return response.data;
     },
 };
 
