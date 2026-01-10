@@ -1,7 +1,7 @@
 export default {
   expo: {
     name: 'EduConnect',
-    slug: 'educonnect',
+    slug: 'eduleadpro',
     version: '2.0.0',
     orientation: 'portrait',
     icon: './assets/logo.png',
