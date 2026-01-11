@@ -5,7 +5,7 @@
 // API Configuration
 export const API_BASE_URL = __DEV__
     ? 'http://192.168.29.166:5000/api/v1/mobile'  // Development (use your PC's IP)
-    : 'https://edu-lead-pro.vercel.app/api/mobile'; // Production
+    : 'https://eduleadconnect.vercel.app/api/v1/mobile'; // Production
 
 export const WEBSOCKET_URL = __DEV__
     ? 'ws://192.168.29.166:5000'
