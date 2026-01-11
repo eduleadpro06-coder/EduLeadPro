@@ -311,10 +311,21 @@ router.get('/child/:childId/bus-assignment', async (req: Request, res: Response)
 
         if (error) throw error;
 
-        // Enhance with driver details
+        // Enhance with driver and route stops
         const enhancedAssignments = await Promise.all((assignments || []).map(async (assignment) => {
             let driverName = 'Driver';
             let driverPhone = '';
+            let routeStops: any[] = [];
+
+            // Fetch stops for the route
+            if (assignment.route_id) {
+                const { data: stops } = await supabase
+                    .from('bus_stops')
+                    .select('*')
+                    .eq('route_id', assignment.route_id)
+                    .order('stop_order', { ascending: true });
+                routeStops = stops || [];
+            }
 
             if (assignment.bus_routes?.driver_id) {
                 const { data: driver } = await supabase
@@ -332,7 +343,8 @@ router.get('/child/:childId/bus-assignment', async (req: Request, res: Response)
             return {
                 ...assignment,
                 driver_name: driverName,
-                driver_phone: driverPhone
+                driver_phone: driverPhone,
+                route_stops: routeStops
             };
         }));
 

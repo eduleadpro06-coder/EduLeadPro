@@ -5,9 +5,10 @@ const AdminMap = React.lazy(() => import('./SimpleMap'));
 
 interface ClientMapWrapperProps {
     activeBuses: any[];
+    allRoutes?: any[];
 }
 
-export default function ClientMapWrapper({ activeBuses }: ClientMapWrapperProps) {
+export default function ClientMapWrapper({ activeBuses, allRoutes }: ClientMapWrapperProps) {
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
@@ -28,7 +29,7 @@ export default function ClientMapWrapper({ activeBuses }: ClientMapWrapperProps)
                 <p className="text-gray-500">Loading map resources...</p>
             </div>
         }>
-            <AdminMap activeBuses={activeBuses} />
+            <AdminMap activeBuses={activeBuses} allRoutes={allRoutes} />
         </Suspense>
     );
 }

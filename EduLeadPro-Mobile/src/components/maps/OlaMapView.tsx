@@ -26,7 +26,7 @@ interface OlaMapViewProps {
     center?: MapLocation;
     zoom?: number;
     markers?: MapMarker[];
-    route?: MapLocation[];
+    route?: MapLocation[]; // List of coordinates for the polyline
     showUserLocation?: boolean;
     onMapReady?: () => void;
     onMarkerPress?: (marker: MapMarker) => void;
@@ -37,6 +37,7 @@ export default function OlaMapView({
     center,
     zoom = 14,
     markers = [],
+    route = [],
     onMapReady,
     onMarkerPress,
     style,
@@ -82,7 +83,7 @@ export default function OlaMapView({
                     try {
                         olamaps = new OlaMaps.OlaMaps({
                             apiKey: '${OLA_MAPS_API_KEY}',
-                            mode: '3d', // Enable 3D to resolve '3d_model' layer errors
+                            mode: '3d',
                             threedTileset: 'https://api.olamaps.io/tiles/vector/v1/3dtiles/tileset.json'
                         });
 
@@ -114,6 +115,49 @@ export default function OlaMapView({
                          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ERROR', message: e.message }));
                     }
                 }
+
+                // Update Route Function
+                window.updateRoute = (coords) => {
+                    if (!map) return;
+                    
+                    if (map.getSource('route')) {
+                        map.getSource('route').setData({
+                            type: 'Feature',
+                            properties: {},
+                            geometry: {
+                                type: 'LineString',
+                                coordinates: coords
+                            }
+                        });
+                    } else {
+                        map.addSource('route', {
+                            type: 'geojson',
+                            data: {
+                                type: 'Feature',
+                                properties: {},
+                                geometry: {
+                                    type: 'LineString',
+                                    coordinates: coords
+                                }
+                            }
+                        });
+
+                        map.addLayer({
+                            id: 'route',
+                            type: 'line',
+                            source: 'route',
+                            layout: {
+                                'line-join': 'round',
+                                'line-cap': 'round'
+                            },
+                            paint: {
+                                'line-color': '#4f46e5',
+                                'line-width': 5,
+                                'line-opacity': 0.75
+                            }
+                        });
+                    }
+                };
 
                 window.updateMarkers = (markersList) => {
                     if (!map) return;
@@ -171,9 +215,17 @@ export default function OlaMapView({
             if (data.type === 'MAP_READY') {
                 setIsMapReady(true);
                 if (onMapReady) onMapReady();
+
+                // Push initial markers
                 if (markers.length > 0) {
                     const safeMarkers = JSON.stringify(markers);
                     webviewRef.current?.injectJavaScript(`window.updateMarkers(${safeMarkers}); true;`);
+                }
+
+                // Push initial route
+                if (route.length > 0) {
+                    const safeRoute = JSON.stringify(route.map(r => [r.longitude, r.latitude]));
+                    webviewRef.current?.injectJavaScript(`window.updateRoute(${safeRoute}); true;`);
                 }
             } else if (data.type === 'MARKER_PRESS') {
                 if (onMarkerPress) onMarkerPress(data.payload);
@@ -189,6 +241,14 @@ export default function OlaMapView({
             webviewRef.current.injectJavaScript(`window.updateMarkers(${safeMarkers}); true;`);
         }
     }, [markers, isMapReady]);
+
+    // Update route when prop changes
+    useEffect(() => {
+        if (isMapReady && webviewRef.current && route.length > 0) {
+            const safeRoute = JSON.stringify(route.map(r => [r.longitude, r.latitude]));
+            webviewRef.current.injectJavaScript(`window.updateRoute(${safeRoute}); true;`);
+        }
+    }, [route, isMapReady]);
 
     useEffect(() => {
         if (isMapReady && webviewRef.current && center) {

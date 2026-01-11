@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { OlaMaps } from 'olamaps-web-sdk';
+// OlaMaps is now loaded via CDN in index.html to avoid bundling issues
+const OlaMapsSDK = (window as any).OlaMaps;
 
 // OLA Maps Configuration
 const OLA_MAPS_API_KEY = import.meta.env.VITE_OLA_MAPS_KEY || 'nN7MyyjOHt7LqUdRFNYcfadYtFEw7cqdProAtSD0';
@@ -22,12 +23,14 @@ interface Bus {
 
 interface SimpleMapProps {
     activeBuses: Bus[];
+    allRoutes?: { routeId: number, coords: [number, number][] }[]; // { id, [lng, lat][] }[]
 }
 
-const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
+const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses, allRoutes }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<any>(null);
     const markersRef = useRef<{ [key: number]: any }>({});
+    const routesRef = useRef<{ [key: number]: boolean }>({});
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -38,12 +41,16 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
             if (mapInstanceRef.current) return;
 
             try {
-                console.log("Initializing Official Ola Maps Web SDK v2 (3D Mode)...");
+                console.log("Initializing Official Ola Maps Web SDK v2 (3D Mode via CDN)...");
 
-                // As per latest documentation for 3D Tiles support
-                const olamaps = new OlaMaps({
+                const OlaNamespace = (window as any).OlaMaps;
+                if (!OlaNamespace) {
+                    throw new Error("Ola Maps SDK not loaded from CDN");
+                }
+
+                const olamaps = new OlaNamespace.OlaMaps({
                     apiKey: OLA_MAPS_API_KEY,
-                    mode: "3d", // Integrated 3D support to resolve style layer errors
+                    mode: "3d",
                     threedTileset: "https://api.olamaps.io/tiles/vector/v1/3dtiles/tileset.json",
                 });
 
@@ -52,7 +59,7 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
                     container: mapContainerRef.current,
                     center: [77.61648476788898, 12.931423492103944],
                     zoom: 12,
-                    pitch: 0, // Initial pitch (0 = 2D view, but 3D data is loaded)
+                    pitch: 0,
                 });
 
                 if (!isMounted) {
@@ -72,8 +79,9 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
                 mapInstanceRef.current = map;
 
                 map.on('load', () => {
-                    console.log("Ola Maps SDK v2 Loaded Successfully with 3D support");
+                    console.log("Ola Maps SDK v2 Loaded Successfully");
                     updateMarkers(activeBuses);
+                    if (allRoutes) updateAllRoutes(allRoutes);
                 });
 
                 map.on('error', (e: any) => {
@@ -110,6 +118,77 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
         }
     }, [activeBuses]);
 
+    useEffect(() => {
+        if (mapInstanceRef.current && allRoutes) {
+            updateAllRoutes(allRoutes);
+        }
+    }, [allRoutes]);
+
+    const updateAllRoutes = (routes: { routeId: number, coords: [number, number][] }[]) => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+
+        // Add or update routes
+        routes.forEach(route => {
+            const sourceId = `route-${route.routeId}`;
+            const layerId = `layer-${route.routeId}`;
+
+            if (map.getSource(sourceId)) {
+                (map.getSource(sourceId) as any).setData({
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: route.coords
+                    }
+                });
+            } else {
+                map.addSource(sourceId, {
+                    type: 'geojson',
+                    data: {
+                        type: 'Feature',
+                        properties: {},
+                        geometry: {
+                            type: 'LineString',
+                            coordinates: route.coords
+                        }
+                    }
+                });
+
+                map.addLayer({
+                    id: layerId,
+                    type: 'line',
+                    source: sourceId,
+                    layout: {
+                        'line-join': 'round',
+                        'line-cap': 'round'
+                    },
+                    paint: {
+                        'line-color': '#4f46e5',
+                        'line-width': 4,
+                        'line-opacity': 0.6
+                    }
+                });
+                routesRef.current[route.routeId] = true;
+            }
+        });
+
+        // Remove old routes
+        const currentIds = routes.map(r => r.routeId);
+        Object.keys(routesRef.current).forEach(idStr => {
+            const id = parseInt(idStr);
+            if (!currentIds.includes(id)) {
+                try {
+                    map.removeLayer(`layer-${id}`);
+                    map.removeSource(`route-${id}`);
+                } catch (e) {
+                    console.warn("Error removing route:", e);
+                }
+                delete routesRef.current[id];
+            }
+        });
+    };
+
     const updateMarkers = (buses: Bus[]) => {
         if (!mapInstanceRef.current) return;
         const map = mapInstanceRef.current;
@@ -127,8 +206,7 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
                 const el = createBusMarkerElement();
 
                 try {
-                    // Documentation shows OlaMaps.Marker / OlaMaps.Popup
-                    const OlaNamespace = (window as any).OlaMaps || OlaMaps;
+                    const OlaNamespace = (window as any).OlaMaps;
 
                     if (OlaNamespace && OlaNamespace.Marker) {
                         const popup = new OlaNamespace.Popup({ offset: [0, -15] }).setHTML(getPopupContent(bus));
@@ -201,7 +279,6 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
                 >
                     Retry Loading
                 </button>
-                <p className="mt-4 text-xs text-gray-400">Ola Maps SDK v2 Integration</p>
             </div>
         );
     }

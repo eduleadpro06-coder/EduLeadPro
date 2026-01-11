@@ -21,6 +21,7 @@ import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
 import OlaMapView from '../../src/components/maps/OlaMapView';
 import { api } from '../../services/api';
+import { getDirections, LatLng } from '../../src/utils/olaApi';
 import { colors, spacing, typography, shadows } from '../../src/theme';
 import PremiumCard from '../../src/components/ui/PremiumCard';
 
@@ -36,6 +37,7 @@ export default function BusTrackingScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isLive, setIsLive] = useState(false);
     const [studentStatus, setStudentStatus] = useState<string>('pending');
+    const [routeCoords, setRouteCoords] = useState<LatLng[]>([]);
     const [error, setError] = useState<string | null>(null);
     const updateInterval = useRef<NodeJS.Timeout | null>(null);
 
@@ -55,6 +57,51 @@ export default function BusTrackingScreen() {
             }
         };
     }, [currentChild]);
+
+    useEffect(() => {
+        if (liveLocation && busData) {
+            updateRoute();
+        }
+    }, [liveLocation, studentStatus, busData]);
+
+    const updateRoute = async () => {
+        if (!liveLocation || !busData) return;
+
+        let destination: LatLng | null = null;
+
+        // Determine destination based on status
+        if (studentStatus === 'pending' || studentStatus === 'waiting') {
+            // Destination is the pickup stop
+            if (busData.assignment?.pickup_stop) {
+                destination = {
+                    latitude: parseFloat(busData.assignment.pickup_stop.latitude),
+                    longitude: parseFloat(busData.assignment.pickup_stop.longitude)
+                };
+            }
+        } else if (studentStatus === 'boarded') {
+            // Destination is the school (last stop of route)
+            const stops = busData.assignment?.route_stops || [];
+            if (stops.length > 0) {
+                const schoolStop = stops[stops.length - 1];
+                destination = {
+                    latitude: parseFloat(schoolStop.latitude),
+                    longitude: parseFloat(schoolStop.longitude)
+                };
+            }
+        }
+
+        if (destination) {
+            const coords = await getDirections(
+                { latitude: liveLocation.latitude, longitude: liveLocation.longitude },
+                destination
+            );
+            if (coords.length > 0) {
+                setRouteCoords(coords);
+            }
+        } else {
+            setRouteCoords([]);
+        }
+    };
 
     const fetchBusData = async () => {
         try {
@@ -187,6 +234,7 @@ export default function BusTrackingScreen() {
                     center={liveLocation || { latitude: 28.6139, longitude: 77.2090 }}
                     zoom={15}
                     markers={mapMarkers}
+                    route={routeCoords}
                     showUserLocation={false}
                     style={styles.map}
                 />

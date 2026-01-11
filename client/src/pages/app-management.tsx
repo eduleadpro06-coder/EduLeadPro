@@ -33,14 +33,66 @@ import { useEffect, useRef, useMemo } from 'react';
 
 // Live Bus Tracking Map Component
 import ClientMapWrapper from "@/components/ClientMapWrapper";
+import { fetchRoute } from "@/utils/routeService";
 
 function LiveBusTrackingMap() {
     const { data: trackingData, refetch, isLoading } = useQuery<{ routes: any[] }>({
         queryKey: ['/api/bus/live-tracking'],
-        refetchInterval: 5000, // Faster refresh (5s) for live movement
+        refetchInterval: 10000,
     });
 
     const activeBuses = trackingData?.routes || [];
+    const [allRoutes, setAllRoutes] = useState<{ routeId: number; coords: [number, number][] }[]>([]);
+
+    useEffect(() => {
+        if (activeBuses.length > 0) {
+            updateAllPaths();
+        } else if (allRoutes.length > 0) {
+            setAllRoutes([]);
+        }
+    }, [activeBuses]);
+
+    const updateAllPaths = async () => {
+        try {
+            const newRoutes: { routeId: number; coords: [number, number][] }[] = [];
+
+            if (activeBuses.length === 0) {
+                setAllRoutes([]);
+                return;
+            }
+
+            for (const bus of activeBuses) {
+                // Destination is the final stop
+                if (bus.stops && bus.stops.length > 0 && bus.currentLocation) {
+                    try {
+                        const schoolStop = bus.stops[bus.stops.length - 1];
+                        if (!schoolStop.latitude || !schoolStop.longitude) continue;
+
+                        const routeData = await fetchRoute(
+                            { lat: bus.currentLocation.latitude, lng: bus.currentLocation.longitude },
+                            { lat: parseFloat(schoolStop.latitude), lng: parseFloat(schoolStop.longitude) }
+                        );
+
+                        if (routeData && routeData.legs && routeData.legs[0]?.steps) {
+                            const coords: [number, number][] = routeData.legs[0].steps
+                                .filter((s: any) => s.start_location?.lng && s.start_location?.lat)
+                                .map((s: any) => [s.start_location.lng, s.start_location.lat] as [number, number]);
+
+                            if (coords.length > 0) {
+                                newRoutes.push({ routeId: bus.routeId, coords });
+                            }
+                        }
+                    } catch (err) {
+                        console.error(`Failed to fetch route for bus ${bus.routeId}:`, err);
+                    }
+                }
+            }
+
+            setAllRoutes(newRoutes);
+        } catch (err) {
+            console.error("Critical error in updateAllPaths:", err);
+        }
+    };
 
     return (
         <Card>
@@ -77,7 +129,7 @@ function LiveBusTrackingMap() {
                     <div>
                         {/* Map Container - using ClientWrapper to avoid SSR issues */}
                         <div style={{ height: '500px', width: '100%', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-                            <ClientMapWrapper activeBuses={activeBuses} />
+                            <ClientMapWrapper activeBuses={activeBuses} allRoutes={allRoutes} />
                         </div>
 
                         {/* Active Buses List */}

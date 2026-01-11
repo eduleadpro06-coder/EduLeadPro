@@ -5692,7 +5692,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               return null;
             }
 
-            // 3. Get driver information using Supabase
+            // 3. Get route stops using Supabase
+            const { data: stops } = await supabase
+              .from('bus_stops')
+              .select('*')
+              .eq('route_id', route.id)
+              .order('stop_order', { ascending: true });
+
+            // 4. Get driver information using Supabase
             let driverName = 'Unknown Driver';
             if (route.driverId) {
               const { data: drivers } = await supabase
@@ -5711,6 +5718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               routeName: route.routeName,
               vehicleNumber: route.vehicleNumber,
               driverName,
+              stops: stops || [],
               currentLocation: {
                 latitude: parseFloat(latestLocation.latitude),
                 longitude: parseFloat(latestLocation.longitude),

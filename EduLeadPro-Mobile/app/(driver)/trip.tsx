@@ -22,6 +22,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import OlaMapView from '../../src/components/maps/OlaMapView';
 import { api } from '../../services/api';
+import { getDirections, LatLng } from '../../src/utils/olaApi';
 import { useAuthStore } from '../../src/store/authStore';
 import { colors, spacing, typography, shadows } from '../../src/theme';
 import PremiumCard from '../../src/components/ui/PremiumCard';
@@ -52,6 +53,8 @@ export default function DriverTripScreen() {
 
     const [currentLocation, setCurrentLocation] = useState<any>(null);
     const [students, setStudents] = useState<Student[]>([]);
+    const [routeStops, setRouteStops] = useState<any[]>([]);
+    const [routeCoords, setRouteCoords] = useState<LatLng[]>([]);
     const [tripStatus, setTripStatus] = useState<'live' | 'paused' | 'ended'>('live');
     const [loading, setLoading] = useState(false);
     const locationSubscription = useRef<any>(null);
@@ -65,6 +68,67 @@ export default function DriverTripScreen() {
             stopLocationTracking();
         };
     }, []);
+
+    useEffect(() => {
+        if (currentLocation && (students.length > 0 || routeStops.length > 0)) {
+            updateRoutePolyline();
+        }
+    }, [currentLocation, students, routeStops]);
+
+    const updateRoutePolyline = async () => {
+        if (!currentLocation) return;
+
+        let destination: LatLng | null = null;
+
+        // Find the next pending stop
+        // 1. Check if there are any students who are still 'pending'
+        const pendingStudents = students.filter(s => s.status === 'pending');
+
+        if (pendingStudents.length > 0) {
+            // Find the stop of the first pending student in the route order
+            // If we have routeStops, we can be more precise.
+            if (routeStops.length > 0) {
+                // Find first stop that matches a pending student's stop
+                const pendingStopNames = new Set(pendingStudents.map(s => s.pickupStop));
+                const nextStop = routeStops.find(stop => pendingStopNames.has(stop.stop_name));
+
+                if (nextStop) {
+                    destination = {
+                        latitude: parseFloat(nextStop.latitude),
+                        longitude: parseFloat(nextStop.longitude)
+                    };
+                }
+            }
+
+            // Fallback: use the first pending student's stop if we can't find it in routeStops
+            if (!destination) {
+                const firstPending = pendingStudents[0];
+                // Note: s.pickupStop in State is just a string name usually, 
+                // but the backend dashboard API now returns full route.stops
+            }
+        } else {
+            // All picked up, destination is school (last stop)
+            if (routeStops.length > 0) {
+                const schoolStop = routeStops[routeStops.length - 1];
+                destination = {
+                    latitude: parseFloat(schoolStop.latitude),
+                    longitude: parseFloat(schoolStop.longitude)
+                };
+            }
+        }
+
+        if (destination) {
+            const coords = await getDirections(
+                { latitude: currentLocation.latitude, longitude: currentLocation.longitude },
+                destination
+            );
+            if (coords.length > 0) {
+                setRouteCoords(coords);
+            }
+        } else {
+            setRouteCoords([]);
+        }
+    };
 
     const startLocationTracking = async () => {
         try {
@@ -148,6 +212,9 @@ export default function DriverTripScreen() {
                     status: s.status || 'pending',
                     pickupStop: s.pickup_stop || s.stop_name,
                 })));
+            }
+            if (dashboardData?.assignedRoute?.stops) {
+                setRouteStops(dashboardData.assignedRoute.stops);
             }
         } catch (error) {
             console.error('Failed to load students:', error);
@@ -242,6 +309,7 @@ export default function DriverTripScreen() {
                     center={currentLocation || { latitude: 28.6139, longitude: 77.2090 }}
                     zoom={16}
                     markers={mapMarkers}
+                    route={routeCoords}
                     showUserLocation={true}
                     style={styles.map}
                 />

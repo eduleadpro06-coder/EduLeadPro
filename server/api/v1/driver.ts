@@ -56,11 +56,25 @@ router.get('/dashboard', async (req: Request, res: Response) => {
             firstRoute: routes?.[0] || 'none'
         };
 
-        // Get assigned students if route exists
+        // Get assigned students and route stops if route exists
         let assignedStudents: any[] = [];
+        let routeStops: any[] = [];
         let assignmentsDebug: any = null;
 
         if (assignedRoute) {
+            // Fetch stops for the route
+            const { data: stops, error: stopsError } = await supabase
+                .from('bus_stops')
+                .select('*')
+                .eq('route_id', assignedRoute.id)
+                .order('stop_order', { ascending: true });
+
+            if (stopsError) {
+                console.error('[Mobile API] Stops fetch error:', stopsError);
+            } else {
+                routeStops = stops || [];
+            }
+
             const { data: assignments, error: assignError } = await supabase
                 .from('student_bus_assignments')
                 .select('student_id')
@@ -96,7 +110,10 @@ router.get('/dashboard', async (req: Request, res: Response) => {
                 name: driver.name,
                 phone: driver.phone
             },
-            assignedRoute,
+            assignedRoute: assignedRoute ? {
+                ...assignedRoute,
+                stops: routeStops
+            } : null,
             assignedStudents,
             debug: {
                 ...debug,
