@@ -799,19 +799,17 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
 
         res.json({
             success: true,
-            data: {
-                isLive: !!activeSession || (isRecent && location?.is_active),
-                location: location ? {
-                    latitude: parseFloat(location.latitude),
-                    longitude: parseFloat(location.longitude),
-                    speed: parseFloat(location.speed || '0'),
-                    heading: parseFloat(location.heading || '0'),
-                    timestamp: location.timestamp
-                } : null,
-                studentStatus: studentEvent?.status || 'pending',
-                statusTime: studentEvent?.event_time || null,
-                message: (!!activeSession || isRecent) ? 'Live tracking active' : 'Tracking inactive'
-            }
+            isLive: !!activeSession || (isRecent && (location?.is_active ?? false)),
+            location: location ? {
+                latitude: parseFloat(location.latitude),
+                longitude: parseFloat(location.longitude),
+                speed: parseFloat(location.speed || '0'),
+                heading: parseFloat(location.heading || '0'),
+                timestamp: location.timestamp
+            } : null,
+            studentStatus: studentEvent?.status || 'pending',
+            statusTime: studentEvent?.event_time || null,
+            message: (!!activeSession || isRecent) ? 'Live tracking active' : 'Tracking inactive'
         });
     } catch (error) {
         console.error('[Mobile API] Get live bus location error:', error);

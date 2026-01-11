@@ -140,8 +140,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing origin or destination" });
       }
 
-      // Hardcoded API Key from previous context as env var might be missing in some scopes
-      const apiKey = process.env.OLA_MAPS_API_KEY || "K7S8wT9qR2mP5nL1vX4yZ3bJ6hN8cF0d";
+      // Use key from environment variables (checking both VITE and EXPO variants)
+      const apiKey = process.env.OLA_MAPS_API_KEY ||
+        process.env.VITE_OLA_MAPS_KEY ||
+        process.env.EXPO_PUBLIC_OLA_MAPS_KEY ||
+        "nN7MyyjOHt7LqUdRFNYcfadYtFEw7cqdProAtSD0";
+
       const url = `https://api.olamaps.io/routing/v1/directions?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&api_key=${apiKey}&geometries=geojson&overview=full`;
 
       const response = await fetch(url, {

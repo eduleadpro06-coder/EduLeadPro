@@ -109,7 +109,9 @@ export default function BusTrackingScreen() {
 
     const fetchBusData = async () => {
         try {
+            console.log('[BusTracking] Fetching bus assignment for student:', currentChild?.id);
             const response = await api.getBusLocation(currentChild?.id ? Number(currentChild.id) : 0);
+            console.log('[BusTracking] Assignment response:', JSON.stringify(response));
 
             if (response && response.assignments && response.assignments.length > 0) {
                 const assignment = response.assignments[0];
@@ -147,26 +149,38 @@ export default function BusTrackingScreen() {
 
     const fetchLiveLocation = async (routeId: number, studentId?: number) => {
         try {
+            console.log(`[BusTracking] Polling live location for Route: ${routeId}, Student: ${studentId}`);
             const response = await api.getLiveBusLocation(routeId, studentId);
-            if (response.success && response.data) {
-                setIsLive(response.data.isLive);
-                setStudentStatus(response.data.studentStatus || 'pending');
+            console.log('[BusTracking] Live Location response:', JSON.stringify(response));
 
-                if (response.data.location) {
+            // APIService.fetchWithAuth already unwraps 'data' property if it exists.
+            // Our backend now returns { success: true, isLive: ... } directly at the root.
+            if (response && (response.success || response.isLive !== undefined)) {
+                console.log(`[BusTracking] Status: ${response.isLive ? 'LIVE' : 'OFFLINE'}, StudentStatus: ${response.studentStatus}`);
+                setIsLive(!!response.isLive);
+                setStudentStatus(response.studentStatus || 'pending');
+
+                if (response.location) {
+                    console.log(`[BusTracking] Pos: ${response.location.latitude}, ${response.location.longitude}`);
                     setLiveLocation({
-                        latitude: response.data.location.latitude,
-                        longitude: response.data.location.longitude,
-                        speed: response.data.location.speed,
-                        timestamp: response.data.location.timestamp,
+                        latitude: response.location.latitude,
+                        longitude: response.location.longitude,
+                        speed: response.location.speed,
+                        timestamp: response.location.timestamp,
                     });
+                } else {
+                    console.log('[BusTracking] No location data in response');
                 }
 
-                if (response.data.orgLocation) {
-                    setOrgLocation(response.data.orgLocation);
+                if (response.orgLocation) {
+                    setOrgLocation(response.orgLocation);
                 }
+            } else {
+                console.log('[BusTracking] Response invalid or missing isLive status');
+                setIsLive(false);
             }
         } catch (err) {
-            console.error("Error fetching live location:", err);
+            console.error("[BusTracking] Error fetching live location:", err);
             setIsLive(false);
         }
     };
