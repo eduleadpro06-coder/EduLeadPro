@@ -15,7 +15,7 @@ export interface LatLng {
 export async function getDirections(origin: LatLng, destination: LatLng): Promise<LatLng[]> {
     try {
         // Use our backend proxy to bypass domain restrictions
-        const url = `https://eduleadconnect.vercel.app/api/proxy/directions`;
+        const url = `https://eduleadconnect.vercel.app/api/v1/mobile/parent/proxy/directions`;
 
         console.log(`[getDirections] Fetching from: ${url}`);
         const response = await fetch(url, {

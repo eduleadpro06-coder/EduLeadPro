@@ -782,34 +782,24 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
             isRecent = locationData.seconds_ago < 900;
         }
 
-        // 4. Get latest student boarding status for filters
+        // 4. Get latest student boarding status (ONLY if session is active)
         let studentEvent = null;
-        if (req.query.studentId) {
+        if (req.query.studentId && activeSession?.started_at) {
             const studentId = parseInt(req.query.studentId as string);
 
-            // Base query for student events
-            let eventQuery = supabase
+            const { data: event } = await supabase
                 .from('bus_trip_passenger_events')
                 .select('status, event_time')
                 .eq('route_id', routeId)
-                .eq('student_id', studentId);
-
-            // If trip is live, only show events from CURRENT session
-            if (activeSession?.started_at) {
-                eventQuery = eventQuery.gte('event_time', activeSession.started_at);
-            } else {
-                // Fallback to today's events if no active session found but tracking is somehow active
-                const today = new Date().toISOString().split('T')[0];
-                eventQuery = eventQuery.gte('event_time', `${today}T00:00:00`);
-            }
-
-            const { data: event } = await eventQuery
+                .eq('student_id', studentId)
+                .gte('event_time', activeSession.started_at)
                 .order('event_time', { ascending: false })
                 .limit(1)
                 .single();
 
             studentEvent = event;
         }
+
 
         res.json({
             success: true,
@@ -834,6 +824,44 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
                 message: 'Failed to fetch bus location'
             }
         });
+    }
+});
+
+/**
+ * POST /api/v1/mobile/parent/proxy/directions
+ * Proxy for Ola Maps Directions (bypass domain restrictions)
+ */
+router.post('/proxy/directions', async (req: Request, res: Response) => {
+    try {
+        const { origin, destination } = req.body;
+        console.log(`[Parent Proxy] Directions requested: From(${origin?.latitude},${origin?.longitude}) To(${destination?.latitude},${destination?.longitude})`);
+
+        const apiKey = process.env.OLA_MAPS_API_KEY ||
+            process.env.VITE_OLA_MAPS_KEY ||
+            process.env.EXPO_PUBLIC_OLA_MAPS_KEY ||
+            "nN7MyyjOHt7LqUdRFNYcfadYtFEw7cqdProAtSD0";
+
+        const url = `https://api.olamaps.io/routing/v1/directions?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&api_key=${apiKey}&geometries=geojson&overview=full`;
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Referer': 'https://eduleadconnect.vercel.app/',
+                'X-Request-Id': Math.random().toString(36).substring(7),
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Ola Proxy Error in Parent API:", errorText);
+            return res.status(response.status).send(errorText);
+        }
+
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error("Ola Proxy Exception in Parent API:", error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
     }
 });
 
