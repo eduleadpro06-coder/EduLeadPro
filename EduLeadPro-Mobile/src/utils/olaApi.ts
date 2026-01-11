@@ -1,7 +1,4 @@
-/**
- * Ola Maps API Utilities for Mobile
- */
-import { OLA_MAPS_API_KEY } from '../config';
+import { api } from '../../services/api';
 
 export interface LatLng {
     latitude: number;
@@ -14,33 +11,20 @@ export interface LatLng {
  */
 export async function getDirections(origin: LatLng, destination: LatLng): Promise<LatLng[]> {
     try {
-        // Use our backend proxy to bypass domain restrictions
-        const url = `https://eduleadconnect.vercel.app/api/v1/mobile/parent/proxy/directions`;
+        // Use our central API service to handle auth tokens and base URLs correctly
+        const url = `/parent/proxy/directions`;
 
         console.log(`[getDirections] Fetching from: ${url}`);
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Request-Id': Math.random().toString(36).substring(7),
-            },
-            body: JSON.stringify({ origin, destination })
-        });
+        const data = await api.post<any>(url, { origin, destination });
 
-        if (!response.ok) {
-            const errText = await response.text();
-            console.warn(`[getDirections] Proxy failed (${response.status}):`, errText);
-            return [];
-        }
-
-        const data = await response.json();
-        console.log(`[getDirections] Received geometry:`, !!data.routes?.[0]?.geometry);
+        console.log(`[getDirections] Raw response routes: ${data.routes?.length || 0}`);
 
         if (data.routes && data.routes.length > 0) {
+            const route = data.routes[0];
+
             // 1. Try formatted GeoJSON geometry (preferred)
-            if (data.routes[0].geometry && data.routes[0].geometry.coordinates) {
-                // GeoJSON is [lng, lat], we need {latitude, longitude}
-                const coords = data.routes[0].geometry.coordinates.map((point: any) => ({
+            if (route.geometry && route.geometry.coordinates) {
+                const coords = route.geometry.coordinates.map((point: any) => ({
                     latitude: point[1],
                     longitude: point[0]
                 }));
@@ -48,9 +32,15 @@ export async function getDirections(origin: LatLng, destination: LatLng): Promis
                 return coords;
             }
 
-            // 2. Fallback to steps (sparse)
-            if (data.routes[0].legs && data.routes[0].legs[0].steps) {
-                const coords = data.routes[0].legs[0].steps.map((s: any) => ({
+            // 2. Fallback to overview_polyline (encoded string)
+            if (route.overview_polyline) {
+                console.warn(`[getDirections] Found encoded polyline, but decoder not implemented yet.`);
+                // We'll add a decoder if this is the case
+            }
+
+            // 3. Fallback to steps (sparse)
+            if (route.legs && route.legs[0].steps) {
+                const coords = route.legs[0].steps.map((s: any) => ({
                     latitude: s.start_location.lat,
                     longitude: s.start_location.lng
                 }));
@@ -59,10 +49,10 @@ export async function getDirections(origin: LatLng, destination: LatLng): Promis
             }
         }
 
-        console.warn(`[getDirections] No routes or geometry found in data:`, JSON.stringify(data).substring(0, 100));
+        console.warn(`[getDirections] No usable path found. Full data keys: ${Object.keys(data).join(', ')}`);
         return [];
-    } catch (error) {
-        console.error("[getDirections] Exception:", error);
+    } catch (error: any) {
+        console.error("[getDirections] Exception:", error?.message);
         return [];
     }
 }

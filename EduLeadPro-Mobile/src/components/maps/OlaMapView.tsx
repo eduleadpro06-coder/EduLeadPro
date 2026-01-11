@@ -191,8 +191,15 @@ export default function OlaMapView({
 
                         // Markers & Routes Handlers
                         window.updateRoute = (coords) => {
-                            if (!map) return;
+                            if (!map) {
+                                log("updateRoute called but MAP NOT READY");
+                                return;
+                            }
                             try {
+                                if (!coords || coords.length === 0) {
+                                    log("updateRoute called with EMPTY coords");
+                                    return;
+                                }
                                 log("Updating route with " + coords.length + " points");
                                 const sourceId = 'route';
                                 if (map.getSource(sourceId)) {
@@ -222,7 +229,11 @@ export default function OlaMapView({
                                         }
                                     });
                                 }
-                                map.triggerRepaint();
+                                // Ensure layer is on top
+                                if (map.getLayer('route-layer')) {
+                                    map.moveLayer('route-layer');
+                                }
+                                log("Route Update Successful");
                             } catch (err) { log("Route Update Err: " + err.message); }
                         };
 

@@ -13,6 +13,9 @@ const router = express.Router();
 router.use(jwtMiddleware);
 router.use(roleGuard(['parent']));
 
+// Connectivity check
+router.get('/ping', (_req, res) => res.json({ success: true, message: 'Parent router alive' }));
+
 // Register push token
 router.post('/register-push-token', async (req: Request, res: Response) => {
     try {
@@ -801,6 +804,14 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
         }
 
 
+        // 5. Get organization location for fallback
+        const orgId = req.user!.organizationId;
+        const org = await storage.getOrganization(orgId);
+        const orgLocation = org ? {
+            latitude: parseFloat(org.latitude || "0"),
+            longitude: parseFloat(org.longitude || "0")
+        } : null;
+
         res.json({
             success: true,
             isLive: !!activeSession || (isRecent && (location?.is_active ?? false)),
@@ -811,6 +822,7 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
                 heading: parseFloat(location.heading || '0'),
                 timestamp: location.timestamp
             } : null,
+            orgLocation,
             studentStatus: studentEvent?.status || 'pending',
             statusTime: studentEvent?.event_time || null,
             message: (!!activeSession || isRecent) ? 'Live tracking active' : 'Tracking inactive'
@@ -858,10 +870,17 @@ router.post('/proxy/directions', async (req: Request, res: Response) => {
         }
 
         const data = await response.json();
+        console.log(`[Parent Proxy] Ola Response success: ${!!data.routes}, routes count: ${data.routes?.length || 0}`);
+        if (data.routes?.length > 0) {
+            console.log(`[Parent Proxy] Route 0 keys: ${Object.keys(data.routes[0]).join(', ')}`);
+            if (data.routes[0].geometry) {
+                console.log(`[Parent Proxy] Geometry type: ${data.routes[0].geometry.type}, coordinates count: ${data.routes[0].geometry.coordinates?.length || 0}`);
+            }
+        }
         res.json(data);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Ola Proxy Exception in Parent API:", error);
-        res.status(500).json({ success: false, error: 'Internal server error' });
+        res.status(500).json({ success: false, error: 'Internal server error', details: error?.message });
     }
 });
 

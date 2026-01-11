@@ -82,14 +82,13 @@ export default function BusTrackingScreen() {
                     longitude: parseFloat(busData.assignment.pickup_stop.longitude)
                 };
             }
-        } else if (studentStatus === 'boarded') {
-            // Destination is the school (last stop of route)
-            const stops = busData.assignment?.route_stops || [];
-            if (stops.length > 0) {
-                const schoolStop = stops[stops.length - 1];
+        } else if (studentStatus === 'boarded' || studentStatus === 'dropped') {
+            // Destination is the school/org (final destination)
+            const fallbackLoc = orgLocation || (busData.assignment?.route_stops?.length > 0 ? busData.assignment.route_stops[busData.assignment.route_stops.length - 1] : null);
+            if (fallbackLoc) {
                 destination = {
-                    latitude: parseFloat(schoolStop.latitude),
-                    longitude: parseFloat(schoolStop.longitude)
+                    latitude: parseFloat(fallbackLoc.latitude),
+                    longitude: parseFloat(fallbackLoc.longitude)
                 };
             }
         }
