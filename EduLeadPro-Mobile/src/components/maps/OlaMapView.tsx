@@ -1,13 +1,13 @@
 /**
  * Ola Maps View Component
- * Implementation using WebView + MapLibre GL + Ola Maps Vector Tiles
+ * Implementation using WebView + Official Ola Maps Web SDK v2
  * 
- * This approach works in Expo Go and ensures consistency with the Web Admin Panel.
- * It bypasses the need for native .aar files and complex build configurations.
+ * This approach works in Expo and ensures consistency with the Web Admin Panel.
+ * It uses the official Web SDK engine inside a WebView for maximum stability and performance.
  */
 
 import React, { useRef, useEffect, useState } from 'react';
-import { StyleSheet, View, ActivityIndicator, Platform } from 'react-native';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { OLA_MAPS_API_KEY } from '../../config';
 
@@ -50,75 +50,60 @@ export default function OlaMapView({
     // Initial Center
     const [initialCenter] = useState(center || { latitude: 12.9716, longitude: 77.5946 });
 
-    // HTML Content for the Map
-    // We use MapLibre GL (Official Ola Recommendation) loaded via CDN
+    // HTML Content for the Map using Official Web SDK v2
     const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-            <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
-            <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+            <link href="https://cdn.jsdelivr.net/npm/olamaps-web-sdk@latest/dist/style.css" rel="stylesheet" />
             <style>
                 body { margin: 0; padding: 0; }
-                #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+                #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; background: #f0f0f0; }
                 .marker-bus {
                     font-size: 24px;
                     line-height: 24px;
-                    width: 30px; height: 30px;
+                    width: 32px; height: 32px;
                     text-align: center;
                     display: flex; justify-content: center; align-items: center;
                     background: white; border-radius: 50%;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                    border: 2px solid #4f46e5;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+                    border: 2px solid #7C3AED;
                 }
             </style>
         </head>
         <body>
             <div id="map"></div>
+            <script src="https://www.unpkg.com/olamaps-web-sdk@latest/dist/olamaps-web-sdk.umd.js"></script>
             <script>
-                const API_KEY = '${OLA_MAPS_API_KEY}';
-                const STYLE_URL = 'https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard/style.json?api_key=' + API_KEY;
-                
                 let map;
+                let olaMaps;
                 let markersMap = {};
 
-                function init() {
+                async function init() {
                     try {
-                        map = new maplibregl.Map({
-                            container: 'map',
-                            style: STYLE_URL,
-                            center: [${initialCenter.longitude}, ${initialCenter.latitude}],
-                            zoom: ${zoom},
-                            attributionControl: false,
-                            transformRequest: (url, resourceType) => {
-                                // Crucial: Append api_key to all Ola Maps requests
-                                if (url.includes('olamaps.io')) {
-                                    try {
-                                        const urlObj = new URL(url);
-                                        urlObj.searchParams.set('api_key', API_KEY);
-                                        return { url: urlObj.toString() };
-                                    } catch (e) {
-                                        return { url };
-                                    }
-                                }
-                                return { url };
-                            }
+                        // Official SDK v2 initialization
+                        olaMaps = new OlaMaps.OlaMaps({
+                            apiKey: '${OLA_MAPS_API_KEY}'
                         });
 
-                        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
-                        map.addControl(new maplibregl.AttributionControl({ customAttribution: '© Ola Maps' }), 'bottom-right');
+                        map = await olaMaps.init({
+                            style: "https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard/style.json",
+                            container: 'map',
+                            center: [${initialCenter.longitude}, ${initialCenter.latitude}],
+                            zoom: ${zoom}
+                        });
+
+                        // Add Navigation Control
+                        map.addControl(olaMaps.addNavigationControl(), 'top-right');
 
                         map.on('load', () => {
                             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
                         });
-                        
-                        // Error handling for tiles
+
                         map.on('error', (e) => {
-                             if(e.error && e.error.status === 403) {
-                                 console.warn("Domain blocked. Verify Dashboard whitelist.");
-                                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ERROR', message: 'Domain blocked - verify whitelist' }));
-                             }
+                            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ERROR', message: e.message || 'Map Load Error' }));
                         });
 
                     } catch (e) {
@@ -126,43 +111,35 @@ export default function OlaMapView({
                     }
                 }
 
-                // Update Markers Function called from React Native
                 window.updateMarkers = (markersList) => {
                     if (!map) return;
 
                     const currentIds = [];
-                    
                     markersList.forEach(m => {
                         const id = m.id || 'm_' + m.coordinate.latitude + '_' + m.coordinate.longitude;
                         currentIds.push(id);
-                        
                         const lngLat = [m.coordinate.longitude, m.coordinate.latitude];
 
                         if (markersMap[id]) {
-                            // Update existing
                             markersMap[id].setLngLat(lngLat);
                         } else {
-                            // Create new
                             const el = document.createElement('div');
+                            el.className = 'marker-bus';
                             
-                            // Custom Icons logic
-                            if (m.icon === 'bus') {
-                                el.className = 'marker-bus';
-                                el.innerHTML = '🚌';
-                            } else if (m.icon === 'stop') {
-                                el.className = 'marker-bus';
-                                el.style.border = '2px solid #10b981';
+                            if (m.icon === 'bus') el.innerHTML = '🚌';
+                            else if (m.icon === 'stop') {
                                 el.innerHTML = '🚏'; 
+                                el.style.border = '2px solid #10b981';
                             } else {
-                                el.className = 'marker-bus'; // Fallback
-                                el.style.border = '2px solid #ef4444';
                                 el.innerHTML = '📍';
+                                el.style.border = '2px solid #ef4444';
                             }
-                            
-                            el.addEventListener('click', () => {
-                                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MARKER_PRESS', payload: m }));
-                            });
 
+                            el.onclick = () => {
+                                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MARKER_PRESS', payload: m }));
+                            };
+
+                            // Using maplibregl which is available via global after SDK loads
                             const marker = new maplibregl.Marker({ element: el })
                                 .setLngLat(lngLat)
                                 .addTo(map);
@@ -171,14 +148,13 @@ export default function OlaMapView({
                         }
                     });
 
-                    // Cleanup removed markers
                     Object.keys(markersMap).forEach(key => {
                         if (!currentIds.includes(key)) {
                             markersMap[key].remove();
                             delete markersMap[key];
                         }
                     });
-                }
+                };
 
                 init();
             </script>
@@ -192,6 +168,11 @@ export default function OlaMapView({
             if (data.type === 'MAP_READY') {
                 setIsMapReady(true);
                 if (onMapReady) onMapReady();
+                // Push initial markers
+                if (markers.length > 0) {
+                    const safeMarkers = JSON.stringify(markers);
+                    webviewRef.current?.injectJavaScript(`window.updateMarkers(${safeMarkers}); true;`);
+                }
             } else if (data.type === 'MARKER_PRESS') {
                 if (onMarkerPress) onMarkerPress(data.payload);
             }
@@ -200,7 +181,6 @@ export default function OlaMapView({
         }
     };
 
-    // Update markers when prop changes
     useEffect(() => {
         if (isMapReady && webviewRef.current) {
             const safeMarkers = JSON.stringify(markers);
@@ -208,7 +188,6 @@ export default function OlaMapView({
         }
     }, [markers, isMapReady]);
 
-    // Update center when prop changes (optional)
     useEffect(() => {
         if (isMapReady && webviewRef.current && center) {
             webviewRef.current.injectJavaScript(`
@@ -218,21 +197,21 @@ export default function OlaMapView({
                 true;
             `);
         }
-    }, [center, isMapReady]); // Note: Adding zoom might conflict if user zooms manually, but acceptable for tracking
+    }, [center, isMapReady]);
 
     return (
         <View style={[styles.container, style]}>
             <WebView
                 ref={webviewRef}
-                style={{ flex: 1, backgroundColor: '#e5e7eb' }}
-                source={{ html: htmlContent, baseUrl: 'https://eduleadconnect.vercel.app/' }} // Ensure trailing slash for Origin header matching
+                style={{ flex: 1, backgroundColor: '#f3f4f6' }}
+                source={{ html: htmlContent, baseUrl: 'https://eduleadconnect.vercel.app/' }}
                 onMessage={handleMessage}
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
                 startInLoadingState={true}
                 renderLoading={() => (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color="#4f46e5" />
+                        <ActivityIndicator size="large" color="#7C3AED" />
                     </View>
                 )}
             />
@@ -250,10 +229,7 @@ const styles = StyleSheet.create({
     },
     loadingContainer: {
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        top: 0, left: 0, right: 0, bottom: 0,
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#f3f4f6',

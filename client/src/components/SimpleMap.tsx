@@ -1,11 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import { OlaMaps } from 'olamaps-web-sdk';
 
 // OLA Maps Configuration
 const OLA_MAPS_API_KEY = import.meta.env.VITE_OLA_MAPS_KEY || 'nN7MyyjOHt7LqUdRFNYcfadYtFEw7cqdProAtSD0';
-// Production Vector Style URL
-const STYLE_URL = `https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard/style.json?api_key=${OLA_MAPS_API_KEY}`;
 
 interface Location {
     latitude: number;
@@ -29,81 +26,69 @@ interface SimpleMapProps {
 
 const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
-    const mapInstanceRef = useRef<maplibregl.Map | null>(null);
-    const markersRef = useRef<{ [key: number]: maplibregl.Marker }>({});
+    const mapInstanceRef = useRef<any>(null);
+    const markersRef = useRef<{ [key: number]: any }>({});
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        let isMounted = true;
+
         const initMap = async () => {
             if (!mapContainerRef.current) return;
             if (mapInstanceRef.current) return;
 
             try {
-                console.log("Initializing Ola Maps (Production Mode)...");
+                console.log("Initializing Official Ola Maps Web SDK v2...");
 
-                const map = new maplibregl.Map({
-                    container: mapContainerRef.current,
-                    style: STYLE_URL, // Using OLA Maps Vector Style
-                    center: [77.61648476788898, 12.931423492103944],
-                    zoom: 12,
-                    transformRequest: (url, resourceType) => {
-                        // Crucial: Append api_key to all Ola Maps requests
-                        if (url.includes('olamaps.io')) {
-                            try {
-                                const urlObj = new URL(url);
-                                // Always overwrite with our key to be sure
-                                urlObj.searchParams.set('api_key', OLA_MAPS_API_KEY);
-                                const newUrl = urlObj.toString();
-
-                                // Logging for debugging (user can check browser console)
-                                if (resourceType === 'Source' || resourceType === 'Tile') {
-                                    console.log(`[OlaMaps] Requesting ${resourceType}: ${newUrl.substring(0, 100)}...`);
-                                }
-
-                                return { url: newUrl };
-                            } catch (e) {
-                                console.error("[OlaMaps] Failed to transform URL:", url);
-                                return { url };
-                            }
-                        }
-                        return { url };
-                    }
+                const olaMaps = new OlaMaps({
+                    apiKey: OLA_MAPS_API_KEY,
                 });
 
-                // Add Controls
-                map.addControl(new maplibregl.NavigationControl(), 'top-right');
+                // The documentation shows 'init' as an async method
+                const map = await olaMaps.init({
+                    style: "https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard/style.json",
+                    container: mapContainerRef.current,
+                    center: [77.61648476788898, 12.931423492103944],
+                    zoom: 12,
+                });
 
-                // Add custom attribution
-                map.addControl(new maplibregl.AttributionControl({
-                    customAttribution: '© Ola Maps'
-                }), 'bottom-right');
+                if (!isMounted) {
+                    map.remove();
+                    return;
+                }
+
+                // Add Controls using SDK methods
+                map.addControl(olaMaps.addNavigationControl(), 'top-right');
 
                 mapInstanceRef.current = map;
 
                 map.on('load', () => {
-                    console.log("Ola Maps Loaded Successfully");
+                    console.log("Ola Maps SDK v2 Loaded Successfully");
                     updateMarkers(activeBuses);
                 });
 
-                map.on('error', (e) => {
-                    console.error("Map Load Error:", e);
-                    // Don't show UI error for tile errors to avoid scary popups, just log
-                    if (e.error && e.error.status === 403) {
-                        console.warn("Domain not allowed by Ola Maps. Verify Dashboard whitelist.");
-                    }
+                map.on('error', (e: any) => {
+                    console.error("Ola Maps SDK Error:", e);
                 });
 
             } catch (err: any) {
-                console.error("Failed to initialize Map:", err);
-                setError(err.message || "Failed to load map");
+                console.error("Failed to initialize Ola Maps SDK:", err);
+                if (isMounted) {
+                    setError(err.message || "Failed to load map");
+                }
             }
         };
 
         initMap();
 
         return () => {
+            isMounted = false;
             if (mapInstanceRef.current) {
-                mapInstanceRef.current.remove();
+                try {
+                    mapInstanceRef.current.remove();
+                } catch (e) {
+                    console.warn("Error removing map instance:", e);
+                }
                 mapInstanceRef.current = null;
             }
         };
@@ -130,17 +115,26 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
                 if (popup) popup.setHTML(getPopupContent(bus));
             } else {
                 const el = createBusMarkerElement();
-                const popup = new maplibregl.Popup({ offset: 25 }).setHTML(getPopupContent(bus));
 
-                const marker = new maplibregl.Marker({ element: el })
-                    .setLngLat(lngLat)
-                    .setPopup(popup)
-                    .addTo(map);
+                try {
+                    // Check if maplibregl is available (it's often bundled with the SDK)
+                    const maplibregl = (window as any).maplibregl;
+                    if (maplibregl) {
+                        const popup = new maplibregl.Popup({ offset: 25 }).setHTML(getPopupContent(bus));
+                        const marker = new maplibregl.Marker({ element: el })
+                            .setLngLat(lngLat)
+                            .setPopup(popup)
+                            .addTo(map);
 
-                markersRef.current[bus.routeId] = marker;
+                        markersRef.current[bus.routeId] = marker;
+                    }
+                } catch (e) {
+                    console.error("Error creating marker:", e);
+                }
             }
         });
 
+        // Removal logic
         const currentIds = buses.map(b => b.routeId);
         Object.keys(markersRef.current).forEach(idStr => {
             const id = parseInt(idStr);
