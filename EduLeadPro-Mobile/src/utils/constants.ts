@@ -3,13 +3,9 @@
  */
 
 // API Configuration
-export const API_BASE_URL = __DEV__
-    ? 'http://192.168.29.166:5000/api/v1/mobile'  // Development (use your PC's IP)
-    : 'https://eduleadconnect.vercel.app/api/v1/mobile'; // Production
+export const API_BASE_URL = 'https://eduleadconnect.vercel.app/api/v1/mobile';
 
-export const WEBSOCKET_URL = __DEV__
-    ? 'ws://192.168.29.166:5000'
-    : 'wss://eduleadconnect.vercel.app';
+export const WEBSOCKET_URL = 'wss://eduleadconnect.vercel.app';
 
 // GPS Tracking Configuration
 export const GPS_CONFIG = {
