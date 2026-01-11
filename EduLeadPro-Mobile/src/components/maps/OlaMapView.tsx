@@ -211,7 +211,7 @@ export default function OlaMapView({
             <WebView
                 ref={webviewRef}
                 style={{ flex: 1, backgroundColor: '#e5e7eb' }}
-                source={{ html: htmlContent, baseUrl: 'https://eduleadconnect.vercel.app/' }} // BaseURL helps with Origin checks if needed
+                source={{ html: htmlContent, baseUrl: 'https://eduleadconnect.vercel.app/' }} // Ensure trailing slash for Origin header matching
                 onMessage={handleMessage}
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
