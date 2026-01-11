@@ -95,14 +95,17 @@ export default function BusTrackingScreen() {
         }
 
         if (destination) {
+            console.log(`[BusTracking] Requesting route: From(${liveLocation.latitude}, ${liveLocation.longitude}) To(${destination.latitude}, ${destination.longitude})`);
             const coords = await getDirections(
                 { latitude: liveLocation.latitude, longitude: liveLocation.longitude },
                 destination
             );
+            console.log(`[BusTracking] Received ${coords.length} route coordinates`);
             if (coords.length > 0) {
                 setRouteCoords(coords);
             }
         } else {
+            console.log('[BusTracking] No destination determined for route');
             setRouteCoords([]);
         }
     };
@@ -409,6 +412,7 @@ export default function BusTrackingScreen() {
                     <Text style={styles.etaSubtext}>
                         {liveLocation && isLive ? (() => {
                             const now = Date.now();
+                            // Ensure timestamp is parsed as UTC
                             const locTime = new Date(liveLocation.timestamp).getTime();
                             const diffInSeconds = Math.max(0, Math.floor((now - locTime) / 1000));
 

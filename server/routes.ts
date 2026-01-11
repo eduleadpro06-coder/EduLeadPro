@@ -149,7 +149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const url = `https://api.olamaps.io/routing/v1/directions?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&api_key=${apiKey}&geometries=geojson&overview=full`;
 
       const response = await fetch(url, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Referer': 'https://eduleadconnect.vercel.app/',
           'X-Request-Id': Math.random().toString(36).substring(7),

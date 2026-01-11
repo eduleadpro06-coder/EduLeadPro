@@ -419,6 +419,7 @@ router.post('/trip/end', async (req: Request, res: Response) => {
 
         try {
             // 1. Mark session as completed
+            console.log(`[Driver API] Attempting to end session: ${sessionId}`);
             await pool.query(`
                 UPDATE active_bus_sessions 
                 SET status = 'completed', ended_at = NOW() 
@@ -433,6 +434,9 @@ router.post('/trip/end', async (req: Request, res: Response) => {
             `, [sessionId]);
 
             console.log(`[Driver API] Trip session ${sessionId} ended and live tracking deactivated`);
+        } catch (dbError: any) {
+            console.error('[Driver API] DB Error during end trip:', dbError.message, dbError.code, dbError.detail);
+            throw dbError;
         } finally {
             await pool.end();
         }
@@ -441,11 +445,11 @@ router.post('/trip/end', async (req: Request, res: Response) => {
             success: true,
             message: 'Trip ended successfully'
         });
-    } catch (error) {
-        console.error('[Mobile API] End trip error:', error);
+    } catch (error: any) {
+        console.error('[Mobile API] End trip exception:', error.message, error.stack);
         res.status(500).json({
             success: false,
-            error: 'Failed to end trip'
+            error: `Failed to end trip: ${error.message}`
         });
     }
 });
