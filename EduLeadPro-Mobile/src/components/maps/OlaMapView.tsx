@@ -92,13 +92,15 @@ export default function OlaMapView({
                             zoom: ${zoom},
                             attributionControl: false,
                             transformRequest: (url, resourceType) => {
-                                // Crucial: Append api_key to all Ola Maps requests if it's missing or empty
-                                if (url.includes('olamaps.io') && (!url.includes('api_key=') || url.includes('key=&'))) {
-                                    const separator = url.includes('?') ? '&' : '?';
-                                    const cleanUrl = url.replace(/key=&/g, '').replace(/\?key=$/g, '');
-                                    return {
-                                        url: \`\${cleanUrl}\${separator}api_key=\${API_KEY}\`
-                                    };
+                                // Crucial: Append api_key to all Ola Maps requests
+                                if (url.includes('olamaps.io')) {
+                                    try {
+                                        const urlObj = new URL(url);
+                                        urlObj.searchParams.set('api_key', API_KEY);
+                                        return { url: urlObj.toString() };
+                                    } catch (e) {
+                                        return { url };
+                                    }
                                 }
                                 return { url };
                             }

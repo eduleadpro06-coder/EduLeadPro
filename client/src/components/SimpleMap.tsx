@@ -47,14 +47,24 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
                     center: [77.61648476788898, 12.931423492103944],
                     zoom: 12,
                     transformRequest: (url, resourceType) => {
-                        // Crucial: Append api_key to all Ola Maps requests if it's missing or empty
-                        // This fixes the issue where Ola's own planet.json/street.json return URLs with "?key="
-                        if (url.includes('olamaps.io') && (!url.includes('api_key=') || url.includes('key=&'))) {
-                            const separator = url.includes('?') ? '&' : '?';
-                            const cleanUrl = url.replace(/key=&/g, '').replace(/\?key=$/g, '');
-                            return {
-                                url: `${cleanUrl}${separator}api_key=${OLA_MAPS_API_KEY}`
-                            };
+                        // Crucial: Append api_key to all Ola Maps requests
+                        if (url.includes('olamaps.io')) {
+                            try {
+                                const urlObj = new URL(url);
+                                // Always overwrite with our key to be sure
+                                urlObj.searchParams.set('api_key', OLA_MAPS_API_KEY);
+                                const newUrl = urlObj.toString();
+
+                                // Logging for debugging (user can check browser console)
+                                if (resourceType === 'Source' || resourceType === 'Tile') {
+                                    console.log(`[OlaMaps] Requesting ${resourceType}: ${newUrl.substring(0, 100)}...`);
+                                }
+
+                                return { url: newUrl };
+                            } catch (e) {
+                                console.error("[OlaMaps] Failed to transform URL:", url);
+                                return { url };
+                            }
                         }
                         return { url };
                     }
