@@ -22,6 +22,11 @@ export default {
         backgroundColor: '#ffffff',
       },
       package: 'com.eduleadpro.app',
+      softwareKeyboardLayoutMode: 'resize',
+      versionCode: 2,
+    },
+    web: {
+      favicon: './assets/logo.png',
     },
     plugins: [
       'expo-router',

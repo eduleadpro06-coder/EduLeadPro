@@ -9,7 +9,7 @@ export const API_BASE_URL = __DEV__
 
 export const WEBSOCKET_URL = __DEV__
     ? 'ws://192.168.29.166:5000'
-    : 'wss://edu-lead-pro.vercel.app';
+    : 'wss://eduleadconnect.vercel.app';
 
 // GPS Tracking Configuration
 export const GPS_CONFIG = {
