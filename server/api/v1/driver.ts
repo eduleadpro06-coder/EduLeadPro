@@ -358,6 +358,7 @@ router.post('/trip/start', async (req: Request, res: Response) => {
         }
 
         // Ensure bus is marked as active in live tracking immediately
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
         const { Pool } = await import('pg');
         const pool = new Pool({
             connectionString: process.env.DATABASE_URL,
@@ -409,6 +410,7 @@ router.post('/trip/end', async (req: Request, res: Response) => {
         const { supabase } = await import('../../supabase.js');
 
         // Update session status and mark live location as inactive
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
         const { Pool } = await import('pg');
         const pool = new Pool({
             connectionString: process.env.DATABASE_URL,
@@ -419,7 +421,7 @@ router.post('/trip/end', async (req: Request, res: Response) => {
             // 1. Mark session as completed
             await pool.query(`
                 UPDATE active_bus_sessions 
-                SET status = 'completed', ended_at = NOW() AT TIME ZONE 'Asia/Kolkata' 
+                SET status = 'completed', ended_at = NOW() 
                 WHERE id = $1
             `, [sessionId]);
 
