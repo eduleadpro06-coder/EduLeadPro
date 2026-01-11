@@ -9,10 +9,28 @@ The mobile app relies heavily on environment variables and hardcoded constants f
 ### 1. Primary Configuration (Recommended)
 These files are the main source of truth for the app's connectivity.
 - **[constants.ts](file:///e:/WorkSpaceEduLeadPro/EduLeadPro/EduLeadPro-Mobile/src/utils/constants.ts)**: Contains `API_BASE_URL` and `WEBSOCKET_URL`. These are used by most services.
-- **[eas.json](file:///e:/WorkSpaceEduLeadPro/EduLeadPro/EduLeadPro-Mobile/eas.json)**: Defines environment variables for different build profiles (`preview`, `production`). Update `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_WS_URL` here for EAS builds.
-- **[.env.production](file:///e:/WorkSpaceEduLeadPro/EduLeadPro/EduLeadPro-Mobile/.env.production)** & **[.env.development](file:///e:/WorkSpaceEduLeadPro/EduLeadPro/EduLeadPro-Mobile/.env.development)**: Local overrides for environment variables.
+- **[.env.production](file:///e:/WorkSpaceEduLeadPro/EduLeadPro/EduLeadPro-Mobile/.env.production)** & **[.env.development](file:///e:/WorkSpaceEduLeadPro/EduLeadPro/EduLeadPro-Mobile/.env.development)**: Standard location for local development. Expo picks up `EXPO_PUBLIC_` variables automatically.
+- **[eas.json](file:///e:/WorkSpaceEduLeadPro/EduLeadPro/EduLeadPro-Mobile/eas.json)**: Currently contains hardcoded environment variables for EAS Cloud builds.
 
-### 2. Secondary & Legacy Configuration
+### 2. Moving Variables to EAS Secrets (Best Practice)
+To avoid hardcoding URLs and keys in `eas.json`, you can use **EAS Secrets**. This allows you to manage them via the Expo Dashboard or CLI.
+
+#### How to move:
+1. **Delete** the `env` block from a profile in `eas.json`.
+2. **Add** the secret via terminal:
+   ```bash
+   eas secret:create --name EXPO_PUBLIC_API_URL --value https://eduleadconnect.vercel.app/api/v1/mobile --type string --scope project
+   ```
+3. Your **[app.config.js](file:///e:/WorkSpaceEduLeadPro/EduLeadPro/EduLeadPro-Mobile/app.config.js)** is already set up to read these:
+   ```javascript
+   extra: {
+     apiUrl: process.env.EXPO_PUBLIC_API_URL,
+     // ...
+   }
+   ```
+   EAS will automatically inject these secrets into the build environment.
+
+### 3. Secondary & Legacy Configuration
 - **[config.ts](file:///e:/WorkSpaceEduLeadPro/EduLeadPro/EduLeadPro-Mobile/src/config.ts)**: Legacy configuration that pulls from `expo-constants`. It provides fallbacks for `localhost` if environment variables are missing.
 - **[app.config.js](file:///e:/WorkSpaceEduLeadPro/EduLeadPro/EduLeadPro-Mobile/app.config.js)**: Maps environment variables to the Expo configuration object (`extra` field).
 
