@@ -55,7 +55,7 @@ export default function OlaMapView({
         <head>
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-            <link href="https://www.unpkg.com/olamaps-web-sdk@latest/dist/style.css" rel="stylesheet" crossorigin="anonymous" />
+            <link href="https://unpkg.com/olamaps-web-sdk@2.2.0/dist/style.css" rel="stylesheet" crossorigin="anonymous" />
             <style>
                 html, body { 
                     margin: 0; padding: 0; height: 100%; width: 100%; 
@@ -110,7 +110,7 @@ export default function OlaMapView({
         </head>
         <body>
             <div id="map"></div>
-            <script src="https://www.unpkg.com/olamaps-web-sdk@latest/dist/olamaps-web-sdk.umd.js" crossorigin="anonymous"></script>
+            <script src="https://unpkg.com/olamaps-web-sdk@2.2.0/dist/olamaps-web-sdk.umd.js" crossorigin="anonymous"></script>
             <script>
                 let map;
                 let olamaps;
