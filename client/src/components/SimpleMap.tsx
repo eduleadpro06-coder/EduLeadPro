@@ -47,7 +47,15 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
                     center: [77.61648476788898, 12.931423492103944],
                     zoom: 12,
                     transformRequest: (url, resourceType) => {
-                        // Optional: Add custom headers if needed by Ola in future
+                        // Crucial: Append api_key to all Ola Maps requests if it's missing or empty
+                        // This fixes the issue where Ola's own planet.json/street.json return URLs with "?key="
+                        if (url.includes('olamaps.io') && (!url.includes('api_key=') || url.includes('key=&'))) {
+                            const separator = url.includes('?') ? '&' : '?';
+                            const cleanUrl = url.replace(/key=&/g, '').replace(/\?key=$/g, '');
+                            return {
+                                url: `${cleanUrl}${separator}api_key=${OLA_MAPS_API_KEY}`
+                            };
+                        }
                         return { url };
                     }
                 });

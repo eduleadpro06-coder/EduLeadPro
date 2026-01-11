@@ -90,7 +90,18 @@ export default function OlaMapView({
                             style: STYLE_URL,
                             center: [${initialCenter.longitude}, ${initialCenter.latitude}],
                             zoom: ${zoom},
-                            attributionControl: false
+                            attributionControl: false,
+                            transformRequest: (url, resourceType) => {
+                                // Crucial: Append api_key to all Ola Maps requests if it's missing or empty
+                                if (url.includes('olamaps.io') && (!url.includes('api_key=') || url.includes('key=&'))) {
+                                    const separator = url.includes('?') ? '&' : '?';
+                                    const cleanUrl = url.replace(/key=&/g, '').replace(/\?key=$/g, '');
+                                    return {
+                                        url: \`\${cleanUrl}\${separator}api_key=\${API_KEY}\`
+                                    };
+                                }
+                                return { url };
+                            }
                         });
 
                         map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
@@ -103,7 +114,8 @@ export default function OlaMapView({
                         // Error handling for tiles
                         map.on('error', (e) => {
                              if(e.error && e.error.status === 403) {
-                                 console.warn("Domain blocked");
+                                 console.warn("Domain blocked. Verify Dashboard whitelist.");
+                                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ERROR', message: 'Domain blocked - verify whitelist' }));
                              }
                         });
 
