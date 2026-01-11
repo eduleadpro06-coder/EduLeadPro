@@ -128,19 +128,13 @@
   {
     "table_name": "bus_location_history",
     "column_name": "id",
-    "data_type": "uuid",
-    "is_nullable": "NO"
-  },
-  {
-    "table_name": "bus_location_history",
-    "column_name": "session_id",
-    "data_type": "uuid",
+    "data_type": "integer",
     "is_nullable": "NO"
   },
   {
     "table_name": "bus_location_history",
     "column_name": "route_id",
-    "data_type": "uuid",
+    "data_type": "integer",
     "is_nullable": "NO"
   },
   {
@@ -169,21 +163,9 @@
   },
   {
     "table_name": "bus_location_history",
-    "column_name": "accuracy",
-    "data_type": "numeric",
-    "is_nullable": "YES"
-  },
-  {
-    "table_name": "bus_location_history",
-    "column_name": "altitude",
-    "data_type": "numeric",
-    "is_nullable": "YES"
-  },
-  {
-    "table_name": "bus_location_history",
     "column_name": "recorded_at",
     "data_type": "timestamp without time zone",
-    "is_nullable": "YES"
+    "is_nullable": "NO"
   },
   {
     "table_name": "bus_routes",

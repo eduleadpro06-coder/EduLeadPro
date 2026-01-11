@@ -149,6 +149,9 @@ export default function BusTrackingScreen() {
         try {
             const response = await api.getLiveBusLocation(routeId, studentId);
             if (response.success && response.data) {
+                setIsLive(response.data.isLive);
+                setStudentStatus(response.data.studentStatus || 'pending');
+
                 if (response.data.location) {
                     setLiveLocation({
                         latitude: response.data.location.latitude,
@@ -156,17 +159,10 @@ export default function BusTrackingScreen() {
                         speed: response.data.location.speed,
                         timestamp: response.data.location.timestamp,
                     });
-                    setIsLive(response.data.isLive);
-                    setStudentStatus(response.data.studentStatus || 'pending');
-                    if (response.data.orgLocation) {
-                        setOrgLocation(response.data.orgLocation);
-                    }
-                } else {
-                    setIsLive(false);
-                    setStudentStatus(response.data.studentStatus || 'pending');
-                    if (response.data.orgLocation) {
-                        setOrgLocation(response.data.orgLocation);
-                    }
+                }
+
+                if (response.data.orgLocation) {
+                    setOrgLocation(response.data.orgLocation);
                 }
             }
         } catch (err) {
