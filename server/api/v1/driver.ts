@@ -169,7 +169,7 @@ router.post('/location', async (req: Request, res: Response) => {
             // Now that we have a UNIQUE (route_id) constraint, this UPSERT is safe and fast
             await pool.query(`
                 INSERT INTO bus_live_locations (route_id, driver_id, latitude, longitude, speed, heading, is_active, timestamp)
-                VALUES ($1, $2, $3, $4, $5, $6, true, NOW() AT TIME ZONE 'Asia/Kolkata')
+                VALUES ($1, $2, $3, $4, $5, $6, true, NOW())
                 ON CONFLICT (route_id) 
                 DO UPDATE SET
                     driver_id = EXCLUDED.driver_id,
@@ -178,7 +178,7 @@ router.post('/location', async (req: Request, res: Response) => {
                     speed = EXCLUDED.speed,
                     heading = EXCLUDED.heading,
                     is_active = true,
-                    timestamp = NOW() AT TIME ZONE 'Asia/Kolkata'
+                    timestamp = NOW()
             `, [routeId, req.user?.userId, latitude, longitude, speed || 0, heading || 0]);
 
             // Table 2: active_bus_sessions (used for current status/dashboard)
@@ -369,11 +369,11 @@ router.post('/trip/start', async (req: Request, res: Response) => {
             // The UPSERT ensures we don't crash and the Admin/Parent portals see 'is_active = true' immediately
             await pool.query(`
                 INSERT INTO bus_live_locations (route_id, driver_id, latitude, longitude, is_active, timestamp)
-                VALUES ($1, $2, 0, 0, true, NOW() AT TIME ZONE 'Asia/Kolkata')
+                VALUES ($1, $2, 0, 0, true, NOW())
                 ON CONFLICT (route_id) DO UPDATE SET 
                 is_active = true, 
                 driver_id = $2,
-                timestamp = NOW() AT TIME ZONE 'Asia/Kolkata'
+                timestamp = NOW()
             `, [routeId, staffId]);
         } catch (dbErr) {
             console.error('[Driver API] Error updating live status on trip start:', dbErr);

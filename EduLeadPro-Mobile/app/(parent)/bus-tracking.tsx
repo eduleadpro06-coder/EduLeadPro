@@ -194,14 +194,21 @@ export default function BusTrackingScreen() {
     };
 
     const calculateETA = () => {
-        if (!isLive || !liveLocation || !liveLocation.speed || liveLocation.speed === 0) {
+        if (!isLive || !liveLocation) {
             return '--';
         }
-        const averageDistance = 5;
-        const speedKmh = liveLocation.speed;
+
+        // Default values for calculation
+        const averageDistance = 5; // km (hardcoded for now, could be dynamic)
+
+        // Use current speed if moving (> 2 km/h), otherwise fallback to average city speed (15 km/h)
+        const speedKmh = (liveLocation.speed && liveLocation.speed > 2) ? liveLocation.speed : 15;
+
         const timeHours = averageDistance / speedKmh;
         const timeMinutes = Math.round(timeHours * 60);
-        return timeMinutes > 0 ? `~${timeMinutes} mins` : 'Arriving soon';
+
+        if (timeMinutes <= 2) return 'Arriving soon';
+        return `~${timeMinutes} mins`;
     };
 
     // Map markers
@@ -401,10 +408,13 @@ export default function BusTrackingScreen() {
                     <Text style={styles.etaTime}>{calculateETA()}</Text>
                     <Text style={styles.etaSubtext}>
                         {liveLocation && isLive ? (() => {
-                            const diffInSeconds = Math.floor((Date.now() - new Date(liveLocation.timestamp).getTime()) / 1000);
-                            if (diffInSeconds < 60) return `Updated: ${diffInSeconds}s ago`;
-                            if (diffInSeconds < 3600) return `Updated: ${Math.floor(diffInSeconds / 60)}m ago`;
-                            return `Updated: ${new Date(liveLocation.timestamp).toLocaleTimeString()}`;
+                            const now = Date.now();
+                            const locTime = new Date(liveLocation.timestamp).getTime();
+                            const diffInSeconds = Math.max(0, Math.floor((now - locTime) / 1000));
+
+                            if (diffInSeconds < 60) return `Updated: just now`;
+                            const mins = Math.floor(diffInSeconds / 60);
+                            return `Updated: ${mins} ${mins === 1 ? 'min' : 'mins'} ago`;
                         })() : 'Tracking not active'}
                     </Text>
                     {liveLocation && isLive && (

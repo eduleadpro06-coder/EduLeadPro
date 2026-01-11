@@ -28,11 +28,13 @@ export async function getDirections(origin: LatLng, destination: LatLng): Promis
         });
 
         if (!response.ok) {
-            console.warn("Directions Proxy check failed (using fallback):", await response.text());
+            const errText = await response.text();
+            console.warn(`[getDirections] Proxy failed (${response.status}):`, errText);
             return [];
         }
 
         const data = await response.json();
+        console.log(`[getDirections] Received geometry:`, !!data.routes?.[0]?.geometry);
 
         if (data.routes && data.routes.length > 0) {
             // 1. Try formatted GeoJSON geometry (preferred)

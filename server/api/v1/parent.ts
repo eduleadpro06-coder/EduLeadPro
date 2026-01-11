@@ -786,11 +786,13 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
         let studentEvent = null;
         if (req.query.studentId) {
             const studentId = parseInt(req.query.studentId as string);
+            const today = new Date().toISOString().split('T')[0];
             const { data: event } = await supabase
                 .from('bus_trip_passenger_events')
                 .select('status, event_time')
                 .eq('route_id', routeId)
                 .eq('student_id', studentId) // Filter by student
+                .gte('event_time', `${today}T00:00:00`) // Filter for today
                 .order('event_time', { ascending: false })
                 .limit(1)
                 .single();
