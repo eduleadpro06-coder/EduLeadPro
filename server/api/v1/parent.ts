@@ -715,7 +715,7 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
         // Use a SQL query that calculates recency using DB time (NOW() - interval)
         const { data: location, error: locError } = await supabase
             .from('bus_live_locations')
-            .select('*, (timestamp > NOW() - INTERVAL \'5 minutes\') as is_recent_db')
+            .select('*')
             .eq('route_id', routeId)
             .eq('is_active', true)
             .order('timestamp', { ascending: false })
@@ -744,8 +744,9 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
             studentEvent = event;
         }
 
-        // Use the DB-calculated recency flag if available, otherwise fallback
-        const isRecent = location?.is_recent_db ?? false;
+        // Calculate recency: within last 5 minutes
+        const liveThreshold = 5 * 60 * 1000;
+        const isRecent = !!(location && (Date.now() - new Date(location.timestamp).getTime() < liveThreshold));
 
         res.json({
             success: true,
