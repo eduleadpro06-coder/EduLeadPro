@@ -10,10 +10,7 @@ CREATE TABLE IF NOT EXISTS bus_live_locations (
     longitude DECIMAL(11, 8) NOT NULL,
     speed DECIMAL(5, 2),
     heading DECIMAL(5, 2),
-    accuracy DECIMAL(8, 2), ERROR  API Error 500 at http://192.168.29.166:5000/api/v1/mobile/driver/location:
- ERROR  API Error 500 at http://192.168.29.166:5000/api/v1/mobile/driver/location:
- WARN  Location update failed [Error: Failed to update location]
- WARN  Location update failed [Error: Failed to update location]
+    accuracy DECIMAL(8, 2),
     timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
     is_active BOOLEAN DEFAULT true
 );

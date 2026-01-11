@@ -5736,11 +5736,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             const latestLocation = locations?.[0];
 
-            if (!latestLocation) {
-              // Active session but no location yet (driver just started, GPS pending)
-              return null;
-            }
-
             // 3. Get route stops using Supabase
             const { data: stops } = await supabase
               .from('bus_stops')
@@ -5768,13 +5763,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               vehicleNumber: route.vehicleNumber,
               driverName,
               stops: stops || [],
-              currentLocation: {
+              currentLocation: latestLocation ? {
                 latitude: parseFloat(latestLocation.latitude),
                 longitude: parseFloat(latestLocation.longitude),
                 speed: parseFloat(latestLocation.speed) || 0,
                 heading: parseFloat(latestLocation.heading) || 0
-              },
-              lastUpdated: latestLocation.timestamp,
+              } : null,
+              lastUpdated: latestLocation?.timestamp || activeSession.started_at,
               sessionStartedAt: activeSession.started_at,
               isActive: true
             };

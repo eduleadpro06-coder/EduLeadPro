@@ -730,24 +730,59 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
         const { supabase } = await import('../../supabase.js');
 
         // 1. Get latest location from the synchronized table
-        // Use a SQL query that calculates recency using DB time (NOW() - interval)
-        const { data: location, error: locError } = await supabase
-            .from('bus_live_locations')
-            .select('*')
-            .eq('route_id', routeId)
-            .eq('is_active', true)
-            .order('timestamp', { ascending: false })
-            .limit(1)
-            .single();
+        // Use raw SQL via pg to get the recency check directly from DB to avoid timezone mismatch
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+        const { Pool } = await import('pg');
+        const pool = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false }
+        });
 
-        if (locError && locError.code !== 'PGRST116') {
-            console.error('[Parent API] Location fetch error:', locError);
+        let locationData: any = null;
+        let isRecent = false;
+
+        try {
+            const query = `
+                SELECT *, 
+                (EXTRACT(EPOCH FROM (NOW() AT TIME ZONE 'Asia/Kolkata' - timestamp))) as seconds_ago
+                FROM bus_live_locations 
+                WHERE route_id = $1 AND is_active = true
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            `;
+            const result = await pool.query(query, [routeId]);
+            if (result.rows.length > 0) {
+                locationData = result.rows[0];
+                // liveThreshold is 15 minutes (900 seconds) for unified consistency
+                isRecent = locationData.seconds_ago < 900;
+            }
+        } catch (dbError) {
+            console.error('[Parent API] DB Error fetching live location:', dbError);
+        } finally {
+            await pool.end();
         }
 
-        // 2. Get latest student boarding status for this route
+        const location = locationData;
 
+        // 2. Double-check active_bus_sessions for added robustness
+        const { data: activeSession } = await supabase
+            .from('active_bus_sessions')
+            .select('id')
+            .eq('route_id', routeId)
+            .eq('status', 'live')
+            .maybeSingle();
 
-        // 2. Get latest student boarding status for filters
+        // 3. Determine if the trip is "Live"
+        // A trip is live if there's an active session OR a recent location update
+        // We relax the threshold for isRecent to 15 minutes (900 seconds) for better UX
+        const isLive = !!activeSession || (locationData && locationData.seconds_ago < 900);
+
+        // Update isRecent for the response with the relaxed threshold
+        if (locationData) {
+            isRecent = locationData.seconds_ago < 900;
+        }
+
+        // 4. Get latest student boarding status for filters
         let studentEvent = null;
         if (req.query.studentId) {
             const studentId = parseInt(req.query.studentId as string);
@@ -762,14 +797,10 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
             studentEvent = event;
         }
 
-        // Calculate recency: within last 5 minutes
-        const liveThreshold = 5 * 60 * 1000;
-        const isRecent = !!(location && (Date.now() - new Date(location.timestamp).getTime() < liveThreshold));
-
         res.json({
             success: true,
             data: {
-                isLive: isRecent && location?.is_active,
+                isLive: !!activeSession || (isRecent && location?.is_active),
                 location: location ? {
                     latitude: parseFloat(location.latitude),
                     longitude: parseFloat(location.longitude),
@@ -779,7 +810,7 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
                 } : null,
                 studentStatus: studentEvent?.status || 'pending',
                 statusTime: studentEvent?.event_time || null,
-                message: isRecent ? 'Live tracking active' : 'Tracking inactive'
+                message: (!!activeSession || isRecent) ? 'Live tracking active' : 'Tracking inactive'
             }
         });
     } catch (error) {

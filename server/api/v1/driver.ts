@@ -165,6 +165,8 @@ router.post('/location', async (req: Request, res: Response) => {
         });
 
         try {
+            // Table 1: bus_live_locations (used for parent real-time map)
+            // Now that we have a UNIQUE (route_id) constraint, this UPSERT is safe and fast
             await pool.query(`
                 INSERT INTO bus_live_locations (route_id, driver_id, latitude, longitude, speed, heading, is_active, timestamp)
                 VALUES ($1, $2, $3, $4, $5, $6, true, NOW() AT TIME ZONE 'Asia/Kolkata')
@@ -179,32 +181,75 @@ router.post('/location', async (req: Request, res: Response) => {
                     timestamp = NOW() AT TIME ZONE 'Asia/Kolkata'
             `, [routeId, req.user?.userId, latitude, longitude, speed || 0, heading || 0]);
 
-            console.log('[Driver API] Location updated via raw SQL with DB timestamp (NOW)');
+            // Table 2: active_bus_sessions (used for current status/dashboard)
+            await pool.query(`
+                UPDATE active_bus_sessions 
+                SET 
+                    current_latitude = $1,
+                    current_longitude = $2,
+                    current_speed = $3,
+                    current_heading = $4,
+                    last_updated = NOW() AT TIME ZONE 'Asia/Kolkata'
+                WHERE route_id = $5 AND status = 'live'
+            `, [latitude, longitude, speed || 0, heading || 0, routeId]);
+
+            console.log('[Driver API] Location & Session updated via raw SQL');
         } catch (dbError) {
             console.error('[Driver API] Raw SQL error:', dbError);
         } finally {
             await pool.end();
         }
 
-        // Table 2: active_bus_sessions (used for current status/dashboard)
-        const { error: sessionError } = await supabase
-            .from('active_bus_sessions')
-            .update({
-                current_latitude: latitude,
-                current_longitude: longitude,
-                current_speed: speed,
-                current_heading: heading,
-                last_updated: new Date().toISOString()
-            })
-            .eq('route_id', routeId)
-            .eq('status', 'live');
-
-        if (sessionError) console.error('[Driver API] Session update error:', sessionError);
-
         res.json({ success: true });
     } catch (error) {
         console.error('[Driver API] Update location error:', error);
         res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+/**
+ * Legacy/Alternative endpoint for location updates
+ */
+router.post('/location/update', async (req, res) => {
+    // Reuse logic - typically you'd call a shared service, but here we'll just redirect or duplicate
+    // To keep it clean, we'll let the express router handle it if we want to alias
+    const locationHandler = (router.stack.find(s => s.route?.path === '/location')?.route?.stack[0]?.handle);
+    if (locationHandler) return locationHandler(req, res, () => { });
+    res.status(500).json({ error: 'Endpoint not configured' });
+});
+
+/**
+ * Stop tracking - mark bus as inactive
+ * POST /api/v1/mobile/driver/location/stop-tracking
+ */
+router.post('/location/stop-tracking', async (req: Request, res: Response) => {
+    try {
+        const { routeId } = req.body;
+        if (!routeId) return res.status(400).json({ error: 'routeId required' });
+
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+        const { Pool } = await import('pg');
+        const pool = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false }
+        });
+
+        try {
+            // 1. Mark as inactive in live tracking
+            await pool.query('UPDATE bus_live_locations SET is_active = false WHERE route_id = $1', [routeId]);
+
+            // 2. Mark any live session as completed
+            await pool.query("UPDATE active_bus_sessions SET status = 'completed', end_time = NOW() AT TIME ZONE 'Asia/Kolkata' WHERE route_id = $1 AND status = 'live'", [routeId]);
+
+            console.log(`[Driver API] Tracking stopped for route ${routeId}`);
+        } finally {
+            await pool.end();
+        }
+
+        res.json({ success: true, message: 'Tracking stopped' });
+    } catch (error) {
+        console.error('[Driver API] Stop tracking error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -312,6 +357,30 @@ router.post('/trip/start', async (req: Request, res: Response) => {
             });
         }
 
+        // Ensure bus is marked as active in live tracking immediately
+        const { Pool } = await import('pg');
+        const pool = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false }
+        });
+
+        try {
+            // Initializing with last known location if possible, or 0,0
+            // The UPSERT ensures we don't crash and the Admin/Parent portals see 'is_active = true' immediately
+            await pool.query(`
+                INSERT INTO bus_live_locations (route_id, driver_id, latitude, longitude, is_active, timestamp)
+                VALUES ($1, $2, 0, 0, true, NOW() AT TIME ZONE 'Asia/Kolkata')
+                ON CONFLICT (route_id) DO UPDATE SET 
+                is_active = true, 
+                driver_id = $2,
+                timestamp = NOW() AT TIME ZONE 'Asia/Kolkata'
+            `, [routeId, staffId]);
+        } catch (dbErr) {
+            console.error('[Driver API] Error updating live status on trip start:', dbErr);
+        } finally {
+            await pool.end();
+        }
+
         res.json({
             success: true,
             session
@@ -339,16 +408,32 @@ router.post('/trip/end', async (req: Request, res: Response) => {
 
         const { supabase } = await import('../../supabase.js');
 
-        // Update session status
-        const { error } = await supabase
-            .from('active_bus_sessions')
-            .update({
-                status: 'completed',
-                ended_at: new Date().toISOString()
-            })
-            .eq('id', sessionId);
+        // Update session status and mark live location as inactive
+        const { Pool } = await import('pg');
+        const pool = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false }
+        });
 
-        if (error) throw error;
+        try {
+            // 1. Mark session as completed
+            await pool.query(`
+                UPDATE active_bus_sessions 
+                SET status = 'completed', ended_at = NOW() AT TIME ZONE 'Asia/Kolkata' 
+                WHERE id = $1
+            `, [sessionId]);
+
+            // 2. Mark bus as inactive in live tracking (find routeId from session)
+            await pool.query(`
+                UPDATE bus_live_locations 
+                SET is_active = false 
+                WHERE route_id = (SELECT route_id FROM active_bus_sessions WHERE id = $1)
+            `, [sessionId]);
+
+            console.log(`[Driver API] Trip session ${sessionId} ended and live tracking deactivated`);
+        } finally {
+            await pool.end();
+        }
 
         res.json({
             success: true,

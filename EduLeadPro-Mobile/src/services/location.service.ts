@@ -119,7 +119,7 @@ class LocationTrackingService {
 
             // Mark tracking as inactive in backend
             if (this.currentRouteId) {
-                await api.post('/v1/mobile/driver/location/stop-tracking', {
+                await api.post('/driver/location/stop-tracking', {
                     routeId: this.currentRouteId,
                 });
             }
@@ -169,7 +169,7 @@ class LocationTrackingService {
                 timestamp: location.timestamp,
             };
 
-            await api.post('/v1/mobile/driver/location/update', locationData);
+            await api.post('/driver/location', locationData);
             console.log('Location sent to server successfully');
         } catch (error) {
             console.error('Error sending location to server:', error);
