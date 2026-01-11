@@ -12,6 +12,14 @@ interface Location {
     heading: number;
 }
 
+interface BusStop {
+    id: number;
+    name: string;
+    latitude: string;
+    longitude: string;
+    arrivalTime?: string;
+}
+
 interface Bus {
     routeId: number;
     routeName: string;
@@ -19,6 +27,7 @@ interface Bus {
     driverName: string;
     currentLocation: Location;
     lastUpdated: string;
+    stops?: BusStop[];
 }
 
 interface SimpleMapProps {
@@ -30,6 +39,7 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses, allRoutes }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<any>(null);
     const markersRef = useRef<{ [key: number]: any }>({});
+    const stopMarkersRef = useRef<{ [key: string]: any }>({});
     const routesRef = useRef<{ [key: number]: boolean }>({});
     const [error, setError] = useState<string | null>(null);
 
@@ -262,6 +272,77 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses, allRoutes }) => {
                 console.warn("FitBounds failed:", e);
             }
         }
+
+        // Update Stops for each bus
+        updateRouteStops(buses);
+    };
+
+    const updateRouteStops = (buses: Bus[]) => {
+        if (!mapInstanceRef.current) return;
+        const map = mapInstanceRef.current;
+        const OlaNamespace = (window as any).OlaMaps;
+        if (!OlaNamespace) return;
+
+        const activeStopIds: string[] = [];
+
+        buses.forEach(bus => {
+            if (!bus.stops || bus.stops.length === 0) return;
+
+            // Assuming last stop is School, others are pickups
+            bus.stops.forEach((stop, index) => {
+                const isSchool = index === bus.stops!.length - 1;
+                const markerId = `stop-${bus.routeId}-${stop.id}`;
+                activeStopIds.push(markerId);
+
+                if (!stopMarkersRef.current[markerId]) {
+                    const el = document.createElement('div');
+                    if (isSchool) {
+                        // School Marker Style (Blue Square with S)
+                        el.style.width = '32px';
+                        el.style.height = '32px';
+                        el.style.backgroundColor = '#3B82F6';
+                        el.style.border = '2px solid white';
+                        el.style.borderRadius = '4px';
+                        el.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
+                        el.style.display = 'flex';
+                        el.style.justifyContent = 'center';
+                        el.style.alignItems = 'center';
+                        el.style.color = 'white';
+                        el.style.fontWeight = 'bold';
+                        el.style.fontFamily = 'sans-serif';
+                        el.innerHTML = 'S';
+                        el.style.zIndex = '95';
+                    } else {
+                        // Stop Marker Style (Red Circle)
+                        el.style.width = '16px';
+                        el.style.height = '16px';
+                        el.style.backgroundColor = '#EF4444';
+                        el.style.border = '2px solid white';
+                        el.style.borderRadius = '50%';
+                        el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+                        el.style.zIndex = '90';
+                    }
+
+                    const popup = new OlaNamespace.Popup({ offset: [0, -10] })
+                        .setHTML(`<div class="p-2 font-sans font-bold">${stop.name}</div>`);
+
+                    const marker = new OlaNamespace.Marker({ element: el })
+                        .setLngLat([parseFloat(stop.longitude), parseFloat(stop.latitude)])
+                        .setPopup(popup)
+                        .addTo(map);
+
+                    stopMarkersRef.current[markerId] = marker;
+                }
+            });
+        });
+
+        // Cleanup old stop markers
+        Object.keys(stopMarkersRef.current).forEach(id => {
+            if (!activeStopIds.includes(id)) {
+                stopMarkersRef.current[id].remove();
+                delete stopMarkersRef.current[id];
+            }
+        });
     };
 
     const createBusMarkerElement = () => {
