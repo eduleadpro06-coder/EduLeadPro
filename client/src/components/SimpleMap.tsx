@@ -204,10 +204,17 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses, allRoutes }) => {
     const updateMarkers = (buses: Bus[]) => {
         if (!mapInstanceRef.current) return;
         const map = mapInstanceRef.current;
+        const OlaNamespace = (window as any).OlaMaps;
+
+        // Bounds for auto-fitting
+        const bounds = new OlaNamespace.LngLatBounds();
 
         buses.forEach(bus => {
             const { latitude, longitude } = bus.currentLocation;
             const lngLat: [number, number] = [longitude, latitude];
+
+            // Extend bounds
+            bounds.extend(lngLat);
 
             if (markersRef.current[bus.routeId]) {
                 const marker = markersRef.current[bus.routeId];
@@ -218,8 +225,6 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses, allRoutes }) => {
                 const el = createBusMarkerElement();
 
                 try {
-                    const OlaNamespace = (window as any).OlaMaps;
-
                     if (OlaNamespace && OlaNamespace.Marker) {
                         const popup = new OlaNamespace.Popup({ offset: [0, -15] }).setHTML(getPopupContent(bus));
                         const marker = new OlaNamespace.Marker({ element: el })
@@ -235,6 +240,7 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses, allRoutes }) => {
             }
         });
 
+        // Remove old markers
         const currentIds = buses.map(b => b.routeId);
         Object.keys(markersRef.current).forEach(idStr => {
             const id = parseInt(idStr);
@@ -243,6 +249,19 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses, allRoutes }) => {
                 delete markersRef.current[id];
             }
         });
+
+        // Auto-center map if there are buses
+        if (buses.length > 0 && !map._userInteracting) { // Optional: avoid hijacking if user is dragging
+            try {
+                map.fitBounds(bounds, {
+                    padding: 50,
+                    maxZoom: 15,
+                    duration: 1000
+                });
+            } catch (e) {
+                console.warn("FitBounds failed:", e);
+            }
+        }
     };
 
     const createBusMarkerElement = () => {
