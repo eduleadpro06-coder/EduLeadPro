@@ -1,7 +1,7 @@
 export default {
   expo: {
     name: 'EduConnect',
-    slug: 'educonnect',
+    slug: 'educonnectlead',
     version: '2.0.0',
     orientation: 'portrait',
     icon: './assets/logo.png',
@@ -49,10 +49,10 @@ export default {
       wsUrl: process.env.EXPO_PUBLIC_WS_URL,
       olaMapsApiKey: process.env.EXPO_PUBLIC_OLA_MAPS_KEY,
       eas: {
-        projectId: '',
+        projectId: 'f302c7c0-8e3c-4bb8-b324-e9973c9a8657',
       },
     },
-    owner: 'educonnect06',
+    owner: 'gauravkachwaha',
     scheme: 'educonnect',
   },
 };
