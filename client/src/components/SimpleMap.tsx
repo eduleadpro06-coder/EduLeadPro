@@ -279,6 +279,7 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses, allRoutes }) => {
         el.style.boxShadow = '0 4px 6px rgba(0,0,0,0.2)';
         el.style.cursor = 'pointer';
         el.style.border = '2px solid white';
+        el.style.zIndex = '1000'; // Force on top
         return el;
     };
 
