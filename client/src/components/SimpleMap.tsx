@@ -43,12 +43,24 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses, allRoutes }) => {
             try {
                 console.log("Initializing Official Ola Maps Web SDK v2 (3D Mode via CDN)...");
 
-                const OlaNamespace = (window as any).OlaMaps;
-                if (!OlaNamespace) {
-                    throw new Error("Ola Maps SDK not loaded from CDN");
-                }
+                const waitForSDK = async (attempts = 10, delay = 500): Promise<any> => {
+                    const existingNs = (window as any).OlaMaps;
+                    if (existingNs) return existingNs;
 
-                const olamaps = new OlaNamespace.OlaMaps({
+                    if (attempts === 0) throw new Error("Ola Maps SDK failed to load after retries");
+
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return waitForSDK(attempts - 1, delay);
+                };
+
+                const ns = await waitForSDK();
+
+                // Robust check for Constructor (handles both namespace.OlaMaps and direct export)
+                const OlaSDK = (ns.OlaMaps) ? ns.OlaMaps : ns;
+
+                console.log("SDK Constructor Found:", OlaSDK);
+
+                const olamaps = new OlaSDK({
                     apiKey: OLA_MAPS_API_KEY,
                     mode: "3d",
                     threedTileset: "https://api.olamaps.io/tiles/vector/v1/3dtiles/tileset.json",

@@ -192,16 +192,13 @@ export default function ActivitiesScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
                     <Feather name="arrow-left" size={24} color="#1F2937" />
                 </TouchableOpacity>
-                <View style={{ alignItems: 'center' }}>
-                    <Text style={styles.schoolName}>{(user as any)?.organizationName || 'EduConnect'}</Text>
-                    <Text style={styles.screenTitle}>Activities</Text>
+                <View style={styles.headerTitleContainer}>
+                    <Text style={styles.headerSubtitle}>{(user as any)?.organizationName || 'EduConnect'}</Text>
+                    <Text style={styles.headerTitle}>Activities & Calendar</Text>
                 </View>
-                <View style={{ width: 40 }} />
+                <View style={{ width: 44 }} />
             </View>
 
-            <View style={styles.titleSection}>
-                <Text style={styles.pageTitle}>Activities & Calendar</Text>
-            </View>
 
             {/* Tabs */}
             <View style={styles.tabContainer}>
@@ -227,9 +224,31 @@ const styles = StyleSheet.create({
         paddingBottom: 16,
         backgroundColor: '#fff',
     },
-    headerButton: { padding: 8 },
-    schoolName: { fontSize: 10, color: '#6B7280', textTransform: 'uppercase', letterSpacing: 1 },
-    screenTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
+    headerButton: {
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 22,
+        backgroundColor: '#F9FAFB',
+    },
+    headerTitleContainer: {
+        alignItems: 'center',
+    },
+    headerSubtitle: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#64748B',
+        textTransform: 'uppercase',
+        letterSpacing: 2.5,
+        marginBottom: -2,
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: '900',
+        color: '#1E293B',
+        letterSpacing: -0.5,
+    },
     notifDot: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', zIndex: 1 },
 
     titleSection: { padding: 20, backgroundColor: '#fff', paddingBottom: 10 },

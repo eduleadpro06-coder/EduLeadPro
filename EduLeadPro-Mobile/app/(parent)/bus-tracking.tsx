@@ -24,11 +24,14 @@ import { api } from '../../services/api';
 import { getDirections, LatLng } from '../../src/utils/olaApi';
 import { colors, spacing, typography, shadows } from '../../src/theme';
 import PremiumCard from '../../src/components/ui/PremiumCard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Stack } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 
 export default function BusTrackingScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { user } = useAuthStore();
     const currentChild = user?.children?.[0];
 
@@ -37,6 +40,7 @@ export default function BusTrackingScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isLive, setIsLive] = useState(false);
     const [studentStatus, setStudentStatus] = useState<string>('pending');
+    const [orgLocation, setOrgLocation] = useState<any>(null);
     const [routeCoords, setRouteCoords] = useState<LatLng[]>([]);
     const [error, setError] = useState<string | null>(null);
     const updateInterval = useRef<NodeJS.Timeout | null>(null);
@@ -154,9 +158,15 @@ export default function BusTrackingScreen() {
                     });
                     setIsLive(response.data.isLive);
                     setStudentStatus(response.data.studentStatus || 'pending');
+                    if (response.data.orgLocation) {
+                        setOrgLocation(response.data.orgLocation);
+                    }
                 } else {
                     setIsLive(false);
                     setStudentStatus(response.data.studentStatus || 'pending');
+                    if (response.data.orgLocation) {
+                        setOrgLocation(response.data.orgLocation);
+                    }
                 }
             }
         } catch (err) {
@@ -174,8 +184,8 @@ export default function BusTrackingScreen() {
     };
 
     const calculateETA = () => {
-        if (!liveLocation || !liveLocation.speed || liveLocation.speed === 0) {
-            return '~15 mins';
+        if (!isLive || !liveLocation || !liveLocation.speed || liveLocation.speed === 0) {
+            return '--';
         }
         const averageDistance = 5;
         const speedKmh = liveLocation.speed;
@@ -185,12 +195,56 @@ export default function BusTrackingScreen() {
     };
 
     // Map markers
-    const mapMarkers = liveLocation && isLive ? [{
-        coordinate: { latitude: liveLocation.latitude, longitude: liveLocation.longitude },
-        title: "School Bus",
-        description: `Speed: ${Math.round(liveLocation.speed)} km/h`,
-        icon: 'bus' as const
-    }] : [];
+    const mapMarkers: any[] = [];
+
+    // 1. Always show Pickup Point
+    if (busData?.assignment?.pickup_stop) {
+        mapMarkers.push({
+            coordinate: {
+                latitude: parseFloat(busData.assignment.pickup_stop.latitude),
+                longitude: parseFloat(busData.assignment.pickup_stop.longitude)
+            },
+            title: "Pickup Point",
+            description: "Assigned Stop",
+            icon: 'marker' as const
+        });
+    }
+
+    // 2. Show Bus if Live
+    if (liveLocation && isLive) {
+        mapMarkers.push({
+            coordinate: { latitude: liveLocation.latitude, longitude: liveLocation.longitude },
+            title: "School Bus",
+            description: `Speed: ${Math.round(liveLocation.speed)} km/h`,
+            icon: 'bus' as const
+        });
+    }
+
+    // 3. Show School (Org Location or Last Stop Fallback)
+    const schoolLoc = orgLocation || (busData?.assignment?.route_stops?.length > 0 ? busData.assignment.route_stops[busData.assignment.route_stops.length - 1] : null);
+
+    if (schoolLoc) {
+        mapMarkers.push({
+            coordinate: {
+                latitude: parseFloat(schoolLoc.latitude),
+                longitude: parseFloat(schoolLoc.longitude)
+            },
+            title: "School",
+            description: "School Campus",
+            icon: 'school' as const,
+            pinColor: '#EF4444' // Red pin for destination
+        });
+    }
+
+    // Determine initial center
+    const mapCenter = (liveLocation && isLive)
+        ? { latitude: liveLocation.latitude, longitude: liveLocation.longitude }
+        : (busData?.assignment?.pickup_stop
+            ? {
+                latitude: parseFloat(busData.assignment.pickup_stop.latitude),
+                longitude: parseFloat(busData.assignment.pickup_stop.longitude)
+            }
+            : { latitude: 28.6139, longitude: 77.2090 });
 
     if (isLoading) {
         return (
@@ -204,13 +258,12 @@ export default function BusTrackingScreen() {
     if (!busData || !busData.assignment) {
         return (
             <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                        <Feather name="arrow-left" size={24} color={colors.textPrimary} />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Bus Tracking</Text>
-                    <View style={{ width: 40 }} />
-                </View>
+                <TouchableOpacity
+                    style={[styles.mapBackBtn, { top: insets.top + 10 }]}
+                    onPress={() => router.back()}
+                >
+                    <Feather name="arrow-left" size={24} color="#1F2937" />
+                </TouchableOpacity>
                 <View style={styles.emptyContainer}>
                     <View style={styles.iconCircle}>
                         <Feather name="alert-circle" size={48} color={colors.accent} />
@@ -226,12 +279,13 @@ export default function BusTrackingScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" />
+            <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+            <Stack.Screen options={{ headerShown: false }} />
 
             {/* Map Section */}
             <View style={styles.mapContainer}>
                 <OlaMapView
-                    center={liveLocation || { latitude: 28.6139, longitude: 77.2090 }}
+                    center={mapCenter}
                     zoom={15}
                     markers={mapMarkers}
                     route={routeCoords}
@@ -241,15 +295,15 @@ export default function BusTrackingScreen() {
 
                 {/* Back Button Overlay */}
                 <TouchableOpacity
-                    style={styles.mapBackBtn}
+                    style={[styles.mapBackBtn, { top: insets.top + 10 }]}
                     onPress={() => router.back()}
                 >
-                    <Feather name="arrow-left" size={24} color={colors.textPrimary} />
+                    <Feather name="arrow-left" size={24} color="#1F2937" />
                 </TouchableOpacity>
 
-                {/* Live Indicator */}
+                {/* Live Indicator Overlay */}
                 {isLive && (
-                    <View style={styles.liveTagContainer}>
+                    <View style={[styles.liveTagContainer, { top: insets.top + 10 }]}>
                         <View style={styles.liveTag}>
                             <View style={styles.pulsingDot} />
                             <Text style={styles.liveText}>LIVE TRACKING</Text>
@@ -259,10 +313,8 @@ export default function BusTrackingScreen() {
             </View>
 
             {/* Info Cards */}
-            <ScrollView
+            <View
                 style={styles.contentContainer}
-                contentContainerStyle={{ paddingBottom: 100 }}
-                showsVerticalScrollIndicator={false}
             >
                 {/* Bus Info Card */}
                 <PremiumCard style={styles.card}>
@@ -272,18 +324,20 @@ export default function BusTrackingScreen() {
                             <Text style={styles.routeText}>{busData.route?.routeName || 'Route'}</Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <View style={[styles.statusBadge, { backgroundColor: isLive ? '#DCFCE7' : '#FEE2E2' }]}>
-                                <View style={[styles.statusDot, { backgroundColor: isLive ? '#22C55E' : '#EF4444' }]} />
-                                <Text style={[styles.statusText, { color: isLive ? '#22C55E' : '#EF4444' }]}>
-                                    {isLive ? 'Live' : 'Offline'}
+                            <View style={[styles.statusBadge, { backgroundColor: isLive ? '#DCFCE7' : '#F3F4F6' }]}>
+                                <View style={[styles.statusDot, { backgroundColor: isLive ? '#22C55E' : '#94A3B8' }]} />
+                                <Text style={[styles.statusText, { color: isLive ? '#22C55E' : '#64748B' }]}>
+                                    {isLive ? 'Live' : 'No Active Trip'}
                                 </Text>
                             </View>
-                            <View style={[styles.statusBadge, { marginLeft: 8, backgroundColor: '#E0F2FE' }]}>
-                                <Text style={[styles.statusText, { color: '#0284C7' }]}>
-                                    {studentStatus === 'boarded' ? '✅ Boarded' :
-                                        studentStatus === 'dropped' ? '🏠 Dropped' : '⏳ Waiting'}
-                                </Text>
-                            </View>
+                            {isLive && (
+                                <View style={[styles.statusBadge, { marginLeft: 8, backgroundColor: '#E0F2FE' }]}>
+                                    <Text style={[styles.statusText, { color: '#0284C7' }]}>
+                                        {studentStatus === 'boarded' ? '✅ Boarded' :
+                                            studentStatus === 'dropped' ? '🏠 Dropped' : '⏳ Waiting'}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
                     </View>
 
@@ -336,7 +390,7 @@ export default function BusTrackingScreen() {
                     </View>
                     <Text style={styles.etaTime}>{calculateETA()}</Text>
                     <Text style={styles.etaSubtext}>
-                        {liveLocation ? (() => {
+                        {liveLocation && isLive ? (() => {
                             const diffInSeconds = Math.floor((Date.now() - new Date(liveLocation.timestamp).getTime()) / 1000);
                             if (diffInSeconds < 60) return `Updated: ${diffInSeconds}s ago`;
                             if (diffInSeconds < 3600) return `Updated: ${Math.floor(diffInSeconds / 60)}m ago`;
@@ -352,7 +406,7 @@ export default function BusTrackingScreen() {
                         </View>
                     )}
                 </PremiumCard>
-            </ScrollView>
+            </View>
         </View>
     );
 }
@@ -371,27 +425,8 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
         marginTop: spacing.md,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-    },
-    backBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: colors.surface,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerTitle: {
-        ...typography.h3,
-        color: colors.textPrimary,
-    },
     mapContainer: {
-        height: height * 0.4,
+        height: height * 0.55,
         position: 'relative',
     },
     map: {
@@ -408,6 +443,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         ...shadows.md,
+        zIndex: 10,
     },
     liveTagContainer: {
         position: 'absolute',

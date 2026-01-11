@@ -100,12 +100,15 @@ export default function ParentFeesScreen() {
             <Stack.Screen options={{ headerShown: false }} />
 
             {/* Header */}
-            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+            <View style={[styles.header, { paddingTop: insets.top }]}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+                    <Feather name="arrow-left" size={24} color="#1F2937" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Fees & Payments</Text>
-                <View style={{ width: 40 }} />
+                <View style={styles.headerTitleContainer}>
+                    <Text style={styles.headerSubtitle}>{(user as any)?.organizationName || 'EduConnect'}</Text>
+                    <Text style={styles.headerTitle}>Fees & Payments</Text>
+                </View>
+                <View style={{ width: 44 }} />
             </View>
 
             <ScrollView
@@ -248,15 +251,37 @@ const styles = StyleSheet.create({
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     header: {
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
+        alignItems: 'center',
         paddingHorizontal: spacing.lg,
-        paddingBottom: spacing.lg,
+        paddingBottom: 16,
         backgroundColor: '#fff',
     },
-    backButton: { padding: 8, marginLeft: -8 },
-    headerButton: { padding: 8, marginRight: -8 },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
+    headerButton: {
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 22,
+        backgroundColor: '#F9FAFB',
+    },
+    headerTitleContainer: {
+        alignItems: 'center',
+    },
+    headerSubtitle: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#64748B',
+        textTransform: 'uppercase',
+        letterSpacing: 2.5,
+        marginBottom: -2,
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: '900',
+        color: '#1E293B',
+        letterSpacing: -0.5,
+    },
     content: { padding: spacing.lg },
     summaryCard: {
         padding: 0,

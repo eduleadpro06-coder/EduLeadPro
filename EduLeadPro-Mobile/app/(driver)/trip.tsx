@@ -14,6 +14,7 @@ import {
     Alert,
     StatusBar,
     BackHandler,
+    Linking,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -55,6 +56,7 @@ export default function DriverTripScreen() {
     const [students, setStudents] = useState<Student[]>([]);
     const [routeStops, setRouteStops] = useState<any[]>([]);
     const [routeCoords, setRouteCoords] = useState<LatLng[]>([]);
+    const [activeDestination, setActiveDestination] = useState<LatLng | null>(null);
     const [tripStatus, setTripStatus] = useState<'live' | 'paused' | 'ended'>('live');
     const [loading, setLoading] = useState(false);
     const locationSubscription = useRef<any>(null);
@@ -100,11 +102,14 @@ export default function DriverTripScreen() {
                 }
             }
 
-            // Fallback: use the first pending student's stop if we can't find it in routeStops
-            if (!destination) {
-                const firstPending = pendingStudents[0];
-                // Note: s.pickupStop in State is just a string name usually, 
-                // but the backend dashboard API now returns full route.stops
+            // Fallback: If we couldn't match a specific stop name, but there are pending students,
+            // default to the FIRST stop in the route list provided it's valid.
+            if (!destination && routeStops.length > 0) {
+                const firstStop = routeStops[0];
+                destination = {
+                    latitude: parseFloat(firstStop.latitude),
+                    longitude: parseFloat(firstStop.longitude)
+                };
             }
         } else {
             // All picked up, destination is school (last stop)
@@ -118,12 +123,19 @@ export default function DriverTripScreen() {
         }
 
         if (destination) {
+            setActiveDestination(destination);
             const coords = await getDirections(
                 { latitude: currentLocation.latitude, longitude: currentLocation.longitude },
                 destination
             );
             if (coords.length > 0) {
                 setRouteCoords(coords);
+            } else {
+                // Fallback: Draw straight line if API fails
+                setRouteCoords([
+                    { latitude: currentLocation.latitude, longitude: currentLocation.longitude },
+                    destination
+                ]);
             }
         } else {
             setRouteCoords([]);
@@ -268,11 +280,25 @@ export default function DriverTripScreen() {
     };
 
     // Map markers
-    const mapMarkers = currentLocation ? [{
-        coordinate: { latitude: currentLocation.latitude, longitude: currentLocation.longitude },
-        title: "Your Location",
-        icon: 'bus' as const
-    }] : [];
+    // Map markers
+    const mapMarkers = [
+        // Driver Location
+        ...(currentLocation ? [{
+            id: 'driver-loc',
+            coordinate: { latitude: currentLocation.latitude, longitude: currentLocation.longitude },
+            title: "Your Location",
+            icon: 'bus' as const
+        }] : []),
+
+        // Route Stops
+        ...routeStops.map((stop: any, index: number) => ({
+            id: `stop-${index}`,
+            coordinate: { latitude: parseFloat(stop.latitude), longitude: parseFloat(stop.longitude) },
+            title: stop.stop_name || `Stop ${index + 1}`,
+            icon: 'stop' as const,
+            pinColor: '#6366F1' // Indigo-500 for stops
+        }))
+    ];
 
     const boardedCount = students.filter(s => s.status === 'boarded').length;
     const droppedCount = students.filter(s => s.status === 'dropped').length;
@@ -288,9 +314,19 @@ export default function DriverTripScreen() {
                 style={styles.header}
             >
                 <View style={[styles.headerContent, { paddingTop: 20 }]}>
-                    <View style={styles.appIconContainer}>
+                    <TouchableOpacity
+                        style={styles.appIconContainer}
+                        onPress={() => {
+                            if (activeDestination) {
+                                const url = `https://www.google.com/maps/dir/?api=1&destination=${activeDestination.latitude},${activeDestination.longitude}&travelmode=driving`;
+                                Linking.openURL(url);
+                            } else {
+                                Alert.alert(t('info'), t('no_destination_set') || "No active destination found.");
+                            }
+                        }}
+                    >
                         <Feather name="navigation" size={24} color="rgba(255,255,255,0.8)" />
-                    </View>
+                    </TouchableOpacity>
 
                     <View style={styles.headerCenter}>
                         <Text style={styles.routeName}>{params.routeName || t('trip_in_progress')}</Text>
@@ -306,11 +342,11 @@ export default function DriverTripScreen() {
             {/* Map */}
             <View style={styles.mapContainer}>
                 <OlaMapView
-                    center={currentLocation || { latitude: 28.6139, longitude: 77.2090 }}
-                    zoom={16}
+                    center={currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : { latitude: 20.5937, longitude: 78.9629 }}
+                    zoom={15}
                     markers={mapMarkers}
                     route={routeCoords}
-                    showUserLocation={true}
+                    showUserLocation={false}
                     style={styles.map}
                 />
             </View>

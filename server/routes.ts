@@ -132,7 +132,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper function to extract organization ID from authenticated user
+  // Proxy for Ola Maps Directions (to bypass domain restrictions on mobile)
+  app.post("/api/proxy/directions", async (req, res) => {
+    try {
+      const { origin, destination } = req.body;
+      if (!origin || !destination) {
+        return res.status(400).json({ error: "Missing origin or destination" });
+      }
+
+      // Hardcoded API Key from previous context as env var might be missing in some scopes
+      const apiKey = process.env.OLA_MAPS_API_KEY || "K7S8wT9qR2mP5nL1vX4yZ3bJ6hN8cF0d";
+      const url = `https://api.olamaps.io/routing/v1/directions?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&api_key=${apiKey}&geometries=geojson&overview=full`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Referer': 'https://eduleadconnect.vercel.app/',
+          'X-Request-Id': Math.random().toString(36).substring(7),
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Ola Proxy Error:", errorText);
+        return res.status(response.status).send(errorText);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Ola Proxy Exception:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
   const getOrganizationId = async (req: express.Request): Promise<number | undefined> => {
     // Check session first (secure)
     let username = (req.session as any)?.username;
@@ -343,7 +375,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           address: org.address,
           city: org.city,
           state: org.state,
-          pincode: org.pincode
+          pincode: org.pincode,
+          settings: org.settings
         }
       });
     } catch (error) {
@@ -363,7 +396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
-      const { phone, address, city, state, pincode, email } = req.body;
+      const { phone, address, city, state, pincode, email, latitude, longitude } = req.body;
 
       // Validate required fields
       if (!phone || !address) {
@@ -376,13 +409,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Phone number must be 10 digits" });
       }
 
+      // Get current organization to merge settings
+      const currentOrg = await storage.getOrganization(organizationId);
+      if (!currentOrg) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      const currentSettings = (currentOrg.settings as any) || {};
+      const updatedSettings = {
+        ...currentSettings,
+        location: {
+          latitude: latitude || currentSettings.location?.latitude,
+          longitude: longitude || currentSettings.location?.longitude
+        }
+      };
+
       const updated = await storage.updateOrganization(organizationId, {
         phone,
         address,
         city: city || null,
         state: state || null,
         pincode: pincode || null,
-        email: email || null
+        email: email || null,
+        settings: updatedSettings
       });
 
       if (!updated) {

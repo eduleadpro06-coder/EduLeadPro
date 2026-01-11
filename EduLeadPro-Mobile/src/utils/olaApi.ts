@@ -14,32 +14,43 @@ export interface LatLng {
  */
 export async function getDirections(origin: LatLng, destination: LatLng): Promise<LatLng[]> {
     try {
-        const url = `https://api.olamaps.io/routing/v1/directions?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&api_key=${OLA_MAPS_API_KEY}`;
+        // Use our backend proxy to bypass domain restrictions
+        // Hardcoding the production URL here as this is a mobile app utility
+        const url = `https://eduleadconnect.vercel.app/api/proxy/directions`;
 
         const response = await fetch(url, {
             method: 'POST',
             headers: {
+                'Content-Type': 'application/json',
                 'X-Request-Id': Math.random().toString(36).substring(7),
-            }
+            },
+            body: JSON.stringify({ origin, destination })
         });
 
         if (!response.ok) {
-            console.error("Directions API Error:", await response.text());
+            console.warn("Directions Proxy check failed (using fallback):", await response.text());
             return [];
         }
 
         const data = await response.json();
 
-        // This is a simplified extraction. 
-        // In a real scenario, you'd decode the polyline or extract steps.
-        // For now, it returns the first route's overview if available.
         if (data.routes && data.routes.length > 0) {
-            // Note: If Ola returns a polyline string, we need a decoder here.
-            // If it returns points, we format them as LatLng[].
-            return data.routes[0].legs[0].steps.map((s: any) => ({
-                latitude: s.start_location.lat,
-                longitude: s.start_location.lng
-            }));
+            // 1. Try formatted GeoJSON geometry (preferred)
+            if (data.routes[0].geometry && data.routes[0].geometry.coordinates) {
+                // GeoJSON is [lng, lat], we need {latitude, longitude}
+                return data.routes[0].geometry.coordinates.map((point: any) => ({
+                    latitude: point[1],
+                    longitude: point[0]
+                }));
+            }
+
+            // 2. Fallback to steps (sparse)
+            if (data.routes[0].legs && data.routes[0].legs[0].steps) {
+                return data.routes[0].legs[0].steps.map((s: any) => ({
+                    latitude: s.start_location.lat,
+                    longitude: s.start_location.lng
+                }));
+            }
         }
 
         return [];

@@ -590,13 +590,31 @@ router.get('/child/:childId/bus-tracking', async (req: Request, res: Response) =
             .limit(1)
             .single();
 
+        // Get organization location
+        const { storage } = await import('../../storage.js');
+        const org = await storage.getOrganization(child.organization_id);
+
+        let orgLocation = null;
+        if (org && org.settings) {
+            const settings = org.settings as any;
+            if (settings.location && settings.location.latitude && settings.location.longitude) {
+                orgLocation = settings.location;
+            } else if (settings.latitude && settings.longitude) {
+                orgLocation = {
+                    latitude: settings.latitude,
+                    longitude: settings.longitude
+                };
+            }
+        }
+
         res.json({
             success: true,
             data: {
                 isAssigned: true,
                 route: route || null,
                 location: location || null,
-                isLive: !!location
+                isLive: !!location,
+                orgLocation: orgLocation
             }
         });
     } catch (error) {

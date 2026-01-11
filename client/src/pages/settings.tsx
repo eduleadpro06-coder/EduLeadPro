@@ -44,6 +44,8 @@ export default function Settings() {
     state: "",
     pincode: "",
     email: "",
+    latitude: "",
+    longitude: "",
   });
 
   // Fetch organization data
@@ -64,6 +66,8 @@ export default function Settings() {
         state: org.state || "",
         pincode: org.pincode || "",
         email: org.email || "",
+        latitude: org.settings?.location?.latitude || "",
+        longitude: org.settings?.location?.longitude || "",
       });
     }
   }, [organizationData]);
@@ -398,6 +402,30 @@ export default function Settings() {
                         />
                       </div>
                     </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="org-latitude" className="text-sm font-semibold">Latitude</Label>
+                        <Input
+                          id="org-latitude"
+                          value={orgProfile.latitude}
+                          onChange={(e) => setOrgProfile({ ...orgProfile, latitude: e.target.value })}
+                          placeholder="e.g. 18.5204"
+                          className="transition-all focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="org-longitude" className="text-sm font-semibold">Longitude</Label>
+                        <Input
+                          id="org-longitude"
+                          value={orgProfile.longitude}
+                          onChange={(e) => setOrgProfile({ ...orgProfile, longitude: e.target.value })}
+                          placeholder="e.g. 73.8567"
+                          className="transition-all focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-2">
                         <Label htmlFor="org-city" className="text-sm font-semibold">City</Label>
@@ -447,220 +475,172 @@ export default function Settings() {
               </CardContent>
             </Card>
           </div>
-        )}
+        )
+        }
 
-        {selectedTab === "notifications" && (
-          <div className="animate-in fade-in-50 duration-300">
-            <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
-              <CardHeader>
-                <CardTitle className="text-h3">Notification Preferences</CardTitle>
-                <CardDescription>
-                  Configure how you want to receive notifications
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {notificationsLoading ? (
-                  <div className="text-center py-4">Loading preferences...</div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-300">
-                      <div className="space-y-1">
-                        <Label className="text-base font-semibold">Overdue Follow-ups</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Get notified about overdue follow-up tasks
-                        </p>
+        {
+          selectedTab === "notifications" && (
+            <div className="animate-in fade-in-50 duration-300">
+              <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
+                <CardHeader>
+                  <CardTitle className="text-h3">Notification Preferences</CardTitle>
+                  <CardDescription>
+                    Configure how you want to receive notifications
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {notificationsLoading ? (
+                    <div className="text-center py-4">Loading preferences...</div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-300">
+                        <div className="space-y-1">
+                          <Label className="text-base font-semibold">Overdue Follow-ups</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Get notified about overdue follow-up tasks
+                          </p>
+                        </div>
+                        <Switch
+                          checked={notifications?.overdueFollowups ?? true}
+                          onCheckedChange={(checked) =>
+                            notificationMutation.mutate({ ...(notifications || {}), overdueFollowups: checked })
+                          }
+                        />
                       </div>
-                      <Switch
-                        checked={notifications?.overdueFollowups ?? true}
-                        onCheckedChange={(checked) =>
-                          notificationMutation.mutate({ ...(notifications || {}), overdueFollowups: checked })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-300">
-                      <div className="space-y-1">
-                        <Label className="text-base font-semibold">New Lead Notifications</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Instant notifications for new leads
-                        </p>
+                      <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-300">
+                        <div className="space-y-1">
+                          <Label className="text-base font-semibold">New Lead Notifications</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Instant notifications for new leads
+                          </p>
+                        </div>
+                        <Switch
+                          checked={notifications?.newLeads ?? false}
+                          onCheckedChange={(checked) =>
+                            notificationMutation.mutate({ ...(notifications || {}), newLeads: checked })
+                          }
+                        />
                       </div>
-                      <Switch
-                        checked={notifications?.newLeads ?? false}
-                        onCheckedChange={(checked) =>
-                          notificationMutation.mutate({ ...(notifications || {}), newLeads: checked })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-300">
-                      <div className="space-y-1">
-                        <Label className="text-base font-semibold">Daily Reports</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Receive daily summary reports
-                        </p>
+                      <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-300">
+                        <div className="space-y-1">
+                          <Label className="text-base font-semibold">Daily Reports</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Receive daily summary reports
+                          </p>
+                        </div>
+                        <Switch
+                          checked={notifications?.dailyReports ?? true}
+                          onCheckedChange={(checked) =>
+                            notificationMutation.mutate({ ...(notifications || {}), dailyReports: checked })
+                          }
+                        />
                       </div>
-                      <Switch
-                        checked={notifications?.dailyReports ?? true}
-                        onCheckedChange={(checked) =>
-                          notificationMutation.mutate({ ...(notifications || {}), dailyReports: checked })
-                        }
-                      />
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )
+        }
 
-        {selectedTab === "system" && (
-          <div className="space-y-6 animate-in fade-in-50 duration-300">
-            <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
-              <CardHeader>
-                <CardTitle className="text-h3">System Configuration</CardTitle>
-                <CardDescription>
-                  Configure system-wide settings and automation
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>Auto-assign New Leads</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically assign leads to available counselors
-                    </p>
+        {
+          selectedTab === "system" && (
+            <div className="space-y-6 animate-in fade-in-50 duration-300">
+              <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
+                <CardHeader>
+                  <CardTitle className="text-h3">System Configuration</CardTitle>
+                  <CardDescription>
+                    Configure system-wide settings and automation
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label>Auto-assign New Leads</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Automatically assign leads to available counselors
+                      </p>
+                    </div>
+                    <Switch
+                      checked={organizationSettings?.autoAssignment ?? true}
+                      onCheckedChange={(checked) =>
+                        updateSettings({ ...organizationSettings, autoAssignment: checked })
+                      }
+                      disabled={isUpdatingSettings}
+                    />
                   </div>
-                  <Switch
-                    checked={organizationSettings?.autoAssignment ?? true}
-                    onCheckedChange={(checked) =>
-                      updateSettings({ ...organizationSettings, autoAssignment: checked })
-                    }
-                    disabled={isUpdatingSettings}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="followup-reminder">Follow-up Reminder (hours)</Label>
-                  <Select
-                    value={organizationSettings?.followupReminders || "24"}
-                    onValueChange={(value) =>
-                      updateSettings({ ...organizationSettings, followupReminders: value })
-                    }
-                    disabled={isUpdatingSettings}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="12">12 hours</SelectItem>
-                      <SelectItem value="24">24 hours</SelectItem>
-                      <SelectItem value="48">48 hours</SelectItem>
-                      <SelectItem value="72">72 hours</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lead-timeout">Lead Timeout (days)</Label>
-                  <Select
-                    value={organizationSettings?.leadTimeout || "30"}
-                    onValueChange={(value) =>
-                      updateSettings({ ...organizationSettings, leadTimeout: value })
-                    }
-                    disabled={isUpdatingSettings}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="15">15 days</SelectItem>
-                      <SelectItem value="30">30 days</SelectItem>
-                      <SelectItem value="45">45 days</SelectItem>
-                      <SelectItem value="60">60 days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="working-hours">Working Hours</Label>
-                  <Input
-                    id="working-hours"
-                    value={organizationSettings?.workingHours || "9:00 AM - 6:00 PM"}
-                    onChange={(e) =>
-                      updateSettings({ ...organizationSettings, workingHours: e.target.value })
-                    }
-                    disabled={isUpdatingSettings}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Academic Year Configuration */}
-            <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
-              <CardHeader>
-                <CardTitle className="text-h3">Academic Year</CardTitle>
-                <CardDescription>
-                  Set the current academic year for the entire system
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="academic-year">Current Academic Year</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="followup-reminder">Follow-up Reminder (hours)</Label>
                     <Select
-                      value={organizationSettings?.academicYear || "2024-25"}
-                      onValueChange={(value) => updateSettings({ academicYear: value })}
+                      value={organizationSettings?.followupReminders || "24"}
+                      onValueChange={(value) =>
+                        updateSettings({ ...organizationSettings, followupReminders: value })
+                      }
                       disabled={isUpdatingSettings}
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="2024-25">2024-25</SelectItem>
-                        <SelectItem value="2025-26">2025-26</SelectItem>
-                        <SelectItem value="2026-27">2026-27</SelectItem>
+                        <SelectItem value="12">12 hours</SelectItem>
+                        <SelectItem value="24">24 hours</SelectItem>
+                        <SelectItem value="48">48 hours</SelectItem>
+                        <SelectItem value="72">72 hours</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button
-                    onClick={() => updateSettings({ academicYear: organizationSettings?.academicYear || "2024-25" })}
-                    disabled={isUpdatingSettings}
-                    className="mt-6"
-                  >
-                    {isUpdatingSettings ? "Saving..." : "Save Year"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {selectedTab === "global-fees" && (
-          <div className="animate-in fade-in-50 duration-300">
-            <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
-              <CardHeader>
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div className="flex flex-col gap-1">
-                    <CardTitle className="text-h3">Global Class Fee Management</CardTitle>
-                    <CardDescription>
-                      Set and manage fee structures for different classes that can be used for calculations and automatically assigned to students
-                    </CardDescription>
+                  <div className="space-y-2">
+                    <Label htmlFor="lead-timeout">Lead Timeout (days)</Label>
+                    <Select
+                      value={organizationSettings?.leadTimeout || "30"}
+                      onValueChange={(value) =>
+                        updateSettings({ ...organizationSettings, leadTimeout: value })
+                      }
+                      disabled={isUpdatingSettings}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="15">15 days</SelectItem>
+                        <SelectItem value="30">30 days</SelectItem>
+                        <SelectItem value="45">45 days</SelectItem>
+                        <SelectItem value="60">60 days</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Button
-                    onClick={() => {
-                      setEditingGlobalFee(null);
-                      setGlobalFeeModalOpen(true);
-                    }}
-                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 shadow-lg"
-                  >
-                    <Calculator className="mr-2 h-4 w-4" />
-                    Add Global Fee
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex flex-wrap gap-3 items-center">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-sm font-semibold">Academic Year:</Label>
-                      <Select value={academicYear} onValueChange={setAcademicYear}>
-                        <SelectTrigger className="w-[140px] bg-white shadow-sm">
+                  <div className="space-y-2">
+                    <Label htmlFor="working-hours">Working Hours</Label>
+                    <Input
+                      id="working-hours"
+                      value={organizationSettings?.workingHours || "9:00 AM - 6:00 PM"}
+                      onChange={(e) =>
+                        updateSettings({ ...organizationSettings, workingHours: e.target.value })
+                      }
+                      disabled={isUpdatingSettings}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Academic Year Configuration */}
+              <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
+                <CardHeader>
+                  <CardTitle className="text-h3">Academic Year</CardTitle>
+                  <CardDescription>
+                    Set the current academic year for the entire system
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor="academic-year">Current Academic Year</Label>
+                      <Select
+                        value={organizationSettings?.academicYear || "2024-25"}
+                        onValueChange={(value) => updateSettings({ academicYear: value })}
+                        disabled={isUpdatingSettings}
+                      >
+                        <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -671,271 +651,326 @@ export default function Settings() {
                       </Select>
                     </div>
                     <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setAcademicYear("2024-25")}
+                      onClick={() => updateSettings({ academicYear: organizationSettings?.academicYear || "2024-25" })}
+                      disabled={isUpdatingSettings}
+                      className="mt-6"
                     >
-                      Reset Filter
+                      {isUpdatingSettings ? "Saving..." : "Save Year"}
                     </Button>
                   </div>
-                  <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                </CardContent>
+              </Card>
+            </div>
+          )
+        }
+
+        {
+          selectedTab === "global-fees" && (
+            <div className="animate-in fade-in-50 duration-300">
+              <Card className="bg-white/70 backdrop-blur-md shadow-xl border-gray-200/50 hover:shadow-2xl transition-all duration-300">
+                <CardHeader>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div className="flex flex-col gap-1">
+                      <CardTitle className="text-h3">Global Class Fee Management</CardTitle>
+                      <CardDescription>
+                        Set and manage fee structures for different classes that can be used for calculations and automatically assigned to students
+                      </CardDescription>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setEditingGlobalFee(null);
+                        setGlobalFeeModalOpen(true);
+                      }}
+                      className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 shadow-lg"
+                    >
+                      <Calculator className="mr-2 h-4 w-4" />
+                      Add Global Fee
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-3 items-center">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-semibold">Academic Year:</Label>
+                        <Select value={academicYear} onValueChange={setAcademicYear}>
+                          <SelectTrigger className="w-[140px] bg-white shadow-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="2024-25">2024-25</SelectItem>
+                            <SelectItem value="2025-26">2025-26</SelectItem>
+                            <SelectItem value="2026-27">2026-27</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAcademicYear("2024-25")}
+                      >
+                        Reset Filter
+                      </Button>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                      <Table>
+                        <TableHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                          <TableRow className="hover:bg-transparent">
+                            <TableHead className="table-header font-semibold">Class</TableHead>
+                            <TableHead className="table-header font-semibold">Fee Type</TableHead>
+                            <TableHead className="table-header font-semibold">Amount</TableHead>
+                            <TableHead className="table-header font-semibold">Frequency</TableHead>
+                            <TableHead className="table-header font-semibold">Academic Year</TableHead>
+                            <TableHead className="table-header font-semibold">Status</TableHead>
+                            <TableHead className="table-header font-semibold">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {globalClassFees
+                            .filter(fee => fee.academicYear === academicYear)
+                            .map((fee) => (
+                              <TableRow key={fee.id} className="hover:bg-blue-50/50 transition-colors duration-200">
+                                <TableCell className="font-medium">{fee.className}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="capitalize font-medium">
+                                    {fee.feeType}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="font-semibold text-green-600">₹{parseFloat(fee.amount).toLocaleString()}</TableCell>
+                                <TableCell className="capitalize text-sm">{fee.frequency}</TableCell>
+                                <TableCell className="text-sm font-medium">{fee.academicYear}</TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant={fee.isActive ? "default" : "secondary"}
+                                    className={fee.isActive ? "bg-green-500 hover:bg-green-600" : "bg-gray-400 hover:bg-gray-500"}
+                                  >
+                                    {fee.isActive ? "Active" : "Inactive"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex space-x-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditingGlobalFee(fee);
+                                        setGlobalFeeModalOpen(true);
+                                      }}
+                                      className="hover:bg-blue-50 hover:border-blue-300 transition-all"
+                                    >
+                                      <Edit className="h-3.5 w-3.5 mr-1" />
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleViewTotalFees(fee.className)}
+                                      className="hover:bg-indigo-50 hover:border-indigo-300 transition-all"
+                                    >
+                                      <Calculator className="h-3.5 w-3.5 mr-1" />
+                                      View Total
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {globalClassFees.filter(fee => fee.academicYear === academicYear).length === 0 && (
+                      <div className="text-center py-12 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl">
+                        <Calculator className="mx-auto h-16 w-16 text-blue-300 mb-4" />
+                        <p className="text-lg font-semibold text-gray-700">No global fees configured for {academicYear}</p>
+                        <p className="text-sm text-gray-500 mt-2">Click "Add Global Fee" to get started</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              {/* Global Class Fee Modal */}
+              <Dialog open={globalFeeModalOpen} onOpenChange={setGlobalFeeModalOpen}>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>{editingGlobalFee ? "Edit Global Class Fee" : "Add Global Class Fee"}</DialogTitle>
+                    <DialogDescription>
+                      {editingGlobalFee
+                        ? "Update the global fee structure for this class"
+                        : "Set a global fee structure that can be used for calculations and automatically assigned to students"
+                      }
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleGlobalClassFee} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="className">Class</Label>
+                        <Select name="className" required value={feeForm.className} onValueChange={v => setFeeForm(f => ({ ...f, className: v }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select class" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Playgroup">Playgroup</SelectItem>
+                            <SelectItem value="Nursery">Nursery</SelectItem>
+                            <SelectItem value="Junior KG">Junior KG</SelectItem>
+                            <SelectItem value="Senior KG">Senior KG</SelectItem>
+                            <SelectItem value="Class 1">Class 1</SelectItem>
+                            <SelectItem value="Class 2">Class 2</SelectItem>
+                            <SelectItem value="Class 3">Class 3</SelectItem>
+                            <SelectItem value="Class 4">Class 4</SelectItem>
+                            <SelectItem value="Class 5">Class 5</SelectItem>
+                            <SelectItem value="Class 6">Class 6</SelectItem>
+                            <SelectItem value="Class 7">Class 7</SelectItem>
+                            <SelectItem value="Class 8">Class 8</SelectItem>
+                            <SelectItem value="Class 9">Class 9</SelectItem>
+                            <SelectItem value="Class 10">Class 10</SelectItem>
+                            <SelectItem value="Class 11">Class 11</SelectItem>
+                            <SelectItem value="Class 12">Class 12</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="feeType">Fee Type</Label>
+                        <Select name="feeType" required value={feeForm.feeType} onValueChange={v => setFeeForm(f => ({ ...f, feeType: v }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select fee type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="tuition">Tuition Fee</SelectItem>
+                            <SelectItem value="admission">Admission Fee</SelectItem>
+                            <SelectItem value="library">Library Fee</SelectItem>
+                            <SelectItem value="laboratory">Laboratory Fee</SelectItem>
+                            <SelectItem value="sports">Sports Fee</SelectItem>
+                            <SelectItem value="transport">Transport Fee</SelectItem>
+                            <SelectItem value="examination">Examination Fee</SelectItem>
+                            <SelectItem value="development">Development Fee</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="amount">Amount (₹)</Label>
+                        <Input
+                          id="amount"
+                          name="amount"
+                          type="number"
+                          required
+                          placeholder="Enter amount"
+                          value={feeForm.amount}
+                          onChange={e => setFeeForm(f => ({ ...f, amount: e.target.value }))}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="frequency">Frequency</Label>
+                        <Select name="frequency" required value={feeForm.frequency} onValueChange={v => setFeeForm(f => ({ ...f, frequency: v }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select frequency" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                            <SelectItem value="quarterly">Quarterly</SelectItem>
+                            <SelectItem value="yearly">Yearly</SelectItem>
+                            <SelectItem value="one-time">One Time</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="academicYear">Academic Year</Label>
+                        <Select name="academicYear" required value={feeForm.academicYear} onValueChange={v => setFeeForm(f => ({ ...f, academicYear: v }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select academic year" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="2024-25">2024-25</SelectItem>
+                            <SelectItem value="2025-26">2025-26</SelectItem>
+                            <SelectItem value="2026-27">2026-27</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="isActive">Status</Label>
+                        <Select name="isActive" required value={feeForm.isActive} onValueChange={v => setFeeForm(f => ({ ...f, isActive: v }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="true">Active</SelectItem>
+                            <SelectItem value="false">Inactive</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="description">Description (Optional)</Label>
+                      <Input
+                        id="description"
+                        name="description"
+                        placeholder="Enter description"
+                        value={feeForm.description}
+                        onChange={e => setFeeForm(f => ({ ...f, description: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={() => {
+                        setGlobalFeeModalOpen(false);
+                        setEditingGlobalFee(null);
+                      }}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={globalClassFeeMutation.isPending}>
+                        {globalClassFeeMutation.isPending
+                          ? (editingGlobalFee ? "Updating..." : "Creating...")
+                          : (editingGlobalFee ? "Update Fee" : "Create Fee")
+                        }
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+              {/* View Total Amount Modal (if needed) */}
+              <Dialog open={viewTotalFeesModalOpen} onOpenChange={setViewTotalFeesModalOpen}>
+                <DialogContent className="max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle>Total Amount for {selectedClassForTotal}</DialogTitle>
+                    <DialogDescription>
+                      Detailed breakdown of all active fees for {selectedClassForTotal} ({academicYear})
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
                     <Table>
-                      <TableHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-                        <TableRow className="hover:bg-transparent">
-                          <TableHead className="table-header font-semibold">Class</TableHead>
-                          <TableHead className="table-header font-semibold">Fee Type</TableHead>
-                          <TableHead className="table-header font-semibold">Amount</TableHead>
-                          <TableHead className="table-header font-semibold">Frequency</TableHead>
-                          <TableHead className="table-header font-semibold">Academic Year</TableHead>
-                          <TableHead className="table-header font-semibold">Status</TableHead>
-                          <TableHead className="table-header font-semibold">Actions</TableHead>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fee Type</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Frequency</TableHead>
+                          <TableHead>Description</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {globalClassFees
-                          .filter(fee => fee.academicYear === academicYear)
-                          .map((fee) => (
-                            <TableRow key={fee.id} className="hover:bg-blue-50/50 transition-colors duration-200">
-                              <TableCell className="font-medium">{fee.className}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="capitalize font-medium">
-                                  {fee.feeType}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="font-semibold text-green-600">₹{parseFloat(fee.amount).toLocaleString()}</TableCell>
-                              <TableCell className="capitalize text-sm">{fee.frequency}</TableCell>
-                              <TableCell className="text-sm font-medium">{fee.academicYear}</TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={fee.isActive ? "default" : "secondary"}
-                                  className={fee.isActive ? "bg-green-500 hover:bg-green-600" : "bg-gray-400 hover:bg-gray-500"}
-                                >
-                                  {fee.isActive ? "Active" : "Inactive"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex space-x-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setEditingGlobalFee(fee);
-                                      setGlobalFeeModalOpen(true);
-                                    }}
-                                    className="hover:bg-blue-50 hover:border-blue-300 transition-all"
-                                  >
-                                    <Edit className="h-3.5 w-3.5 mr-1" />
-                                    Edit
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleViewTotalFees(fee.className)}
-                                    className="hover:bg-indigo-50 hover:border-indigo-300 transition-all"
-                                  >
-                                    <Calculator className="h-3.5 w-3.5 mr-1" />
-                                    View Total
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                        {getClassFeeBreakdown(selectedClassForTotal, academicYear).map(fee => (
+                          <TableRow key={fee.id}>
+                            <TableCell className="capitalize">{fee.feeType}</TableCell>
+                            <TableCell>₹{parseFloat(fee.amount).toLocaleString()}</TableCell>
+                            <TableCell className="capitalize">{fee.frequency}</TableCell>
+                            <TableCell>{fee.description || "-"}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted font-semibold">
+                          <TableCell>Total</TableCell>
+                          <TableCell>₹{calculateClassTotalFees(selectedClassForTotal, academicYear).toLocaleString()}</TableCell>
+                          <TableCell>-</TableCell>
+                          <TableCell>-</TableCell>
+                        </TableRow>
                       </TableBody>
                     </Table>
                   </div>
-                  {globalClassFees.filter(fee => fee.academicYear === academicYear).length === 0 && (
-                    <div className="text-center py-12 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl">
-                      <Calculator className="mx-auto h-16 w-16 text-blue-300 mb-4" />
-                      <p className="text-lg font-semibold text-gray-700">No global fees configured for {academicYear}</p>
-                      <p className="text-sm text-gray-500 mt-2">Click "Add Global Fee" to get started</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            {/* Global Class Fee Modal */}
-            <Dialog open={globalFeeModalOpen} onOpenChange={setGlobalFeeModalOpen}>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>{editingGlobalFee ? "Edit Global Class Fee" : "Add Global Class Fee"}</DialogTitle>
-                  <DialogDescription>
-                    {editingGlobalFee
-                      ? "Update the global fee structure for this class"
-                      : "Set a global fee structure that can be used for calculations and automatically assigned to students"
-                    }
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleGlobalClassFee} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="className">Class</Label>
-                      <Select name="className" required value={feeForm.className} onValueChange={v => setFeeForm(f => ({ ...f, className: v }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select class" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Playgroup">Playgroup</SelectItem>
-                          <SelectItem value="Nursery">Nursery</SelectItem>
-                          <SelectItem value="Junior KG">Junior KG</SelectItem>
-                          <SelectItem value="Senior KG">Senior KG</SelectItem>
-                          <SelectItem value="Class 1">Class 1</SelectItem>
-                          <SelectItem value="Class 2">Class 2</SelectItem>
-                          <SelectItem value="Class 3">Class 3</SelectItem>
-                          <SelectItem value="Class 4">Class 4</SelectItem>
-                          <SelectItem value="Class 5">Class 5</SelectItem>
-                          <SelectItem value="Class 6">Class 6</SelectItem>
-                          <SelectItem value="Class 7">Class 7</SelectItem>
-                          <SelectItem value="Class 8">Class 8</SelectItem>
-                          <SelectItem value="Class 9">Class 9</SelectItem>
-                          <SelectItem value="Class 10">Class 10</SelectItem>
-                          <SelectItem value="Class 11">Class 11</SelectItem>
-                          <SelectItem value="Class 12">Class 12</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="feeType">Fee Type</Label>
-                      <Select name="feeType" required value={feeForm.feeType} onValueChange={v => setFeeForm(f => ({ ...f, feeType: v }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select fee type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="tuition">Tuition Fee</SelectItem>
-                          <SelectItem value="admission">Admission Fee</SelectItem>
-                          <SelectItem value="library">Library Fee</SelectItem>
-                          <SelectItem value="laboratory">Laboratory Fee</SelectItem>
-                          <SelectItem value="sports">Sports Fee</SelectItem>
-                          <SelectItem value="transport">Transport Fee</SelectItem>
-                          <SelectItem value="examination">Examination Fee</SelectItem>
-                          <SelectItem value="development">Development Fee</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="amount">Amount (₹)</Label>
-                      <Input
-                        id="amount"
-                        name="amount"
-                        type="number"
-                        required
-                        placeholder="Enter amount"
-                        value={feeForm.amount}
-                        onChange={e => setFeeForm(f => ({ ...f, amount: e.target.value }))}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="frequency">Frequency</Label>
-                      <Select name="frequency" required value={feeForm.frequency} onValueChange={v => setFeeForm(f => ({ ...f, frequency: v }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select frequency" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                          <SelectItem value="quarterly">Quarterly</SelectItem>
-                          <SelectItem value="yearly">Yearly</SelectItem>
-                          <SelectItem value="one-time">One Time</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="academicYear">Academic Year</Label>
-                      <Select name="academicYear" required value={feeForm.academicYear} onValueChange={v => setFeeForm(f => ({ ...f, academicYear: v }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select academic year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="2024-25">2024-25</SelectItem>
-                          <SelectItem value="2025-26">2025-26</SelectItem>
-                          <SelectItem value="2026-27">2026-27</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="isActive">Status</Label>
-                      <Select name="isActive" required value={feeForm.isActive} onValueChange={v => setFeeForm(f => ({ ...f, isActive: v }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="true">Active</SelectItem>
-                          <SelectItem value="false">Inactive</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Description (Optional)</Label>
-                    <Input
-                      id="description"
-                      name="description"
-                      placeholder="Enter description"
-                      value={feeForm.description}
-                      onChange={e => setFeeForm(f => ({ ...f, description: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => {
-                      setGlobalFeeModalOpen(false);
-                      setEditingGlobalFee(null);
-                    }}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={globalClassFeeMutation.isPending}>
-                      {globalClassFeeMutation.isPending
-                        ? (editingGlobalFee ? "Updating..." : "Creating...")
-                        : (editingGlobalFee ? "Update Fee" : "Create Fee")
-                      }
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-            {/* View Total Amount Modal (if needed) */}
-            <Dialog open={viewTotalFeesModalOpen} onOpenChange={setViewTotalFeesModalOpen}>
-              <DialogContent className="max-w-xl">
-                <DialogHeader>
-                  <DialogTitle>Total Amount for {selectedClassForTotal}</DialogTitle>
-                  <DialogDescription>
-                    Detailed breakdown of all active fees for {selectedClassForTotal} ({academicYear})
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fee Type</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Frequency</TableHead>
-                        <TableHead>Description</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {getClassFeeBreakdown(selectedClassForTotal, academicYear).map(fee => (
-                        <TableRow key={fee.id}>
-                          <TableCell className="capitalize">{fee.feeType}</TableCell>
-                          <TableCell>₹{parseFloat(fee.amount).toLocaleString()}</TableCell>
-                          <TableCell className="capitalize">{fee.frequency}</TableCell>
-                          <TableCell>{fee.description || "-"}</TableCell>
-                        </TableRow>
-                      ))}
-                      <TableRow className="bg-muted font-semibold">
-                        <TableCell>Total</TableCell>
-                        <TableCell>₹{calculateClassTotalFees(selectedClassForTotal, academicYear).toLocaleString()}</TableCell>
-                        <TableCell>-</TableCell>
-                        <TableCell>-</TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        )}
+                </DialogContent>
+              </Dialog>
+            </div>
+          )
+        }
 
         {/* {selectedTab === "templates" && (
           <div className="animate-in fade-in-50 duration-300">
@@ -943,7 +978,7 @@ export default function Settings() {
           </div>
         )} */}
 
-      </main>
+      </main >
     </div >
   );
 }
