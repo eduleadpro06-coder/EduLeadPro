@@ -15,9 +15,9 @@ export interface LatLng {
 export async function getDirections(origin: LatLng, destination: LatLng): Promise<LatLng[]> {
     try {
         // Use our backend proxy to bypass domain restrictions
-        // Hardcoding the production URL here as this is a mobile app utility
         const url = `https://eduleadconnect.vercel.app/api/proxy/directions`;
 
+        console.log(`[getDirections] Fetching from: ${url}`);
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -40,24 +40,29 @@ export async function getDirections(origin: LatLng, destination: LatLng): Promis
             // 1. Try formatted GeoJSON geometry (preferred)
             if (data.routes[0].geometry && data.routes[0].geometry.coordinates) {
                 // GeoJSON is [lng, lat], we need {latitude, longitude}
-                return data.routes[0].geometry.coordinates.map((point: any) => ({
+                const coords = data.routes[0].geometry.coordinates.map((point: any) => ({
                     latitude: point[1],
                     longitude: point[0]
                 }));
+                console.log(`[getDirections] Parsed ${coords.length} coordinates from GeoJSON`);
+                return coords;
             }
 
             // 2. Fallback to steps (sparse)
             if (data.routes[0].legs && data.routes[0].legs[0].steps) {
-                return data.routes[0].legs[0].steps.map((s: any) => ({
+                const coords = data.routes[0].legs[0].steps.map((s: any) => ({
                     latitude: s.start_location.lat,
                     longitude: s.start_location.lng
                 }));
+                console.log(`[getDirections] Parsed ${coords.length} coordinates from Steps`);
+                return coords;
             }
         }
 
+        console.warn(`[getDirections] No routes or geometry found in data:`, JSON.stringify(data).substring(0, 100));
         return [];
     } catch (error) {
-        console.error("Error fetching directions:", error);
+        console.error("[getDirections] Exception:", error);
         return [];
     }
 }

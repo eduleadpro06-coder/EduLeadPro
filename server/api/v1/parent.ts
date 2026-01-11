@@ -767,7 +767,7 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
         // 2. Double-check active_bus_sessions for added robustness
         const { data: activeSession } = await supabase
             .from('active_bus_sessions')
-            .select('id')
+            .select('id, started_at')
             .eq('route_id', routeId)
             .eq('status', 'live')
             .maybeSingle();
@@ -786,16 +786,28 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
         let studentEvent = null;
         if (req.query.studentId) {
             const studentId = parseInt(req.query.studentId as string);
-            const today = new Date().toISOString().split('T')[0];
-            const { data: event } = await supabase
+
+            // Base query for student events
+            let eventQuery = supabase
                 .from('bus_trip_passenger_events')
                 .select('status, event_time')
                 .eq('route_id', routeId)
-                .eq('student_id', studentId) // Filter by student
-                .gte('event_time', `${today}T00:00:00`) // Filter for today
+                .eq('student_id', studentId);
+
+            // If trip is live, only show events from CURRENT session
+            if (activeSession?.started_at) {
+                eventQuery = eventQuery.gte('event_time', activeSession.started_at);
+            } else {
+                // Fallback to today's events if no active session found but tracking is somehow active
+                const today = new Date().toISOString().split('T')[0];
+                eventQuery = eventQuery.gte('event_time', `${today}T00:00:00`);
+            }
+
+            const { data: event } = await eventQuery
                 .order('event_time', { ascending: false })
                 .limit(1)
                 .single();
+
             studentEvent = event;
         }
 

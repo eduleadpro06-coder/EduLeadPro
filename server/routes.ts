@@ -136,6 +136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/proxy/directions", async (req, res) => {
     try {
       const { origin, destination } = req.body;
+      console.log(`[Proxy] Directions requested: From(${origin?.latitude},${origin?.longitude}) To(${destination?.latitude},${destination?.longitude})`);
       if (!origin || !destination) {
         return res.status(400).json({ error: "Missing origin or destination" });
       }
