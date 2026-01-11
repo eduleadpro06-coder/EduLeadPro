@@ -49,7 +49,7 @@ export default {
       wsUrl: process.env.EXPO_PUBLIC_WS_URL,
       olaMapsApiKey: process.env.EXPO_PUBLIC_OLA_MAPS_KEY,
       eas: {
-        projectId: '25f5b34a-4952-4dec-bdc3-45ce9fb48702',
+        projectId: '',
       },
     },
     owner: 'educonnect06',

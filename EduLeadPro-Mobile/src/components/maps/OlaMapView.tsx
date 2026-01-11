@@ -196,17 +196,24 @@ export default function OlaMapView({
                                 return;
                             }
                             try {
-                                if (!coords || coords.length === 0) {
-                                    log("updateRoute called with EMPTY coords");
-                                    return;
-                                }
                                 log("Updating route with " + coords.length + " points");
+                                
+                                // GeoJSON LineString expects arrays of [longitude, latitude]
+                                // Handle both {latitude, longitude} objects and [lng, lat] arrays
+                                const geojsonCoords = coords.map(p => {
+                                    if (Array.isArray(p)) return p;
+                                    return [
+                                        parseFloat(p.longitude || p.lng || 0),
+                                        parseFloat(p.latitude || p.lat || 0)
+                                    ];
+                                });
+
                                 const sourceId = 'route';
                                 if (map.getSource(sourceId)) {
                                     map.getSource(sourceId).setData({
                                         type: 'Feature',
                                         properties: {},
-                                        geometry: { type: 'LineString', coordinates: coords }
+                                        geometry: { type: 'LineString', coordinates: geojsonCoords }
                                     });
                                 } else {
                                     map.addSource(sourceId, {
@@ -214,7 +221,7 @@ export default function OlaMapView({
                                         data: {
                                             type: 'Feature',
                                             properties: {},
-                                            geometry: { type: 'LineString', coordinates: coords }
+                                            geometry: { type: 'LineString', coordinates: geojsonCoords }
                                         }
                                     });
                                     map.addLayer({
