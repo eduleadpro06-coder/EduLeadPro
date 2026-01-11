@@ -55,10 +55,10 @@ export default function OlaMapView({
         <head>
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-            <link href="https://cdn.jsdelivr.net/npm/olamaps-web-sdk@latest/dist/style.css" rel="stylesheet" />
+            <link href="https://api.olamaps.io/tiles/vector/v1/js/olamaps-web-sdk.css" rel="stylesheet" />
             <style>
                 body { margin: 0; padding: 0; }
-                #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; background: #f0f0f0; }
+                #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; background: #f3f4f6; }
                 .marker-bus {
                     font-size: 24px;
                     line-height: 24px;
@@ -73,14 +73,33 @@ export default function OlaMapView({
         </head>
         <body>
             <div id="map"></div>
-            <script src="https://www.unpkg.com/olamaps-web-sdk@latest/dist/olamaps-web-sdk.umd.js"></script>
+            <script src="https://api.olamaps.io/tiles/vector/v1/js/olamaps-web-sdk.js"></script>
             <script>
                 let map;
                 let olamaps;
                 let markersMap = {};
 
+                // Intercept console logs
+                const log = (msg) => {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOG', message: msg }));
+                };
+
+                window.onerror = function(message, source, lineno, colno, error) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                        type: 'ERROR', 
+                        message: message + " (at " + lineno + ":" + colno + ")" 
+                    }));
+                };
+
                 async function init() {
                     try {
+                        log("Initializing Ola Maps SDK...");
+                        
+                        // Check if OlaMaps is defined
+                        if (typeof OlaMaps === 'undefined') {
+                            throw new Error("OlaMaps SDK failed to load from CDN");
+                        }
+
                         olamaps = new OlaMaps.OlaMaps({
                             apiKey: '${OLA_MAPS_API_KEY}',
                             mode: '3d',
@@ -100,19 +119,26 @@ export default function OlaMapView({
                                 map.addControl(olamaps.addNavigationControl(), 'top-right');
                             }
                         } catch (e) {
-                            console.warn("Control Error:", e);
+                            log("Control Error: " + e.message);
                         }
 
                         map.on('load', () => {
+                            log("Map Loaded successfully");
                             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
                         });
 
                         map.on('error', (e) => {
-                            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ERROR', message: e.message || 'Map Load Error' }));
+                            window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                                type: 'ERROR', 
+                                message: "Map Error: " + (e.message || 'Unknown map error') 
+                            }));
                         });
 
                     } catch (e) {
-                         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ERROR', message: e.message }));
+                         window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                             type: 'ERROR', 
+                             message: "Init Error: " + e.message 
+                         }));
                     }
                 }
 
@@ -120,87 +146,91 @@ export default function OlaMapView({
                 window.updateRoute = (coords) => {
                     if (!map) return;
                     
-                    if (map.getSource('route')) {
-                        map.getSource('route').setData({
-                            type: 'Feature',
-                            properties: {},
-                            geometry: {
-                                type: 'LineString',
-                                coordinates: coords
-                            }
-                        });
-                    } else {
-                        map.addSource('route', {
-                            type: 'geojson',
-                            data: {
+                    try {
+                        if (map.getSource('route')) {
+                            map.getSource('route').setData({
                                 type: 'Feature',
                                 properties: {},
                                 geometry: {
                                     type: 'LineString',
                                     coordinates: coords
                                 }
-                            }
-                        });
+                            });
+                        } else {
+                            map.addSource('route', {
+                                type: 'geojson',
+                                data: {
+                                    type: 'Feature',
+                                    properties: {},
+                                    geometry: {
+                                        type: 'LineString',
+                                        coordinates: coords
+                                    }
+                                }
+                            });
 
-                        map.addLayer({
-                            id: 'route',
-                            type: 'line',
-                            source: 'route',
-                            layout: {
-                                'line-join': 'round',
-                                'line-cap': 'round'
-                            },
-                            paint: {
-                                'line-color': '#4f46e5',
-                                'line-width': 5,
-                                'line-opacity': 0.75
-                            }
-                        });
-                    }
+                            map.addLayer({
+                                id: 'route',
+                                type: 'line',
+                                source: 'route',
+                                layout: {
+                                    'line-join': 'round',
+                                    'line-cap': 'round'
+                                },
+                                paint: {
+                                    'line-color': '#4f46e5',
+                                    'line-width': 5,
+                                    'line-opacity': 0.75
+                                }
+                            });
+                        }
+                    } catch (e) { log("Route Update Error: " + e.message); }
                 };
 
                 window.updateMarkers = (markersList) => {
                     if (!map) return;
 
-                    const currentIds = [];
-                    markersList.forEach(m => {
-                        const id = m.id || 'm_' + m.coordinate.latitude + '_' + m.coordinate.longitude;
-                        currentIds.push(id);
-                        const lngLat = [m.coordinate.longitude, m.coordinate.latitude];
+                    try {
+                        const currentIds = [];
+                        markersList.forEach(m => {
+                            const id = m.id || 'm_' + m.coordinate.latitude + '_' + m.coordinate.longitude;
+                            currentIds.push(id);
+                            const lngLat = [m.coordinate.longitude, m.coordinate.latitude];
 
-                        if (markersMap[id]) {
-                            markersMap[id].setLngLat(lngLat);
-                        } else {
-                            const el = document.createElement('div');
-                            el.className = 'marker-bus';
-                            
-                            if (m.icon === 'bus') el.innerHTML = '🚌';
-                            else if (m.icon === 'stop') {
-                                el.innerHTML = '🚏'; 
-                                el.style.border = '2px solid #10b981';
+                            if (markersMap[id]) {
+                                markersMap[id].setLngLat(lngLat);
                             } else {
-                                el.innerHTML = '📍';
-                                el.style.border = '2px solid #ef4444';
+                                const el = document.createElement('div');
+                                el.className = 'marker-bus';
+                                
+                                if (m.icon === 'bus') el.innerHTML = '🚌';
+                                else if (m.icon === 'stop') {
+                                    el.innerHTML = '🚏'; 
+                                    el.style.border = '2px solid #10b981';
+                                } else {
+                                    el.innerHTML = '📍';
+                                    el.style.border = '2px solid #ef4444';
+                                }
+
+                                el.onclick = () => {
+                                    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MARKER_PRESS', payload: m }));
+                                };
+
+                                const marker = new OlaMaps.Marker({ element: el })
+                                    .setLngLat(lngLat)
+                                    .addTo(map);
+                                
+                                markersMap[id] = marker;
                             }
+                        });
 
-                            el.onclick = () => {
-                                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MARKER_PRESS', payload: m }));
-                            };
-
-                            const marker = new OlaMaps.Marker({ element: el })
-                                .setLngLat(lngLat)
-                                .addTo(map);
-                            
-                            markersMap[id] = marker;
-                        }
-                    });
-
-                    Object.keys(markersMap).forEach(key => {
-                        if (!currentIds.includes(key)) {
-                            markersMap[key].remove();
-                            delete markersMap[key];
-                        }
-                    });
+                        Object.keys(markersMap).forEach(key => {
+                            if (!currentIds.includes(key)) {
+                                markersMap[key].remove();
+                                delete markersMap[key];
+                            }
+                        });
+                    } catch (e) { log("Marker Update Error: " + e.message); }
                 };
 
                 init();
@@ -212,7 +242,11 @@ export default function OlaMapView({
     const handleMessage = (event: any) => {
         try {
             const data = JSON.parse(event.nativeEvent.data);
-            if (data.type === 'MAP_READY') {
+            if (data.type === 'LOG') {
+                console.log("[OlaMap WebView]", data.message);
+            } else if (data.type === 'ERROR') {
+                console.error("[OlaMap WebView Error]", data.message);
+            } else if (data.type === 'MAP_READY') {
                 setIsMapReady(true);
                 if (onMapReady) onMapReady();
 
@@ -253,8 +287,8 @@ export default function OlaMapView({
     useEffect(() => {
         if (isMapReady && webviewRef.current && center) {
             webviewRef.current.injectJavaScript(`
-                if(map) { 
-                    map.flyTo({ center: [${center.longitude}, ${center.latitude}], zoom: ${zoom} }); 
+                if(window.map) { 
+                    window.map.flyTo({ center: [${center.longitude}, ${center.latitude}], zoom: ${zoom} }); 
                 } 
                 true;
             `);
@@ -271,6 +305,14 @@ export default function OlaMapView({
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
                 startInLoadingState={true}
+                onHttpError={(syntheticEvent) => {
+                    const { nativeEvent } = syntheticEvent;
+                    console.error('WebView HTTP Error: ', nativeEvent.statusCode, nativeEvent.url);
+                }}
+                onError={(syntheticEvent) => {
+                    const { nativeEvent } = syntheticEvent;
+                    console.error('WebView Error: ', nativeEvent.description);
+                }}
                 renderLoading={() => (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color="#7C3AED" />
