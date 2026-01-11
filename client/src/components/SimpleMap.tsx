@@ -38,18 +38,21 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
             if (mapInstanceRef.current) return;
 
             try {
-                console.log("Initializing Official Ola Maps Web SDK v2...");
+                console.log("Initializing Official Ola Maps Web SDK v2 (3D Mode)...");
 
-                const olaMaps = new OlaMaps({
+                // As per latest documentation for 3D Tiles support
+                const olamaps = new OlaMaps({
                     apiKey: OLA_MAPS_API_KEY,
+                    mode: "3d", // Integrated 3D support to resolve style layer errors
+                    threedTileset: "https://api.olamaps.io/tiles/vector/v1/3dtiles/tileset.json",
                 });
 
-                // The documentation shows 'init' as an async method
-                const map = await olaMaps.init({
+                const map = await olamaps.init({
                     style: "https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard/style.json",
                     container: mapContainerRef.current,
                     center: [77.61648476788898, 12.931423492103944],
                     zoom: 12,
+                    pitch: 0, // Initial pitch (0 = 2D view, but 3D data is loaded)
                 });
 
                 if (!isMounted) {
@@ -57,13 +60,19 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
                     return;
                 }
 
-                // Add Controls using SDK methods
-                map.addControl(olaMaps.addNavigationControl(), 'top-right');
+                // Defensive check for navigation control
+                try {
+                    if (typeof (olamaps as any).addNavigationControl === 'function') {
+                        map.addControl((olamaps as any).addNavigationControl(), 'top-right');
+                    }
+                } catch (controlErr) {
+                    console.warn("Failed to add navigation control:", controlErr);
+                }
 
                 mapInstanceRef.current = map;
 
                 map.on('load', () => {
-                    console.log("Ola Maps SDK v2 Loaded Successfully");
+                    console.log("Ola Maps SDK v2 Loaded Successfully with 3D support");
                     updateMarkers(activeBuses);
                 });
 
@@ -110,18 +119,20 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
             const lngLat: [number, number] = [longitude, latitude];
 
             if (markersRef.current[bus.routeId]) {
-                markersRef.current[bus.routeId].setLngLat(lngLat);
-                const popup = markersRef.current[bus.routeId].getPopup();
+                const marker = markersRef.current[bus.routeId];
+                marker.setLngLat(lngLat);
+                const popup = marker.getPopup();
                 if (popup) popup.setHTML(getPopupContent(bus));
             } else {
                 const el = createBusMarkerElement();
 
                 try {
-                    // Check if maplibregl is available (it's often bundled with the SDK)
-                    const maplibregl = (window as any).maplibregl;
-                    if (maplibregl) {
-                        const popup = new maplibregl.Popup({ offset: 25 }).setHTML(getPopupContent(bus));
-                        const marker = new maplibregl.Marker({ element: el })
+                    // Documentation shows OlaMaps.Marker / OlaMaps.Popup
+                    const OlaNamespace = (window as any).OlaMaps || OlaMaps;
+
+                    if (OlaNamespace && OlaNamespace.Marker) {
+                        const popup = new OlaNamespace.Popup({ offset: [0, -15] }).setHTML(getPopupContent(bus));
+                        const marker = new OlaNamespace.Marker({ element: el })
                             .setLngLat(lngLat)
                             .setPopup(popup)
                             .addTo(map);
@@ -134,7 +145,6 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
             }
         });
 
-        // Removal logic
         const currentIds = buses.map(b => b.routeId);
         Object.keys(markersRef.current).forEach(idStr => {
             const id = parseInt(idStr);
@@ -179,15 +189,24 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses }) => {
 
     if (error) {
         return (
-            <div className="flex flex-col items-center justify-center h-full bg-red-50 text-red-600 p-4 rounded-lg">
-                <span className="text-2xl mb-2">⚠️</span>
-                <p className="font-bold">Map Error</p>
-                <p className="text-sm">{error}</p>
+            <div className="flex flex-col items-center justify-center p-6 bg-white rounded-xl shadow-lg border border-red-100">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                    <span className="text-2xl">⚠️</span>
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Map Loading Issue</h3>
+                <p className="text-sm text-gray-600 text-center mb-4">{error}</p>
+                <button
+                    onClick={() => window.location.reload()}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                    Retry Loading
+                </button>
+                <p className="mt-4 text-xs text-gray-400">Ola Maps SDK v2 Integration</p>
             </div>
         );
     }
 
-    return <div ref={mapContainerRef} style={{ height: '100%', width: '100%', minHeight: '500px', backgroundColor: '#e5e7eb', borderRadius: '12px', overflow: 'hidden' }} />;
+    return <div ref={mapContainerRef} style={{ height: '100%', width: '100%', minHeight: '500px', backgroundColor: '#f9fafb', borderRadius: '12px', overflow: 'hidden' }} />;
 };
 
 export default SimpleMap;

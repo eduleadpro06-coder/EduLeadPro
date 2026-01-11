@@ -1,9 +1,6 @@
 /**
  * Ola Maps View Component
  * Implementation using WebView + Official Ola Maps Web SDK v2
- * 
- * This approach works in Expo and ensures consistency with the Web Admin Panel.
- * It uses the official Web SDK engine inside a WebView for maximum stability and performance.
  */
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -78,25 +75,32 @@ export default function OlaMapView({
             <script src="https://www.unpkg.com/olamaps-web-sdk@latest/dist/olamaps-web-sdk.umd.js"></script>
             <script>
                 let map;
-                let olaMaps;
+                let olamaps;
                 let markersMap = {};
 
                 async function init() {
                     try {
-                        // Official SDK v2 initialization
-                        olaMaps = new OlaMaps.OlaMaps({
-                            apiKey: '${OLA_MAPS_API_KEY}'
+                        olamaps = new OlaMaps.OlaMaps({
+                            apiKey: '${OLA_MAPS_API_KEY}',
+                            mode: '3d', // Enable 3D to resolve '3d_model' layer errors
+                            threedTileset: 'https://api.olamaps.io/tiles/vector/v1/3dtiles/tileset.json'
                         });
 
-                        map = await olaMaps.init({
+                        map = await olamaps.init({
                             style: "https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard/style.json",
                             container: 'map',
                             center: [${initialCenter.longitude}, ${initialCenter.latitude}],
                             zoom: ${zoom}
                         });
 
-                        // Add Navigation Control
-                        map.addControl(olaMaps.addNavigationControl(), 'top-right');
+                        // Defensive check for navigation control
+                        try {
+                            if (olamaps.addNavigationControl) {
+                                map.addControl(olamaps.addNavigationControl(), 'top-right');
+                            }
+                        } catch (e) {
+                            console.warn("Control Error:", e);
+                        }
 
                         map.on('load', () => {
                             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
@@ -139,8 +143,7 @@ export default function OlaMapView({
                                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MARKER_PRESS', payload: m }));
                             };
 
-                            // Using maplibregl which is available via global after SDK loads
-                            const marker = new maplibregl.Marker({ element: el })
+                            const marker = new OlaMaps.Marker({ element: el })
                                 .setLngLat(lngLat)
                                 .addTo(map);
                             
@@ -168,7 +171,6 @@ export default function OlaMapView({
             if (data.type === 'MAP_READY') {
                 setIsMapReady(true);
                 if (onMapReady) onMapReady();
-                // Push initial markers
                 if (markers.length > 0) {
                     const safeMarkers = JSON.stringify(markers);
                     webviewRef.current?.injectJavaScript(`window.updateMarkers(${safeMarkers}); true;`);
