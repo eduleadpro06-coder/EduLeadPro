@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,7 +15,7 @@ export default function MenuScreen() {
         router.replace('/(auth)/login');
     };
 
-    const menuItems = user?.role === 'staff' ? [
+    const menuItems = user?.role === 'teacher' ? [
         { icon: 'grid-outline', label: 'Dashboard', route: '/(teacher)/dashboard' },
         { icon: 'calendar-outline', label: 'Mark Attendance', route: '/(teacher)/attendance' },
         { icon: 'create-outline', label: 'Post Update', route: '/(teacher)/activity' },
@@ -42,7 +43,7 @@ export default function MenuScreen() {
                     <View>
                         <Text style={styles.userName}>{user?.name || 'User'}</Text>
                         <Text style={styles.userRole}>
-                            {user?.role === 'staff' ? 'Teacher' : 'Parent'}
+                            {user?.role === 'teacher' ? 'Teacher' : 'Parent'}
                         </Text>
                     </View>
                 </View>

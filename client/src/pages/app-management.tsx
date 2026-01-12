@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Bus, MapPin, Users, Radio, Smartphone, Key, Search, RefreshCw, Megaphone, Calendar, ClipboardList, BookOpen, Trash2 } from "lucide-react";
+import { Plus, Bus, MapPin, Users, Radio, Smartphone, Key, Search, RefreshCw, Megaphone, Calendar, ClipboardList, BookOpen, Trash2, Check } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Lead, PreschoolAnnouncement, PreschoolEvent, DailyUpdate, PreschoolHomework, BusRoute, BusStop, StudentBusAssignment } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -21,6 +21,9 @@ import { Badge } from "@/components/ui/badge";
 import Header from "@/components/layout/header";
 import { TeacherAssignmentDropdown } from "@/components/teacher-assignment-dropdown";
 import { Switch } from "@/components/ui/switch";
+import TaskManagement from "@/components/mobile/task-management";
+import ActivityApproval from "@/components/mobile/activity-approval";
+import StopSelectionMap from "@/components/StopSelectionMap";
 // import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import { useEffect, useRef, useMemo } from 'react';
 // import 'leaflet/dist/leaflet.css';
@@ -619,7 +622,7 @@ export default function AppManagement() {
                             variant={mainTab === "content" ? "default" : "ghost"}
                             onClick={() => {
                                 setMainTab("content");
-                                setActiveTab("announcements");
+                                setActiveTab("approvals");
                             }}
                             className="rounded-b-none flex-1"
                         >
@@ -1340,56 +1343,11 @@ export default function AppManagement() {
                                                     <Label>Stop Name</Label>
                                                     <Input value={stopName} onChange={(e) => setStopName(e.target.value)} placeholder="e.g. Main Square" />
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="space-y-2">
-                                                        <Label>Latitude</Label>
-                                                        <Input value={location.latitude} onChange={(e) => setLocation({ ...location, latitude: e.target.value })} placeholder="20.5937" />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Longitude</Label>
-                                                        <Input value={location.longitude} onChange={(e) => setLocation({ ...location, longitude: e.target.value })} placeholder="78.9629" />
-                                                    </div>
-                                                </div>
-                                                <div className="text-xs text-blue-600 mb-2">
-                                                    <a href="https://www.google.com/maps" target="_blank" rel="noreferrer">Open Google Maps to find coordinates</a>
-                                                </div>
-
-                                                {/* Interactive Map - Temporarily disabled due to library conflict */}
-                                                {/* <div className="h-[200px] w-full rounded-md overflow-hidden border mb-4 relative z-0">
-                                                    <MapContainer
-                                                        center={[
-                                                            parseFloat(location.latitude) || 20.5937,
-                                                            parseFloat(location.longitude) || 78.9629
-                                                        ]}
-                                                        zoom={5}
-                                                        style={{ height: '100%', width: '100%' }}
-                                                        attributionControl={false}
-                                                    >
-                                                        <TileLayer url={OLA_MAPS_TILE_URL} />
-                                                        <Marker
-                                                            position={[
-                                                                parseFloat(location.latitude) || 20.5937,
-                                                                parseFloat(location.longitude) || 78.9629
-                                                            ]}
-                                                            draggable={true}
-                                                            eventHandlers={{
-                                                                dragend: (e) => {
-                                                                    const marker = e.target;
-                                                                    const position = marker.getLatLng();
-                                                                    setLocation({
-                                                                        latitude: position.lat.toFixed(6),
-                                                                        longitude: position.lng.toFixed(6)
-                                                                    });
-                                                                },
-                                                            }}
-                                                        >
-                                                            <Popup>Drag me to the bus stop location!</Popup>
-                                                        </Marker>
-                                                    </MapContainer>
-                                                </div>
-                                                <div className="text-xs text-center text-gray-500 mb-4">
-                                                    👆 Drag the pin to set precise location
-                                                </div> */}
+                                                {/* Interactive Map Selection */}
+                                                <StopSelectionMap
+                                                    onLocationSelect={(lat, lng) => setLocation({ latitude: lat, longitude: lng })}
+                                                    initialLocation={location.latitude && location.longitude ? location : undefined}
+                                                />
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <div className="space-y-2">
                                                         <Label>Arrival Time</Label>
@@ -1588,6 +1546,14 @@ export default function AppManagement() {
                 <div className="px-4 py-6 space-y-6">
                     <div className="flex gap-2 -mb-px border-b mb-6">
                         <Button
+                            variant={activeTab === "approvals" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("approvals")}
+                            className="rounded-b-none"
+                        >
+                            <ClipboardList className="mr-2 h-4 w-4" />
+                            Daily Updates
+                        </Button>
+                        <Button
                             variant={activeTab === "announcements" ? "default" : "ghost"}
                             onClick={() => setActiveTab("announcements")}
                             className="rounded-b-none"
@@ -1596,22 +1562,32 @@ export default function AppManagement() {
                             Announcements
                         </Button>
                         <Button
-                            variant={activeTab === "holidays" ? "default" : "ghost"}
-                            onClick={() => setActiveTab("holidays")}
+                            variant={activeTab === "events" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("events")}
                             className="rounded-b-none"
                         >
                             <Calendar className="mr-2 h-4 w-4" />
                             Events & Holidays
                         </Button>
                         <Button
-                            variant={activeTab === "updates" ? "default" : "ghost"}
-                            onClick={() => setActiveTab("updates")}
+                            variant={activeTab === "tasks" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("tasks")}
                             className="rounded-b-none"
                         >
-                            <ClipboardList className="mr-2 h-4 w-4" />
-                            Daily Updates
+                            <BookOpen className="mr-2 h-4 w-4" />
+                            Tasks
                         </Button>
                     </div>
+
+                    {/* Tasks Tab */}
+                    {activeTab === "tasks" && (
+                        <TaskManagement />
+                    )}
+
+                    {/* Approvals Tab */}
+                    {activeTab === "approvals" && (
+                        <ActivityApproval />
+                    )}
 
                     {/* Announcements Sub-Tab */}
                     {activeTab === "announcements" && (
@@ -1746,9 +1722,8 @@ export default function AppManagement() {
                         </Card>
                     )}
 
-                    {/* Events Tab */}
-                    {/* Holidays Tab */}
-                    {activeTab === "holidays" && (
+                    {/* Events & Holidays Tab */}
+                    {activeTab === "events" && (
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <div>
@@ -1841,107 +1816,7 @@ export default function AppManagement() {
                         </Card>
                     )}
 
-                    {/* Daily Updates Tab */}
-                    {activeTab === "updates" && (
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <div>
-                                    <CardTitle>Daily Activity Updates</CardTitle>
-                                    <CardDescription>Post food, sleep, and activity updates for specific students</CardDescription>
-                                </div>
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => { setStudentPhone(""); setContent(""); setType("activity"); }}>
-                                            <Plus className="mr-2" size={18} />
-                                            Post Update
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Student Activity Update</DialogTitle>
-                                        </DialogHeader>
-                                        <div className="space-y-4 py-4">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="up-student">Select Student</Label>
-                                                <select
-                                                    id="up-student"
-                                                    className="w-full border rounded-md p-2"
-                                                    value={studentPhone} // Using studentPhone state for leadId temporarily
-                                                    onChange={(e) => setStudentPhone(e.target.value)}
-                                                >
-                                                    <option value="">Select a student...</option>
-                                                    {parents.map(p => (
-                                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="up-type">Activity Type</Label>
-                                                <select id="up-type" className="w-full border rounded-md p-2" value={type} onChange={(e) => setType(e.target.value)}>
-                                                    <option value="activity">General Activity</option>
-                                                    <option value="food">Meal/Food</option>
-                                                    <option value="sleep">Sleep/Nap</option>
-                                                    <option value="photo">Photo Update</option>
-                                                </select>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="up-content">Update Content</Label>
-                                                <Textarea id="up-content" value={content} onChange={(e) => setContent(e.target.value)} placeholder="e.g. Finished all lunch, slept for 1 hour." />
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <DialogClose asChild>
-                                                <Button onClick={() => createUpdateMutation.mutate({
-                                                    leadId: Number(studentPhone),
-                                                    activityType: type,
-                                                    content,
-                                                    postedAt: new Date().toISOString()
-                                                })}>
-                                                    Post Update
-                                                </Button>
-                                            </DialogClose>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                            </CardHeader>
-                            <CardContent>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Student</TableHead>
-                                            <TableHead>Type</TableHead>
-                                            <TableHead>Content</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {isLoadingUpdates ? (
-                                            <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
-                                        ) : dailyUpdates.length === 0 ? (
-                                            <TableRow><TableCell colSpan={4} className="text-center text-gray-500 py-8">No updates posted today</TableCell></TableRow>
-                                        ) : (
-                                            dailyUpdates.map((up) => (
-                                                <TableRow key={up.id}>
-                                                    <TableCell className="font-medium">
-                                                        {parents.find(p => p.id === up.leadId)?.name || `Student #${up.leadId}`}
-                                                    </TableCell>
-                                                    <TableCell><Badge variant="secondary">{up.activityType}</Badge></TableCell>
-                                                    <TableCell className="max-w-xs truncate">{up.content}</TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Button variant="ghost" size="sm" onClick={() => {
-                                                            if (confirm("Delete this update?")) deleteUpdateMutation.mutate(up.id);
-                                                        }}>
-                                                            <Trash2 className="text-red-500" size={16} />
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
-                    )}
+
                 </div>
             )
             }

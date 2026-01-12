@@ -79,6 +79,7 @@ import React from "react";
 import StaffDetailModal from "@/components/staff/StaffDetailModal";
 import StaffCSVImport from "@/components/staff/csv-import";
 import StaffActivityTab from "@/components/staff/staff-activity-tab";
+import StaffLeavesTab from "@/components/staff/staff-leaves-tab";
 import { Textarea } from "@/components/ui/textarea";
 import PageHeader from "@/components/layout/page-header";
 
@@ -277,7 +278,7 @@ export default function StaffAI() {
   const { data: staff = [] } = useQuery({
     queryKey: ["/api/staff"]
   });
-  const displayStaff: Staff[] = (staff as Staff[]);
+  const displayStaff: Staff[] = (staff as Staff[]).filter(member => member.role !== 'Driver');
   // Note: Attendance endpoint not available - using empty array
   const attendance: Attendance[] = [];
   const { data: payroll = [] } = useQuery({ queryKey: ["/api/payroll"] });
@@ -391,14 +392,8 @@ export default function StaffAI() {
   // Payroll generation mutation
   const generatePayrollMutation = useMutation({
     mutationFn: async (payrollData: PayrollGeneration) => {
-      const response = await fetch("/api/payroll", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payrollData),
-      });
-      if (!response.ok) throw new Error("Failed to generate payroll");
+      console.log('Generating payroll with data:', payrollData);
+      const response = await apiRequest("POST", "/api/payroll", payrollData);
       return response.json();
     },
     onSuccess: () => {
@@ -428,14 +423,7 @@ export default function StaffAI() {
   // Bulk payroll generation mutation
   const generateBulkPayrollMutation = useMutation({
     mutationFn: async (bulkData: { month: number; year: number; staffIds: number[]; payrollData?: PayrollGeneration[] }) => {
-      const response = await fetch("/api/payroll/bulk-generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(bulkData),
-      });
-      if (!response.ok) throw new Error("Failed to generate bulk payroll");
+      const response = await apiRequest("POST", "/api/payroll/bulk-generate", bulkData);
       return response.json();
     },
     onSuccess: () => {
@@ -459,10 +447,7 @@ export default function StaffAI() {
   // Delete payroll mutation
   const deletePayrollMutation = useMutation({
     mutationFn: async (payrollId: number) => {
-      const response = await fetch(`/api/payroll/${payrollId}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error("Failed to delete payroll record");
+      const response = await apiRequest("DELETE", `/api/payroll/${payrollId}`);
       return response.json();
     },
     onSuccess: () => {
@@ -490,10 +475,16 @@ export default function StaffAI() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
+        // Get auth headers manually since we're using fetch directly for blob/timeout support
+        const userStr = localStorage.getItem('auth_user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        const authHeaders = user?.email ? { 'x-user-name': user.email } : {};
+
         const response = await fetch('/api/payroll/generate-slip/' + payrollData.staffId + '/' + payrollData.month + '/' + payrollData.year, {
           method: "GET",
           headers: {
             "Accept": "application/pdf",
+            ...authHeaders
           },
           signal: controller.signal
         });
@@ -1869,7 +1860,7 @@ export default function StaffAI() {
                     </div>
                     {/* Tabs */}
                     <div className="flex gap-4 mb-6 mt-2">
-                      {['Overview', 'Activity', 'Payroll'].map(tab => (
+                      {['Overview', 'Activity', 'Leaves', 'Payroll'].map(tab => (
                         <button
                           key={tab}
                           className={`pb-3 px-3 py-1.5 text-sm font-medium transition-colors duration-200 relative rounded-md ${contactTab === tab ? 'text-white bg-[#643ae5]' : 'text-gray-600 bg-white hover:bg-gray-100'} mx-1`}
@@ -1943,6 +1934,7 @@ export default function StaffAI() {
                       </>
                     )}
                     {contactTab === 'Activity' && selectedStaff && <StaffActivityTab staffId={selectedStaff.id} />}
+                    {contactTab === 'Leaves' && selectedStaff && <StaffLeavesTab staffId={selectedStaff.id} />}
                     {contactTab === 'Payroll' && selectedStaff && (
                       <div className="w-full glass-card rounded-lg border bg-card text-card-foreground shadow-lg p-6" style={{ minHeight: '200px' }}>
                         <div className="flex items-center justify-between mb-4">

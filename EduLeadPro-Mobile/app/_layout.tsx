@@ -31,28 +31,6 @@ function RootLayoutNav() {
         loadUser();
     }, []);
 
-    // Handle navigation based on auth state
-    useEffect(() => {
-        if (isLoading) return;
-
-        const rootSegment = segments[0];
-        const inAuthGroup = rootSegment === '(auth)';
-
-        if (!isAuthenticated && !inAuthGroup) {
-            // Redirect to login if not authenticated and not in auth group
-            router.replace('/(auth)/login');
-        } else if (isAuthenticated && inAuthGroup) {
-            // Redirect AWAY from auth group if already authenticated
-            if (user?.role === 'teacher') {
-                router.replace('/(teacher)');
-            } else if (user?.role === 'driver') {
-                router.replace('/(driver)');
-            } else {
-                router.replace('/(parent)');
-            }
-        }
-    }, [isAuthenticated, isLoading, segments[0], user?.role]);
-
     // Show loading screen while checking auth
     if (isLoading) {
         return (

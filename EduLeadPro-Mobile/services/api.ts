@@ -1,5 +1,6 @@
 import { setItemAsync, getItemAsync, deleteItemAsync } from 'expo-secure-store';
-import { API_BASE_URL, STORAGE_KEYS } from '../src/utils/constants';
+import { STORAGE_KEYS } from '../src/utils/constants';
+import { API_BASE_URL } from '../src/config';
 import { router } from 'expo-router';
 import { useAuthStore } from '../src/store/authStore';
 

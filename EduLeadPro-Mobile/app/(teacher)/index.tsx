@@ -281,6 +281,26 @@ export default function TeacherHomeScreen() {
                                             </View>
                                             <Text style={styles.actionLabel}>Attendance History</Text>
                                         </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={[styles.actionCard, { backgroundColor: '#F3E8FF', borderColor: '#E9D5FF' }]}
+                                            onPress={() => router.push('/(teacher)/leaves')}
+                                        >
+                                            <View style={[styles.actionIconBox, { backgroundColor: '#F3E8FF' }]}>
+                                                <Feather name="calendar" size={24} color="#9333EA" />
+                                            </View>
+                                            <Text style={styles.actionLabel}>Apply Leave</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={[styles.actionCard, { backgroundColor: '#E0F2FE', borderColor: '#BAE6FD' }]}
+                                            onPress={() => router.push('/(teacher)/tasks')}
+                                        >
+                                            <View style={[styles.actionIconBox, { backgroundColor: '#E0F2FE' }]}>
+                                                <Feather name="check-square" size={24} color="#0284C7" />
+                                            </View>
+                                            <Text style={styles.actionLabel}>My Tasks</Text>
+                                        </TouchableOpacity>
                                     </View>
                                 </View>
                             </>

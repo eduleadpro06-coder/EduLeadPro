@@ -51,3 +51,24 @@ export interface PostUpdateRequest {
     teacherName: string;
     organizationId: number;
 }
+
+export interface LeaveApplication {
+    id: number;
+    staff_id: number;
+    start_date: string;
+    end_date: string;
+    reason: string;
+    status: 'pending' | 'approved' | 'rejected';
+    rejection_reason?: string;
+    applied_at: string;
+}
+
+export interface TeacherTask {
+    id: number;
+    staff_id: number;
+    title: string;
+    description?: string;
+    is_completed: boolean;
+    due_date?: string;
+    created_at: string;
+}

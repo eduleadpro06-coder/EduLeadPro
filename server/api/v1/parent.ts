@@ -227,6 +227,7 @@ router.get('/child/:childId/activities', async (req: Request, res: Response) => 
             .from('daily_updates')
             .select('id, title, content, activity_type, mood, teacher_name, media_urls, posted_at')
             .eq('lead_id', childId)
+            .eq('status', 'approved') // Only show approved updates
             .order('posted_at', { ascending: false })
             .range(offset, offset + limit - 1);
 

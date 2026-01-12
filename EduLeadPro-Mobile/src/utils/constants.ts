@@ -3,9 +3,12 @@
  */
 
 // API Configuration
-export const API_BASE_URL = 'https://eduleadconnect.vercel.app/api/v1/mobile';
+// API Configuration
+// DEPRECATED: Use API_BASE_URL from ../config.ts instead
+// export const API_BASE_URL = 'http://192.168.29.166:5000/api/v1/mobile';
 
-export const WEBSOCKET_URL = 'wss://eduleadconnect.vercel.app';
+// DEPRECATED: Use WS_URL from ../config.ts instead
+// export const WEBSOCKET_URL = 'http://192.168.29.166:5000';
 
 // GPS Tracking Configuration
 export const GPS_CONFIG = {

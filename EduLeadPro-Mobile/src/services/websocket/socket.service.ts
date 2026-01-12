@@ -3,7 +3,7 @@
  */
 
 import { io, Socket } from 'socket.io-client';
-import { WEBSOCKET_URL } from '../../utils/constants';
+import { WS_URL } from '../../config';
 import { LocationUpdate } from '../../types/bus.types';
 
 class WebSocketService {
@@ -20,7 +20,7 @@ class WebSocketService {
             return;
         }
 
-        this.socket = io(WEBSOCKET_URL, {
+        this.socket = io(WS_URL, {
             transports: ['websocket', 'polling'],
             reconnection: true,
             reconnectionAttempts: this.maxReconnectAttempts,

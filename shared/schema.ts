@@ -100,6 +100,9 @@ export const staff = pgTable("staff", {
   panNumber: varchar("pan_number", { length: 10 }),
   organizationId: integer("organization_id").references(() => organizations.id),
   appPassword: varchar("app_password", { length: 255 }),
+  clLimit: integer("cl_limit").default(10), // Casual Leave Limit
+  elLimit: integer("el_limit").default(5),  // Emergency Leave Limit
+  totalLeaves: integer("total_leaves").default(15),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -201,7 +204,7 @@ export const feePayments = pgTable("fee_payments", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
   paymentDate: date("payment_date").notNull(),
-  paymentMode: varchar("payment_mode", { length: 20 }).notNull(), // cash, online, cheque, emi
+  paymentMode: varchar("payment_mode", { length: 20 }).notNull(), // UPI, Cash, Card, Cheque, Bank Transfer
   receiptNumber: varchar("receipt_number", { length: 100 }),
   installmentNumber: integer("installment_number"),
   transactionId: varchar("transaction_id", { length: 100 }),
@@ -883,7 +886,7 @@ export const daycarePayments = pgTable("daycare_payments", {
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
 
   paymentDate: date("payment_date").notNull(),
-  paymentMode: varchar("payment_mode", { length: 30 }), // cash, card, upi, bank_transfer, cheque
+  paymentMode: varchar("payment_mode", { length: 30 }), // UPI, Cash, Card, Cheque, Bank Transfer
   transactionId: varchar("transaction_id", { length: 100 }),
   chequeNumber: varchar("cheque_number", { length: 50 }),
 
@@ -1304,6 +1307,8 @@ export const dailyUpdates = pgTable("daily_updates", {
   className: varchar("class_name", { length: 50 }),
   section: varchar("section", { length: 10 }),
   isPinned: boolean("is_pinned").default(false),
+  status: varchar("status", { length: 20 }).default("pending"), // 'pending', 'approved', 'rejected'
+  rejectionReason: text("rejection_reason"),
   postedAt: timestamp("posted_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1567,6 +1572,41 @@ export type LedgerEntry = typeof ledgerEntries.$inferSelect;
 export type ClassificationRule = typeof classificationRules.$inferSelect;
 export type ClassificationFeedback = typeof classificationFeedback.$inferSelect;
 export type AccountingAuditLog = typeof accountingAuditLogs.$inferSelect;
+
+
+// Teacher Leaves & Tasks
+export const teacherLeaves = pgTable("teacher_leaves", {
+  id: serial("id").primaryKey(),
+  staffId: integer("staff_id").references(() => staff.id).notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  reason: text("reason").notNull(),
+  leaveType: varchar("leave_type", { length: 20 }).default("CL").notNull(), // CL, EL, Other
+  status: varchar("status", { length: 20 }).default("pending"), // pending, approved, rejected
+  rejectionReason: text("rejection_reason"),
+  appliedAt: timestamp("applied_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const teacherTasks = pgTable("teacher_tasks", {
+  id: serial("id").primaryKey(),
+  staffId: integer("staff_id").references(() => staff.id).notNull(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  isCompleted: boolean("is_completed").default(false),
+  dueDate: timestamp("due_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTeacherLeaveSchema = createInsertSchema(teacherLeaves).omit({ id: true, appliedAt: true, updatedAt: true });
+export const insertTeacherTaskSchema = createInsertSchema(teacherTasks).omit({ id: true, createdAt: true });
+
+export type TeacherLeave = typeof teacherLeaves.$inferSelect;
+export type TeacherTask = typeof teacherTasks.$inferSelect;
+export type InsertTeacherLeave = z.infer<typeof insertTeacherLeaveSchema>;
+export type InsertTeacherTask = z.infer<typeof insertTeacherTaskSchema>;
 
 export type InsertAccountMaster = z.infer<typeof insertAccountMasterSchema>;
 export type InsertBankStatement = z.infer<typeof insertBankStatementSchema>;

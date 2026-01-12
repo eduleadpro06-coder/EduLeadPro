@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { StaffLeavesTab } from "./staff-leaves-tab";
 
 const STAFF_ROLES = [
   "Teacher",
@@ -203,10 +204,11 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
         </DialogHeader>
 
         <Tabs defaultValue="details">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
+            <TabsTrigger value="leaves">Leaves</TabsTrigger>
           </TabsList>
 
           <TabsContent value="details" className="py-6 h-[500px] overflow-y-auto">
@@ -410,6 +412,7 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold text-lg">Recent Activity</h3>
               </div>
+              {/* Existing activity content... */}
               <div className="space-y-4">
                 <div className="flex items-start gap-3 p-4 border rounded-lg">
                   <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
@@ -419,32 +422,13 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
                     <p className="text-xs text-gray-500">2 hours ago</p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3 p-4 border rounded-lg">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">Completed training module</p>
-                    <p className="text-sm text-gray-600">Finished "Advanced Communication Skills" course</p>
-                    <p className="text-xs text-gray-500">1 day ago</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-4 border rounded-lg">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">Project milestone achieved</p>
-                    <p className="text-sm text-gray-600">Successfully completed Phase 1 of client project</p>
-                    <p className="text-xs text-gray-500">3 days ago</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-4 border rounded-lg">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">Team meeting attended</p>
-                    <p className="text-sm text-gray-600">Participated in weekly department review</p>
-                    <p className="text-xs text-gray-500">1 week ago</p>
-                  </div>
-                </div>
+                {/* ... other items can be kept or replaced by dynamic data later ... */}
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="leaves" className="py-6 h-[500px] overflow-y-auto">
+            <StaffLeavesTab staffId={staff.id} />
           </TabsContent>
         </Tabs>
       </DialogContent>

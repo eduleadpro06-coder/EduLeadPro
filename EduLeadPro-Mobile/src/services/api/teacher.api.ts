@@ -183,6 +183,62 @@ export const teacherAPI = {
         const response = await apiClient.get('/teacher/attendance/today');
         return response.data;
     },
+
+    /**
+     * Get leave history
+     */
+    async getLeaves(): Promise<any[]> {
+        const response = await apiClient.get('/teacher/leaves');
+        return response.data;
+    },
+
+    /**
+     * Get leave balance
+     */
+    async getLeaveBalance(): Promise<{ cl: any; el: any }> {
+        const response = await apiClient.get('/teacher/leaves/balance');
+        return response.data;
+    },
+
+    /**
+     * Apply for leave
+     */
+    async applyLeave(data: { startDate: string; endDate: string; reason: string; leaveType: 'CL' | 'EL' }): Promise<any> {
+        const response = await apiClient.post('/teacher/leaves', data);
+        return response.data;
+    },
+
+    /**
+     * Get tasks
+     */
+    async getTasks(): Promise<any[]> {
+        const response = await apiClient.get('/teacher/tasks');
+        return response.data;
+    },
+
+    /**
+     * Add task
+     */
+    async addTask(data: { title: string; description?: string; dueDate?: string }): Promise<any> {
+        const response = await apiClient.post('/teacher/tasks', data);
+        return response.data;
+    },
+
+    /**
+     * Update task
+     */
+    async updateTask(taskId: number, data: { isCompleted: boolean }): Promise<any> {
+        const response = await apiClient.patch(`/teacher/tasks/${taskId}`, data);
+        return response.data;
+    },
+
+    /**
+     * Delete task
+     */
+    async deleteTask(taskId: number): Promise<any> {
+        const response = await apiClient.delete(`/teacher/tasks/${taskId}`);
+        return response;
+    },
 };
 
 export default teacherAPI;
