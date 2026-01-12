@@ -59,9 +59,13 @@ export function useOrganization() {
     });
 
     return {
-        settings,
+        settings: settings?.settings,
+        orgData: settings,
+        name: settings?.name || "EduLead Pro Daycare",
+        address: settings?.address || "Nagpur, Maharashtra",
+        phone: settings?.phone || "8591627145",
         isLoading,
         updateSettings: updateSettingsMutation.mutate,
-        academicYear: settings?.academicYear || "2024-25", // Default fallback
+        academicYear: settings?.settings?.academicYear || "2024-25", // Default fallback
     };
 }

@@ -8,10 +8,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Baby, Users, UserPlus, Calendar, DollarSign, Settings as SettingsIcon, TrendingUp, Plus, Clock, CheckCircle, UserCheck, LogOut, AlertTriangle, Phone, Mail, Eye, FileText, Download, Filter, InfoIcon, AlertCircle, User2, Trash2 } from "lucide-react";
+import { Baby, Users, UserPlus, Calendar, IndianRupee, Settings as SettingsIcon, TrendingUp, Plus, Clock, CheckCircle, UserCheck, LogOut, AlertTriangle, Phone, Mail, Eye, FileText, Download, Filter, InfoIcon, AlertCircle, User2, Trash2 } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import { useState, useEffect } from "react";
-import { useDaycareStats, useCurrentlyCheckedIn, useDaycareChildren, useDaycareInquiries, useDaycareEnrollments, useTodayAttendance, useDaycarePayments, useActiveBillingConfig, useCreateDaycareChild, useCreateDaycareInquiry, useCreateEnrollment, useCheckInChild, useCheckOutChild, useRecordPayment, useUpdateBillingConfig } from "@/hooks/use-daycare";
+import { useDaycareStats, useCurrentlyCheckedIn, useDaycareChildren, useDaycareInquiries, useDaycareEnrollments, useTodayAttendance, useDaycarePayments, useActiveBillingConfig, useCreateDaycareChild, useCreateDaycareInquiry, useCreateEnrollment, useCheckInChild, useCheckOutChild, useRecordPayment, useUpdateBillingConfig, useAttendanceReport } from "@/hooks/use-daycare";
+import { useOrganization } from "@/hooks/use-organization";
+import { generateDaycareAttendancePDF } from "@/lib/daycare-report-generator";
+import { generateDaycareReceiptPDF } from "@/lib/daycare-receipt-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -30,6 +33,7 @@ export default function Daycare() {
     const [dailyHours, setDailyHours] = useState('8');
     const [paymentAmount, setPaymentAmount] = useState('');
     const [selectedChild, setSelectedChild] = useState<any>(null);
+    const [selectedReportChildId, setSelectedReportChildId] = useState<string>("");
     const [isAddChildOpen, setIsAddChildOpen] = useState(false);
     const [isEnrollmentOpen, setIsEnrollmentOpen] = useState(false);
 
@@ -57,6 +61,13 @@ export default function Daycare() {
     const todayAttendance = useTodayAttendance();
     const payments = useDaycarePayments();
     const billingConfig = useActiveBillingConfig();
+    const org = useOrganization();
+
+    const attendanceReport = useAttendanceReport(
+        selectedReportChildId ? parseInt(selectedReportChildId) : null,
+        selectedYear,
+        selectedMonth + 1
+    );
 
     // Mutations
     const createChild = useCreateDaycareChild();
@@ -198,7 +209,7 @@ export default function Daycare() {
                             onClick={() => setActiveTab("billing")}
                             className="rounded-b-none flex-1"
                         >
-                            <DollarSign className="h-4 w-4 mr-2" />
+                            <IndianRupee className="h-4 w-4 mr-2" />
                             Billing & Payments
                         </Button>
                         <Button
@@ -383,7 +394,7 @@ export default function Daycare() {
                             <div className="flex items-center justify-between">
                                 <CardDescription>Month Revenue</CardDescription>
                                 <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
-                                    <DollarSign className="h-5 w-5 text-teal-600" />
+                                    <IndianRupee className="h-5 w-5 text-teal-600" />
                                 </div>
                             </div>
                             <CardTitle className="text-3xl">
@@ -489,7 +500,7 @@ export default function Daycare() {
                                         <p className="text-sm text-gray-600">Pending Payments</p>
                                         <p className="text-2xl font-bold">{stats.data?.pendingPayments || 0}</p>
                                     </div>
-                                    <DollarSign className="h-8 w-8 text-amber-500" />
+                                    <IndianRupee className="h-8 w-8 text-amber-500" />
                                 </div>
                                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                     <div>
@@ -1039,24 +1050,22 @@ export default function Daycare() {
                                                             <TableCell>{age} yrs</TableCell>
                                                             <TableCell>{child.parentName}</TableCell>
                                                             <TableCell>
-                                                                <div className="flex items-center gap-2">
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        className="h-8 w-8 p-0"
-                                                                        onClick={() => window.location.href = `tel:${child.parentPhone}`}
+                                                                <div className="flex flex-col gap-1">
+                                                                    <a
+                                                                        href={`tel:${child.parentPhone}`}
+                                                                        className="text-sm font-medium text-purple-600 hover:text-purple-800 flex items-center gap-2"
                                                                     >
-                                                                        <Phone className="h-4 w-4" />
-                                                                    </Button>
+                                                                        <Phone className="h-3 w-3" />
+                                                                        {child.parentPhone || "No Phone"}
+                                                                    </a>
                                                                     {child.parentEmail && (
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="ghost"
-                                                                            className="h-8 w-8 p-0"
-                                                                            onClick={() => window.location.href = `mailto:${child.parentEmail}`}
+                                                                        <a
+                                                                            href={`mailto:${child.parentEmail}`}
+                                                                            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-2"
                                                                         >
-                                                                            <Mail className="h-4 w-4" />
-                                                                        </Button>
+                                                                            <Mail className="h-3 w-3" />
+                                                                            {child.parentEmail}
+                                                                        </a>
                                                                     )}
                                                                 </div>
                                                             </TableCell>
@@ -1218,21 +1227,25 @@ export default function Daycare() {
                                                     </div>
                                                 </div>
 
-                                                <div className="flex gap-2">
+                                                <div className="flex flex-col gap-2">
                                                     <a
                                                         href={`tel:${selectedChild.parentPhone}`}
-                                                        className="flex-1 flex items-center justify-center gap-2 bg-green-50 text-green-700 p-2 rounded hover:bg-green-100 transition-colors"
+                                                        className="flex items-center gap-3 text-purple-600 hover:text-purple-800 transition-colors"
                                                     >
-                                                        <Phone className="h-4 w-4" />
-                                                        <span>Call</span>
+                                                        <div className="w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center text-purple-600">
+                                                            <Phone className="h-4 w-4" />
+                                                        </div>
+                                                        <span className="font-medium">{selectedChild.parentPhone || "No Phone Number"}</span>
                                                     </a>
                                                     {selectedChild.parentEmail && (
                                                         <a
                                                             href={`mailto:${selectedChild.parentEmail}`}
-                                                            className="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-700 p-2 rounded hover:bg-blue-100 transition-colors"
+                                                            className="flex items-center gap-3 text-blue-600 hover:text-blue-800 transition-colors"
                                                         >
-                                                            <Mail className="h-4 w-4" />
-                                                            <span>Email</span>
+                                                            <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
+                                                                <Mail className="h-4 w-4" />
+                                                            </div>
+                                                            <span className="font-medium">{selectedChild.parentEmail}</span>
                                                         </a>
                                                     )}
                                                 </div>
@@ -1275,115 +1288,87 @@ export default function Daycare() {
             {activeTab === "billing" && (<div className="space-y-6 px-6 py-6">
                 <Card className="bg-white">
                     <CardHeader>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-end justify-between">
                             <div>
-                                <CardTitle>Monthly Billing & Payments</CardTitle>
-                                <CardDescription>Automated billing calculations and payment tracking</CardDescription>
+                                <CardTitle>Billing & Payments History</CardTitle>
+                                <CardDescription>Track all payment records and transactions</CardDescription>
                             </div>
-                            <div className="flex gap-2">
-                                <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-                                    <SelectTrigger className="w-[150px]">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {Array.from({ length: 12 }, (_, i) => (
-                                            <SelectItem key={i} value={i.toString()}>
-                                                {new Date(2024, i, 1).toLocaleDateString('en-IN', { month: 'long' })}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-                                    <SelectTrigger className="w-[120px]">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {Array.from({ length: 3 }, (_, i) => {
-                                            const year = new Date().getFullYear() - i;
-                                            return (
-                                                <SelectItem key={year} value={year.toString()}>
-                                                    {year}
-                                                </SelectItem>
-                                            );
-                                        })}
-                                    </SelectContent>
-                                </Select>
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button className="bg-purple-600 hover:bg-purple-700">
-                                            <Plus className="h-4 w-4 mr-2" />
-                                            Record Payment
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Record Payment</DialogTitle>
-                                            <DialogDescription>Record a payment with transaction details</DialogDescription>
-                                        </DialogHeader>
-                                        <form onSubmit={(e) => {
-                                            e.preventDefault();
-                                            const formData = new FormData(e.currentTarget);
-                                            recordPayment.mutate({
-                                                childId: parseInt(formData.get('childId') as string),
-                                                amount: parseFloat(formData.get('amount') as string),
-                                                paymentMode: formData.get('paymentMode'),
-                                                userId: 1,
-                                                paymentType: 'monthly_fee'
-                                            }, {
-                                                onSuccess: () => {
-                                                    toast({ title: "Payment recorded successfully" });
-                                                    e.currentTarget.reset();
-                                                }
-                                            });
-                                        }}>
-                                            <div className="space-y-4 py-4">
-                                                <div>
-                                                    <Label htmlFor="childId">Select Child *</Label>
-                                                    <Select name="childId" required>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Choose a child" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {children.data?.map((child: any) => (
-                                                                <SelectItem key={child.id} value={child.id.toString()}>
-                                                                    {child.childName} ({child.childId})
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div>
-                                                    <Label htmlFor="amount">Amount (₹) *</Label>
-                                                    <Input id="amount" name="amount" type="number" step="0.01" required />
-                                                </div>
-                                                <div>
-                                                    <Label htmlFor="paymentMode">Payment Mode *</Label>
-                                                    <Select name="paymentMode" required>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select mode" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="cash">Cash</SelectItem>
-                                                            <SelectItem value="card">Card</SelectItem>
-                                                            <SelectItem value="upi">UPI</SelectItem>
-                                                            <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div>
-                                                    <Label htmlFor="transactionId">Transaction ID</Label>
-                                                    <Input id="transactionId" name="transactionId" placeholder="Optional" />
-                                                </div>
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button className="bg-purple-600 hover:bg-purple-700">
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Record Payment
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Record Payment</DialogTitle>
+                                        <DialogDescription>Record a payment with transaction details</DialogDescription>
+                                    </DialogHeader>
+                                    <form onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const formData = new FormData(e.currentTarget);
+                                        recordPayment.mutate({
+                                            childId: parseInt(formData.get('childId') as string),
+                                            amount: parseFloat(formData.get('amount') as string),
+                                            paymentMode: formData.get('paymentMode'),
+                                            userId: 1,
+                                            paymentType: 'monthly_fee'
+                                        }, {
+                                            onSuccess: () => {
+                                                toast({ title: "Payment recorded successfully" });
+                                                e.currentTarget.reset();
+                                            }
+                                        });
+                                    }}>
+                                        <div className="space-y-4 py-4">
+                                            <div>
+                                                <Label htmlFor="childId">Select Child *</Label>
+                                                <Select name="childId" required>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Choose a child" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {children.data?.map((child: any) => (
+                                                            <SelectItem key={child.id} value={child.id.toString()}>
+                                                                {child.childName} ({child.childId})
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
-                                            <DialogFooter>
-                                                <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
-                                                    Record Payment
-                                                </Button>
-                                            </DialogFooter>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
+                                            <div>
+                                                <Label htmlFor="amount">Amount (₹) *</Label>
+                                                <Input id="amount" name="amount" type="number" step="0.01" required />
+                                            </div>
+                                            <div>
+                                                <Label htmlFor="paymentMode">Payment Mode *</Label>
+                                                <Select name="paymentMode" required>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select mode" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="UPI">UPI</SelectItem>
+                                                        <SelectItem value="Cash">Cash</SelectItem>
+                                                        <SelectItem value="Card">Card</SelectItem>
+                                                        <SelectItem value="Cheque">Cheque</SelectItem>
+                                                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div>
+                                                <Label htmlFor="transactionId">Transaction ID</Label>
+                                                <Input id="transactionId" name="transactionId" placeholder="Optional" />
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
+                                                Record Payment
+                                            </Button>
+                                        </DialogFooter>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -1397,7 +1382,7 @@ export default function Daycare() {
                                 <div className="text-center py-8">Loading...</div>
                             ) : !payments.data || payments.data.length === 0 ? (
                                 <div className="text-center py-8 text-gray-500">
-                                    <DollarSign className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+                                    <IndianRupee className="h-12 w-12 mx-auto mb-3 text-gray-400" />
                                     <p>No payments recorded</p>
                                 </div>
                             ) : (
@@ -1428,19 +1413,43 @@ export default function Daycare() {
                                                     <TableCell className="capitalize">{payment.paymentMode?.replace('_', ' ')}</TableCell>
                                                     <TableCell className="font-mono text-xs">{payment.transactionId || '-'}</TableCell>
                                                     <TableCell>
-                                                        <div className="flex justify-end items-center gap-2">
-                                                            {payment.status === 'pending' ? (
+                                                        <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'} className="capitalize">
+                                                            {payment.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end items-center gap-1">
+                                                            {payment.status === 'completed' && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                                                    onClick={() => generateDaycareReceiptPDF({
+                                                                        receiptNumber: payment.receiptNumber,
+                                                                        paymentDate: payment.paymentDate,
+                                                                        childName: child?.childName || 'N/A',
+                                                                        amount: payment.totalAmount,
+                                                                        paymentMode: payment.paymentMode,
+                                                                        transactionId: payment.transactionId,
+                                                                        organization: {
+                                                                            name: org.name,
+                                                                            address: org.address,
+                                                                            phone: org.phone
+                                                                        }
+                                                                    })}
+                                                                    title="Print Receipt"
+                                                                >
+                                                                    <FileText className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
+                                                            {payment.status === 'pending' && (
                                                                 <Button
                                                                     size="sm"
-                                                                    className="h-7 bg-amber-500 hover:bg-amber-600 text-white"
+                                                                    className="h-7 bg-amber-500 hover:bg-amber-600 text-white px-2"
                                                                     onClick={() => setSelectedPayment(payment)}
                                                                 >
-                                                                    Pay Now
+                                                                    Pay
                                                                 </Button>
-                                                            ) : (
-                                                                <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'}>
-                                                                    {payment.status}
-                                                                </Badge>
                                                             )}
                                                             <Button
                                                                 variant="ghost"
@@ -1465,68 +1474,176 @@ export default function Daycare() {
                         </div>
                     </CardContent>
                 </Card>
-            </div>)}
+            </div>)
+            }
 
-            {/* Reports Tab */}
-            {activeTab === "reports" && (<div className="space-y-6 px-6 py-6">
-                <Card className="bg-white">
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle>Reports & Analytics</CardTitle>
-                                <CardDescription>Attendance and revenue reports</CardDescription>
+            {
+                activeTab === "reports" && (<div className="space-y-6 px-6 py-6">
+                    <Card className="bg-white">
+                        <CardHeader>
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div>
+                                    <CardTitle>Reports & Analytics</CardTitle>
+                                    <CardDescription>Attendance and revenue reports</CardDescription>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <div className="w-48">
+                                        <Select
+                                            value={selectedReportChildId}
+                                            onValueChange={setSelectedReportChildId}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select child" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {children.data?.map((child: any) => (
+                                                    <SelectItem key={child.id} value={child.id.toString()}>
+                                                        {child.childName}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="w-32">
+                                        <Select
+                                            value={selectedMonth.toString()}
+                                            onValueChange={(val) => setSelectedMonth(parseInt(val))}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Month" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {Array.from({ length: 12 }, (_, i) => (
+                                                    <SelectItem key={i} value={i.toString()}>
+                                                        {new Date(0, i).toLocaleString('default', { month: 'long' })}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="w-24">
+                                        <Select
+                                            value={selectedYear.toString()}
+                                            onValueChange={(val) => setSelectedYear(parseInt(val))}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Year" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {[2024, 2025, 2026].map(year => (
+                                                    <SelectItem key={year} value={year.toString()}>
+                                                        {year}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            if (!attendanceReport.data) return;
+                                            const child = children.data?.find((c: any) => c.id === parseInt(selectedReportChildId));
+                                            generateDaycareAttendancePDF({
+                                                childName: child?.childName || "N/A",
+                                                parentName: child?.parentName || "N/A",
+                                                month: new Date(0, selectedMonth).toLocaleString('default', { month: 'long' }),
+                                                year: selectedYear,
+                                                totalDays: attendanceReport.data.totalDays,
+                                                totalHours: attendanceReport.data.totalHours.toFixed(2),
+                                                attendances: attendanceReport.data.attendances,
+                                                organization: {
+                                                    name: org.name,
+                                                    address: org.address,
+                                                    phone: org.phone
+                                                }
+                                            });
+                                        }}
+                                        disabled={!selectedReportChildId || attendanceReport.isLoading}
+                                    >
+                                        <Download className="h-4 w-4 mr-2" />
+                                        Export PDF
+                                    </Button>
+                                </div>
                             </div>
-                            <Button variant="outline">
-                                <Download className="h-4 w-4 mr-2" />
-                                Export Report
-                            </Button>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                            <Card className="border-2 border-purple-200">
-                                <CardHeader>
-                                    <CardTitle className="text-lg">Total Revenue</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-3xl font-bold text-purple-600">
-                                        ₹{(stats.data?.monthRevenue || 0).toLocaleString('en-IN')}
-                                    </p>
-                                    <p className="text-sm text-gray-600 mt-2">This month</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="border-2 border-blue-200">
-                                <CardHeader>
-                                    <CardTitle className="text-lg">Total Attendance</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-3xl font-bold text-blue-600">
-                                        {todayAttendance.data?.length || 0}
-                                    </p>
-                                    <p className="text-sm text-gray-600 mt-2">Today</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="border-2 border-green-200">
-                                <CardHeader>
-                                    <CardTitle className="text-lg">Active Plans</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-3xl font-bold text-green-600">
-                                        {stats.data?.activeEnrollments || 0}
-                                    </p>
-                                    <p className="text-sm text-gray-600 mt-2">Monthly enrollments</p>
-                                </CardContent>
-                            </Card>
-                        </div>
+                        </CardHeader>
+                        <CardContent>
+                            {!selectedReportChildId ? (
+                                <div className="text-center py-12 text-gray-400">
+                                    <Baby className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                                    <p>Please select a child to view the attendance report</p>
+                                </div>
+                            ) : attendanceReport.isLoading ? (
+                                <div className="text-center py-12">Loading report data...</div>
+                            ) : !attendanceReport.data || attendanceReport.data.attendances.length === 0 ? (
+                                <div className="text-center py-12 text-gray-500">
+                                    <Calendar className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                                    <p>No attendance records found for the selected period.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                        <div className="p-4 bg-purple-50 rounded-lg border border-purple-100">
+                                            <p className="text-sm text-purple-600 font-medium">Monthly Days</p>
+                                            <p className="text-2xl font-bold text-gray-900">{attendanceReport.data.totalDays}</p>
+                                        </div>
+                                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                                            <p className="text-sm text-blue-600 font-medium">Total Hours</p>
+                                            <p className="text-2xl font-bold text-gray-900">{attendanceReport.data.totalHours.toFixed(2)} hrs</p>
+                                        </div>
+                                        <div className="p-4 bg-green-50 rounded-lg border border-green-100">
+                                            <p className="text-sm text-green-600 font-medium">Est. Usage Charges</p>
+                                            <p className="text-2xl font-bold text-gray-900">₹{attendanceReport.data.totalCharges.toFixed(2)}</p>
+                                        </div>
+                                    </div>
 
-                        <div className="text-center py-12 text-gray-500">
-                            <FileText className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                            <p>Detailed reports coming soon</p>
-                            <p className="text-sm mt-2">Attendance trends, revenue analytics, and more</p>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>)}
+                                    <div className="rounded-md border overflow-hidden">
+                                        <Table>
+                                            <TableHeader className="bg-gray-50">
+                                                <TableRow>
+                                                    <TableHead>Date</TableHead>
+                                                    <TableHead>Check-In</TableHead>
+                                                    <TableHead>Check-Out</TableHead>
+                                                    <TableHead>Duration</TableHead>
+                                                    <TableHead>Status</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {attendanceReport.data.attendances.map((att: any) => (
+                                                    <TableRow key={att.id}>
+                                                        <TableCell className="font-medium">
+                                                            {new Date(att.attendanceDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                        </TableCell>
+                                                        <TableCell className="font-mono text-sm text-green-600">
+                                                            {new Date(att.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                        </TableCell>
+                                                        <TableCell className="font-mono text-sm text-blue-600">
+                                                            {att.checkOutTime
+                                                                ? new Date(att.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                                                                : <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">Active</Badge>
+                                                            }
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {att.durationMinutes
+                                                                ? `${(att.durationMinutes / 60).toFixed(2)} hrs`
+                                                                : "-"
+                                                            }
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge className="capitalize" variant={att.status === 'present' ? 'default' : 'secondary'}>
+                                                                {att.status}
+                                                            </Badge>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>)
+            }
             {/* Pay Pending Bill Dialog */}
             <Dialog open={!!selectedPayment} onOpenChange={(open) => !open && setSelectedPayment(null)}>
                 <DialogContent>
@@ -1567,10 +1684,11 @@ export default function Daycare() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="cash">Cash</SelectItem>
-                                        <SelectItem value="card">Card</SelectItem>
-                                        <SelectItem value="upi">UPI</SelectItem>
-                                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                                        <SelectItem value="UPI">UPI</SelectItem>
+                                        <SelectItem value="Cash">Cash</SelectItem>
+                                        <SelectItem value="Card">Card</SelectItem>
+                                        <SelectItem value="Cheque">Cheque</SelectItem>
+                                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

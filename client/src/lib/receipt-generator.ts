@@ -102,7 +102,7 @@ function drawReceipt(
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.text("Amount Paid", 20, amountY + 12);
-    doc.text(`Rs. ${data.amount}`, 185, amountY + 12, { align: "right" });
+    doc.text(`₹ ${data.amount}`, 185, amountY + 12, { align: "right" });
 
     // Footer (adjust y position)
     const footerY = data.transactionId ? y + 136 : y + 126;

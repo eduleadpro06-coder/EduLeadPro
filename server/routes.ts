@@ -12,7 +12,7 @@ import { registerDaycareRoutes } from "./daycareRoutes.js";
 import { cacheService } from "./cache-service.js"; // Performance optimization: caching layer
 import { getOrganizationId } from "./utils.js";
 import mobileApiV1 from "./api/v1/index.js"; // NEW: Mobile API v1
-import { eq, inArray, sql, and, or } from 'drizzle-orm';
+import { eq, inArray, sql, and, or, desc } from 'drizzle-orm';
 import { pushTokens, users, leads } from "../shared/schema.js";
 import accountingRouter from "./routes/accounting.js";
 import mobileLogsRouter from "./routes/mobile-logs.js"; // Mobile app logging
@@ -179,15 +179,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!org) {
         return res.status(404).json({ message: "Organization not found" });
       }
-      // Return settings or empty object, ensuring academicYear defaults if missing
       const settings = (org.settings as any) || {};
       if (!settings.academicYear) {
         settings.academicYear = "2026-27"; // Default if not set
       }
-      res.json(settings);
+      res.json({
+        ...org,
+        settings
+      });
     } catch (error) {
-      console.error("Failed to fetch organization settings:", error);
-      res.status(500).json({ message: "Failed to fetch settings" });
+      console.error("Failed to fetch organization details:", error);
+      res.status(500).json({ message: "Failed to fetch organization info" });
     }
   });
 
@@ -220,6 +222,297 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update settings" });
     }
   });
+
+  // Teacher Leaves Admin Endpoints
+  app.get("/api/staff/:id/leaves", async (req, res) => {
+    try {
+      const staffId = req.params.id;
+      const organizationId = await getOrganizationId(req);
+
+      if (!organizationId) {
+        console.error(`[DEBUG] 403 Forbidden - OrganizationID missing. SessionID: ${req.sessionID}`);
+        console.error(`[DEBUG] req.session:`, JSON.stringify(req.session, null, 2));
+        console.error(`[DEBUG] req.user:`, JSON.stringify(req.user, null, 2));
+        console.error(`[DEBUG] Headers:`, JSON.stringify(req.headers, null, 2));
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      console.log(`[DEBUG] GET /api/staff/${staffId}/leaves - Organization: ${organizationId}`);
+
+      const leaves = await db.select().from(schema.teacherLeaves)
+        .where(and(
+          eq(schema.teacherLeaves.staffId, parseInt(staffId)),
+          eq(schema.teacherLeaves.organizationId, organizationId)
+        ))
+        .orderBy(desc(schema.teacherLeaves.appliedAt));
+
+      console.log(`[DEBUG] Found ${leaves.length} leaves via Drizzle:`, leaves);
+
+      res.json(leaves);
+    } catch (error) {
+      console.error("Failed to fetch staff leaves:", error);
+      res.status(500).json({ message: "Failed to fetch leaves" });
+    }
+  });
+
+  app.patch("/api/admin/leaves/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, rejectionReason } = req.body;
+      const organizationId = await getOrganizationId(req);
+
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const updateData: any = { status };
+      if (status === 'rejected' && rejectionReason) {
+        updateData.rejectionReason = rejectionReason;
+      }
+
+      const [updatedLeave] = await db.update(schema.teacherLeaves)
+        .set(updateData)
+        .where(and(
+          eq(schema.teacherLeaves.id, parseInt(id)),
+          eq(schema.teacherLeaves.organizationId, organizationId)
+        ))
+        .returning();
+
+      console.log(`[DEBUG] Updated leave ${id} status to ${status}`);
+
+      res.status(200).json(updatedLeave);
+
+    } catch (error) {
+      console.error('Error updating leave status:', error);
+      res.status(500).json({ error: "Failed to update leave status" });
+    }
+  });
+
+  // Update Staff Leave Quota
+  app.patch("/api/staff/:id/leave-quota", async (req, res) => {
+    try {
+      const staffId = parseInt(req.params.id);
+      const { totalLeaves, clLimit, elLimit } = req.body;
+      const organizationId = await getOrganizationId(req);
+
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      console.log(`[DEBUG] Updating quota for staff ${staffId}: Total=${totalLeaves}, CL=${clLimit}, EL=${elLimit}`);
+
+      const updateData: any = {};
+
+      if (totalLeaves !== undefined) {
+        const parsed = parseInt(totalLeaves);
+        if (!isNaN(parsed)) updateData.totalLeaves = parsed;
+      }
+
+      if (clLimit !== undefined) {
+        const parsed = parseInt(clLimit);
+        if (!isNaN(parsed)) updateData.clLimit = parsed;
+      }
+
+      if (elLimit !== undefined) {
+        const parsed = parseInt(elLimit);
+        if (!isNaN(parsed)) updateData.elLimit = parsed;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+
+      const [updatedStaff] = await db.update(schema.staff)
+        .set(updateData)
+        .where(and(
+          eq(schema.staff.id, staffId),
+          eq(schema.staff.organizationId, organizationId)
+        ))
+        .returning();
+
+      res.json(updatedStaff);
+    } catch (error) {
+      console.error("Failed to update leave quota:", error);
+      // Don't leak internal database errors to client usually, but logging full error above
+      res.status(500).json({ message: "Failed to update leave quota" });
+    }
+  });
+
+  // Admin Task Management Endpoints
+
+  // GET /api/admin/tasks - Fetch all tasks with staff details
+  app.get("/api/admin/tasks", async (req, res) => {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+      // Fetch tasks along with staff details
+      // Note: This requires a foreign key relationship or a join. 
+      // Since explicit joins in Supabase JS client can be tricky without foreign keys, we'll fetch tasks 
+      // and then fetch staff details if needed, or rely on a view.
+      // Assuming 'teacher_tasks' has a 'staff_id' which links to 'staff' table.
+
+      const { data: tasks, error } = await supabase
+        .from('teacher_tasks')
+        .select(`
+          *,
+          staff:staff_id (
+            id,
+            name,
+            department
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      res.json(tasks);
+    } catch (error) {
+      console.error('Error fetching admin tasks:', error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // POST /api/admin/tasks - Admin assigns a task to a teacher
+  app.post("/api/admin/tasks", async (req, res) => {
+    try {
+      const { staffId, title, description, dueDate } = req.body;
+      const organizationId = await getOrganizationId(req);
+
+      if (!staffId || !title) {
+        return res.status(400).json({ error: "Staff ID and Title are required" });
+      }
+
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+      const { data, error } = await supabase
+        .from('teacher_tasks')
+        .insert({
+          staff_id: staffId,
+          organization_id: organizationId || 1, // Defaulting to 1 if orgId not present (should be handled better in prod)
+          title,
+          description,
+          due_date: dueDate || null,
+          is_completed: false
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.json(data);
+    } catch (error) {
+      console.error('Error creating admin task:', error);
+      res.status(500).json({ error: "Failed to create task" });
+    }
+  });
+
+  // DELETE /api/admin/tasks/:id - Admin deletes a task
+  app.delete("/api/admin/tasks/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+      const { error } = await supabase
+        .from('teacher_tasks')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting admin task:', error);
+      res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // Admin Activity Approval Endpoints
+
+  // GET /api/admin/daily-updates - Fetch updates (filter by status)
+  app.get("/api/admin/daily-updates", async (req, res) => {
+    try {
+      const { status } = req.query; // e.g., 'pending', 'approved'
+      let organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        console.warn('[Admin] No organization ID found in session, defaulting to 1 for dev/testing');
+        organizationId = 1;
+      }
+
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+      let query = supabase
+        .from('daily_updates')
+        .select(`
+          *,
+          leads:leads!daily_updates_lead_id_fkey (
+            id,
+            name,
+            class
+          )
+        `)
+        .eq('organization_id', organizationId)
+        .order('posted_at', { ascending: false });
+
+      if (status) {
+        query = query.eq('status', status as string);
+      }
+
+      console.log(`[DEBUG] Fetching updates for Org: ${organizationId}, Status: ${status}`);
+
+      const { data, error } = await query;
+
+      console.log(`[DEBUG] Found ${data?.length || 0} updates.`);
+
+      if (error) throw error;
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching daily updates:', error);
+      res.status(500).json({ error: "Failed to fetch updates" });
+    }
+  });
+
+  // PATCH /api/admin/daily-updates/:id/status - Approve or Reject update
+  app.patch("/api/admin/daily-updates/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, rejectionReason } = req.body; // 'approved' | 'rejected'
+
+      if (!['approved', 'rejected', 'pending'].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+      const { data, error } = await supabase
+        .from('daily_updates')
+        .update({
+          status,
+          rejection_reason: rejectionReason || null
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.json(data);
+    } catch (error) {
+      console.error('Error updating daily update status:', error);
+      res.status(500).json({ error: "Failed to update status" });
+    }
+  });
+
 
   // Comprehensive Dashboard Analytics (WITH CACHING)
   app.get("/api/dashboard/analytics", async (req, res) => {
@@ -2420,6 +2713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           transactionId: transactionId || null,
           status: 'completed',
           installmentNumber: 0, // 0 indicates registration fee
+          organizationId: organizationId,
         };
 
         const payment = await storage.createFeePayment(paymentData);
@@ -3861,6 +4155,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper to convert number to words (Indian numbering system)
+  function numberToWords(num: number): string {
+    const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    if ((num = num.toString() as any).length > 9) return 'Overflow';
+    const n: any = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+    if (!n) return '';
+    let str = '';
+    str += (Number(n[1]) != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';
+    str += (Number(n[2]) != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : '';
+    str += (Number(n[3]) != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : '';
+    str += (Number(n[4]) != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : '';
+    str += (Number(n[5]) != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
+    return str.trim();
+  }
+
   // Generate salary slip PDF
   app.get("/api/payroll/generate-slip/:employeeId/:month/:year", async (req, res) => {
     try {
@@ -3876,6 +4187,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
       }
+
+      // Get Organization details
+      let organization;
+      if (employee.organizationId) {
+        organization = await storage.getOrganization(employee.organizationId);
+      }
+
+      // Fallback details if organization not found
+      const orgName = organization?.name || "EduConnect";
+      const orgAddress = organization?.address || "Education Management System";
+      const orgPhone = organization?.phone || "";
+      const orgEmail = organization?.email || "";
 
       // Get payroll details
       const payrollDetails = await storage.getPayrollByStaff(employee.id);
@@ -3914,111 +4237,206 @@ export async function registerRoutes(app: Express): Promise<Server> {
           res.end(pdfData);
         } catch (error) {
           console.error("Error sending PDF response:", error);
-          res.status(500).json({ message: "Failed to send PDF" });
+          if (!res.headersSent) {
+            res.status(500).json({ message: "Failed to send PDF" });
+          }
         }
       });
 
       doc.on('error', (error) => {
         console.error("PDF generation error:", error);
-        res.status(500).json({ message: "Failed to generate PDF" });
+        if (!res.headersSent) {
+          res.status(500).json({ message: "Failed to generate PDF" });
+        }
       });
 
-      // Calculate workedDays (present days) using payroll logic
-      let presentDays = 30;
-      let totalDays = 30;
-      let absentDays = 0;
-      let baseSalary = typeof employee.salary === 'number' ? employee.salary : Number(employee.salary) || 0;
-      let dailyRate = baseSalary / 30;
-      let basicSalary = 0;
-      let absentDeduction = 0;
-      let netSalary = 0;
+      // --- PDF Content Generation ---
 
-      // Debug logging
-      console.log('PDF Generation Debug:');
-      console.log('Employee:', employee.name, 'Salary:', baseSalary);
-      console.log('Current Payroll:', currentPayroll);
-      console.log('Payroll attendedDays:', currentPayroll?.attendedDays);
-      console.log('Payroll basicSalary:', currentPayroll?.basicSalary);
-      console.log('Payroll deductions:', currentPayroll?.deductions);
-      console.log('Payroll netSalary:', currentPayroll?.netSalary);
+      // Colors
+      const primaryColor = "#643ae5"; // Purple
+      const secondaryColor = "#444444"; // Dark Gray
+      const lightGray = "#f5f5f5";
+      const borderColor = "#e0e0e0";
 
-      // Use manual/auto payroll values if available
-      if (currentPayroll && 'attendedDays' in currentPayroll && currentPayroll.attendedDays !== undefined && currentPayroll.attendedDays !== null) {
-        presentDays = Number(currentPayroll.attendedDays) || 30;
-        absentDays = totalDays - presentDays;
-        basicSalary = currentPayroll.basicSalary !== undefined ? Number(currentPayroll.basicSalary) : dailyRate * presentDays;
-        absentDeduction = currentPayroll.deductions !== undefined ? Number(currentPayroll.deductions) : absentDays * dailyRate;
-        netSalary = currentPayroll.netSalary !== undefined ? Number(currentPayroll.netSalary) : basicSalary - absentDeduction;
+      // Helper function for lines
+      const drawLine = (y: number) => {
+        doc.strokeColor(borderColor).lineWidth(1).moveTo(50, y).lineTo(545, y).stroke();
+      };
 
-        console.log('Using payroll values:');
-        console.log('Present Days:', presentDays);
-        console.log('Absent Days:', absentDays);
-        console.log('Basic Salary:', basicSalary);
-        console.log('Absent Deduction:', absentDeduction);
-        console.log('Net Salary:', netSalary);
-      } else {
-        // fallback: try to count present days from attendance
-        const attendanceRecords = await storage.getAttendanceByStaff(employee.id, parseInt(month), parseInt(year));
-        presentDays = attendanceRecords.filter(a => a.status === 'present').length || 30;
-        absentDays = totalDays - presentDays;
-        basicSalary = dailyRate * presentDays;
-        absentDeduction = absentDays * dailyRate;
-        netSalary = basicSalary - absentDeduction;
+      // 1. Header Section
+      // Logo REMOVED as per user request to maximize space and clean alignment.
+      const pageWidth = doc.page.width;
 
-        console.log('Using fallback calculations:');
-        console.log('Present Days:', presentDays);
-        console.log('Absent Days:', absentDays);
-        console.log('Basic Salary:', basicSalary);
-        console.log('Absent Deduction:', absentDeduction);
-        console.log('Net Salary:', netSalary);
+      // Organization Details (Centered across the whole page)
+      doc.font('Helvetica-Bold').fontSize(20).fillColor(primaryColor).text(orgName.toUpperCase(), 0, 45, { align: 'center', width: pageWidth });
+      doc.font('Helvetica').fontSize(10).fillColor(secondaryColor);
+
+      let currentY = 70;
+      if (orgAddress) {
+        doc.text(orgAddress, 0, currentY, { align: 'center', width: pageWidth });
+        currentY += 15;
       }
 
-      // Institute and Title
-      doc.fontSize(16).text('EuroKids Manewada', { align: 'center', underline: true });
-      doc.moveDown(0.5);
-      doc.fontSize(13).text(`PAY SLIP FOR THE MONTH OF ${new Date(parseInt(year), parseInt(month) - 1).toLocaleString('en-US', { month: 'long' })} - ${year}`, { align: 'center' });
+      let contactLine = "";
+      if (orgPhone) contactLine += `Phone: ${orgPhone}`;
+      if (orgEmail) contactLine += (contactLine ? " | " : "") + `Email: ${orgEmail}`;
+      if (contactLine) doc.text(contactLine, 0, currentY, { align: 'center', width: pageWidth });
+
+      doc.moveDown(1.5);
+      drawLine(doc.y);
       doc.moveDown(1);
 
-      // Employee Details
-      doc.fontSize(11);
-      doc.text(`Employee Name:   ${employee.name}`);
-      doc.text(`Empcode:         ${employee.employeeId || 'N/A'}`);
-      doc.text(`Department:      ${employee.department || 'N/A'}`);
-      doc.text(`Designation:     ${employee.role || 'N/A'}`);
+      // 2. Title
+      const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('en-US', { month: 'long' });
+      doc.font('Helvetica-Bold').fontSize(14).fillColor("#333").text(`PAYSLIP FOR ${monthName.toUpperCase()} ${year}`, { align: 'center' });
       doc.moveDown(1);
 
-      // Attendance Section
-      doc.fontSize(11).text('Attendance', { underline: true });
-      doc.moveDown(0.2);
-      doc.text(`Present Days:    ${presentDays}`);
-      doc.text(`Absent Days:     ${absentDays}`);
-      doc.text(`Total Days:      ${totalDays}`);
-      doc.moveDown(1);
+      // 3. Employee Details Grid
+      const startY = doc.y;
+      const col1X = 50;
+      const col2X = 300;
+      const lineHeight = 18;
 
-      // Salary Details Section
-      doc.fontSize(11).text('Salary Details', { underline: true });
-      doc.moveDown(0.2);
-      doc.text(`Daily Rate:      ₹${dailyRate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
-      doc.text(`Basic Salary:    ₹${basicSalary.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
-      doc.moveDown(1);
+      doc.fontSize(10).fillColor("#555");
 
-      // Deductions Section
-      doc.fontSize(11).text('Deductions', { underline: true });
-      doc.moveDown(0.2);
-      doc.text(`Absent Deduction: ₹${absentDeduction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
-      doc.moveDown(1);
+      // Left Column
+      doc.font('Helvetica-Bold').text("Employee Name:", col1X, startY);
+      doc.font('Helvetica').text(employee.name, col1X + 90, startY);
 
-      // Net Salary Section
-      doc.fontSize(11).text('Net Salary', { underline: true });
-      doc.moveDown(0.2);
-      doc.font('Helvetica-Bold').fontSize(13).text(`₹${netSalary.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, { align: 'left' });
-      doc.font('Helvetica').fontSize(10);
-      doc.moveDown(2);
+      doc.font('Helvetica-Bold').text("Employee ID:", col1X, startY + lineHeight);
+      doc.font('Helvetica').text(employee.employeeId || 'N/A', col1X + 90, startY + lineHeight);
 
-      // Footer
-      doc.fontSize(8).text('* This is a computer generated report. No signature required.', { align: 'center' });
+      doc.font('Helvetica-Bold').text("Designation:", col1X, startY + lineHeight * 2);
+      doc.font('Helvetica').text(employee.role || 'N/A', col1X + 90, startY + lineHeight * 2);
 
-      // End the document
+      // Right Column
+      doc.font('Helvetica-Bold').text("Department:", col2X, startY);
+      doc.font('Helvetica').text(employee.department || 'N/A', col2X + 90, startY);
+
+      doc.font('Helvetica-Bold').text("Date of Joining:", col2X, startY + lineHeight);
+      const joiningDate = employee.dateOfJoining ? new Date(employee.dateOfJoining).toLocaleDateString('en-GB') : 'N/A';
+      doc.font('Helvetica').text(joiningDate, col2X + 90, startY + lineHeight);
+
+      doc.font('Helvetica-Bold').text("Bank Acct:", col2X, startY + lineHeight * 2);
+      const bankAcc = employee.bankAccountNumber ? `XXXX${employee.bankAccountNumber.slice(-4)}` : 'N/A';
+      doc.font('Helvetica').text(bankAcc, col2X + 90, startY + lineHeight * 2);
+
+      doc.moveDown(4);
+
+      // 4. Financial Table
+      const tableTop = doc.y;
+      const tableHeaderHeight = 25;
+
+      // Table Header Background
+      doc.rect(50, tableTop, 495, tableHeaderHeight).fill(primaryColor); // Purple background
+
+      // Table Header Text
+      doc.fillColor("#fff").font('Helvetica-Bold').fontSize(10);
+      const colWidth = 123.75; // 495 / 4
+
+      doc.text("EARNINGS", 50 + 10, tableTop + 8, { width: 140 });
+      doc.text("AMOUNT (Rs.)", 50 + 160, tableTop + 8, { width: 80, align: 'right' });
+      doc.text("DEDUCTIONS", 300 + 10, tableTop + 8, { width: 140 });
+      doc.text("AMOUNT (Rs.)", 300 + 160, tableTop + 8, { width: 80, align: 'right' });
+
+      // Calculate values
+      const basic = Number(currentPayroll.basicSalary);
+      const allowances = Number(currentPayroll.allowances || 0);
+      const overtime = Number(currentPayroll.overtime || 0);
+      const grossEarnings = basic + allowances + overtime;
+
+      const deductions = Number(currentPayroll.deductions || 0);
+      const totalDeductions = deductions;
+      const netSalary = Number(currentPayroll.netSalary);
+
+      // Table Content
+      let rowY = tableTop + tableHeaderHeight + 10;
+      doc.fillColor("#333").font('Helvetica').fontSize(10);
+
+      // Row 1: Basic & Deductions
+      doc.text("Basic Salary", 50 + 10, rowY);
+      doc.text(basic.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 50 + 160, rowY, { width: 80, align: 'right' });
+
+      doc.text("Deductions (Absent/Other)", 300 + 10, rowY);
+      doc.text(deductions.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 300 + 160, rowY, { width: 80, align: 'right' });
+
+      rowY += 20;
+
+      // Row 2: Allowances
+      if (allowances > 0) {
+        doc.text("Allowances", 50 + 10, rowY);
+        doc.text(allowances.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 50 + 160, rowY, { width: 80, align: 'right' });
+        rowY += 20;
+      }
+
+      // Row 3: Overtime
+      if (overtime > 0) {
+        doc.text("Overtime", 50 + 10, rowY);
+        doc.text(overtime.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 50 + 160, rowY, { width: 80, align: 'right' });
+        rowY += 20;
+      }
+
+      // Draw vertical line splitting Earnings and Deductions
+      const tableHeight = Math.max(rowY - (tableTop + tableHeaderHeight), 60); // Min height
+      const tableBottom = tableTop + tableHeaderHeight + tableHeight + 10;
+
+      // Vertical Center Line
+      doc.strokeColor(borderColor).lineWidth(1)
+        .moveTo(297.5, tableTop + tableHeaderHeight)
+        .lineTo(297.5, tableBottom)
+        .stroke();
+
+      // Outer Box border
+      doc.rect(50, tableTop, 495, tableHeaderHeight + tableHeight + 10).strokeColor(borderColor).stroke();
+
+      // Totals Row
+      const totalsY = tableBottom;
+      doc.rect(50, totalsY, 495, 25).fill(lightGray);
+
+      doc.fillColor("#333").font('Helvetica-Bold');
+      doc.text("Total Earnings", 50 + 10, totalsY + 8);
+      doc.text(`Rs. ${grossEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 50 + 160, totalsY + 8, { width: 80, align: 'right' });
+
+      doc.text("Total Deductions", 300 + 10, totalsY + 8);
+      doc.text(`Rs. ${totalDeductions.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 300 + 160, totalsY + 8, { width: 80, align: 'right' });
+
+      // 5. Net Pay Section
+      doc.moveDown(4);
+      const netPayBoxY = doc.y + 40;
+
+      doc.rect(50, netPayBoxY, 495, 50).fillOpacity(0.05).fill(primaryColor);
+      doc.fillOpacity(1).strokeColor(primaryColor).lineWidth(1).rect(50, netPayBoxY, 495, 50).stroke();
+
+      doc.font('Helvetica-Bold').fontSize(12).fillColor(primaryColor);
+      doc.text("NET SALARY PAYABLE", 70, netPayBoxY + 18);
+
+      doc.fontSize(16).fillColor("#333");
+      doc.text(`Rs. ${netSalary.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 0, netPayBoxY + 15, { width: 525, align: 'right' });
+
+      // Amount in words
+      const amountInWords = numberToWords(Math.floor(netSalary));
+      doc.fontSize(9).font('Helvetica-Oblique').fillColor("#666");
+      doc.text(`(In words: ${amountInWords} Rupees Only)`, 70, netPayBoxY + 32);
+
+      // 6. Footer (Attendance & Signatures)
+      doc.moveDown(4);
+      const footerY = 700;
+
+      // Attendance Summary Mini-table
+      doc.fontSize(9).font('Helvetica').fillColor("#555");
+      const attY = 600;
+      doc.text("Attendance Summary:", 50, attY);
+      doc.font('Helvetica-Bold');
+      doc.text(`Total Days: 30   |   Present: ${currentPayroll.attendedDays || 30}   |   Paid Days: ${currentPayroll.attendedDays || 30}`, 50, attY + 15);
+
+      // Signatures
+      doc.fontSize(10).font('Helvetica-Bold').fillColor("#333");
+      doc.text("Employer Signature", 380, footerY - 15);
+      doc.text("_______________________", 350, footerY - 5);
+
+      doc.fontSize(8).font('Helvetica').fillColor("#888");
+      doc.text("This is a computer-generated document and does not require a physical signature.", 0, 750, { align: 'center' });
+
       doc.end();
 
     } catch (error) {
@@ -5755,6 +6173,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Live tracking API error:", error);
       res.status(500).json({ message: "Failed to fetch live bus locations" });
+    }
+  });
+
+  // Geocoding Proxy for Ola Maps
+  app.get("/api/maps/geocode", async (req, res) => {
+    try {
+      const { address } = req.query;
+      if (!address) return res.status(400).json({ message: "Address is required" });
+
+      const apiKey = process.env.OLA_MAPS_API_KEY || 'nN7MyyjOHt7LqUdRFNYcfadYtFEw7cqdProAtSD0';
+      const url = `https://api.olamaps.io/places/v1/geocode?address=${encodeURIComponent(address as string)}&api_key=${apiKey}`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      res.status(500).json({ message: "Failed to geocode address" });
     }
   });
 

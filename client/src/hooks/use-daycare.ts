@@ -342,3 +342,20 @@ export function useUpdateBillingConfig() {
         },
     });
 }
+
+// ============================================
+// REPORTS & ANALYTICS
+// ============================================
+
+export function useAttendanceReport(childId: number | null, year: number, month: number) {
+    return useQuery({
+        queryKey: ["/api/daycare/reports/attendance", childId, year, month],
+        queryFn: async () => {
+            if (!childId) return null;
+            const response = await fetch(`/api/daycare/reports/attendance/${childId}?year=${year}&month=${month}`, { headers: getAuthHeaders() });
+            if (!response.ok) throw new Error("Failed to fetch attendance report");
+            return response.json();
+        },
+        enabled: !!childId,
+    });
+}

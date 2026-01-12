@@ -405,6 +405,7 @@ router.post('/activity', async (req: Request, res: Response) => {
             mood: mood || 'happy',
             teacher_name: teacher?.name || 'Teacher',
             media_urls: finalMediaUrls,
+            status: 'pending', // Pending admin approval
             posted_at: new Date().toISOString()
         }));
 
@@ -484,6 +485,373 @@ router.get('/attendance/today', async (req: Request, res: Response) => {
             error: {
                 code: 'FETCH_TODAY_ATTENDANCE_ERROR',
                 message: 'Failed to fetch today\'s attendance'
+            }
+        });
+    }
+});
+
+/**
+ * GET /api/v1/mobile/teacher/leaves
+ * Get leave history
+ */
+router.get('/leaves', async (req: Request, res: Response) => {
+    try {
+        const staffId = req.user!.userId;
+        const organizationId = req.user!.organizationId;
+
+        const { supabase } = await import('../../supabase.js');
+
+        const { data: leaves, error } = await supabase
+            .from('teacher_leaves')
+            .select('*')
+            .eq('staff_id', staffId)
+            .eq('organization_id', organizationId)
+            .order('applied_at', { ascending: false });
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            data: leaves || []
+        });
+    } catch (error) {
+        console.error('[Mobile API] Get leaves error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'FETCH_LEAVES_ERROR',
+                message: 'Failed to fetch leave history'
+            }
+        });
+    }
+});
+
+/**
+ * GET /api/v1/mobile/teacher/leaves/balance
+ * Get leave balance
+ */
+router.get('/leaves/balance', async (req: Request, res: Response) => {
+    try {
+        const staffId = req.user!.userId;
+        const organizationId = req.user!.organizationId;
+        const year = new Date().getFullYear();
+
+        const { supabase } = await import('../../supabase.js');
+
+        // Get Staff Limits
+        const { data: staff, error: staffError } = await supabase
+            .from('staff')
+            .select('cl_limit, el_limit, total_leaves')
+            .eq('id', staffId)
+            .single();
+
+        if (staffError) throw staffError;
+
+        // Get Used Leaves
+        const { data: usedLeaves, error: leavesError } = await supabase
+            .from('teacher_leaves')
+            .select('leave_type, start_date, end_date')
+            .eq('staff_id', staffId)
+            .eq('organization_id', organizationId)
+            .eq('status', 'approved')
+            .gte('start_date', `${year}-01-01`);
+
+        if (leavesError) throw leavesError;
+
+        let clUsed = 0;
+        let elUsed = 0;
+
+        console.log(`[Mobile Balance] Fetching leaves for Staff ${staffId}, Year ${year}, Org ${organizationId}`);
+        console.log(`[Mobile Balance] Raw Leaves Data: ${JSON.stringify(usedLeaves)}`);
+
+        usedLeaves?.forEach(leave => {
+            // Count instances instead of days as per user requirement
+            const days = 1;
+
+            // Handle both camelCase and snake_case properties just in case
+            const type = leave.leave_type || (leave as any).leaveType;
+
+            if (type === 'CL') clUsed += days;
+            else if (type === 'EL') elUsed += days;
+        });
+
+        console.log(`[Mobile Balance] Calculated Used: CL=${clUsed}, EL=${elUsed}`);
+
+        res.json({
+            success: true,
+            data: {
+                cl: { limit: staff.cl_limit || 10, used: clUsed, balance: (staff.cl_limit || 10) - clUsed },
+                el: { limit: staff.el_limit || 5, used: elUsed, balance: (staff.el_limit || 5) - elUsed }
+            }
+        });
+    } catch (error) {
+        console.error('[Mobile API] Get leave balance error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'FETCH_BALANCE_ERROR',
+                message: 'Failed to fetch leave balance'
+            }
+        });
+    }
+});
+
+/**
+ * POST /api/v1/mobile/teacher/leaves
+ * Apply for leave
+ */
+router.post('/leaves', async (req: Request, res: Response) => {
+    try {
+        const { startDate, endDate, reason } = req.body;
+        const staffId = req.user!.userId;
+        const organizationId = req.user!.organizationId;
+
+        if (!startDate || !endDate || !reason) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'INVALID_REQUEST',
+                    message: 'Start date, end date, and reason are required'
+                }
+            });
+        }
+
+        const { supabase } = await import('../../supabase.js');
+
+        // 1. Create Leave Request
+        const { data, error } = await supabase
+            .from('teacher_leaves')
+            .insert({
+                staff_id: staffId,
+                organization_id: organizationId,
+                start_date: startDate,
+                end_date: endDate,
+                reason,
+                leave_type: req.body.leaveType || 'CL',
+                status: 'pending'
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // 2. Fetch Teacher Name (for notification)
+        const { data: teacher } = await supabase
+            .from('staff')
+            .select('name')
+            .eq('id', staffId)
+            .single();
+
+        const teacherName = teacher?.name || 'A teacher';
+
+        // 3. Notify Admins
+        try {
+            const { data: admins } = await supabase
+                .from('users')
+                .select('id')
+                .eq('organization_id', organizationId)
+                .eq('role', 'admin');
+
+            if (admins && admins.length > 0) {
+                const notifications = admins.map(admin => ({
+                    user_id: admin.id,
+                    type: 'staff',
+                    title: 'New Leave Application',
+                    message: `${teacherName} has applied for ${req.body.leaveType || 'CL'} leave from ${startDate} to ${endDate}. Reason: ${reason}`,
+                    priority: 'medium',
+                    action_type: 'view_staff',
+                    action_id: staffId.toString(),
+                    read: false,
+                    // organization_id: organizationId // schema check: notifications might not have organization_id column, checking schema...
+                }));
+
+                // Double check schema for notifications
+                // Looking at my memory of schema.ts... notifications has: id, userId, type, title, message, priority, read, actionType, actionId, metadata, createdAt...
+                // It does NOT seem to have organization_id in the view_file I saw earlier? 
+                // Let's check schema.ts lines 1571...
+                // Actually I can just exclude it if I'm not sure, or check schema first.
+                // Re-reading schema lines from previous turn...
+
+                await supabase.from('notifications').insert(notifications);
+            }
+        } catch (notifError) {
+            console.error('Failed to send admin notifications:', notifError);
+            // Don't fail the request if notification fails
+        }
+
+        res.json({
+            success: true,
+            data
+        });
+    } catch (error) {
+        console.error('[Mobile API] Apply leave error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'APPLY_LEAVE_ERROR',
+                message: 'Failed to apply for leave'
+            }
+        });
+    }
+});
+
+/**
+ * GET /api/v1/mobile/teacher/tasks
+ * Get teacher tasks
+ */
+router.get('/tasks', async (req: Request, res: Response) => {
+    try {
+        const staffId = req.user!.userId;
+        const organizationId = req.user!.organizationId;
+
+        const { supabase } = await import('../../supabase.js');
+
+        const { data: tasks, error } = await supabase
+            .from('teacher_tasks')
+            .select('*')
+            .eq('staff_id', staffId)
+            .eq('organization_id', organizationId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            data: tasks || []
+        });
+    } catch (error) {
+        console.error('[Mobile API] Get tasks error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'FETCH_TASKS_ERROR',
+                message: 'Failed to fetch tasks'
+            }
+        });
+    }
+});
+
+/**
+ * POST /api/v1/mobile/teacher/tasks
+ * Create task
+ */
+router.post('/tasks', async (req: Request, res: Response) => {
+    try {
+        const { title, description, dueDate } = req.body;
+        const staffId = req.user!.userId;
+        const organizationId = req.user!.organizationId;
+
+        if (!title) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'INVALID_REQUEST',
+                    message: 'Title is required'
+                }
+            });
+        }
+
+        const { supabase } = await import('../../supabase.js');
+
+        const { data, error } = await supabase
+            .from('teacher_tasks')
+            .insert({
+                staff_id: staffId,
+                organization_id: organizationId,
+                title,
+                description,
+                due_date: dueDate || null,
+                is_completed: false
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            data
+        });
+    } catch (error) {
+        console.error('[Mobile API] Create task error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'CREATE_TASK_ERROR',
+                message: 'Failed to create task'
+            }
+        });
+    }
+});
+
+/**
+ * PATCH /api/v1/mobile/teacher/tasks/:id
+ * Update task status
+ */
+router.patch('/tasks/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { isCompleted } = req.body;
+        const staffId = req.user!.userId;
+
+        const { supabase } = await import('../../supabase.js');
+
+        const { data, error } = await supabase
+            .from('teacher_tasks')
+            .update({ is_completed: isCompleted })
+            .eq('id', id)
+            .eq('staff_id', staffId) // Ensure ownership
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            data
+        });
+    } catch (error) {
+        console.error('[Mobile API] Update task error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'UPDATE_TASK_ERROR',
+                message: 'Failed to update task'
+            }
+        });
+    }
+});
+
+/**
+ * DELETE /api/v1/mobile/teacher/tasks/:id
+ * Delete task
+ */
+router.delete('/tasks/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const staffId = req.user!.userId;
+
+        const { supabase } = await import('../../supabase.js');
+
+        const { error } = await supabase
+            .from('teacher_tasks')
+            .delete()
+            .eq('id', id)
+            .eq('staff_id', staffId); // Ensure ownership
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            message: 'Task deleted successfully'
+        });
+    } catch (error) {
+        console.error('[Mobile API] Delete task error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'DELETE_TASK_ERROR',
+                message: 'Failed to delete task'
             }
         });
     }

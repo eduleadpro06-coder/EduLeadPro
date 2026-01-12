@@ -2020,11 +2020,11 @@ export default function StudentFees() {
                                   <SelectValue placeholder="Select mode" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="cash">Cash</SelectItem>
-                                  <SelectItem value="card">Card</SelectItem>
-                                  <SelectItem value="upi">UPI</SelectItem>
-                                  <SelectItem value="net_banking">Net Banking</SelectItem>
-                                  <SelectItem value="cheque">Cheque</SelectItem>
+                                  <SelectItem value="UPI">UPI</SelectItem>
+                                  <SelectItem value="Cash">Cash</SelectItem>
+                                  <SelectItem value="Card">Card</SelectItem>
+                                  <SelectItem value="Cheque">Cheque</SelectItem>
+                                  <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -2558,10 +2558,11 @@ export default function StudentFees() {
                                         <SelectValue placeholder="Select mode" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="cash">Cash</SelectItem>
-                                        <SelectItem value="online">Online</SelectItem>
-                                        <SelectItem value="cheque">Cheque</SelectItem>
-                                        <SelectItem value="transfer">Transfer</SelectItem>
+                                        <SelectItem value="UPI">UPI</SelectItem>
+                                        <SelectItem value="Cash">Cash</SelectItem>
+                                        <SelectItem value="Card">Card</SelectItem>
+                                        <SelectItem value="Cheque">Cheque</SelectItem>
+                                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
                                       </SelectContent>
                                     </Select>
                                   </div>

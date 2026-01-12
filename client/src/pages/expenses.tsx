@@ -92,7 +92,9 @@ export default function Expenses() {
 
   const totalExpenses = expenses.reduce((sum: number, exp: Expense) => sum + Number(exp.amount), 0);
   const remainingBudget = monthlyBudget - totalExpenses;
-  const budgetUtilization = (totalExpenses / monthlyBudget) * 100;
+
+  // Handle division by zero
+  const budgetUtilization = monthlyBudget > 0 ? (totalExpenses / monthlyBudget) * 100 : 0;
 
   // Prepare Chart Data
   const categoryData = expenses.reduce((acc: any[], curr: Expense) => {
@@ -283,8 +285,14 @@ export default function Expenses() {
                 </div>
               </div>
               <div className="mt-4 flex items-center text-sm text-gray-500">
-                <span className="text-purple-600 font-medium">{budgetUtilization.toFixed(0)}%</span>
-                <span className="ml-1">of monthly budget</span>
+                {monthlyBudget > 0 ? (
+                  <>
+                    <span className="text-purple-600 font-medium">{budgetUtilization.toFixed(0)}%</span>
+                    <span className="ml-1">of monthly budget</span>
+                  </>
+                ) : (
+                  <span className="text-gray-400 font-medium">No budget limit set</span>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -294,7 +302,9 @@ export default function Expenses() {
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-sm font-medium text-gray-500">Remaining</p>
-                  <h3 className="text-2xl font-bold text-gray-900 mt-2">₹{remainingBudget.toLocaleString()}</h3>
+                  <h3 className="text-2xl font-bold text-gray-900 mt-2">
+                    {monthlyBudget > 0 ? `₹${remainingBudget.toLocaleString()}` : 'N/A'}
+                  </h3>
                 </div>
                 <div className="p-2 bg-emerald-50 rounded-lg">
                   <TrendingDown className="h-5 w-5 text-emerald-600" />

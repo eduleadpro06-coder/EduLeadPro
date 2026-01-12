@@ -1,6 +1,7 @@
 import { eq, and, gte, lte, desc, sql, isNull, or, asc, type SQL } from "drizzle-orm";
 import { db } from "./db.js";
 import * as schema from "../shared/schema.js";
+import { cacheService } from "./cache-service.js";
 import type {
     DaycareChild, InsertDaycareChild,
     DaycareInquiry, InsertDaycareInquiry,
@@ -329,6 +330,9 @@ export class DaycareStorage {
                 enrollmentDate: new Date().toISOString().split('T')[0]
             })
             .returning();
+
+        // Invalidate dashboard cache
+        cacheService.clearAll();
         return result[0];
     }
 
@@ -706,7 +710,7 @@ export class DaycareStorage {
         enrollmentId?: number,
         status: string = "completed"
     ): Promise<DaycarePayment> {
-        return await this.createDaycarePayment({
+        const result = await this.createDaycarePayment({
             childId,
             enrollmentId,
             amount: amount.toString(),
@@ -719,6 +723,10 @@ export class DaycareStorage {
             status,
             collectedBy: userId
         } as any);
+
+        // Invalidate dashboard cache
+        cacheService.clearAll();
+        return result;
     }
 
     async updatePayment(id: number, updates: Partial<DaycarePayment>): Promise<DaycarePayment | undefined> {
@@ -726,6 +734,9 @@ export class DaycareStorage {
             .set({ ...updates, updatedAt: new Date() })
             .where(eq(schema.daycarePayments.id, id))
             .returning();
+
+        // Invalidate dashboard cache
+        cacheService.clearAll();
         return result[0];
     }
 
@@ -733,6 +744,9 @@ export class DaycareStorage {
         const result = await db.delete(schema.daycarePayments)
             .where(eq(schema.daycarePayments.id, id))
             .returning();
+
+        // Invalidate dashboard cache
+        cacheService.clearAll();
         return result.length > 0;
     }
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,12 +15,11 @@ export default function MenuScreen() {
         router.replace('/(auth)/login');
     };
 
-    const menuItems = [
-        { icon: 'grid-outline', label: 'Dashboard', route: '/(teacher)/dashboard' },
-        { icon: 'calendar-outline', label: 'Mark Attendance', route: '/(teacher)/attendance' },
-        { icon: 'create-outline', label: 'Post Update', route: '/(teacher)/activity' },
-        { icon: 'people-outline', label: 'My Students', route: '/(teacher)/students' },
-    ];
+    const menuItems = user?.role === 'teacher' ? [{ icon: 'grid-outline', label: 'Dashboard', route: '/(teacher)/dashboard' },
+    { icon: 'calendar-outline', label: 'Mark Attendance', route: '/(teacher)/attendance' },
+    { icon: 'create-outline', label: 'Post Update', route: '/(teacher)/activity' },
+    { icon: 'people-outline', label: 'My Students', route: '/(teacher)/students' },
+    ] : []; // Added an empty array for non-teacher roles to ensure menuItems is always an array
 
     return (
         <SafeAreaView style={styles.container}>
@@ -30,7 +30,7 @@ export default function MenuScreen() {
                 <View style={styles.userInfo}>
                     <View style={styles.avatarContainer}>
                         <Text style={styles.avatarText}>
-                            {user?.name?.charAt(0).toUpperCase() || 'U'}
+                            {((user?.role === 'teacher' ? 'Teacher' : 'Parent') || 'U').charAt(0).toUpperCase()}
                         </Text>
                     </View>
                     <View>

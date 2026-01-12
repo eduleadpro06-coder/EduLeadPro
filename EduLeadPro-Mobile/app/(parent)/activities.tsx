@@ -82,7 +82,15 @@ export default function ActivitiesScreen() {
                 switch (type?.toLowerCase()) {
                     case 'achievement': return { icon: 'star', color: '#F59E0B', bg: '#FEF3C7', label: 'Achievement' };
                     case 'wellness': return { icon: 'heart', color: '#EC4899', bg: '#FCE7F3', label: 'Wellness' };
-                    default: return { icon: 'sun', color: '#10B981', bg: '#D1FAE5', label: 'Daily Update' };
+                    case 'food': return { icon: 'coffee', color: '#F59E0B', bg: '#FEF3C7', label: 'Meal Update' };
+                    case 'sleep': return { icon: 'moon', color: '#6366F1', bg: '#E0E7FF', label: 'Sleep Update' };
+                    case 'bathroom': return { icon: 'droplet', color: '#3B82F6', bg: '#DBEAFE', label: 'Bathroom' };
+                    case 'photo': return { icon: 'camera', color: '#8B5CF6', bg: '#EDE9FE', label: 'Photo' };
+                    case 'behaviour': return { icon: 'smile', color: '#10B981', bg: '#D1FAE5', label: 'Behaviour' };
+                    case 'homework': return { icon: 'book', color: '#EF4444', bg: '#FEE2E2', label: 'Homework' };
+                    case 'notice': return { icon: 'alert-circle', color: '#F97316', bg: '#FFEDD5', label: 'Notice' };
+                    case 'general': return { icon: 'file-text', color: '#6B7280', bg: '#F3F4F6', label: 'General Update' };
+                    default: return { icon: 'sun', color: '#10B981', bg: '#D1FAE5', label: 'Activity' };
                 }
             };
 

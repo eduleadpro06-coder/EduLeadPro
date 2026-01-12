@@ -6,10 +6,9 @@
 
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { API_BASE_URL as CONFIG_API_URL } from '../config';
 
-const API_BASE_URL = __DEV__
-    ? 'http://localhost:5000/api'
-    : 'https://eduleadconnect.vercel.app/api';
+const API_BASE_URL = CONFIG_API_URL.replace('/mobile', '');
 
 class MobileLogger {
     private enabled: boolean = true;

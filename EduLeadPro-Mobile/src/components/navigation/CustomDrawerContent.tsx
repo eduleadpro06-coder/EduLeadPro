@@ -24,6 +24,8 @@ export default function CustomDrawerContent(props: any) {
 
     const teacherItems = [
         { label: 'Dashboard', icon: 'home', route: '/(teacher)' },
+        { label: 'My Tasks', icon: 'clipboard', route: '/(teacher)/tasks' },
+        { label: 'Apply Leave', icon: 'calendar', route: '/(teacher)/leaves' },
         { label: 'Mark Attendance', icon: 'check-square', route: '/(teacher)/mark-attendance' },
         { label: 'Post Activity', icon: 'camera', route: '/(teacher)/post-update' },
         { label: 'My Students', icon: 'users', route: '/(teacher)' },

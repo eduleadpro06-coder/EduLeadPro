@@ -4,7 +4,8 @@
 
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
-import { API_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
+import { STORAGE_KEYS } from '../../utils/constants';
+import { API_BASE_URL } from '../../config';
 
 class APIClient {
     private client: AxiosInstance;
@@ -78,6 +79,14 @@ class APIClient {
      */
     async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
         const response = await this.client.put(url, data, config);
+        return response.data;
+    }
+
+    /**
+     * PATCH request
+     */
+    async patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+        const response = await this.client.patch(url, data, config);
         return response.data;
     }
 

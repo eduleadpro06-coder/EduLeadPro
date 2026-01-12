@@ -116,21 +116,29 @@ export const teacherAPI = {
             console.log(`Successfully uploaded ${validUrls.length} images.`);
         }
 
+        // Prepare clean payload for backend - explicitly exclude base64 images
         const payload: any = {
-            ...options, // Spread first so specific keys override it
             content,
             title: options.title || 'Activity Update',
             activityType: options.activityType || 'general',
-            image: null, // Explicitly set to null to prevent backend upload
-            mediaUrls: mediaUrls, // Send the updated array
+            mediaUrls: mediaUrls, // Use the uploaded Supabase URLs
             mood: options.mood,
         };
 
+        // Add lead identifier
         if (Array.isArray(leadIds)) {
             payload.leadIds = leadIds;
         } else {
             payload.leadId = leadIds;
         }
+
+        // Add any other metadata from options, but EXCLUDE large media fields
+        const { images, image, ...otherOptions } = options;
+        Object.assign(payload, otherOptions);
+
+        // Ensure image fields are cleared in payload for backend safety
+        payload.image = null;
+        payload.images = undefined;
 
         return await this.postDailyUpdate(payload);
     },
@@ -174,6 +182,62 @@ export const teacherAPI = {
     async getTodayAttendanceAll(): Promise<any> {
         const response = await apiClient.get('/teacher/attendance/today');
         return response.data;
+    },
+
+    /**
+     * Get leave history
+     */
+    async getLeaves(): Promise<any[]> {
+        const response = await apiClient.get('/teacher/leaves');
+        return response.data;
+    },
+
+    /**
+     * Get leave balance
+     */
+    async getLeaveBalance(): Promise<{ cl: any; el: any }> {
+        const response = await apiClient.get('/teacher/leaves/balance');
+        return response.data;
+    },
+
+    /**
+     * Apply for leave
+     */
+    async applyLeave(data: { startDate: string; endDate: string; reason: string; leaveType: 'CL' | 'EL' }): Promise<any> {
+        const response = await apiClient.post('/teacher/leaves', data);
+        return response.data;
+    },
+
+    /**
+     * Get tasks
+     */
+    async getTasks(): Promise<any[]> {
+        const response = await apiClient.get('/teacher/tasks');
+        return response.data;
+    },
+
+    /**
+     * Add task
+     */
+    async addTask(data: { title: string; description?: string; dueDate?: string }): Promise<any> {
+        const response = await apiClient.post('/teacher/tasks', data);
+        return response.data;
+    },
+
+    /**
+     * Update task
+     */
+    async updateTask(taskId: number, data: { isCompleted: boolean }): Promise<any> {
+        const response = await apiClient.patch(`/teacher/tasks/${taskId}`, data);
+        return response.data;
+    },
+
+    /**
+     * Delete task
+     */
+    async deleteTask(taskId: number): Promise<any> {
+        const response = await apiClient.delete(`/teacher/tasks/${taskId}`);
+        return response;
     },
 };
 

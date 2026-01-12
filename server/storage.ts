@@ -1,6 +1,7 @@
 import { eq, and, ne, gte, lte, lt, sql, desc, or, isNull, isNotNull, not, asc, ilike, aliasedTable } from "drizzle-orm";
 import { db } from "./db.js";
 import * as schema from "../shared/schema.js";
+import { cacheService } from "./cache-service.js";
 import type {
   User, InsertUser, Lead, InsertLead, FollowUp, InsertFollowUp,
   LeadSource, InsertLeadSource, Staff, InsertStaff, Attendance, InsertAttendance,
@@ -1449,12 +1450,22 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    // We also need to add any "additional_charge" payments to the Total Receivables.
-    // Why? Because if a parent pays ₹500 for a form, that was effectively a "Receivable" the moment it was charged.
-    // Logic: Total Receivables = (Base Fees) + (Extra Collected Fees)
-    // This allows Pending to correctly track Tuition Balance: (Base R + Extra R) - (Base C + Extra C) = (Base R - Base C).
+    // Separating "Plan Fees" from "Additional Charges" per user request.
+    // Additional charges are not part of receivables/pending calculation.
 
-    // Get collected additional charges
+    // 1. Get total core fees collected (excluding additional charges)
+    const planFeesCollectedResult = await db
+      .select({ total: sql<number>`cast(coalesce(sum(${schema.feePayments.amount}), 0) as integer)` })
+      .from(schema.feePayments)
+      .where(
+        and(
+          organizationId ? eq(schema.feePayments.organizationId, organizationId) : sql`1=1`,
+          ne(schema.feePayments.paymentCategory, 'additional_charge')
+        )
+      );
+    const totalCollectedPlanFees = planFeesCollectedResult[0]?.total || 0;
+
+    // 2. Get total additional charges collected
     const additionalChargesResult = await db
       .select({ total: sql<number>`cast(coalesce(sum(${schema.feePayments.amount}), 0) as integer)` })
       .from(schema.feePayments)
@@ -1464,27 +1475,23 @@ export class DatabaseStorage implements IStorage {
           eq(schema.feePayments.paymentCategory, 'additional_charge')
         )
       );
-
     const additionalCollected = additionalChargesResult[0]?.total || 0;
-    totalExpectedRevenue += additionalCollected;
 
-    // NOTE: 'totalCollectedAllTime' includes both fee_payment AND additional_charge.
-    // So Pending = (Base + Extra) - (Collected Base + Collected Extra)
-    // This correctly leaves the Pending amount as just the Base balance (e.g. 28,000).
-
-    // If we have expected revenue (from fee structures/EMI), calculate pending normally
-    // Otherwise, if there are payments but no structures, show 0 pending and 100% collection
-    const totalPending = totalExpectedRevenue > 0
-      ? Math.max(0, totalExpectedRevenue - totalCollectedAllTime)
-      : 0; // No structures = no pending expectation
-
-    // Collection rate: Collected / Expected (or 100% if collected without structures)
+    // Receivables (Pending) Logic:
+    // Total Pending = (Total Plan Expectation) - (Total Plan Fees Collected)
+    // Additional charges are NOT added to expectation.
+    // Collection rate: Collected Plan Fees / Expected Plan Fees
     const collectionRate = totalExpectedRevenue > 0
-      ? (totalCollectedAllTime / totalExpectedRevenue) * 100
-      : (totalCollectedAllTime > 0 ? 100 : 0); // If collected without structures, show 100%
+      ? (totalCollectedPlanFees / totalExpectedRevenue) * 100
+      : (totalCollectedPlanFees > 0 ? 100 : 0);
 
+    const totalPending = totalExpectedRevenue > 0
+      ? Math.max(0, totalExpectedRevenue - totalCollectedPlanFees)
+      : 0;
+
+    // Chart Data focuses on Plan Fees only
     const paidVsPending = [
-      { label: 'Collected', value: totalCollectedAllTime },
+      { label: 'Collected', value: totalCollectedPlanFees },
       { label: 'Pending', value: totalPending }
     ];
 
@@ -1744,15 +1751,42 @@ export class DatabaseStorage implements IStorage {
       : "0.0";
 
     // 4. DAYCARE REVENUE
-    // NOTE: 'daycareTransactions' table does not exist in schema yet.
-    // Using placeholder 0 to prevent crash. Re-enable query once table is created.
-    const monthlyDaycareRevenue = 0;
-    const prevMonthDaycareRevenue = 0;
-    const daycareRevenueChange = "0.0";
+    const [currentDaycareRevenueResult, prevDaycareRevenueResult, totalDaycareResult] = await Promise.all([
+      db.select({ total: sql<number>`cast(coalesce(sum(${schema.daycarePayments.totalAmount}), 0) as integer)` })
+        .from(schema.daycarePayments)
+        .where(
+          and(
+            organizationId ? eq(schema.daycareChildren.organizationId, organizationId) : sql`1=1`,
+            gte(schema.daycarePayments.paymentDate, currentMonthStartStr),
+            lte(schema.daycarePayments.paymentDate, currentMonthEndStr)
+          )
+        )
+        .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id)),
+      db.select({ total: sql<number>`cast(coalesce(sum(${schema.daycarePayments.totalAmount}), 0) as integer)` })
+        .from(schema.daycarePayments)
+        .where(
+          and(
+            organizationId ? eq(schema.daycareChildren.organizationId, organizationId) : sql`1=1`,
+            gte(schema.daycarePayments.paymentDate, prevMonthStartStr),
+            lte(schema.daycarePayments.paymentDate, prevMonthEndStr)
+          )
+        )
+        .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id)),
+      db.select({ total: sql<number>`cast(coalesce(sum(${schema.daycarePayments.totalAmount}), 0) as integer)` })
+        .from(schema.daycarePayments)
+        .where(organizationId ? eq(schema.daycareChildren.organizationId, organizationId) : sql`1=1`)
+        .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id))
+    ]);
 
-    // 5. TOTAL REVENUE (Receivables + All Daycare)
-    const totalDaycareAllTime = 0;
-    const totalBusinessRevenue = totalExpectedRevenue + totalDaycareAllTime;
+    const monthlyDaycareRevenue = currentDaycareRevenueResult[0]?.total || 0;
+    const prevMonthDaycareRevenue = prevDaycareRevenueResult[0]?.total || 0;
+    const totalDaycareAllTime = totalDaycareResult[0]?.total || 0;
+
+    const daycareRevenueChange = prevMonthDaycareRevenue > 0
+      ? (((monthlyDaycareRevenue - prevMonthDaycareRevenue) / prevMonthDaycareRevenue) * 100).toFixed(1)
+      : monthlyDaycareRevenue > 0 ? "100.0" : "0.0";
+    const planExpectation = totalExpectedRevenue > 0 ? totalExpectedRevenue : totalCollectedPlanFees;
+    const totalCalculatedRevenue = planExpectation + additionalCollected + totalDaycareAllTime;
 
     const currentTotalMonthlyCollection = monthlyRevenue + monthlyDaycareRevenue;
     const prevTotalMonthlyCollection = prevRevenue + prevMonthDaycareRevenue;
@@ -1826,11 +1860,8 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(schema.leads.createdAt))
       .limit(10);
 
-    // 9. TOTAL REVENUE (Student Fees + Daycare)
-    // As per user request: "Total Receivables" (School Potential) + "Total Daycare Revenue" (All Time Daycare)
-    // We already calculated this as 'totalBusinessRevenue' earlier.
-
-    const totalRevenue = totalBusinessRevenue;
+    // 9. TOTAL REVENUE (What we actually collected: Plans + Additional + Daycare)
+    const totalRevenue = totalCalculatedRevenue;
 
     // For change trend, we continue to use the collections trend calculated earlier as 'totalRevenueChange'.
     // (Note: The variable 'totalRevenueChange' was already defined in step 5, so we don't redefine it here).
@@ -1844,7 +1875,7 @@ export class DatabaseStorage implements IStorage {
           change: `${leadChange >= "0" ? '+' : ''}${leadChange}%`
         },
         studentFee: {
-          value: totalExpectedRevenue, // Total expected revenue from all enrolled students
+          value: totalCalculatedRevenue,
           change: `${parseFloat(totalRevenueChange) >= 0 ? '+' : ''}${totalRevenueChange}%`
         },
         staffManagement: {
@@ -1860,7 +1891,7 @@ export class DatabaseStorage implements IStorage {
           change: `${parseFloat(expenseChange) >= 0 ? '+' : ''}${expenseChange}%`
         },
         totalReceivables: {
-          value: totalExpectedRevenue > 0 ? totalExpectedRevenue : totalCollectedAllTime, // Fallback to collected when no structures
+          value: planExpectation,
           change: totalExpectedRevenue > 0 ? "" : "No fee structures"
         },
         conversionRate: {
@@ -1888,7 +1919,7 @@ export class DatabaseStorage implements IStorage {
         paidVsPending,
         monthlyCollection,
         collectionRate: Math.round(collectionRate * 100) / 100,
-        totalRevenue: totalCollectedAllTime,
+        totalRevenue: totalCollectedPlanFees,
         totalPending: totalPending
       },
       staffAnalytics: {
@@ -3482,6 +3513,12 @@ export class DatabaseStorage implements IStorage {
     const lead = await this.getLead(payment.leadId);
     const studentName = lead ? lead.name : `Student ${payment.leadId}`;
 
+    // Invalidate dashboard and organization cache
+    if (payment.organizationId) {
+      cacheService.invalidateOrganization(payment.organizationId);
+    }
+    cacheService.invalidate('dashboard:*');
+
     await this.notifyChange(
       'fee',
       'Fee Payment Recorded',
@@ -3498,7 +3535,12 @@ export class DatabaseStorage implements IStorage {
       ...updates,
       updatedAt: new Date()
     }).where(eq(schema.feePayments.id, id)).returning();
-    return result[0];
+    const payment = result[0];
+    if (payment && payment.organizationId) {
+      cacheService.invalidateOrganization(payment.organizationId);
+      cacheService.invalidate('dashboard:*');
+    }
+    return payment;
   }
 
   async getFeeStats(): Promise<{
@@ -3734,6 +3776,12 @@ export class DatabaseStorage implements IStorage {
     const lead = await this.getLead(plan.studentId);
     const studentName = lead ? lead.name : `Student ${plan.studentId}`;
 
+    // Invalidate dashboard and organization cache
+    if (plan.organizationId) {
+      cacheService.invalidateOrganization(plan.organizationId);
+    }
+    cacheService.invalidate('dashboard:*');
+
     await this.notifyChange(
       'emi',
       'EMI Plan Created',
@@ -3752,6 +3800,12 @@ export class DatabaseStorage implements IStorage {
     }).where(eq(schema.emiPlans.id, id)).returning();
     const plan = result[0];
     if (plan) {
+      // Invalidate dashboard and organization cache
+      if (plan.organizationId) {
+        cacheService.invalidateOrganization(plan.organizationId);
+      }
+      cacheService.invalidate('dashboard:*');
+
       // Get student/lead details for the notification
       const lead = await this.getLead(plan.studentId);
       const studentName = lead ? lead.name : `Student ${plan.studentId}`;
@@ -3785,14 +3839,12 @@ export class DatabaseStorage implements IStorage {
 
     await db.delete(schema.emiPlans).where(eq(schema.emiPlans.id, id));
 
-    await this.notifyChange(
-      'emi',
-      'EMI Plan Deleted',
-      `EMI plan for ${studentName} deleted`,
-      'medium',
-      'emi_plan_deleted',
-      id.toString()
-    );
+    // Invalidate dashboard and organization cache
+    if (plan && plan.organizationId) {
+      cacheService.invalidateOrganization(plan.organizationId);
+    }
+    cacheService.invalidate('dashboard:*');
+
     return true;
   }
 
@@ -3993,6 +4045,11 @@ export class DatabaseStorage implements IStorage {
 
   // Fee Payment Deletion
   async deleteFeePayment(id: number): Promise<boolean> {
+    const payment = await this.getFeePayment(id);
+    if (payment && payment.organizationId) {
+      cacheService.invalidateOrganization(payment.organizationId);
+      cacheService.invalidate('dashboard:*');
+    }
     await db.delete(schema.feePayments).where(eq(schema.feePayments.id, id));
     return true;
   }
