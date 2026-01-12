@@ -10,6 +10,10 @@
       "dest": "/api/cron/route.ts"
     },
     {
+      "src": "/api/cron/backup",
+      "dest": "/api/cron/backup.ts"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/index.ts"
     },
@@ -33,6 +37,10 @@
     {
       "path": "/api/cron",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/backup",
+      "schedule": "0 2 * * 0"
     }
   ],
   "functions": {
@@ -44,6 +52,9 @@
     },
     "api/cron/route.ts": {
       "maxDuration": 30
+    },
+    "api/cron/backup.ts": {
+      "maxDuration": 60
     }
   }
 }
