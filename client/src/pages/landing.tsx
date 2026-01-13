@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, Link } from "wouter";
+import InteractiveHero from "@/components/landing/interactive-hero";
 import { motion, useMotionValue, useMotionTemplate, animate, AnimatePresence, useAnimation, useInView, useSpring } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -151,7 +152,7 @@ const AnimatedJourneyPath = ({ progress }: { progress: number }) => (
 // RotatingTaglines: Rotates through AI-generated taglines
 const taglines = [
   "Did you know? Our AI predicts enrollments with 95% accuracy!",
-  "EduConnect adapts to your institution's unique needs.",
+  "Yonerra adapts to your institution's unique needs.",
   "AI-driven insights, real results.",
   "Admissions, reimagined for the future.",
   "Your growth, powered by intelligence."
@@ -190,7 +191,7 @@ const testimonials = [
   {
     name: "Priya S.",
     role: "Principal, Delhi Public School",
-    quote: "EduConnect transformed our admissions process. We saw a 35% increase in enrollments!",
+    quote: "Yonerra transformed our admissions process. We saw a 35% increase in enrollments!",
     avatar: "https://randomuser.me/api/portraits/women/68.jpg"
   },
   {
@@ -596,11 +597,11 @@ export default function Landing() {
 
   const faqItems = [
     {
-      question: "How quickly can we implement EduConnect in our institution?",
+      question: "How quickly can we implement Yonerra in our institution?",
       answer: "Most Indian institutions are up and running within 2-3 days. Our team provides complete setup assistance, data migration support, and comprehensive training tailored for Indian staff."
     },
     {
-      question: "Is EduConnect suitable for small educational institutions?",
+      question: "Is Yonerra suitable for small educational institutions?",
       answer: "Absolutely! Our Starter plan is designed specifically for Indian schools and coaching centers with up to 200 students. You can scale up as your institution grows without any migration hassles."
     },
     {
@@ -608,7 +609,7 @@ export default function Landing() {
       answer: "Our AI analyzes multiple data points including student demographics, engagement patterns, communication history, and behavioral indicators to predict enrollment likelihood with 95% accuracy for Indian admissions."
     },
     {
-      question: "Can EduConnect integrate with our existing systems?",
+      question: "Can Yonerra integrate with our existing systems?",
       answer: "Yes! We offer seamless integrations with popular Indian ERPs like Tally, Zoho, and more. Our API also allows custom integrations with any system you currently use."
     },
     {
@@ -616,7 +617,7 @@ export default function Landing() {
       answer: "We provide 24/7 customer support in English, Hindi, and regional languages, dedicated account managers for Enterprise clients, and regular training sessions for Indian institutions."
     },
     {
-      question: "Is our data secure with EduConnect?",
+      question: "Is our data secure with Yonerra?",
       answer: "Security is our top priority. We use enterprise-grade encryption, comply with Indian data protection standards, and undergo regular security audits to protect your sensitive information."
     }
   ];
@@ -741,7 +742,7 @@ export default function Landing() {
   return (
     <PublicLayout>
       {/* Hero Section (placeholder for now) */}
-      <motion.section id="home" style={{ backgroundImage }} className="relative min-h-screen flex items-center justify-center overflow-hidden pt-72 pb-24 font-sans">
+      <motion.section id="home" style={{ backgroundImage }} className="relative min-h-[70vh] flex items-center justify-center overflow-hidden pt-40 pb-20 font-sans">
         <div className="relative z-10 flex flex-col items-center justify-center w-full px-4 max-w-6xl mx-auto text-center">
           <h1 className="text-white font-extrabold text-5xl md:text-7xl leading-tight mb-8">
             <span>One platform – total control</span><br />
@@ -767,14 +768,9 @@ export default function Landing() {
               Learn more
             </Button>
           </div>
-          <motion.img
-            src="/assets/Dashboard.png"
-            alt="Dashboard mockup"
-            initial={{ opacity: 0, scale: 1, rotateX: 50, y: 0 }}
-            animate={{ opacity: 1, scale: 1, rotateX: 0, y: 0 }}
-            transition={{ type: 'spring', stiffness: 50, damping: 24, delay: 0.4 }}
-            className="mt-10 mb-[-4rem] md:mb-[-6rem] rounded-2xl shadow-2xl max-w-6xl w-full mx-auto border border-white/10 scale-110 max-h-[600px] md:max-h-[700px]"
-          />
+          <div className="w-full mt-10 mb-[-4rem]">
+            <InteractiveHero />
+          </div>
         </div>
       </motion.section>
       {/* All other sections wrapped in a dark background */}

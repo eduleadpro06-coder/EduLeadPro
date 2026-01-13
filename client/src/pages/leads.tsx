@@ -167,63 +167,65 @@ export default function Leads() {
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto w-full">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b bg-gray-50">
-                      <th className="text-left py-4 px-6 font-medium text-gray-600">Student</th>
-                      <th className="text-left py-4 px-6 font-medium text-gray-600">Parent</th>
-                      <th className="text-left py-4 px-6 font-medium text-gray-600">Contact</th>
-                      <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
-                      <th className="text-left py-4 px-6 font-medium text-gray-600">Source</th>
-                      <th className="text-left py-4 px-6 font-medium text-gray-600">Counselor</th>
-                      <th className="text-left py-4 px-6 font-medium text-gray-600">Follow-up</th>
-                      <th className="text-left py-4 px-6 font-medium text-gray-600">Actions</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Student</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Parent</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Contact</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Source</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Counselor</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Follow-up</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredLeads.map((lead) => (
                       <tr key={lead.id} className="border-b hover:bg-gray-50">
-                        <td className="py-4 px-6 align-top">
+                        <td className="py-3 px-4 align-top">
                           <div>
                             <div className="flex items-center gap-2">
-                              <p className="font-medium text-gray-900">{lead.name}</p>
+                              <p className="font-medium text-sm text-gray-900">{lead.name}</p>
                               {isNewLead(lead.createdAt) && (
-                                <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-800">
                                   New
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-sm text-gray-500">{lead.class}</p>
+                            <p className="text-xs text-gray-500">{lead.class}</p>
 
                           </div>
                         </td>
-                        <td className="py-4 px-6 align-top">
-                          <p className="text-gray-900">{lead.parentName}</p>
+                        <td className="py-3 px-4 align-top">
+                          <p className="text-sm text-gray-900">{lead.parentName}</p>
                         </td>
-                        <td className="py-4 px-6 align-top">
+                        <td className="py-3 px-4 align-top">
                           <div className="space-y-1">
-                            <div className="flex items-center text-sm text-gray-600">
+                            <div className="flex items-center text-xs text-gray-600">
                               <Phone className="w-3 h-3 mr-1" />
                               {lead.phone}
                             </div>
                             {lead.email && (
-                              <div className="flex items-center text-sm text-gray-600">
+                              <div className="flex items-center text-xs text-gray-600">
                                 <Mail className="w-3 h-3 mr-1" />
-                                {lead.email}
+                                <div className="truncate max-w-[120px]" title={lead.email}>
+                                  {lead.email}
+                                </div>
                               </div>
                             )}
                           </div>
                         </td>
-                        <td className="py-4 px-6 align-top">
+                        <td className="py-3 px-4 align-top">
                           <Select
                             value={lead.status}
                             onValueChange={(newStatus) =>
                               updateLeadMutation.mutate({ id: lead.id, data: { status: newStatus } })
                             }
                           >
-                            <SelectTrigger className="w-32 h-9">
-                              <Badge variant="status" className={`${getStatusColor(lead.status)} cursor-pointer`}>
+                            <SelectTrigger className="w-28 h-8 text-xs">
+                              <Badge variant="status" className={`${getStatusColor(lead.status)} cursor-pointer text-[10px] px-2 py-0.5`}>
                                 {lead.status}
                               </Badge>
                             </SelectTrigger>
@@ -236,17 +238,17 @@ export default function Leads() {
                             </SelectContent>
                           </Select>
                         </td>
-                        <td className="py-4 px-4 text-gray-600">{lead.source}</td>
-                        <td className="py-4 px-4">
-                          <p className="text-gray-900">{lead.counselor?.name || "Unassigned"}</p>
+                        <td className="py-3 px-4 text-sm text-gray-600">{lead.source}</td>
+                        <td className="py-3 px-4">
+                          <p className="text-sm text-gray-900">{lead.counselor?.name || "Unassigned"}</p>
                         </td>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center text-sm text-gray-600">
+                        <td className="py-3 px-4">
+                          <div className="flex items-center text-xs text-gray-600">
                             <Calendar className="w-3 h-3 mr-1" />
                             {formatDate(lead.lastContactedAt)}
                           </div>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="py-3 px-4">
                           <Button
                             variant="ghost"
                             size="sm"

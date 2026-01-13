@@ -3,7 +3,8 @@
  * Admin panel for managing school bus routes, stops, assignments, and live tracking
  */
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useQueryState } from "@/hooks/use-query-state";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ import TaskManagement from "@/components/mobile/task-management";
 import ActivityApproval from "@/components/mobile/activity-approval";
 import StopSelectionMap from "@/components/StopSelectionMap";
 // import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
-import { useEffect, useRef, useMemo } from 'react';
+// import hooks consolidated above
 // import 'leaflet/dist/leaflet.css';
 // import L from 'leaflet';
 
@@ -176,8 +177,8 @@ function LiveBusTrackingMap() {
 
 
 export default function AppManagement() {
-    const [mainTab, setMainTab] = useState("users");
-    const [activeTab, setActiveTab] = useState("parents");
+    const [mainTab, setMainTab] = useQueryState<string>("tab", "users");
+    const [activeTab, setActiveTab] = useQueryState<string>("subtab", "parents");
     const [searchTerm, setSearchTerm] = useState("");
     const { toast } = useToast();
 

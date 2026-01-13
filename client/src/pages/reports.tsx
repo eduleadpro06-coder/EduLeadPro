@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryState } from "@/hooks/use-query-state";
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +29,7 @@ export default function Reports() {
     queryKey: [paymentDueUrl]
   });
 
-  const [activeTab, setActiveTab] = useState("payment-due");
+  const [activeTab, setActiveTab] = useQueryState("tab", "payment-due");
 
   return (
     <div className="min-h-screen bg-gray-50">

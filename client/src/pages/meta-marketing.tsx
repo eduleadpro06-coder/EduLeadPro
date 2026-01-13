@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQueryState } from "@/hooks/use-query-state";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -57,7 +58,7 @@ interface MetaCampaign {
 export default function MetaMarketing() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const [activeTab, setActiveTab] = useState("overview");
+    const [activeTab, setActiveTab] = useQueryState<string>("tab", "overview");
     const [isCreateCampaignOpen, setIsCreateCampaignOpen] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
 

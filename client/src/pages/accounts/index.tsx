@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { useQueryState } from "@/hooks/use-query-state";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText, CheckSquare, PieChart } from "lucide-react";
 import StatementUpload from "./components/StatementUpload";
@@ -9,7 +10,7 @@ import AccountingDashboard from "./components/AccountingDashboard";
 import Header from "@/components/layout/header";
 
 export default function AccountsPage() {
-    const [activeTab, setActiveTab] = useState("dashboard");
+    const [activeTab, setActiveTab] = useQueryState<string>("tab", "dashboard");
 
     return (
         <div className="min-h-screen app-bg-gradient transition-all duration-300">

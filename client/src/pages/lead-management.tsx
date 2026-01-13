@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,7 +36,7 @@ import ERPConnector from "@/components/erp-integration/erp-connector";
 import { type LeadWithCounselor } from "@shared/schema";
 import Header from "@/components/layout/header";
 import { Textarea } from "@/components/ui/textarea";
-import { useHashState } from "@/hooks/use-hash-state";
+import { useQueryState } from "@/hooks/use-query-state";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext } from "@/components/ui/pagination";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -50,7 +50,7 @@ const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 export default function LeadManagement() {
-  const [activeTab, setActiveTab] = useHashState("leads");
+  const [activeTab, setActiveTab] = useQueryState("tab", "leads");
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);

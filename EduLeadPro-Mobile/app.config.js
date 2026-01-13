@@ -1,7 +1,7 @@
 export default {
   expo: {
-    name: 'EduConnect',
-    slug: 'educonnectlead',
+    name: 'Yonerra',
+    slug: 'yonerra',
     version: '2.0.0',
     orientation: 'portrait',
     icon: './assets/logo.png',
@@ -14,16 +14,16 @@ export default {
     assetBundlePatterns: ['**/*'],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'com.educonnect.app',
+      bundleIdentifier: 'com.yonerra.app',
     },
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/logo.png',
         backgroundColor: '#ffffff',
       },
-      package: 'com.eduleadpro.app',
+      package: 'com.yonerra.app',
       softwareKeyboardLayoutMode: 'resize',
-      versionCode: 2,
+      versionCode: 3,
     },
     web: {
       favicon: './assets/logo.png',
@@ -37,7 +37,7 @@ export default {
       [
         'expo-camera',
         {
-          cameraPermission: 'Allow EduConnect to access camera for attendance',
+          cameraPermission: 'Allow Yonerra to access camera for attendance',
         },
       ],
     ],
@@ -53,6 +53,6 @@ export default {
       },
     },
     owner: 'gauravkachwaha',
-    scheme: 'educonnect',
+    scheme: 'yonerra',
   },
 };

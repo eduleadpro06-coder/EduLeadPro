@@ -112,7 +112,7 @@ export default function LoginScreen() {
                     />
                 </View>
                 <Text style={styles.title}>Parent Portal</Text>
-                <Text style={styles.subtitle}>Powered by EduConnect</Text>
+                <Text style={styles.subtitle}>Powered by Yonerra</Text>
             </Animated.View>
 
             {/* Login Form Card */}

@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Baby, Users, UserPlus, Calendar, IndianRupee, Settings as SettingsIcon, TrendingUp, Plus, Clock, CheckCircle, UserCheck, LogOut, AlertTriangle, Phone, Mail, Eye, FileText, Download, Filter, InfoIcon, AlertCircle, User2, Trash2 } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useQueryState } from "@/hooks/use-query-state";
 import { useDaycareStats, useCurrentlyCheckedIn, useDaycareChildren, useDaycareInquiries, useDaycareEnrollments, useTodayAttendance, useDaycarePayments, useActiveBillingConfig, useCreateDaycareChild, useCreateDaycareInquiry, useCreateEnrollment, useCheckInChild, useCheckOutChild, useRecordPayment, useUpdateBillingConfig, useAttendanceReport } from "@/hooks/use-daycare";
 import { useOrganization } from "@/hooks/use-organization";
 import { generateDaycareAttendancePDF } from "@/lib/daycare-report-generator";
@@ -21,7 +22,7 @@ import { apiRequest } from "@/lib/queryClient";
 import Header from "@/components/layout/header";
 
 export default function Daycare() {
-    const [activeTab, setActiveTab] = useState("dashboard");
+    const [activeTab, setActiveTab] = useQueryState("tab", "dashboard");
     const [currentTime, setCurrentTime] = useState(new Date());
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());

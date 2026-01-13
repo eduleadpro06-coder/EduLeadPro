@@ -48,14 +48,9 @@ const NavBar = ({ items, className, setLocation, user, loading, activeTab, setAc
         <a
           href="/"
           className="flex items-center gap-2 text-white font-extrabold text-2xl md:text-3xl tracking-tight hover:opacity-90 transition-opacity pl-2 pr-4 select-none"
-          style={{ textShadow: '0 2px 8px #0008' }}
         >
-          {/* Use logo image if available, otherwise fallback to text */}
-          {false ? (
-            <img src="/logo.png" alt="EduConnect Logo" className="h-8 w-8 mr-2" />
-          ) : (
-            <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">EduConnect</span>
-          )}
+          {/* Yonerra brand logo */}
+          <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">YONERRA</span>
         </a>
         {items.filter(item => item.name !== "Home").map((item) => {
           const Icon = item.icon;

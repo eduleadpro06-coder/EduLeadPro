@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+﻿import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +46,7 @@ import { generateMelonsFeeReceipt, type FeeReceiptData } from "@/lib/receipt-gen
 import { generateInvoicePDF } from "@/lib/invoice-generator";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import { useHashState } from "@/hooks/use-hash-state";
+import { useQueryState } from "@/hooks/use-query-state";
 import { type LeadWithCounselor } from "@shared/schema";
 import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -291,7 +291,7 @@ function RecordPaymentButton({ plan, onClick }: { plan: any; onClick: () => void
 export default function StudentFees() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [addMandateOpen, setAddMandateOpen] = useState(false);
-  const [selectedTab, setSelectedTab] = useHashState("overview");
+  const [selectedTab, setSelectedTab] = useQueryState("tab", "overview");
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
   const [selectedFee, setSelectedFee] = useState<FeeStructure | null>(null);
   const [addClassFeeOpen, setAddClassFeeOpen] = useState(false);

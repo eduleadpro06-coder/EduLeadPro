@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Bell, User, LogOut, Settings, ChevronDown, Sun, Moon } from "lucide-react";
+import { Bell, User, LogOut, Settings, ChevronDown, Sun, Moon, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import NotificationCenter from "@/components/notifications/notification-center";
@@ -11,20 +11,31 @@ interface HeaderProps {
   title?: string;
   subtitle?: string;
   className?: string;
+  onMenuClick?: () => void;
 }
 
-export default function Header({ title, subtitle, className }: HeaderProps) {
+export default function Header({ title, subtitle, className, onMenuClick }: HeaderProps) {
   const [, setLocation] = useLocation();
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { user, signOut } = useAuth();
 
   return (
-    <header className={`bg-white shadow-sm border-b border-gray-200 px-6 py-4 ${className || ''}`}>
-      <div className="flex items-center justify-between pl-2">
-        <div className="flex flex-col">
-          {title && <h1 className="text-xl font-bold text-gray-900">{title}</h1>}
-          {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
+    <header className={`bg-white shadow-sm border-b border-gray-200 px-4 lg:px-6 py-4 ${className || ''}`}>
+      <div className="flex items-center justify-between lg:pl-2">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden -ml-2 text-gray-500 hover:text-gray-700"
+            onClick={onMenuClick}
+          >
+            <Menu className="h-6 w-6" />
+          </Button>
+          <div className="flex flex-col">
+            {title && <h1 className="text-xl font-bold text-gray-900">{title}</h1>}
+            {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
+          </div>
         </div>
         <div className="flex items-center space-x-4">
           <NotificationCenter />

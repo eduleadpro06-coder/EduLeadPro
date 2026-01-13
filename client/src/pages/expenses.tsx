@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryState } from "@/hooks/use-query-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -71,7 +72,7 @@ export default function Expenses() {
   });
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
   const [newBudget, setNewBudget] = useState(monthlyBudget.toString());
-  const [activeTab, setActiveTab] = useState("overall");
+  const [activeTab, setActiveTab] = useQueryState("tab", "overall");
   const [selectedCategory, setSelectedCategory] = useState(categories[0]);
 
   // Fetch all expenses

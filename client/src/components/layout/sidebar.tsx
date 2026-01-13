@@ -36,7 +36,12 @@ const navigation = [
 ];
 
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
   const [customInstituteName, setCustomInstituteName] = useState(() => {
@@ -96,15 +101,18 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="w-64 bg-white fixed h-full z-10 shadow-xl border-r border-gray-200 flex flex-col justify-between">
+    <div className={`
+      fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-xl border-r border-gray-200 flex flex-col justify-between transition-transform duration-300 ease-in-out
+      ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+    `}>
       <div>
         <div className="p-6 pb-2">
           <Link href="/landing">
-            <div className="flex flex-col items-start justify-center select-none" style={{ textShadow: '0 2px 8px #0008' }}>
+            <div className="flex flex-col items-start justify-center select-none">
               <span className="text-2xl font-extrabold tracking-tight">
-                <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">EduConnect</span>
+                <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">YONERRA</span>
               </span>
-              <span className="text-xs font-medium text-muted-foreground mt-1 ml-0">AI-Powered CRM</span>
+              <span className="text-xs font-medium text-muted-foreground mt-1 ml-0">Intelligence, Simplified</span>
             </div>
           </Link>
         </div>

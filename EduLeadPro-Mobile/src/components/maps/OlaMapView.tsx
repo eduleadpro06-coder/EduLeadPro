@@ -346,7 +346,7 @@ export default function OlaMapView({
             <WebView
                 ref={webviewRef}
                 style={{ flex: 1, backgroundColor: '#f3f4f6', opacity: 0.99 }}
-                source={{ html: htmlContent, baseUrl: 'https://eduleadconnect.vercel.app/' }}
+                source={{ html: htmlContent, baseUrl: 'https://yonerra.vercel.app/' }}
                 onMessage={handleMessage}
                 javaScriptEnabled={true}
                 domStorageEnabled={true}

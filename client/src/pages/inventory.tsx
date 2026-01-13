@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryState } from "@/hooks/use-query-state";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/utils";
 import Header from "@/components/layout/header";
@@ -20,7 +21,7 @@ import { TransactionsTab } from "@/components/inventory/transactions-tab";
 export default function Inventory() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const [activeTab, setActiveTab] = useState<"items" | "transactions">("items");
+    const [activeTab, setActiveTab] = useQueryState<"items" | "transactions">("tab", "items");
     const [searchTerm, setSearchTerm] = useState("");
     const [categoryFilter, setCategoryFilter] = useState("all");
     const [supplierFilter, setSupplierFilter] = useState("all");

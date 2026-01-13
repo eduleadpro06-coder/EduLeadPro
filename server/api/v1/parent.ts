@@ -859,7 +859,7 @@ router.post('/proxy/directions', async (req: Request, res: Response) => {
         const response = await fetch(url, {
             method: 'GET',
             headers: {
-                'Referer': 'https://eduleadconnect.vercel.app/',
+                'Referer': 'https://yonerra.vercel.app/',
                 'X-Request-Id': Math.random().toString(36).substring(7),
             }
         });

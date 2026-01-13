@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useQueryState } from "@/hooks/use-query-state";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -68,7 +69,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { insertStaffSchema, type InsertStaff } from "@shared/schema";
 import { z } from "zod";
-import { useHashState } from "@/hooks/use-hash-state";
+// import { useHashState } from "@/hooks/use-hash-state";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -203,8 +204,8 @@ export default function StaffAI() {
   const [aiAnalysisOpen, setAiAnalysisOpen] = useState(false);
   const [payrollGenerationOpen, setPayrollGenerationOpen] = useState(false);
   const [bulkPayrollOpen, setBulkPayrollOpen] = useState(false);
-  const [selectedTab, setSelectedTab] = useHashState("overview");
-  const [activeTab, setActiveTab] = useState<"overview" | "payroll">("overview");
+  const [selectedTab, setSelectedTab] = useQueryState<string>("view", "All Employees");
+  const [activeTab, setActiveTab] = useQueryState<string>("tab", "overview");
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
@@ -1451,7 +1452,7 @@ export default function StaffAI() {
   const availableMonths = (y: number) => validHistoryMonths.filter(x => x.year === y).map(x => x.month);
 
   // Add new state for contact details panel tabs
-  const [contactTab, setContactTab] = useState('Overview');
+  const [contactTab, setContactTab] = useQueryState<string>('subview', 'Overview');
 
   // Prevent page scrolling when overview tab is active
   useEffect(() => {
