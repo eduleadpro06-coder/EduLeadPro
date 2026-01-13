@@ -49,7 +49,7 @@ export default {
       wsUrl: process.env.EXPO_PUBLIC_WS_URL,
       olaMapsApiKey: process.env.EXPO_PUBLIC_OLA_MAPS_KEY,
       eas: {
-        projectId: 'f302c7c0-8e3c-4bb8-b324-e9973c9a8657',
+        projectId: '30dace9c-63f8-4c50-8337-0a177603ecd1',
       },
     },
     owner: 'gauravkachwaha',
