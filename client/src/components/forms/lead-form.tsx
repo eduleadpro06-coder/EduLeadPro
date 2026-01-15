@@ -246,6 +246,8 @@ export function LeadForm({ onSuccess, initialData }: LeadFormProps) {
                     <SelectItem value="new">New</SelectItem>
                     <SelectItem value="contacted">Contacted</SelectItem>
                     <SelectItem value="interested">Interested</SelectItem>
+                    <SelectItem value="pre_enrolled">Pre-Enrolled</SelectItem>
+                    <SelectItem value="future_intake">Future Intake</SelectItem>
                     <SelectItem value="enrolled">Enrolled</SelectItem>
                     <SelectItem value="dropped">Dropped</SelectItem>
                   </SelectContent>

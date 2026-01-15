@@ -19,6 +19,18 @@ export const organizations = pgTable("organizations", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Organization Holidays - School closures and holidays
+export const organizationHolidays = pgTable("organization_holidays", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  holidayName: varchar("holiday_name", { length: 255 }).notNull(),
+  holidayDate: date("holiday_date").notNull(),
+  description: text("description"),
+  isRepeating: boolean("is_repeating").default(false),
+  createdBy: varchar("created_by", { length: 255 }), // Stored as varchar in DB
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -26,6 +38,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("counselor"), // counselor, admin, marketing_head, super_admin
   name: text("name"),
   email: text("email"),
+  profilePhoto: text("profile_photo"), // Profile photo URL
   organizationId: integer("organization_id").references(() => organizations.id),
   notificationPreferences: jsonb("notification_preferences"), // JSON for notification settings
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -41,7 +54,7 @@ export const leads = pgTable("leads", {
   section: text("section"), // Section A, B, etc.
   batch: text("batch"), // Batch time/year
   stream: text("stream"), // Science, Commerce, Arts
-  status: text("status").notNull().default("new"), // new, contacted, interested, enrolled, dropped
+  status: text("status").notNull().default("new"), // new, contacted, interested, pre_enrolled, future_intake, enrolled, dropped
   source: text("source").notNull(), // facebook, google_ads, website, referral, etc.
   counselorId: integer("counselor_id").references(() => staff.id), // Changed to reference staff instead of users
   assignedAt: timestamp("assigned_at"),
@@ -59,6 +72,7 @@ export const leads = pgTable("leads", {
   organizationId: integer("organization_id").references(() => organizations.id),
   appPassword: text("app_password"),
   isAppActive: boolean("is_app_active").default(true),
+  isEnrolled: boolean("is_enrolled").default(false), // Enrollment status flag
 });
 
 export const followUps = pgTable("follow_ups", {
@@ -1615,3 +1629,21 @@ export type InsertLedgerEntry = z.infer<typeof insertLedgerEntrySchema>;
 export type InsertClassificationRule = z.infer<typeof insertClassificationRuleSchema>;
 export type InsertClassificationFeedback = z.infer<typeof insertClassificationFeedbackSchema>;
 export type InsertAccountingAuditLog = z.infer<typeof insertAccountingAuditLogSchema>;
+
+// Teacher-Student Assignments
+export const teacherStudentAssignments = pgTable("teacher_student_assignments", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  teacherStaffId: integer("teacher_staff_id").notNull().references(() => staff.id),
+  studentLeadId: integer("student_lead_id").notNull().references(() => leads.id),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  assignedBy: varchar("assigned_by", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTeacherStudentAssignmentSchema = createInsertSchema(teacherStudentAssignments).omit({ id: true, assignedAt: true, createdAt: true, updatedAt: true });
+export type TeacherStudentAssignment = typeof teacherStudentAssignments.$inferSelect;
+export type InsertTeacherStudentAssignment = z.infer<typeof insertTeacherStudentAssignmentSchema>;
+

@@ -8,13 +8,13 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseServiceKey) {
     console.error('❌ Error: Supabase credentials not found in environment variables');
     console.log('\nPlease ensure your .env file has:');
     console.log('  VITE_SUPABASE_URL=https://your-project.supabase.co');
-    console.log('  SUPABASE_SERVICE_KEY=your-service-key');
+    console.log('  SUPABASE_SERVICE_ROLE_KEY=your-service-key');
     process.exit(1);
 }
 

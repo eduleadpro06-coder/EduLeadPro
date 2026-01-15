@@ -16,6 +16,9 @@ import { eq, inArray, sql, and, or, desc } from 'drizzle-orm';
 import { pushTokens, users, leads } from "../shared/schema.js";
 import accountingRouter from "./routes/accounting.js";
 import mobileLogsRouter from "./routes/mobile-logs.js"; // Mobile app logging
+import { comparePassword } from "./utils/password.js"; // Security: bcrypt password comparison
+import { supabase } from "./supabase.js"; // Shared Supabase client with Service Role Key
+
 
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -343,10 +346,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/tasks - Fetch all tasks with staff details
   app.get("/api/admin/tasks", async (req, res) => {
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      // Use shared supabase client
+
 
       // Fetch tasks along with staff details
       // Note: This requires a foreign key relationship or a join. 
@@ -384,10 +385,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Staff ID and Title are required" });
       }
 
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      // Use shared supabase client
+
 
       const { data, error } = await supabase
         .from('teacher_tasks')
@@ -414,10 +413,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/tasks/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      // Use shared supabase client
+
 
       const { error } = await supabase
         .from('teacher_tasks')
@@ -444,10 +441,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         organizationId = 1;
       }
 
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      // Use shared supabase client
+
 
       let query = supabase
         .from('daily_updates')
@@ -490,10 +485,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid status" });
       }
 
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      // Use shared supabase client
+
 
       const { data, error } = await supabase
         .from('daily_updates')
@@ -837,8 +830,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("User found:", user);
 
-      // Check if user exists and password matches
-      if (user && user.password === password) {
+      // Check if user exists and password matches (bcrypt comparison)
+      if (user && await comparePassword(password, user.password)) {
         console.log("Credentials validated for user:", username);
 
         // Check if user has email for OTP
@@ -969,16 +962,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Sending OTP to email:", email);
 
       // Import Supabase client
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+      // Use shared supabase client
+      // const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-      if (!supabaseUrl || !supabaseAnonKey) {
-        console.error("Supabase credentials not configured");
-        return res.status(500).json({ success: false, message: "Email service not configured" });
-      }
-
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
       // Send OTP via Supabase Auth
       const { data, error } = await supabase.auth.signInWithOtp({
@@ -1012,16 +998,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Verifying OTP for email:", email);
 
       // Import Supabase client
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+      // Use shared supabase client
+      // const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-      if (!supabaseUrl || !supabaseAnonKey) {
-        console.error("Supabase credentials not configured");
-        return res.status(500).json({ success: false, message: "Email service not configured" });
-      }
-
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
       // Verify OTP
       const { data, error } = await supabase.auth.verifyOtp({
@@ -1080,7 +1059,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await storage.getUserByEmail(email);
 
-      if (!user || user.password !== password) {
+      // Validate password using bcrypt comparison
+      if (!user || !(await comparePassword(password, user.password))) {
         console.log("Login failed: Invalid credentials");
         return res.status(401).json({ error: "Invalid credentials" });
       }
