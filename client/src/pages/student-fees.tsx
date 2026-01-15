@@ -186,8 +186,7 @@ function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, stat
   const { data: payments, isLoading } = useQuery({
     queryKey: [`/api/emi-plans/${planId}/payments`],
     queryFn: async () => {
-      const res = await fetch(`/api/emi-plans/${planId}/payments`);
-      if (!res.ok) return [];
+      const res = await apiRequest("GET", `/api/emi-plans/${planId}/payments`);
       return res.json();
     }
   });
@@ -260,8 +259,7 @@ function RecordPaymentButton({ plan, onClick }: { plan: any; onClick: () => void
   const { data: payments, isLoading } = useQuery({
     queryKey: [`/api/emi-plans/${plan.id}/payments`],
     queryFn: async () => {
-      const res = await fetch(`/api/emi-plans/${plan.id}/payments`);
-      if (!res.ok) return [];
+      const res = await apiRequest("GET", `/api/emi-plans/${plan.id}/payments`);
       return res.json();
     }
   });
@@ -466,8 +464,7 @@ export default function StudentFees() {
     queryKey: ["/api/emi-plans", selectedEmiPlan?.id, "payment-progress"],
     queryFn: async () => {
       if (!selectedEmiPlan) return null;
-      const response = await fetch(`/api/emi-plans/${selectedEmiPlan.id}/payment-progress`);
-      if (!response.ok) throw new Error('Failed to fetch EMI progress');
+      const response = await apiRequest("GET", `/api/emi-plans/${selectedEmiPlan.id}/payment-progress`);
       return response.json();
     },
     enabled: !!selectedEmiPlan,
@@ -478,8 +475,7 @@ export default function StudentFees() {
     queryKey: ["/api/emi-plans", selectedEmiPlan?.id, "payments"],
     queryFn: async () => {
       if (!selectedEmiPlan) return [];
-      const res = await fetch(`/api/emi-plans/${selectedEmiPlan.id}/payments`);
-      if (!res.ok) return [];
+      const res = await apiRequest("GET", `/api/emi-plans/${selectedEmiPlan.id}/payments`);
       return res.json();
     },
     enabled: !!selectedEmiPlan,
@@ -494,8 +490,7 @@ export default function StudentFees() {
     queryKey: ["/api/emi-plans", selectedEmiPlan?.id, "pending-emis"],
     queryFn: async () => {
       if (!selectedEmiPlan) return [];
-      const response = await fetch(`/api/emi-plans/${selectedEmiPlan.id}/pending-emis`);
-      if (!response.ok) throw new Error('Failed to fetch pending EMIs');
+      const response = await apiRequest("GET", `/api/emi-plans/${selectedEmiPlan.id}/pending-emis`);
       return response.json();
     },
     enabled: !!selectedEmiPlan,
@@ -580,30 +575,8 @@ export default function StudentFees() {
       const url = editingGlobalFee ? `/api/global-class-fees/${editingGlobalFee.id}` : "/api/global-class-fees";
       const method = editingGlobalFee ? "PUT" : "POST";
 
-      console.log("Sending global class fee data:", data);
-      console.log("URL:", url);
-      console.log("Method:", method);
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      console.log("Response status:", response.status);
-      console.log("Response ok:", response.ok);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API error response:", errorText);
-        throw new Error(`Failed to save global class fee: ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log("API success response:", result);
-      return result;
+      const response = await apiRequest(method, url, data);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/global-class-fees"] });
@@ -627,24 +600,8 @@ export default function StudentFees() {
   // Add E-Mandate mutation
   const addEMandateMutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log("Sending E-Mandate data to API:", data);
-      const response = await fetch("/api/e-mandates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-name": JSON.parse(localStorage.getItem('auth_user') || '{}').email
-        },
-        body: JSON.stringify(data),
-      });
-      console.log("API response status:", response.status);
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API error response:", errorText);
-        throw new Error(`Failed to create E-Mandate: ${errorText}`);
-      }
-      const result = await response.json();
-      console.log("API success response:", result);
-      return result;
+      const response = await apiRequest("POST", "/api/e-mandates", data);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/e-mandates"] });
@@ -668,24 +625,8 @@ export default function StudentFees() {
   // Add payment mutation
   const addPaymentMutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log("Sending payment data to API:", data);
-      const response = await fetch("/api/fee-payments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-name": JSON.parse(localStorage.getItem('auth_user') || '{}').email
-        },
-        body: JSON.stringify(data),
-      });
-      console.log("API response status:", response.status);
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API error response:", errorText);
-        throw new Error(`Failed to record payment: ${errorText}`);
-      }
-      const result = await response.json();
-      console.log("API success response:", result);
-      return result;
+      const response = await apiRequest("POST", "/api/fee-payments", data);
+      return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
@@ -717,24 +658,8 @@ export default function StudentFees() {
   // Add EMI plan mutation
   const addEmiPlanMutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log("Sending EMI plan data to API:", data);
-      const response = await fetch("/api/emi-plans", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-name": JSON.parse(localStorage.getItem('auth_user') || '{}').email
-        },
-        body: JSON.stringify(data),
-      });
-      console.log("API response status:", response.status);
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API error response:", errorText);
-        throw new Error(`Failed to create EMI plan: ${errorText}`);
-      }
-      const result = await response.json();
-      console.log("API success response:", result);
-      return result;
+      const response = await apiRequest("POST", "/api/emi-plans", data);
+      return response.json();
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/emi-plans"] });

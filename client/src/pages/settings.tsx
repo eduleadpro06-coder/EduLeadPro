@@ -19,6 +19,7 @@ import React from "react"; // Added for useEffect
 import MessageTemplatesManager from "@/components/settings/message-templates-manager";
 import { useOrganization } from "@/hooks/use-organization";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest } from "@/lib/queryClient";
 
 // Define GlobalClassFee interface if not already imported
 interface GlobalClassFee {
@@ -153,15 +154,7 @@ export default function Settings() {
     mutationFn: async (data: Partial<GlobalClassFee>) => {
       const url = editingGlobalFee ? `/api/global-class-fees/${editingGlobalFee.id}` : "/api/global-class-fees";
       const method = editingGlobalFee ? "PUT" : "POST";
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to save global class fee: ${errorText}`);
-      }
+      const response = await apiRequest(method, url, data);
       return response.json();
     },
     onSuccess: () => {
@@ -213,15 +206,7 @@ export default function Settings() {
   const orgProfileMutation = useMutation({
     mutationFn: async (data: typeof orgProfile) => {
       if (!user?.organizationId) throw new Error("No organization ID");
-      const response = await fetch(`/api/organizations/${user.organizationId}/contact-info`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to update organization");
-      }
+      const response = await apiRequest("PATCH", `/api/organizations/${user.organizationId}/contact-info`, data);
       return response.json();
     },
     onSuccess: () => {
@@ -261,15 +246,7 @@ export default function Settings() {
   // Mutation for updating notification preferences
   const notificationMutation = useMutation({
     mutationFn: async (prefs: any) => {
-      const response = await fetch("/api/user/notification-preferences", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-name": user?.email || "",
-        },
-        body: JSON.stringify({ preferences: prefs }),
-      });
-      if (!response.ok) throw new Error("Failed to update preferences");
+      const response = await apiRequest("PATCH", "/api/user/notification-preferences", { preferences: prefs });
       return response.json();
     },
     onSuccess: () => {

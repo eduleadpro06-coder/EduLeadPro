@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Notification } from "@shared/schema";
 import { useAuth } from "@/contexts/AuthContext";
 import OrganizationOnboarding from "@/components/onboarding/organization-onboarding";
+import { apiRequest } from "@/lib/queryClient";
 
 interface DashboardAnalytics {
   kpis: {
@@ -67,14 +68,12 @@ export default function Dashboard() {
     async function checkOnboarding() {
       if (user?.organizationId) {
         try {
-          const res = await fetch(`/api/organizations/${user.organizationId}/needs-onboarding`);
-          if (res.ok) {
-            const data = await res.json();
+          const res = await apiRequest("GET", `/api/organizations/${user.organizationId}/needs-onboarding`);
+          const data = await res.json();
 
-            if (data.needsOnboarding) {
-              setShowOnboarding(true);
-              setOrgData(data.organization);
-            }
+          if (data.needsOnboarding) {
+            setShowOnboarding(true);
+            setOrgData(data.organization);
           }
         } catch (error) {
           console.error("Failed to check onboarding status:", error);

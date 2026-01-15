@@ -9,40 +9,51 @@ import { storage } from './storage.js';
  * Extract organization ID from authenticated user
  */
 export async function getOrganizationId(req: express.Request): Promise<number | undefined> {
+    console.log(`[Auth Debug] getOrganizationId called. Path: ${req.path}`);
+
     // 1. Check direct session organizationId (highest priority)
     const sessionOrgId = (req.session as any)?.organizationId;
+    console.log(`[Auth Debug] session.organizationId: ${sessionOrgId}`);
     if (sessionOrgId) return Number(sessionOrgId);
 
     // 2. Fallback to username/userName in session
     let identifier = (req.session as any)?.username || (req.session as any)?.userName;
+    console.log(`[Auth Debug] Session identifier (username/userName): ${identifier}`);
 
     // 3. Fallback to header (for mobile app / legacy)
     if (!identifier) {
         identifier = req.headers['x-user-name'] as string;
+        console.log(`[Auth Debug] Header x-user-name fallback: ${identifier}`);
     }
 
-    if (!identifier) return undefined;
+    if (!identifier) {
+        console.warn(`[Auth Debug] No identifier (session or header) found for request to ${req.path}`);
+        return undefined;
+    }
 
     // Normalization: trim whitespace
     const cleanIdentifier = identifier.trim();
 
     // Try lookup by username (case-insensitive via ilike in storage)
     let user = await storage.getUserByUsername(cleanIdentifier);
+    console.log(`[Auth Debug] Lookup by username "${cleanIdentifier}": ${user ? 'Found (ID: ' + user.id + ')' : 'Not Found'}`);
 
     // Fallback: try lookup by email if username lookup failed
     if (!user) {
         user = await storage.getUserByEmail(cleanIdentifier);
+        console.log(`[Auth Debug] Lookup by email "${cleanIdentifier}": ${user ? 'Found (ID: ' + user.id + ')' : 'Not Found'}`);
     }
 
     if (!user) {
-        console.warn(`[Auth] No user found for identifier: "${cleanIdentifier}"`);
+        console.warn(`[Auth Debug] No user found for identifier: "${cleanIdentifier}"`);
         return undefined;
     }
 
     if (!user.organizationId) {
-        console.warn(`[Auth] User "${cleanIdentifier}" found (ID: ${user.id}) but has no organizationId assigned.`);
+        console.warn(`[Auth Debug] User "${cleanIdentifier}" found (ID: ${user.id}) but has no organizationId assigned.`);
     }
 
+    console.log(`[Auth Debug] Final organizationId for ${cleanIdentifier}: ${user.organizationId}`);
     return user.organizationId || undefined;
 }
 
