@@ -6,6 +6,7 @@
 import express, { Request, Response } from 'express';
 import { supabase } from '../../supabase.js';
 import { generateAccessToken, generateRefreshToken, verifyToken } from '../../middleware/auth.js';
+import { comparePassword } from '../../utils/password.js'; // Security: bcrypt password comparison
 
 const router = express.Router();
 
@@ -36,10 +37,15 @@ router.post('/login', async (req: Request, res: Response) => {
         if (!staffError && staffMembers && staffMembers.length > 0) {
             const staff = staffMembers[0];
 
-            // Check password - priority: custom app_password > phone number > default 1234
-            const isValidPassword = staff.app_password
-                ? password === staff.app_password  // If custom password set, must match
-                : (password === phone || password === '1234');  // Otherwise allow defaults
+            // Check password - priority: custom app_password (bcrypt) > phone number > default 1234
+            // Use bcrypt for custom passwords, plain comparison for defaults (backward compat)
+            let isValidPassword = false;
+            if (staff.app_password) {
+                isValidPassword = await comparePassword(password, staff.app_password);
+            } else {
+                // Allow default passwords for accounts without custom password
+                isValidPassword = (password === phone || password === '1234');
+            }
 
             if (isValidPassword) {
                 // Fetch organization name
@@ -123,9 +129,10 @@ router.post('/login', async (req: Request, res: Response) => {
         let authenticated = false;
         let requiresChange = false;
 
-        if (storedPassword && storedPassword === password) {
-            authenticated = true;
-        } else if (!storedPassword && password === '1234') {
+        // Use bcrypt for stored passwords, allow default '1234' for accounts without password
+        if (storedPassword) {
+            authenticated = await comparePassword(password, storedPassword);
+        } else if (password === '1234') {
             authenticated = true;
             requiresChange = true;
         }

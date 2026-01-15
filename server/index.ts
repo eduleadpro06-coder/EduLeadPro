@@ -8,8 +8,28 @@ import logger from './config/logger';
 import { StructuredLogger, LogCategory } from './utils/structuredLogger';
 import compression from 'compression'; // Performance: Response compression
 import { initializeCronJobs } from './cron-jobs.js';
+import helmet from 'helmet'; // Security: HTTP headers
+import rateLimit from 'express-rate-limit'; // Security: Rate limiting
 
 const app = express();
+
+// Security: Set secure HTTP headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Disabled to allow inline styles/scripts for React
+  crossOriginEmbedderPolicy: false // Disabled for broader compatibility
+}));
+
+// Security: Rate limiting for authentication endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { success: false, message: 'Too many authentication attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth', authLimiter);
+app.use('/api/login', authLimiter);
+app.use('/api/v1/mobile/auth', authLimiter);
 
 // Cookie parser middleware
 app.use(cookieParser());
@@ -27,14 +47,23 @@ app.use(session({
   }
 }));
 
-// CORS Middleware
+// CORS Middleware with stricter origin control
+const allowedOrigins = [
+  'http://localhost:5000',
+  'http://localhost:3000',
+  'http://localhost:8081', // Expo dev
+  'https://eduleadconnect.vercel.app',
+  process.env.FRONTEND_URL
+].filter(Boolean) as string[];
+
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin) {
-    res.header("Access-Control-Allow-Origin", origin);
+  // Allow requests with no origin (mobile apps, Postman, etc.)
+  if (!origin || allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin || '*');
   }
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-user-name");
   res.header("Access-Control-Allow-Credentials", "true");
   if (req.method === 'OPTIONS') {
     return res.status(200).end();

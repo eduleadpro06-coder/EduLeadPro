@@ -19,6 +19,18 @@ export const organizations = pgTable("organizations", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Organization Holidays - School closures and holidays
+export const organizationHolidays = pgTable("organization_holidays", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  holidayName: varchar("holiday_name", { length: 255 }).notNull(),
+  holidayDate: date("holiday_date").notNull(),
+  description: text("description"),
+  isRepeating: boolean("is_repeating").default(false),
+  createdBy: varchar("created_by", { length: 255 }), // Stored as varchar in DB
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -26,6 +38,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("counselor"), // counselor, admin, marketing_head, super_admin
   name: text("name"),
   email: text("email"),
+  profilePhoto: text("profile_photo"), // Profile photo URL
   organizationId: integer("organization_id").references(() => organizations.id),
   notificationPreferences: jsonb("notification_preferences"), // JSON for notification settings
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -59,6 +72,7 @@ export const leads = pgTable("leads", {
   organizationId: integer("organization_id").references(() => organizations.id),
   appPassword: text("app_password"),
   isAppActive: boolean("is_app_active").default(true),
+  isEnrolled: boolean("is_enrolled").default(false), // Enrollment status flag
 });
 
 export const followUps = pgTable("follow_ups", {
