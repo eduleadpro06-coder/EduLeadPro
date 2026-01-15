@@ -9,34 +9,38 @@ import { storage } from './storage.js';
  * Extract organization ID from authenticated user
  */
 export async function getOrganizationId(req: express.Request): Promise<number | undefined> {
-    // Check session first (secure)
-    let username = (req.session as any)?.username;
+    // 1. Check direct session organizationId (highest priority)
+    const sessionOrgId = (req.session as any)?.organizationId;
+    if (sessionOrgId) return Number(sessionOrgId);
 
-    // Fallback to header (for mobile app)
-    if (!username) {
-        username = req.headers['x-user-name'] as string;
+    // 2. Fallback to username/userName in session
+    let identifier = (req.session as any)?.username || (req.session as any)?.userName;
+
+    // 3. Fallback to header (for mobile app / legacy)
+    if (!identifier) {
+        identifier = req.headers['x-user-name'] as string;
     }
 
-    if (!username) return undefined;
+    if (!identifier) return undefined;
 
     // Normalization: trim whitespace
-    const identifier = username.trim();
+    const cleanIdentifier = identifier.trim();
 
     // Try lookup by username (case-insensitive via ilike in storage)
-    let user = await storage.getUserByUsername(identifier);
+    let user = await storage.getUserByUsername(cleanIdentifier);
 
     // Fallback: try lookup by email if username lookup failed
     if (!user) {
-        user = await storage.getUserByEmail(identifier);
+        user = await storage.getUserByEmail(cleanIdentifier);
     }
 
     if (!user) {
-        console.warn(`[Auth] No user found for identifier: "${identifier}"`);
+        console.warn(`[Auth] No user found for identifier: "${cleanIdentifier}"`);
         return undefined;
     }
 
     if (!user.organizationId) {
-        console.warn(`[Auth] User "${identifier}" found (ID: ${user.id}) but has no organizationId assigned.`);
+        console.warn(`[Auth] User "${cleanIdentifier}" found (ID: ${user.id}) but has no organizationId assigned.`);
     }
 
     return user.organizationId || undefined;

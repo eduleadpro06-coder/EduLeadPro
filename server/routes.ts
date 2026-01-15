@@ -136,39 +136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  const getOrganizationId = async (req: express.Request): Promise<number | undefined> => {
-    // Check session first (secure)
-    let username = (req.session as any)?.username;
 
-    // Fallback to header (legacy/insecure - consider removing later)
-    if (!username) {
-      username = req.headers['x-user-name'] as string;
-    }
-
-    if (!username) return undefined;
-
-    // Normalization: trim whitespace
-    const identifier = username.trim();
-
-    // Try lookup by username (case-insensitive via ilike in storage)
-    let user = await storage.getUserByUsername(identifier);
-
-    // Fallback: try lookup by email if username lookup failed (common if x-user-name is an email)
-    if (!user) {
-      user = await storage.getUserByEmail(identifier);
-    }
-
-    if (!user) {
-      console.warn(`[Auth] No user found for identifier: "${identifier}"`);
-      return undefined;
-    }
-
-    if (!user.organizationId) {
-      console.warn(`[Auth] User "${identifier}" found (ID: ${user.id}) but has no organizationId assigned.`);
-    }
-
-    return user.organizationId || undefined;
-  };
 
 
   // Organization Settings Endpoints
@@ -845,6 +813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Set session
         (req.session as any).userId = user.id;
         (req.session as any).username = user.username;
+        (req.session as any).organizationId = user.organizationId;
 
         // Return success with requiresOtp flag
         // The frontend will then call /api/auth/send-otp
@@ -1033,6 +1002,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set session
       (req.session as any).userId = user.id;
       (req.session as any).username = user.username;
+      (req.session as any).organizationId = user.organizationId;
 
       res.json({
         success: true,
