@@ -352,6 +352,8 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
       case "new": return "bg-blue-100 text-blue-800";
       case "contacted": return "bg-purple-100 text-purple-800";
       case "interested": return "bg-yellow-100 text-yellow-800";
+      case "pre_enrolled": return "bg-indigo-100 text-indigo-800";
+      case "future_intake": return "bg-sky-100 text-sky-800";
       case "enrolled": return "bg-green-100 text-green-800";
       case "dropped": return "bg-red-100 text-red-800";
       default: return "bg-gray-100 text-gray-800";
@@ -396,7 +398,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col">
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 min-h-0 flex flex-col">
             <div className="px-6 pt-4 bg-gray-50 border-b">
               <TabsList className="grid w-full grid-cols-2 bg-gray-100">
                 <TabsTrigger
@@ -415,7 +417,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
               </TabsList>
             </div>
 
-            <TabsContent value="details" className="flex-1 overflow-y-auto p-6 m-0 space-y-4">
+            <TabsContent value="details" className="flex-1 min-h-0 overflow-y-auto p-6 m-0 space-y-4">
               <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold text-lg">Lead Information</h3>
@@ -661,6 +663,8 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                                     <SelectItem value="new">New</SelectItem>
                                     <SelectItem value="contacted">Contacted</SelectItem>
                                     <SelectItem value="interested">Interested</SelectItem>
+                                    <SelectItem value="pre_enrolled">Pre-Enrolled</SelectItem>
+                                    <SelectItem value="future_intake">Future Intake</SelectItem>
                                     <SelectItem value="enrolled">Enrolled</SelectItem>
                                     <SelectItem value="dropped">Dropped</SelectItem>
                                   </SelectContent>
@@ -794,7 +798,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
               </div>
             </TabsContent>
 
-            <TabsContent value="followups" className="flex-1 overflow-y-auto p-6 m-0 space-y-4">
+            <TabsContent value="followups" className="flex-1 min-h-0 overflow-y-auto p-6 m-0 space-y-4">
               {/* Follow-up content remains mostly the same, ensuring buttons are wired up */}
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">

@@ -54,7 +54,7 @@ export const leads = pgTable("leads", {
   section: text("section"), // Section A, B, etc.
   batch: text("batch"), // Batch time/year
   stream: text("stream"), // Science, Commerce, Arts
-  status: text("status").notNull().default("new"), // new, contacted, interested, enrolled, dropped
+  status: text("status").notNull().default("new"), // new, contacted, interested, pre_enrolled, future_intake, enrolled, dropped
   source: text("source").notNull(), // facebook, google_ads, website, referral, etc.
   counselorId: integer("counselor_id").references(() => staff.id), // Changed to reference staff instead of users
   assignedAt: timestamp("assigned_at"),
@@ -1629,3 +1629,21 @@ export type InsertLedgerEntry = z.infer<typeof insertLedgerEntrySchema>;
 export type InsertClassificationRule = z.infer<typeof insertClassificationRuleSchema>;
 export type InsertClassificationFeedback = z.infer<typeof insertClassificationFeedbackSchema>;
 export type InsertAccountingAuditLog = z.infer<typeof insertAccountingAuditLogSchema>;
+
+// Teacher-Student Assignments
+export const teacherStudentAssignments = pgTable("teacher_student_assignments", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  teacherStaffId: integer("teacher_staff_id").notNull().references(() => staff.id),
+  studentLeadId: integer("student_lead_id").notNull().references(() => leads.id),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  assignedBy: varchar("assigned_by", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTeacherStudentAssignmentSchema = createInsertSchema(teacherStudentAssignments).omit({ id: true, assignedAt: true, createdAt: true, updatedAt: true });
+export type TeacherStudentAssignment = typeof teacherStudentAssignments.$inferSelect;
+export type InsertTeacherStudentAssignment = z.infer<typeof insertTeacherStudentAssignmentSchema>;
+
