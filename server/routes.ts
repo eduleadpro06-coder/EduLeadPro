@@ -13,20 +13,17 @@ import { cacheService } from "./cache-service.js"; // Performance optimization: 
 import { getOrganizationId } from "./utils.js";
 import mobileApiV1 from "./api/v1/index.js"; // NEW: Mobile API v1
 import { registerMetaWebhookRoutes } from "./routes/meta.js";
-import { eq, inArray, sql, and, or, desc } from 'drizzle-orm';
-import { pushTokens, users, leads } from "../shared/schema.js";
-import accountingRouter from "./routes/accounting.js";
-import mobileLogsRouter from "./routes/mobile-logs.js"; // Mobile app logging
-import { comparePassword } from "./utils/password.js"; // Security: bcrypt password comparison
-import { supabase } from "./supabase.js"; // Shared Supabase client with Service Role Key
+import { registerIntegrationRoutes } from "./routes/integrations.js";
 
-
+// ...
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("🚀 Starting route registration...");
 
   // Meta Webhook Routes
   registerMetaWebhookRoutes(app);
+  // Integration Routes (Make/Zapier)
+  registerIntegrationRoutes(app);
 
   // NEW: Mobile API v1 - Modern JWT-based API for mobile apps
   app.use("/api/v1/mobile", mobileApiV1);
