@@ -12,6 +12,7 @@ import { registerDaycareRoutes } from "./daycareRoutes.js";
 import { cacheService } from "./cache-service.js"; // Performance optimization: caching layer
 import { getOrganizationId } from "./utils.js";
 import mobileApiV1 from "./api/v1/index.js"; // NEW: Mobile API v1
+import { registerMetaWebhookRoutes } from "./routes/meta.js";
 import { eq, inArray, sql, and, or, desc } from 'drizzle-orm';
 import { pushTokens, users, leads } from "../shared/schema.js";
 import accountingRouter from "./routes/accounting.js";
@@ -23,6 +24,9 @@ import { supabase } from "./supabase.js"; // Shared Supabase client with Service
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("🚀 Starting route registration...");
+
+  // Meta Webhook Routes
+  registerMetaWebhookRoutes(app);
 
   // NEW: Mobile API v1 - Modern JWT-based API for mobile apps
   app.use("/api/v1/mobile", mobileApiV1);
@@ -1691,6 +1695,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lead = await storage.updateLead(Number(req.params.id), updates);
       if (!lead) {
         return res.status(404).json({ message: "Lead not found" });
+      }
+
+      // META CAPI INTEGRATION
+      // Check if status has changed and maps to a conversion event
+      if (updates.status && lead.status === updates.status) {
+        // Status mapping logic
+        const statusEvents: Record<string, string> = {
+          "contacted": "Contact",
+          "interested": "Schedule",
+          "pre_enrolled": "InitiateCheckout",
+          "enrolled": "Purchase", // Could also use "CompleteRegistration" or "Lead" (if qualified)
+          "dropped": "Archive" // Optional
+        };
+
+        const eventName = statusEvents[lead.status];
+        if (eventName) {
+          const { metaService } = await import("./services/meta.js");
+          // Send event in background
+          metaService.sendConversionEvent(lead, [eventName]).catch(err =>
+            console.error("Background CAPI error", err)
+          );
+        }
       }
 
       // Invalidate dashboard cache when lead status changes (e.g., enrollment)

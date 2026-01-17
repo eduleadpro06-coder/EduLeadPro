@@ -73,6 +73,7 @@ export const leads = pgTable("leads", {
   appPassword: text("app_password"),
   isAppActive: boolean("is_app_active").default(true),
   isEnrolled: boolean("is_enrolled").default(false), // Enrollment status flag
+  metaLeadId: text("meta_lead_id"), // Meta Lead ID for CAPI tracking
 });
 
 export const followUps = pgTable("follow_ups", {
