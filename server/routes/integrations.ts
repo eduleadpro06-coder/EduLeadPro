@@ -37,12 +37,19 @@ export function registerIntegrationRoutes(app: Express) {
             const studentName = child_name || name || "Unknown Lead";
             const parentName = child_name ? name : null; // If child name exists, the FB name is likely the parent
 
+            // Phone Cleaning Logic:
+            // 1. Try to strip non-digits
+            const cleanedPhone = phone.replace(/\D/g, '');
+            // 2. If we have digits, take the last 10. 
+            // 3. IF NO DIGITS (e.g. Meta Test Data text), use the original string so user can see it.
+            const finalPhone = cleanedPhone.length > 0 ? cleanedPhone.slice(-10) : phone;
+
             // Insert into DB
             const newLead = await db.insert(leads).values({
                 name: studentName,
                 parentName: parentName,
                 email: email || null,
-                phone: phone.replace(/\D/g, '').slice(-10),
+                phone: finalPhone, // Use the smarter logic
                 class: "Unknown", // User removed 'program' field
                 source: "facebook_make",
                 status: "new",
