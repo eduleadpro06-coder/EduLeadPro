@@ -14,6 +14,12 @@ import { getOrganizationId } from "./utils.js";
 import mobileApiV1 from "./api/v1/index.js"; // NEW: Mobile API v1
 import { registerMetaWebhookRoutes } from "./routes/meta.js";
 import { registerIntegrationRoutes } from "./routes/integrations.js";
+import { eq, inArray, sql, and, or, desc } from 'drizzle-orm';
+import { pushTokens, users, leads } from "../shared/schema.js";
+import accountingRouter from "./routes/accounting.js";
+import mobileLogsRouter from "./routes/mobile-logs.js"; // Mobile app logging
+import { comparePassword } from "./utils/password.js"; // Security: bcrypt password comparison
+import { supabase } from "./supabase.js"; // Shared Supabase client with Service Role Key
 
 // ...
 
