@@ -1,48 +1,67 @@
 
 import type { Express, Request, Response } from "express";
-import { db } from "../db";
-import { leads } from "../../shared/schema";
-import { leads as leadsSchema } from "../../shared/schema";
+import { db } from "../db.js";
+import { leads } from "../../shared/schema.js";
 
 export function registerIntegrationRoutes(app: Express) {
 
     // Generic JSON Lead Ingestion (for Make, Zapier, etc.)
     app.post("/api/webhooks/leads/ingest", async (req: Request, res: Response) => {
         try {
-            const { name, email, phone, program, city, meta_lead_id } = req.body;
+            // Updated destructuring based on user request
+            const { name, email, phone, child_name, street_address, meta_lead_id, organization_id } = req.body;
             const secret = req.query.secret;
 
-            // Simple security check (User can set this in Make)
-            // You can hardcode a secret here or use an env var
+            // Simple security check
             const EXPECTED_SECRET = process.env.INTEGRATION_SECRET || "edulead_secure_api";
 
             if (secret !== EXPECTED_SECRET) {
                 return res.status(401).json({ error: "Unauthorized: Invalid secret" });
             }
 
-            if (!name || !phone) {
-                return res.status(400).json({ error: "Missing required fields: name, phone" });
+            if (!phone) {
+                return res.status(400).json({ error: "Missing required fields: phone" });
             }
+
+            // Default to Org ID 1 if not provided
+            const orgId = organization_id ? parseInt(organization_id) : 1;
+            if (isNaN(orgId)) {
+                return res.status(400).json({ error: "Invalid organization_id" });
+            }
+
+            // Logic: 
+            // - 'child_name' (Custom Form Field) -> Lead Name (Student)
+            // - 'name' (FB Profile Name) -> Parent Name
+            // - 'street_address' -> Address
+
+            const studentName = child_name || name || "Unknown Lead";
+            const parentName = child_name ? name : null; // If child name exists, the FB name is likely the parent
 
             // Insert into DB
             const newLead = await db.insert(leads).values({
-                name,
+                name: studentName,
+                parentName: parentName,
                 email: email || null,
-                phone: phone.replace(/\D/g, '').slice(-10), // Clean phone
-                class: program || "Unknown", // Make "Program" map to Class
+                phone: phone.replace(/\D/g, '').slice(-10),
+                class: "Unknown", // User removed 'program' field
                 source: "facebook_make",
                 status: "new",
-                address: city || null,
+                address: street_address || null, // Updated from city
                 metaLeadId: meta_lead_id || null,
-                notes: "Imported via Make.com"
+                notes: "Imported via Make.com",
+                organizationId: orgId
             }).returning();
 
-            console.log("Creating new lead via Integration:", name);
+            console.log(`Creating new lead via Integration for Org ${orgId}: ${studentName}`);
             res.json({ success: true, leadId: newLead[0].id });
 
         } catch (error) {
-            console.error("Integration Lead Error:", error);
-            res.status(500).json({ error: "Internal Server Error" });
+            console.error("Integration Lead Error (Full Details):", error);
+            res.status(500).json({
+                error: "Internal Server Error",
+                message: error instanceof Error ? error.message : "Unknown error",
+                details: String(error)
+            });
         }
     });
 }
