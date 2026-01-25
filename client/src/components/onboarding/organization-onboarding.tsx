@@ -74,6 +74,9 @@ export default function OrganizationOnboarding({
                     method: "PATCH",
                     headers: {
                         "Content-Type": "application/json",
+                        ...(localStorage.getItem('auth_user')
+                            ? { 'x-user-name': JSON.parse(localStorage.getItem('auth_user')!).email }
+                            : {})
                     },
                     body: JSON.stringify(formData),
                 }

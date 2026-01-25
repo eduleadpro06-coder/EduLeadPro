@@ -2116,7 +2116,7 @@ export default function StudentFees() {
                       <div className="font-semibold">EMI Plans</div>
                       <button
                         className={`px-6 py-2 rounded-lg font-semibold shadow transition ${emiPlans.filter(plan => plan.studentId === selectedStudent.id && plan.status === 'active').length > 0 ||
-                          feePayments.filter(payment => payment.leadId === selectedStudent.id && payment.installmentNumber === null).length > 0
+                          feePayments.filter(payment => payment.leadId === selectedStudent.id && payment.installmentNumber === null && (payment.paymentCategory === 'fee_payment' || !payment.paymentCategory)).length > 0
                           ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
                           : 'bg-[#643ae5] text-white hover:bg-[#7c4dff]'
                           }`}
@@ -2126,7 +2126,7 @@ export default function StudentFees() {
                         }}
                         disabled={
                           emiPlans.filter(plan => plan.studentId === selectedStudent.id && plan.status === 'active').length > 0 ||
-                          feePayments.filter(payment => payment.leadId === selectedStudent.id && payment.installmentNumber === null).length > 0
+                          feePayments.filter(payment => payment.leadId === selectedStudent.id && payment.installmentNumber === null && (payment.paymentCategory === 'fee_payment' || !payment.paymentCategory)).length > 0
                         }
                       >
                         Add EMI Plan
