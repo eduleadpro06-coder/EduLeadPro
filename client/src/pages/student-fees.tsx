@@ -306,7 +306,7 @@ export default function StudentFees() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [studentPaymentStatusFilter, setStudentPaymentStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [studentsPerPage, setStudentsPerPage] = useState(10);
+  const [studentsPerPage, setStudentsPerPage] = useState(7);
   const [mandateFrequency, setMandateFrequency] = useState("monthly");
   const [globalFeeModalOpen, setGlobalFeeModalOpen] = useState(false);
   const [editingGlobalFee, setEditingGlobalFee] = useState<GlobalClassFee | null>(null);
@@ -1574,26 +1574,10 @@ export default function StudentFees() {
               </SelectContent>
             </Select>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[160px] bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
-                <div className="flex items-center gap-2 truncate">
-                  <ListFilter className="h-4 w-4 text-gray-400 shrink-0" />
-                  <SelectValue placeholder="All Statuses" />
-                </div>
-              </SelectTrigger>
-              <SelectContent className="bg-white border-gray-200 shadow-lg">
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="E-Mandate Active">E-Mandate Active</SelectItem>
-                <SelectItem value="No E-Mandate">No E-Mandate</SelectItem>
-                <SelectItem value="enrolled">Enrolled</SelectItem>
-                <SelectItem value="interested">Interested</SelectItem>
-                <SelectItem value="contacted">Contacted</SelectItem>
-                <SelectItem value="new">New</SelectItem>
-              </SelectContent>
-            </Select>
+
 
             <Select value={studentPaymentStatusFilter} onValueChange={setStudentPaymentStatusFilter}>
-              <SelectTrigger className="w-[180px] bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
+              <SelectTrigger className="w-[220px] bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
                 <div className="flex items-center gap-2 truncate">
                   <CreditCard className="h-4 w-4 text-gray-400 shrink-0" />
                   <SelectValue placeholder="Payment Status" />
@@ -1638,7 +1622,7 @@ export default function StudentFees() {
           </div>
         }
       />
-      <div className="flex min-h-screen bg-gray-50 p-6">
+      <div className="flex h-fit min-h-0 bg-gray-50 p-6">
         {/* Sidebar: Student List */}
         <aside className="w-[320px] bg-white rounded-2xl border border-gray-200 shadow h-fit mr-6 flex flex-col">
           <div className="px-6 pt-6 pb-2 text-base font-semibold text-gray-800">
@@ -1660,45 +1644,64 @@ export default function StudentFees() {
                     <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-gray-200 ${((student as any).status === 'active' || (student as any).status === 'enrolled') ? 'bg-green-500' : 'bg-gray-500'}`}></span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-800 truncate">{student.name}</div>
-                    <div className="text-xs text-[#b0b3b8] truncate">{student.class || 'No Class'}</div>
-                    <div className="text-xs text-[#62656e]">{student.email || 'No email'}</div>
+                    <div className="font-medium text-gray-800 truncate mb-1">{student.name}</div>
+                    <div className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold border border-slate-200">
+                      {student.class || 'No Class'}
+                    </div>
                   </div>
                 </li>
               ))}
             </ul>
           </div>
           {/* Pagination Controls */}
-          <div className="flex items-center gap-2 px-6 py-2">
-            <button
-              className="px-2 py-1 rounded border border-gray-200 text-sm text-gray-800 bg-white disabled:opacity-50"
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-white rounded-b-2xl">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 px-4 text-xs font-medium text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700 rounded-lg transition-colors"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
             >
-              &lt; Prev
-            </button>
-            {[...Array(totalStudentPages)].map((_, i) => (
-              <button
-                key={i}
-                className={`px-2 py-1 rounded border border-gray-200 text-sm ${currentPage === i + 1 ? 'bg-[#643ae5] text-gray-800' : 'bg-white text-[#b0b3b8]'}`}
-                onClick={() => setCurrentPage(i + 1)}
+              Previous
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Select
+                value={currentPage.toString()}
+                onValueChange={(value) => setCurrentPage(parseInt(value))}
               >
-                {i + 1}
-              </button>
-            ))}
-            <button
-              className="px-2 py-1 rounded border border-gray-200 text-sm text-gray-800 bg-white disabled:opacity-50"
+                <SelectTrigger className="h-9 w-[70px] border-gray-200 text-xs font-medium focus:ring-purple-500/20">
+                  <SelectValue placeholder={currentPage.toString()} />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: totalStudentPages }, (_, i) => i + 1).map((page) => (
+                    <SelectItem key={page} value={page.toString()} className="text-xs">
+                      {page}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
+                of {totalStudentPages}
+              </span>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 px-4 text-xs font-medium text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700 rounded-lg transition-colors"
               onClick={() => setCurrentPage((p) => Math.min(totalStudentPages, p + 1))}
               disabled={currentPage === totalStudentPages}
             >
-              Next &gt;
-            </button>
+              Next
+            </Button>
           </div>
         </aside>
         {/* Details Panel */}
         <main className="flex-1">
           {selectedStudent ? (
-            <div className="bg-white rounded-2xl shadow border border-gray-200 p-8 min-h-[600px] text-gray-800">
+            <div className="bg-white rounded-2xl shadow border border-gray-200 p-8 min-h-[400px] text-gray-800">
               <div className="flex items-center gap-6 mb-6">
                 <div className="relative">
                   <div className="h-16 w-16 rounded-full flex items-center justify-center bg-purple-100 text-gray-800 font-bold text-2xl border-2 border-gray-200">

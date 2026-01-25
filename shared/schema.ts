@@ -508,13 +508,15 @@ export const insertOrganizationSchema = createInsertSchema(organizations).omit({
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true })
   .extend({
+    name: z.string()
+      .min(1, { message: "Name is required" })
+      .refine((val) => val.trim().split(/\s+/).length >= 2, { message: "Please enter both First and Last name" }),
     phone: z.string()
-      .min(1, { message: "Phone number is required" })
-      .regex(/^[\d\s\-\+\(\)]+$/, { message: "Phone number can only contain digits, spaces, hyphens, plus signs, and parentheses" })
-      .refine((val) => {
-        const digitsOnly = val.replace(/\D/g, '');
-        return digitsOnly.length === 10;
-      }, { message: "Phone number must contain exactly 10 digits" }),
+      .regex(/^\d{10}$/, { message: "Phone number must be exactly 10 digits" }),
+    parentName: z.string()
+      .min(1, { message: "Parent name is required" }),
+    address: z.string()
+      .min(1, { message: "Address is required" }),
     email: z.string()
       .email({ message: "Please enter a valid email address" })
       .optional()

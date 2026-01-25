@@ -1590,7 +1590,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const existingActiveLead = activeLeads.find(lead =>
         lead.phone === sanitizedData.phone ||
-        (sanitizedData.email && lead.email === sanitizedData.email)
+        (sanitizedData.email && lead.email === sanitizedData.email) ||
+        (lead.name.trim().toLowerCase() === sanitizedData.name.trim().toLowerCase())
       );
 
       console.log("Existing active lead found:", !!existingActiveLead);
@@ -1598,7 +1599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existingActiveLead) {
         console.log("Active duplicate detected, returning 409");
         return res.status(409).json({
-          message: "A lead with this phone number or email already exists",
+          message: "A lead with this phone number, email, or name already exists",
           existingLead: {
             id: existingActiveLead.id,
             name: existingActiveLead.name,

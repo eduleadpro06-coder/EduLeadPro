@@ -223,15 +223,29 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
         <div className="text-center text-lg font-bold mb-4">Add New Lead</div>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Student First and Last Name *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter student first and last name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="name"
+                name="parentName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Student Name *</FormLabel>
+                    <FormLabel>Parent First and Last Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter student name" {...field} />
+                      <Input placeholder="Enter parent first and last name" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -373,26 +387,14 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="parentName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Parent Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter parent name" {...field} value={field.value ?? ""} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+
 
             <FormField
               control={form.control}
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address</FormLabel>
+                  <FormLabel>Address *</FormLabel>
                   <FormControl>
                     <Input placeholder="Enter address" {...field} value={field.value ?? ""} />
                   </FormControl>
