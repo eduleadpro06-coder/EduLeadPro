@@ -32,7 +32,7 @@ const navigation = [
   { name: "Reports", href: "/reports", icon: FileText },
   { name: "App Management", href: "/app-management", icon: Bus, separator: true },
   { name: "Accounting", href: "/accounts", icon: Wallet },
-  { name: "Meta Marketing", href: "/meta-marketing", icon: Facebook },
+  // { name: "Meta Marketing", href: "/meta-marketing", icon: Facebook },
 ];
 
 
@@ -112,7 +112,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <span className="text-2xl font-extrabold tracking-tight">
                 <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">YONERRA</span>
               </span>
-              <span className="text-xs font-medium text-muted-foreground mt-1 ml-0">Intelligence, Simplified</span>
+              <span className="text-xs font-medium text-muted-foreground mt-1 ml-0">Campus</span>
             </div>
           </Link>
         </div>

@@ -300,7 +300,7 @@ export default function Login() {
 
                     <div className="relative z-10 text-center max-w-lg text-white space-y-6">
                         <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
-                            Welcome to EduConnect
+                            Yonerra Campus
                         </h1>
                         <p className="text-lg text-slate-300">
                             The most advanced AI-powered management platform for educational institutions.
