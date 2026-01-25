@@ -4175,8 +4175,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fallback details if organization not found
-      const orgName = organization?.name || "EduConnect";
-      const orgAddress = organization?.address || "Education Management System";
+      // Fallback details if organization not found
+      const orgName = organization?.name || "Organization Name";
+      const orgAddress = organization?.address || "";
       const orgPhone = organization?.phone || "";
       const orgEmail = organization?.email || "";
 

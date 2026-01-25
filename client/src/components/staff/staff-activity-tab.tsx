@@ -3,14 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
-import { 
-  User, 
-  IndianRupee, 
-  CheckCircle, 
-  Clock, 
-  Edit, 
+import { formatDateTimeIST } from "@/lib/utils";
+import {
+  User,
+  IndianRupee,
+  CheckCircle,
+  Clock,
+  Edit,
   AlertCircle,
-  Activity as ActivityIcon 
+  Activity as ActivityIcon
 } from "lucide-react";
 
 interface Activity {
@@ -185,7 +186,7 @@ export default function StaffActivityTab({ staffId }: StaffActivityTabProps) {
                       <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {format(new Date(activity.timestamp), "MMM d, yyyy 'at' h:mm a")}
+                          {formatDateTimeIST(activity.timestamp)}
                         </span>
                         {activity.metadata && activity.metadata.payrollId && (
                           <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">
@@ -204,8 +205,8 @@ export default function StaffActivityTab({ staffId }: StaffActivityTabProps) {
                         )}
                       </div>
                     </div>
-                    <Badge 
-                      variant="outline" 
+                    <Badge
+                      variant="outline"
                       className={`text-xs ${getPriorityColor(activity.priority)} flex-shrink-0`}
                     >
                       {activity.priority}

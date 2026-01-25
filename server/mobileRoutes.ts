@@ -196,10 +196,16 @@ router.post('/auth/login', async (req: Request, res: Response) => {
                 if (staff.organization_id) {
                     const { data: org } = await supabase
                         .from('organizations')
-                        .select('name')
+                        .select('name, email, phone, address, city, state, pincode')
                         .eq('id', staff.organization_id)
                         .single();
-                    if (org) organizationName = org.name;
+                    if (org) {
+                        organizationName = org.name;
+                        // Start: Support Details
+                        (staff as any).organizationEmail = org.email;
+                        (staff as any).organizationPhone = org.phone;
+                        (staff as any).organizationAddress = org.address ? `${org.address}${org.city ? ', ' + org.city : ''}` : '';
+                    }
                 }
 
                 const userRole = staff.role.toLowerCase();
@@ -233,7 +239,12 @@ router.post('/auth/login', async (req: Request, res: Response) => {
                         email: staff.email,
                         role: normalizedRole,
                         organization_id: staff.organization_id,
-                        organizationName: organizationName
+                        role: normalizedRole,
+                        organization_id: staff.organization_id,
+                        organizationName: organizationName,
+                        organizationEmail: (staff as any).organizationEmail || '',
+                        organizationPhone: (staff as any).organizationPhone || '',
+                        organizationAddress: (staff as any).organizationAddress || ''
                     },
                     requiresPasswordChange: false,
                     students: []
@@ -292,11 +303,14 @@ router.post('/auth/login', async (req: Request, res: Response) => {
         if (parentRecord.organization_id) {
             const { data: org } = await supabase
                 .from('organizations')
-                .select('name')
+                .select('name, email, phone, address, city, state, pincode')
                 .eq('id', parentRecord.organization_id)
                 .single();
             if (org) {
                 organizationName = org.name;
+                (parentRecord as any).organizationEmail = org.email;
+                (parentRecord as any).organizationPhone = org.phone;
+                (parentRecord as any).organizationAddress = org.address ? `${org.address}${org.city ? ', ' + org.city : ''}` : '';
             }
         }
 
@@ -325,7 +339,11 @@ router.post('/auth/login', async (req: Request, res: Response) => {
                 phone: parentRecord.parent_phone,
                 role: 'parent',
                 organization_id: parentRecord.organization_id,
-                organizationName: organizationName
+                organization_id: parentRecord.organization_id,
+                organizationName: organizationName,
+                organizationEmail: (parentRecord as any).organizationEmail || '',
+                organizationPhone: (parentRecord as any).organizationPhone || '',
+                organizationAddress: (parentRecord as any).organizationAddress || ''
             },
             requiresPasswordChange: requiresChange,
             students: students.map(s => ({

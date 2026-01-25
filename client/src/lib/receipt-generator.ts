@@ -14,6 +14,7 @@ export interface FeeReceiptData {
     organizationName?: string; // Organization name
     organizationPhone?: string; // Organization phone
     organizationAddress?: string; // Organization address
+    academicYear?: string; // Academic Year
 }
 
 /* ============================
@@ -21,15 +22,18 @@ export interface FeeReceiptData {
    (Use DB in production)
 ============================ */
 
-export function generateReceiptNo(): string {
-    const academicYear = "2025-26";
+/* ============================
+   AUTO RECEIPT NUMBER
+   (Use DB in production)
+============================ */
 
-    let counter = Number(localStorage.getItem("melons_receipt_no")) || 0;
+export function generateReceiptNo(academicYear: string = "2025-26"): string {
+    let counter = Number(localStorage.getItem("fee_receipt_no")) || 0;
     counter++;
 
-    localStorage.setItem("melons_receipt_no", counter.toString());
+    localStorage.setItem("fee_receipt_no", counter.toString());
 
-    return `MEL/${academicYear}/${String(counter).padStart(6, "0")}`;
+    return `REC/${academicYear}/${String(counter).padStart(6, "0")}`;
 }
 
 /* ============================
@@ -43,15 +47,15 @@ function drawReceipt(
     data: FeeReceiptData,
     copyLabel: "PARENT COPY" | "OFFICE COPY"
 ) {
-    // Brand colors (Melons)
-    const brandGreen: [number, number, number] = [107, 191, 89];
-    const lightBg: [number, number, number] = [244, 250, 243];
+    // Brand colors (Generic Green or pass as prop)
+    const brandColor: [number, number, number] = [0, 100, 0]; // Dark Green generic
+    const lightBg: [number, number, number] = [245, 245, 245];
 
     // Card background
     doc.setFillColor(...lightBg);
     doc.roundedRect(10, y + 10, 190, 135, 5, 5, "F");
 
-    doc.setDrawColor(...brandGreen);
+    doc.setDrawColor(...brandColor);
     doc.roundedRect(10, y + 10, 190, 135, 5, 5);
 
     // Copy label
@@ -59,13 +63,14 @@ function drawReceipt(
     doc.setFontSize(8);
     doc.text(copyLabel, 195, y + 18, { align: "right" });
 
-    // Header - Use dynamic organization name or fallback
+    // Header
     doc.setFontSize(15);
-    doc.text(data.organizationName || "MELONS PRESCHOOL & DAYCARE", 105, y + 30, { align: "center" });
+    doc.text(data.organizationName || "Organization Name", 105, y + 30, { align: "center" });
 
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text("Where Learning Grows Naturally", 105, y + 36, { align: "center" });
+    // Optional Tagline or spacer
+    // doc.setFontSize(9);
+    // doc.setFont("helvetica", "normal");
+    // doc.text("Education Management", 105, y + 36, { align: "center" }); 
 
     // Title
     doc.setFont("helvetica", "bold");
@@ -88,13 +93,13 @@ function drawReceipt(
     doc.text("Payment Mode :", 15, y + 95);
     doc.text(data.paymentMode, 55, y + 95);
 
-    // Transaction ID (if provided)
+    // Transaction ID
     if (data.transactionId) {
         doc.text("Transaction ID :", 15, y + 105);
         doc.text(data.transactionId, 55, y + 105);
     }
 
-    // Amount highlight (adjust y position if transaction ID is shown)
+    // Amount highlight
     const amountY = data.transactionId ? y + 113 : y + 103;
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(15, amountY, 180, 18, 4, 4, "F");
@@ -102,19 +107,21 @@ function drawReceipt(
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.text("Amount Paid", 20, amountY + 12);
-    doc.text(`₹ ${data.amount}`, 185, amountY + 12, { align: "right" });
+    doc.text(`Rs. ${data.amount}`, 185, amountY + 12, { align: "right" });
 
-    // Footer (adjust y position)
+    // Footer
     const footerY = data.transactionId ? y + 136 : y + 126;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.text("Academic Year: 2025–26", 15, footerY);
+    doc.text(`Academic Year: ${data.academicYear || "2025-26"}`, 15, footerY);
 
-    // Footer - Use dynamic organization contact or fallback
+    // Dynamic Footer Address
+    const footerAddress = data.organizationAddress
+        ? `${data.organizationName || "Organization"}, ${data.organizationAddress} | Ph: ${data.organizationPhone || "N/A"}`
+        : "Authorized Signatory";
+
     doc.text(
-        data.organizationAddress
-            ? `${data.organizationName || "Organization"}, ${data.organizationAddress} | Ph: ${data.organizationPhone || "N/A"}`
-            : "Melons Preschool & Daycare, Manewada, Nagpur | Ph: 8591627145",
+        footerAddress,
         105,
         y + 132,
         { align: "center" }
@@ -137,11 +144,11 @@ function drawReceipt(
 /**
  * Generate PDF Receipt
  * @param data Receipt details
- * @param existingReceiptNo Optional receipt number. If not provided, a new one is generated.
+ * @param existingReceiptNo Optional receipt number
  */
-export function generateMelonsFeeReceipt(data: FeeReceiptData, existingReceiptNo?: string): void {
+export function generateFeeReceipt(data: FeeReceiptData, existingReceiptNo?: string): void {
     const doc = new jsPDF("p", "mm", "a4");
-    const receiptNo = existingReceiptNo || generateReceiptNo();
+    const receiptNo = existingReceiptNo || generateReceiptNo(data.academicYear);
 
     // Parent copy (Top)
     drawReceipt(doc, 0, receiptNo, data, "PARENT COPY");
@@ -154,5 +161,7 @@ export function generateMelonsFeeReceipt(data: FeeReceiptData, existingReceiptNo
     // Office copy (Bottom)
     drawReceipt(doc, 148, receiptNo, data, "OFFICE COPY");
 
-    doc.save(`Melons_Fee_Receipt_${receiptNo}.pdf`);
+    doc.save(`Fee_Receipt_${receiptNo.replace(/\//g, "-")}.pdf`);
 }
+
+

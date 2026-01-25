@@ -42,9 +42,10 @@ import {
   ListFilter
 } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
-import { generateMelonsFeeReceipt, type FeeReceiptData } from "@/lib/receipt-generator";
+import { generateFeeReceipt, type FeeReceiptData } from "@/lib/receipt-generator";
 import { generateInvoicePDF } from "@/lib/invoice-generator";
 import { format } from "date-fns";
+import { formatDateTimeIST } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useQueryState } from "@/hooks/use-query-state";
 import { type LeadWithCounselor } from "@shared/schema";
@@ -312,7 +313,14 @@ export default function StudentFees() {
   const [editingGlobalFee, setEditingGlobalFee] = useState<GlobalClassFee | null>(null);
   // Global Organization Settings
   // Global Organization Settings
-  const { academicYear: globalAcademicYear, settings } = useOrganization();
+  const {
+    academicYear: globalAcademicYear,
+    settings,
+    name: hookOrgName,
+    address: hookOrgAddress,
+    phone: hookOrgPhone,
+    orgData: hookOrgData
+  } = useOrganization();
   const [academicYear, setAcademicYear] = useState(globalAcademicYear || "2026-27");
 
   // Sync with global academic year when it changes
@@ -1498,27 +1506,26 @@ export default function StudentFees() {
       }
 
       // Use fetched organization data or fallback to settings/defaults
-      const orgName = orgData?.name || settings?.organizationName || settings?.name || user?.organizationName || "EduConnect Institute";
-      const orgPhone = orgData?.phone || settings?.phone || settings?.contactPhone || "(555) 123-4567";
-      const orgEmail = user?.email || settings?.email || settings?.contactEmail || "accounts@edulead.pro";
+      // Use fetched organization data with strict fallbacks
+      const orgName = hookOrgName || hookOrgData?.name || user?.organizationName || "Organization Name";
+      const orgPhone = hookOrgPhone || hookOrgData?.phone || "Phone Number";
+      const orgEmail = hookOrgData?.email || user?.email || "Email Address";
 
-      // Build formatted address from organization data
+      // Build formatted address - format: address, City State Pincode
       let orgAddress = "";
-      if (orgData?.address) {
-        const addressParts = [orgData.address];
-        if (orgData.city && orgData.state) {
-          addressParts.push(`${orgData.city}, ${orgData.state}`);
-        } else if (orgData.city) {
-          addressParts.push(orgData.city);
-        } else if (orgData.state) {
-          addressParts.push(orgData.state);
+      if (hookOrgData?.address || hookOrgAddress) {
+        const addressParts = [hookOrgAddress || hookOrgData?.address];
+        // Build city/state/pincode as single line with spaces
+        const locationParts = [];
+        if (hookOrgData?.city) locationParts.push(hookOrgData.city);
+        if (hookOrgData?.state) locationParts.push(hookOrgData.state);
+        if (hookOrgData?.pincode) locationParts.push(hookOrgData.pincode);
+        if (locationParts.length > 0) {
+          addressParts.push(locationParts.join(' '));
         }
-        if (orgData.pincode) {
-          addressParts.push(orgData.pincode);
-        }
-        orgAddress = addressParts.join(", ");
+        orgAddress = addressParts.filter(Boolean).join(", ");
       } else {
-        orgAddress = settings?.address || "123 Education Lane, Knowledge City, 500081";
+        orgAddress = "Address";
       }
 
       generateInvoicePDF({
@@ -1871,34 +1878,29 @@ export default function StudentFees() {
                                   variant="outline"
                                   size="sm"
                                   onClick={async () => {
-                                    // Fetch organization data
-                                    let orgData: any = null;
-                                    const user = JSON.parse(localStorage.getItem('auth_user') || '{}');
-                                    if (user?.organizationId) {
-                                      try {
-                                        const orgRes = await fetch(`/api/organizations/${user.organizationId}/needs-onboarding`);
-                                        if (orgRes.ok) {
-                                          const orgResponse = await orgRes.json();
-                                          orgData = orgResponse.organization;
-                                        }
-                                      } catch (error) {
-                                        console.error("Failed to fetch organization data for receipt:", error);
-                                      }
-                                    }
-
                                     const receiptData: FeeReceiptData = {
                                       studentName: selectedStudent.name,
                                       className: selectedStudent.class,
                                       paymentMode: payment.paymentMode,
                                       amount: payment.amount,
                                       date: format(new Date(payment.paymentDate), "dd-MM-yyyy"),
-                                      organizationName: orgData?.name,
-                                      organizationPhone: orgData?.phone,
-                                      organizationAddress: orgData?.address
-                                        ? `${orgData.address}${orgData.city ? ', ' + orgData.city : ''}${orgData.state ? ', ' + orgData.state : ''}${orgData.pincode ? ', ' + orgData.pincode : ''}`
-                                        : undefined,
+                                      organizationName: hookOrgName,
+                                      organizationPhone: hookOrgPhone,
+                                      organizationAddress: (() => {
+                                        const addr = hookOrgAddress || hookOrgData?.address;
+                                        if (!addr) return undefined;
+                                        const parts = [addr];
+                                        // Build city/state/pincode as single space-separated string
+                                        const locationParts = [];
+                                        if (hookOrgData?.city) locationParts.push(hookOrgData.city);
+                                        if (hookOrgData?.state) locationParts.push(hookOrgData.state);
+                                        if (hookOrgData?.pincode) locationParts.push(hookOrgData.pincode);
+                                        if (locationParts.length > 0) parts.push(locationParts.join(' '));
+                                        return parts.filter(Boolean).join(', ');
+                                      })(),
+                                      academicYear: academicYear // Use the component's academicYear state
                                     };
-                                    generateMelonsFeeReceipt(receiptData, payment.receiptNumber);
+                                    generateFeeReceipt(receiptData, payment.receiptNumber);
                                   }}
                                 >
                                   <Printer className="mr-1 h-3 w-3" />
@@ -3187,7 +3189,7 @@ export default function StudentFees() {
                   </div>
                 </div>
 
-                {selectedPaymentForDetails.installmentNumber && (
+                {selectedPaymentForDetails.installmentNumber && selectedPaymentForDetails.installmentNumber > 0 && (
                   <div>
                     <Label className="text-gray-500">Installment Number</Label>
                     <div className="font-medium">#{selectedPaymentForDetails.installmentNumber}</div>
@@ -3244,7 +3246,7 @@ export default function StudentFees() {
 
                 <div className="border-t pt-4">
                   <Label className="text-gray-500">Recorded On</Label>
-                  <div className="text-sm text-gray-600">{selectedPaymentForDetails.createdAt ? format(new Date(selectedPaymentForDetails.createdAt), "PPpp") : 'N/A'}</div>
+                  <div className="text-sm text-gray-600">{selectedPaymentForDetails.createdAt ? formatDateTimeIST(selectedPaymentForDetails.createdAt) : 'N/A'}</div>
                 </div>
               </div>
               <DialogFooter>

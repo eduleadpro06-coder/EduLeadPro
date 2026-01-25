@@ -109,6 +109,7 @@ export async function apiRequest(
   }
 }
 
+
 export function invalidateNotifications(queryClient: QueryClient): void {
   // Invalidate all notification-related queries
   queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
@@ -117,3 +118,74 @@ export function invalidateNotifications(queryClient: QueryClient): void {
   // Also trigger a custom event to refresh notifications
   window.dispatchEvent(new CustomEvent('refreshNotifications'));
 }
+
+/**
+ * Timezone Utilities for IST (Indian Standard Time, UTC+5:30)
+ */
+
+/**
+ * Converts a date to IST timezone
+ * @param date - Date string, Date object, or timestamp
+ * @returns Date object adjusted to IST
+ */
+export function toIST(date: string | Date | number): Date {
+  const d = new Date(date);
+  // IST is UTC+5:30 (330 minutes)
+  const istOffset = 330; // minutes
+  const utcTime = d.getTime() + (d.getTimezoneOffset() * 60000);
+  return new Date(utcTime + (istOffset * 60000));
+}
+
+/**
+ * Formats a date in IST timezone
+ * @param date - Date string, Date object, or timestamp
+ * @param formatStr - Format string (uses Intl.DateTimeFormat options)
+ * @returns Formatted date string in IST
+ */
+export function formatDateIST(date: string | Date | number, formatStr?: string): string {
+  const d = new Date(date);
+
+  // Default format options for IST
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  };
+
+  return new Intl.DateTimeFormat('en-IN', options).format(d);
+}
+
+/**
+ * Formats a date for display with full details in IST
+ * @param date - Date string, Date object, or timestamp
+ * @returns Formatted date string like "Jan 21, 2026, 7:14:05 PM"
+ */
+export function formatDateTimeIST(date: string | Date | number): string {
+  const d = new Date(date);
+
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  };
+
+  return new Intl.DateTimeFormat('en-IN', options).format(d);
+}
+
+/**
+ * Get current date/time in IST
+ * @returns Current Date in IST
+ */
+export function nowIST(): Date {
+  return toIST(new Date());
+}
+

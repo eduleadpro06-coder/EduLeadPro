@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Bell, Check, X } from "lucide-react";
 import { format } from "date-fns";
+import { formatDateTimeIST } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -129,7 +130,7 @@ export default function NotificationCenter() {
                           <p className="font-medium text-gray-900">{notification.title}</p>
                           <p className="text-sm text-gray-600">{notification.message}</p>
                           <p className="text-xs text-gray-500 mt-1">
-                            {format(new Date(notification.createdAt), "MMM d, h:mm a")}
+                            {formatDateTimeIST(notification.createdAt)}
                           </p>
                         </div>
                       </div>

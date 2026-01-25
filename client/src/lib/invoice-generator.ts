@@ -2,6 +2,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
+import { formatDateIST } from "./utils";
 
 interface InvoiceData {
     student: {
@@ -63,7 +64,7 @@ export const generateInvoicePDF = (data: InvoiceData) => {
     // Invoice Number format: INV-{YYYY}-{StudentID}
     const studentIdStr = data.student.studentId || data.student.id?.toString() || '0088';
     const invoiceNo = `INV-${new Date().getFullYear()}-${studentIdStr.padStart(4, '0')}`;
-    const invoiceDate = format(new Date(), "MMMM dd, yyyy");
+    const invoiceDate = formatDateIST(new Date());
 
     // Helper function to format currency with Indian comma style
     const formatCurrency = (amount: number): string => {

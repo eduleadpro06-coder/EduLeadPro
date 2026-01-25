@@ -15,6 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
 import { format } from "date-fns";
+import { formatDateTimeIST } from "@/lib/utils";
 
 interface CommunicationLog {
   id: number;
@@ -528,7 +529,7 @@ export default function Communication() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {format(new Date(log.sentAt), "MMM dd, HH:mm")}
+                        {formatDateTimeIST(log.sentAt)}
                       </TableCell>
                     </TableRow>
                   ))}
