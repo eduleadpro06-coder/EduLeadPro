@@ -245,16 +245,28 @@ export default function Dashboard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <RCPieChart>
                     <Pie
-                      data={[
-                        { label: 'New', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.captured || 0 },
-                        { label: 'Contacted', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.engaged || 0 },
-                        { label: 'Interested', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.qualified || 0 },
-                        { label: 'Ready for Admission', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.readyForAdmission || 0 },
-                        { label: 'Enrolled', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.converted || 0 }
-                      ]}
-                      dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius="60%" outerRadius="90%" paddingAngle={5}
+                      data={(() => {
+                        const funnelData = [
+                          { label: 'New', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.captured || 0, color: '#3b82f6' },
+                          { label: 'Interested', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.qualified || 0, color: '#f59e0b' },
+                          { label: 'Ready for Admission', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.readyForAdmission || 0, color: '#14b8a6' },
+                          { label: 'Enrolled', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.converted || 0, color: '#10b981' }
+                        ];
+                        return funnelData.filter(item => item.value > 0);
+                      })()}
+                      dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius="60%" outerRadius="90%" paddingAngle={2}
                     >
-                      <Cell fill="#3b82f6" /><Cell fill="#8b5cf6" /><Cell fill="#f59e0b" /><Cell fill="#14b8a6" /><Cell fill="#10b981" />
+                      {(() => {
+                        const funnelData = [
+                          { label: 'New', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.captured || 0, color: '#3b82f6' },
+                          { label: 'Interested', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.qualified || 0, color: '#f59e0b' },
+                          { label: 'Ready for Admission', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.readyForAdmission || 0, color: '#14b8a6' },
+                          { label: 'Enrolled', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.converted || 0, color: '#10b981' }
+                        ];
+                        return funnelData.filter(item => item.value > 0).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ));
+                      })()}
                     </Pie>
                     <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                   </RCPieChart>
@@ -262,7 +274,7 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 gap-2 mt-4 w-full">
                 <div className="text-center py-1.5 bg-blue-50/50 rounded-lg">
-                  <p className="text-caption uppercase font-bold tracking-tight">New</p>
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">New</p>
                   <p className="text-sm font-bold text-blue-600">{analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.captured || 0}</p>
                 </div>
                 <div className="text-center py-1.5 bg-amber-50/50 rounded-lg">
@@ -274,7 +286,7 @@ export default function Dashboard() {
                   <p className="text-sm font-bold text-teal-600">{analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.readyForAdmission || 0}</p>
                 </div>
                 <div className="text-center py-1.5 bg-green-50/50 rounded-lg">
-                  <p className="text-caption uppercase font-bold tracking-tight">Enrolled</p>
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Enrolled</p>
                   <p className="text-sm font-bold text-green-600">{analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.converted || 0}</p>
                 </div>
               </div>
