@@ -54,7 +54,7 @@ export const leads = pgTable("leads", {
   section: text("section"), // Section A, B, etc.
   batch: text("batch"), // Batch time/year
   stream: text("stream"), // Science, Commerce, Arts
-  status: text("status").notNull().default("new"), // new, contacted, interested, pre_enrolled, future_intake, enrolled, dropped
+  status: text("status").notNull().default("new"), // new, contacted, interested, ready_for_admission, future_intake, enrolled, dropped
   source: text("source").notNull(), // facebook, google_ads, website, referral, etc.
   counselorId: integer("counselor_id").references(() => staff.id), // Changed to reference staff instead of users
   assignedAt: timestamp("assigned_at"),

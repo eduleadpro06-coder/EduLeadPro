@@ -352,7 +352,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
       case "new": return "bg-blue-100 text-blue-800";
       case "contacted": return "bg-purple-100 text-purple-800";
       case "interested": return "bg-yellow-100 text-yellow-800";
-      case "pre_enrolled": return "bg-indigo-100 text-indigo-800";
+      case "ready_for_admission": return "bg-teal-100 text-teal-800";
       case "future_intake": return "bg-sky-100 text-sky-800";
       case "enrolled": return "bg-green-100 text-green-800";
       case "dropped": return "bg-red-100 text-red-800";
@@ -386,7 +386,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
               </div>
               <div className="flex items-center gap-2">
                 <Badge className={getStatusColor(lead.status)}>
-                  {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
+                  {lead.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </Badge>
 
               </div>
@@ -663,7 +663,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                                     <SelectItem value="new">New</SelectItem>
                                     <SelectItem value="contacted">Contacted</SelectItem>
                                     <SelectItem value="interested">Interested</SelectItem>
-                                    <SelectItem value="pre_enrolled">Pre-Enrolled</SelectItem>
+                                    <SelectItem value="ready_for_admission">Ready for Admission</SelectItem>
                                     <SelectItem value="future_intake">Future Intake</SelectItem>
                                     <SelectItem value="enrolled">Enrolled</SelectItem>
                                     <SelectItem value="dropped">Dropped</SelectItem>
@@ -774,7 +774,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                           <Badge className={getStatusColor(lead.status)}>
-                            {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
+                            {lead.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                           </Badge>
                         </div>
                         <div>

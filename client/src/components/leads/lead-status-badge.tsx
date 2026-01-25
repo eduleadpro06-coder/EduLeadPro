@@ -10,7 +10,7 @@ export default function LeadStatusBadge({ status }: LeadStatusBadgeProps) {
       case "new": return "bg-blue-100 text-blue-800";
       case "contacted": return "bg-purple-100 text-purple-800";
       case "interested": return "bg-yellow-100 text-yellow-800";
-      case "pre_enrolled": return "bg-indigo-100 text-indigo-800";
+      case "ready_for_admission": return "bg-teal-100 text-teal-800";
       case "future_intake": return "bg-sky-100 text-sky-800";
       case "enrolled": return "bg-green-100 text-green-800";
       case "dropped": return "bg-red-100 text-red-800";
@@ -20,7 +20,7 @@ export default function LeadStatusBadge({ status }: LeadStatusBadgeProps) {
 
   return (
     <Badge variant="status" className={getStatusColor(status)}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
     </Badge>
   );
 }

@@ -1790,9 +1790,12 @@ export class DatabaseStorage implements IStorage {
 
     const currentTotalMonthlyCollection = monthlyRevenue + monthlyDaycareRevenue;
     const prevTotalMonthlyCollection = prevRevenue + prevMonthDaycareRevenue;
-    const totalRevenueChange = prevTotalMonthlyCollection > 0
-      ? (((currentTotalMonthlyCollection - prevTotalMonthlyCollection) / prevTotalMonthlyCollection) * 100).toFixed(1)
-      : currentTotalMonthlyCollection > 0 ? "100.0" : "0.0";
+
+    // Calculate change but cap at 100% to avoid extreme values like 1500%
+    const rawRevenueChange = prevTotalMonthlyCollection > 0
+      ? ((currentTotalMonthlyCollection - prevTotalMonthlyCollection) / prevTotalMonthlyCollection) * 100
+      : currentTotalMonthlyCollection > 0 ? 100 : 0;
+    const totalRevenueChange = Math.min(rawRevenueChange, 100).toFixed(1);
 
     // 4. ENGAGEMENT CURVE DATA (Last 30 days)
     const engagementCurveData = await db
@@ -1825,6 +1828,7 @@ export class DatabaseStorage implements IStorage {
         captured: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'new') as integer)`,
         engaged: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'contacted') as integer)`,
         qualified: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'interested') as integer)`,
+        readyForAdmission: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'ready_for_admission') as integer)`,
         converted: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'enrolled') as integer)`
       })
       .from(schema.leads)
@@ -1842,6 +1846,7 @@ export class DatabaseStorage implements IStorage {
       captured: f.captured,
       engaged: f.engaged,
       qualified: f.qualified,
+      readyForAdmission: f.readyForAdmission,
       converted: f.converted
     }));
 
