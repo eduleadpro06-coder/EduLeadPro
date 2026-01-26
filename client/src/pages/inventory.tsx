@@ -25,7 +25,7 @@ export default function Inventory() {
     const [searchTerm, setSearchTerm] = useState("");
     const [categoryFilter, setCategoryFilter] = useState("all");
     const [supplierFilter, setSupplierFilter] = useState("all");
-    const [statusFilter, setStatusFilter] = useState("all");
+    const [statusFilter, setStatusFilter] = useState("active");
 
     const [addItemOpen, setAddItemOpen] = useState(false);
     const [editItemOpen, setEditItemOpen] = useState(false);

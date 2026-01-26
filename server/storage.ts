@@ -4530,7 +4530,24 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async deleteInventoryCategory(id: number) {
+  async deleteInventoryCategory(id: number, force: boolean = false) {
+    // Check for existing items
+    const [existingItem] = await db.select({ id: schema.inventoryItems.id })
+      .from(schema.inventoryItems)
+      .where(eq(schema.inventoryItems.categoryId, id))
+      .limit(1);
+
+    if (existingItem) {
+      if (force) {
+        // Unlink items (set categoryId to null)
+        await db.update(schema.inventoryItems)
+          .set({ categoryId: null, updatedAt: new Date() })
+          .where(eq(schema.inventoryItems.categoryId, id));
+      } else {
+        throw new Error("Cannot delete category with associated inventory items");
+      }
+    }
+
     await db.delete(schema.inventoryCategories).where(eq(schema.inventoryCategories.id, id));
     return true;
   }
@@ -4556,7 +4573,24 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async deleteInventorySupplier(id: number) {
+  async deleteInventorySupplier(id: number, force: boolean = false) {
+    // Check for existing items
+    const [existingItem] = await db.select({ id: schema.inventoryItems.id })
+      .from(schema.inventoryItems)
+      .where(eq(schema.inventoryItems.supplierId, id))
+      .limit(1);
+
+    if (existingItem) {
+      if (force) {
+        // Unlink items (set supplierId to null)
+        await db.update(schema.inventoryItems)
+          .set({ supplierId: null, updatedAt: new Date() })
+          .where(eq(schema.inventoryItems.supplierId, id));
+      } else {
+        throw new Error("Cannot delete supplier with associated inventory items");
+      }
+    }
+
     await db.delete(schema.inventorySuppliers).where(eq(schema.inventorySuppliers.id, id));
     return true;
   }
@@ -4643,10 +4677,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteInventoryItem(id: number) {
-    await db.update(schema.inventoryItems)
-      .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(schema.inventoryItems.id, id));
-    return true;
+    // Check for dependencies (transactions or expenses)
+    const [transaction] = await db.select({ id: schema.inventoryTransactions.id })
+      .from(schema.inventoryTransactions)
+      .where(eq(schema.inventoryTransactions.itemId, id))
+      .limit(1);
+
+    const [expense] = await db.select({ id: schema.expenses.id })
+      .from(schema.expenses)
+      .where(eq(schema.expenses.inventoryItemId, id))
+      .limit(1);
+
+    if (transaction || expense) {
+      // Soft Delete
+      await db.update(schema.inventoryItems)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(schema.inventoryItems.id, id));
+      return { success: true, method: 'soft_delete', message: "Item archived to preserve history" };
+    } else {
+      // Hard Delete
+      await db.delete(schema.inventoryItems).where(eq(schema.inventoryItems.id, id));
+      return { success: true, method: 'hard_delete' };
+    }
   }
 
   // Stock Transactions - Complete audit trail

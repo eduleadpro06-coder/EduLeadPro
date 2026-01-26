@@ -5348,11 +5348,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete inventory category
   app.delete("/api/inventory/categories/:id", async (req, res) => {
     try {
-      await storage.deleteInventoryCategory(Number(req.params.id));
+      const force = req.query.force === 'true';
+      await storage.deleteInventoryCategory(Number(req.params.id), force);
       res.json({ message: "Category deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete category:", error);
+      if (error.message === "Cannot delete category with associated inventory items") {
+        return res.status(400).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to delete category" });
+    }
+  });
+
+  // ... (lines omitted)
+
+  // Delete inventory supplier
+  app.delete("/api/inventory/suppliers/:id", async (req, res) => {
+    try {
+      const force = req.query.force === 'true';
+      await storage.deleteInventorySupplier(Number(req.params.id), force);
+      res.json({ message: "Supplier deleted successfully" });
+    } catch (error: any) {
+      console.error("Failed to delete supplier:", error);
+      if (error.message === "Cannot delete supplier with associated inventory items") {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to delete supplier" });
     }
   });
 
@@ -5410,8 +5431,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await storage.deleteInventorySupplier(Number(req.params.id));
       res.json({ message: "Supplier deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete supplier:", error);
+      if (error.message === "Cannot delete supplier with associated inventory items") {
+        return res.status(400).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to delete supplier" });
     }
   });

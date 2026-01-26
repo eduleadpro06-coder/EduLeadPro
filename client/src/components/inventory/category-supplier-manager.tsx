@@ -58,18 +58,42 @@ export function CategorySupplierManager() {
     });
 
     const deleteCategory = useMutation({
-        mutationFn: async (id: number) => apiRequest("DELETE", `/api/inventory/categories/${id}`),
+        mutationFn: async ({ id, force }: { id: number, force?: boolean }) => {
+            return apiRequest("DELETE", `/api/inventory/categories/${id}${force ? '?force=true' : ''}`);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['/api/inventory/categories'] });
             toast({ title: "Success", description: "Category deleted" });
         },
+        onError: (error: any, variables) => {
+            const message = error.errorData?.message || "Failed to delete category";
+            if (message === "Cannot delete category with associated inventory items") {
+                if (window.confirm("This category has associated inventory items. Do you want to force delete it? Items will be unlinked (uncategorized).")) {
+                    deleteCategory.mutate({ id: variables.id, force: true });
+                    return;
+                }
+            }
+            toast({ title: "Error", description: message, variant: "destructive" });
+        },
     });
 
     const deleteSupplier = useMutation({
-        mutationFn: async (id: number) => apiRequest("DELETE", `/api/inventory/suppliers/${id}`),
+        mutationFn: async ({ id, force }: { id: number, force?: boolean }) => {
+            return apiRequest("DELETE", `/api/inventory/suppliers/${id}${force ? '?force=true' : ''}`);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['/api/inventory/suppliers'] });
             toast({ title: "Success", description: "Supplier deleted" });
+        },
+        onError: (error: any, variables) => {
+            const message = error.errorData?.message || "Failed to delete supplier";
+            if (message === "Cannot delete supplier with associated inventory items") {
+                if (window.confirm("This supplier has associated inventory items. Do you want to force delete it? Items will be unlinked (no supplier).")) {
+                    deleteSupplier.mutate({ id: variables.id, force: true });
+                    return;
+                }
+            }
+            toast({ title: "Error", description: message, variant: "destructive" });
         },
     });
 
@@ -114,7 +138,7 @@ export function CategorySupplierManager() {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => deleteCategory.mutate(cat.id)}
+                                        onClick={() => deleteCategory.mutate({ id: cat.id })}
                                     >
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
@@ -145,7 +169,7 @@ export function CategorySupplierManager() {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => deleteSupplier.mutate(sup.id)}
+                                        onClick={() => deleteSupplier.mutate({ id: sup.id })}
                                     >
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
