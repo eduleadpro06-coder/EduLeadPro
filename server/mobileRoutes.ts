@@ -257,7 +257,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
         // If not staff, check for PARENT (existing logic)
         const { data: students, error: fetchError } = await supabase
             .from('leads')
-            .select('id, name, class, status, parent_name, parent_phone, phone, app_password, organization_id, is_app_active')
+            .select('id, name, class, status, parent_name, parent_phone, phone, app_password, organization_id, is_app_active, father_first_name, father_last_name, father_phone, mother_first_name, mother_last_name, mother_phone')
             .or(`parent_phone.eq."${phone}",phone.eq."${phone}"`);
 
         if (fetchError) {
@@ -335,8 +335,20 @@ router.post('/auth/login', async (req: Request, res: Response) => {
             refreshToken,
             user: {
                 userId: parentRecord.id,
-                name: parentRecord.parent_name || 'Parent',
-                phone: parentRecord.parent_phone,
+                name: (() => {
+                    const pr = parentRecord as any;
+                    if (pr.father_first_name) {
+                        return `${pr.father_first_name} ${pr.father_last_name || ''}`.trim();
+                    }
+                    if (pr.mother_first_name) {
+                        return `${pr.mother_first_name} ${pr.mother_last_name || ''}`.trim();
+                    }
+                    return pr.parent_name || 'Parent';
+                })(),
+                phone: (() => {
+                    const pr = parentRecord as any;
+                    return pr.father_phone || pr.mother_phone || pr.parent_phone;
+                })(),
                 role: 'parent',
                 organization_id: parentRecord.organization_id,
                 organization_id: parentRecord.organization_id,

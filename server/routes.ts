@@ -3090,8 +3090,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: lead.id,
           studentName: lead.name || '',
           studentPhone: lead.phone || '',
-          fatherName: lead.parentName || '',
-          parentPhone: lead.parentPhone || '',
+          fatherName: (() => {
+            if (lead.fatherFirstName) {
+              return `${lead.fatherFirstName} ${lead.fatherLastName || ''}`.trim();
+            }
+            if (lead.motherFirstName) {
+              return `${lead.motherFirstName} ${lead.motherLastName || ''}`.trim();
+            }
+            return lead.parentName || '';
+          })(),
+          parentPhone: lead.fatherPhone || lead.motherPhone || lead.parentPhone || '',
           program: `${lead.class || ''} ${lead.stream || ''}`.trim(),
           class: lead.class || '',
           stream: lead.stream || '',

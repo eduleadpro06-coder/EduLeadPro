@@ -82,16 +82,40 @@ router.get('/', async (req, res) => {
                 assigned_by,
                 notes,
                 teacher:staff!teacher_staff_id(id, name, email),
-                student:leads!student_lead_id(id, name, parent_name, class, stream)
+                student:leads!student_lead_id(id, name, father_first_name, father_last_name, father_phone, mother_first_name, mother_last_name, mother_phone, class, stream)
             `)
             .eq('organization_id', organizationId)
             .order('assigned_at', { ascending: false });
 
         if (error) throw error;
 
-        // Clean up response to match frontend expectations if necessary
-        // The frontend expects array of objects.
-        res.json(data || []);
+        // Clean up response to match frontend expectations
+        const mappedData = (data || []).map((assignment: any) => {
+            if (assignment.student) {
+                const s = assignment.student;
+                // Construct parent_name
+                let parentName = '';
+                if (s.father_first_name) {
+                    parentName = `${s.father_first_name} ${s.father_last_name || ''}`.trim();
+                } else if (s.mother_first_name) {
+                    parentName = `${s.mother_first_name} ${s.mother_last_name || ''}`.trim();
+                }
+
+                // Construct parent_phone if needed (though usually separate field)
+                // Assuming frontend expects it in parent_name for display or parent_phone
+
+                return {
+                    ...assignment,
+                    student: {
+                        ...s,
+                        parent_name: parentName || 'N/A'
+                    }
+                };
+            }
+            return assignment;
+        });
+
+        res.json(mappedData);
     } catch (error: any) {
         console.error('Error fetching teacher assignments:', error);
         res.status(500).json({ error: error.message });
