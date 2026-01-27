@@ -577,14 +577,26 @@ export default function AppManagement() {
     });
 
     // Filter leads with parent info - only showing enrolled students
-    const parents = leads.filter(lead =>
-        lead.status === 'enrolled' &&
-        (lead.parentPhone || lead.phone) &&
-        (lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (lead.parentName && lead.parentName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    const parents = leads.filter(lead => {
+        // Type assertion to access new fields safely if not in type definition yet
+        const l = lead as any;
+        const parentName = l.fatherFirstName ? `${l.fatherFirstName} ${l.fatherLastName || ''}` :
+            (l.motherFirstName ? `${l.motherFirstName} ${l.motherLastName || ''}` : l.parentName);
+        const parentPhone = l.fatherPhone || l.motherPhone || l.parentPhone;
+
+        const hasParentInfo = parentPhone || l.phone;
+        if (lead.status !== 'enrolled' || !hasParentInfo) return false;
+
+        if (!searchTerm) return true;
+
+        const lowerSearch = searchTerm.toLowerCase();
+        return (
+            lead.name.toLowerCase().includes(lowerSearch) ||
+            (parentName && parentName.toLowerCase().includes(lowerSearch)) ||
             (lead.phone && lead.phone.includes(searchTerm)) ||
-            (lead.parentPhone && lead.parentPhone.includes(searchTerm)))
-    );
+            (parentPhone && parentPhone.includes(searchTerm))
+        );
+    });
 
     return (
         <div className="min-h-screen bg-gray-50/50">
@@ -715,12 +727,22 @@ export default function AppManagement() {
                                                 parents.map((lead) => (
                                                     <TableRow key={lead.id}>
                                                         <TableCell className="font-medium">{lead.name}</TableCell>
-                                                        <TableCell>{lead.parentName || '-'}</TableCell>
+                                                        <TableCell>
+                                                            {(() => {
+                                                                if (lead.fatherFirstName) {
+                                                                    return `${lead.fatherFirstName} ${lead.fatherLastName || ''}`.trim();
+                                                                }
+                                                                if (lead.motherFirstName) {
+                                                                    return `${lead.motherFirstName} ${lead.motherLastName || ''}`.trim();
+                                                                }
+                                                                return lead.parentName || '-';
+                                                            })()}
+                                                        </TableCell>
                                                         <TableCell>
                                                             <div className="flex flex-col">
-                                                                <span>{lead.phone}</span>
-                                                                {lead.parentPhone && lead.parentPhone !== lead.phone && (
-                                                                    <span className="text-xs text-gray-500">{lead.parentPhone} (Alt)</span>
+                                                                <span>{lead.fatherPhone || lead.motherPhone || lead.phone}</span>
+                                                                {(lead.fatherPhone || lead.motherPhone) && lead.phone !== (lead.fatherPhone || lead.motherPhone) && (
+                                                                    <span className="text-xs text-gray-500">{lead.phone} (Alt)</span>
                                                                 )}
                                                             </div>
                                                         </TableCell>
