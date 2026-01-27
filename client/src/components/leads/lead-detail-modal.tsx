@@ -78,7 +78,12 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
       source: "",
       counselorId: undefined,
       notes: "",
-      parentName: "",
+      fatherFirstName: "",
+      fatherLastName: "",
+      fatherPhone: "",
+      motherFirstName: "",
+      motherLastName: "",
+      motherPhone: "",
       address: "",
       lastContactedAt: undefined, // Add default value
     },
@@ -97,7 +102,12 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
         source: lead.source,
         counselorId: lead.counselorId ?? undefined,
         notes: lead.notes || "",
-        parentName: lead.parentName || "",
+        fatherFirstName: lead.fatherFirstName || "",
+        fatherLastName: lead.fatherLastName || "",
+        fatherPhone: lead.fatherPhone || "",
+        motherFirstName: lead.motherFirstName || "",
+        motherLastName: lead.motherLastName || "",
+        motherPhone: lead.motherPhone || "",
         address: lead.address || "",
         lastContactedAt: lead.lastContactedAt ? new Date(lead.lastContactedAt) : undefined, // Map to Date object or keep undefined
       });
@@ -513,12 +523,41 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                             )}
                           />
 
+                          {/* Father Contact */}
                           <FormField
                             control={form.control}
-                            name="parentName"
+                            name="fatherFirstName"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Parent Name</FormLabel>
+                                <FormLabel>Father First and Last Name *</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    value={`${form.getValues('fatherFirstName') || ''} ${form.getValues('fatherLastName') || ''}`.trim()}
+                                    onChange={(e) => {
+                                      const fullName = e.target.value;
+                                      const parts = fullName.trim().split(/\s+/);
+                                      if (parts.length >= 2) {
+                                        form.setValue('fatherFirstName', parts[0]);
+                                        form.setValue('fatherLastName', parts.slice(1).join(' '));
+                                      } else {
+                                        form.setValue('fatherFirstName', fullName);
+                                        form.setValue('fatherLastName', '');
+                                      }
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="fatherPhone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Father Phone * (Primary Contact)</FormLabel>
                                 <FormControl>
                                   <Input {...field} value={field.value ?? ""} />
                                 </FormControl>
@@ -527,15 +566,44 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                             )}
                           />
 
-                          {/* Phone */}
+                          {/* Mother Contact */}
                           <FormField
                             control={form.control}
-                            name="phone"
+                            name="motherFirstName"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Phone Number</FormLabel>
+                                <FormLabel>Mother First and Last Name</FormLabel>
                                 <FormControl>
-                                  <Input {...field} />
+                                  <Input
+                                    {...field}
+                                    value={`${form.getValues('motherFirstName') || ''} ${form.getValues('motherLastName') || ''}`.trim()}
+                                    placeholder="(Optional)"
+                                    onChange={(e) => {
+                                      const fullName = e.target.value;
+                                      const parts = fullName.trim().split(/\s+/);
+                                      if (parts.length >= 2) {
+                                        form.setValue('motherFirstName', parts[0]);
+                                        form.setValue('motherLastName', parts.slice(1).join(' '));
+                                      } else {
+                                        form.setValue('motherFirstName', fullName);
+                                        form.setValue('motherLastName', '');
+                                      }
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="motherPhone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Mother Phone *</FormLabel>
+                                <FormControl>
+                                  <Input {...field} value={field.value ?? ""} />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -730,17 +798,39 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Parent Name</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Father Name</label>
                           <div className="flex items-center gap-2">
                             <User size={16} className="text-gray-500" />
-                            <span>{lead.parentName || "Not provided"}</span>
+                            <span>
+                              {lead.fatherFirstName && lead.fatherLastName
+                                ? `${lead.fatherFirstName} ${lead.fatherLastName}`
+                                : lead.fatherFirstName || "Not provided"}
+                            </span>
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Father Phone (Primary Contact)</label>
                           <div className="flex items-center gap-2">
                             <Phone size={16} className="text-gray-500" />
-                            <span>{lead.phone}</span>
+                            <span>{lead.fatherPhone || "Not provided"}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Mother Name</label>
+                          <div className="flex items-center gap-2">
+                            <User size={16} className="text-gray-500" />
+                            <span>
+                              {lead.motherFirstName && lead.motherLastName
+                                ? `${lead.motherFirstName} ${lead.motherLastName}`
+                                : lead.motherFirstName || "Not provided"}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Mother Phone</label>
+                          <div className="flex items-center gap-2">
+                            <Phone size={16} className="text-gray-500" />
+                            <span>{lead.motherPhone || "Not provided"}</span>
                           </div>
                         </div>
                         <div>
@@ -785,14 +875,13 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                           <label className="block text-sm font-medium text-gray-700 mb-1">Lead Source</label>
                           <span className="capitalize">{lead.source?.replace('_', ' ')}</span>
                         </div>
+                        {lead.notes && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                            <p className="text-gray-700 bg-gray-50 p-3 rounded-lg text-sm">{lead.notes}</p>
+                          </div>
+                        )}
                       </div>
-
-                      {lead.notes && (
-                        <div className="col-span-1 md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                          <p className="text-gray-700 bg-gray-50 p-3 rounded-lg">{lead.notes}</p>
-                        </div>
-                      )}
                     </div>
                   )}
               </div>

@@ -48,6 +48,24 @@ import { format } from "date-fns";
 import { formatDateTimeIST } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useQueryState } from "@/hooks/use-query-state";
+
+// Helper function to get parent contact info
+const getParentContact = (student: any, parentType: 'father' | 'mother') => {
+  const firstNameKey = `${parentType}FirstName`;
+  const lastNameKey = `${parentType}LastName`;
+  const phoneKey = `${parentType}Phone`;
+
+  const firstName = student[firstNameKey] || '';
+  const lastName = student[lastNameKey] || '';
+  const fullName = (firstName + (lastName ? ` ${lastName}` : '')).trim();
+  const phone = student[phoneKey] || '';
+
+  return {
+    name: fullName || (parentType === 'father' ? student.parentName : '') || '-',
+    phone: phone || '-'
+  };
+};
+
 import { type LeadWithCounselor } from "@shared/schema";
 import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -292,6 +310,27 @@ export default function StudentFees() {
   const [addMandateOpen, setAddMandateOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useQueryState("tab", "overview");
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
+  const [freshContactData, setFreshContactData] = useState<any>(null);
+
+  // Fetch fresh contact data whenever selectedStudent changes
+  useEffect(() => {
+    if (selectedStudent?.id) {
+      console.log(`🔍 Fetching fresh contact data for lead ID: ${selectedStudent.id}`);
+      apiRequest("GET", `/api/leads/${selectedStudent.id}`)
+        .then(response => response.json())
+        .then(data => {
+          console.log('✅ Fresh contact data fetched:', data);
+          setFreshContactData(data);
+        })
+        .catch(err => {
+          console.error('❌ Error fetching fresh contact data:', err);
+          setFreshContactData(null);
+        });
+    } else {
+      setFreshContactData(null);
+    }
+  }, [selectedStudent?.id]);
+
   const [selectedFee, setSelectedFee] = useState<FeeStructure | null>(null);
   const [addClassFeeOpen, setAddClassFeeOpen] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
@@ -1373,6 +1412,8 @@ export default function StudentFees() {
       search === '' ||
       student.name.toLowerCase().includes(search) ||
       (student.studentId && student.studentId.toLowerCase().includes(search)) ||
+      ((student as any).fatherPhone && (student as any).fatherPhone.includes(search)) ||
+      ((student as any).motherPhone && (student as any).motherPhone.includes(search)) ||
       (student.parentPhone && student.parentPhone.includes(search)) ||
       ((student as any).email && (student as any).email.toLowerCase().includes(search));
     return matchesClass && matchesStatus && matchesPaymentStatus && matchesSearch;
@@ -1748,11 +1789,29 @@ export default function StudentFees() {
                       <CardContent>
                         <div className="space-y-2">
                           <div><span className="font-semibold">Full Name:</span> {selectedStudent.name}</div>
-                          <div><span className="font-semibold">Phone:</span> {selectedStudent.parentPhone || (selectedStudent as any).phone || '-'}</div>
-                          <div><span className="font-semibold">Email:</span> {(selectedStudent as any).email || '-'}</div>
+                          <div><span className="font-semibold">Email:</span> {(selectedStudent as any).email || freshContactData?.email || '-'}</div>
                           <div><span className="font-semibold">Class:</span> {selectedStudent.class}</div>
-                          <div><span className="font-semibold">Parent:</span> {selectedStudent.parentName || '-'}</div>
-                          <div><span className="font-semibold">Address:</span> {(selectedStudent as any).address || '-'}</div>
+                          {(() => {
+                            const contact = freshContactData || selectedStudent;
+                            const fatherContact = getParentContact(contact, 'father');
+                            return (
+                              <>
+                                <div><span className="font-semibold">Father:</span> {fatherContact.name}</div>
+                                <div className="text-sm text-gray-600 ml-4">Phone: {fatherContact.phone}</div>
+                              </>
+                            );
+                          })()}
+                          {(() => {
+                            const contact = freshContactData || selectedStudent;
+                            const motherContact = getParentContact(contact, 'mother');
+                            return (
+                              <>
+                                <div><span className="font-semibold">Mother:</span> {motherContact.name}</div>
+                                <div className="text-sm text-gray-600 ml-4">Phone: {motherContact.phone}</div>
+                              </>
+                            );
+                          })()}
+                          <div><span className="font-semibold">Address:</span> {(selectedStudent as any).address || freshContactData?.address || '-'}</div>
                         </div>
 
                       </CardContent>

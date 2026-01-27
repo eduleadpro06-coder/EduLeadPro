@@ -34,14 +34,13 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
     defaultValues: {
       name: "",
       email: "",
-      phone: "", // This will be used as Parent Phone
-      class: "",
-      stream: "",
-      status: "new",
-      source: "",
-      counselorId: undefined,
-      notes: "",
-      parentName: "",
+      fatherFirstName: "",
+      fatherLastName: "",
+      fatherPhone: "",
+      motherFirstName: "",
+      motherLastName: "",
+      motherPhone: "",
+      phone: "", // Keep for backward compatibility
       address: "",
     },
   });
@@ -237,29 +236,87 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="parentName"
+                name="fatherFirstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Parent First and Last Name *</FormLabel>
+                    <FormLabel>Father First and Last Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter parent first and last name" {...field} value={field.value ?? ""} />
+                      <Input
+                        placeholder="Enter father's full name"
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => {
+                          const fullName = e.target.value;
+                          const parts = fullName.trim().split(/\s+/);
+                          if (parts.length >= 2) {
+                            form.setValue('fatherFirstName', parts[0]);
+                            form.setValue('fatherLastName', parts.slice(1).join(' '));
+                          } else {
+                            form.setValue('fatherFirstName', fullName);
+                            form.setValue('fatherLastName', '');
+                          }
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
-                name="phone"
+                name="fatherPhone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Parent Phone Number *</FormLabel>
+                    <FormLabel>Father Phone * (Primary Contact)</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter parent phone number" {...field} />
+                      <Input placeholder="10 digit number" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="motherFirstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mother First and Last Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter mother's full name (optional)"
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => {
+                          const fullName = e.target.value;
+                          const parts = fullName.trim().split(/\s+/);
+                          if (parts.length >= 2) {
+                            form.setValue('motherFirstName', parts[0]);
+                            form.setValue('motherLastName', parts.slice(1).join(' '));
+                          } else {
+                            form.setValue('motherFirstName', fullName);
+                            form.setValue('motherLastName', '');
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="motherPhone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mother Phone *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="10 digit number" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -37,7 +37,12 @@ export function LeadForm({ onSuccess, initialData }: LeadFormProps) {
     resolver: zodResolver(insertLeadSchema),
     defaultValues: {
       name: initialData?.name || "",
-      parentName: initialData?.parentName || "",
+      fatherFirstName: initialData?.fatherFirstName || "",
+      fatherLastName: initialData?.fatherLastName || "",
+      fatherPhone: initialData?.fatherPhone || "",
+      motherFirstName: initialData?.motherFirstName || "",
+      motherLastName: initialData?.motherLastName || "",
+      motherPhone: initialData?.motherPhone || "",
       phone: initialData?.phone || "",
       email: initialData?.email || "",
       class: initialData?.class || "",
@@ -134,14 +139,30 @@ export function LeadForm({ onSuccess, initialData }: LeadFormProps) {
             )}
           />
 
+          {/* Father Contact Information */}
           <FormField
             control={form.control}
-            name="parentName"
+            name="fatherFirstName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Parent Name *</FormLabel>
+                <FormLabel>Father First and Last Name *</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="Enter parent name" value={field.value || ""} />
+                  <Input
+                    {...field}
+                    placeholder="Enter father's full name"
+                    value={field.value || ""}
+                    onChange={(e) => {
+                      const fullName = e.target.value;
+                      const parts = fullName.trim().split(/\s+/);
+                      if (parts.length >= 2) {
+                        form.setValue('fatherFirstName', parts[0]);
+                        form.setValue('fatherLastName', parts.slice(1).join(' '));
+                      } else {
+                        form.setValue('fatherFirstName', fullName);
+                        form.setValue('fatherLastName', '');
+                      }
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -150,18 +171,62 @@ export function LeadForm({ onSuccess, initialData }: LeadFormProps) {
 
           <FormField
             control={form.control}
-            name="phone"
+            name="fatherPhone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Phone Number *</FormLabel>
+                <FormLabel>Father Phone * (Primary Contact)</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="+91-9876543210" value={field.value || ""} />
+                  <Input {...field} placeholder="10 digit number" value={field.value || ""} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
 
+          {/* Mother Contact Information */}
+          <FormField
+            control={form.control}
+            name="motherFirstName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Mother First and Last Name</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    placeholder="Enter mother's full name (optional)"
+                    value={field.value || ""}
+                    onChange={(e) => {
+                      const fullName = e.target.value;
+                      const parts = fullName.trim().split(/\s+/);
+                      if (parts.length >= 2) {
+                        form.setValue('motherFirstName', parts[0]);
+                        form.setValue('motherLastName', parts.slice(1).join(' '));
+                      } else {
+                        form.setValue('motherFirstName', fullName);
+                        form.setValue('motherLastName', '');
+                      }
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="motherPhone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Mother Phone *</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="10 digit number" value={field.value || ""} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Email */}
           <FormField
             control={form.control}
             name="email"

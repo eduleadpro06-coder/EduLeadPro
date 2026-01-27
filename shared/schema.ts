@@ -63,8 +63,12 @@ export const leads = pgTable("leads", {
   lastContactedAt: timestamp("last_contacted_at"),
 
   notes: text("notes"),
-  parentName: text("parent_name"),
-  parentPhone: text("parent_phone"),
+  fatherFirstName: text("father_first_name"),
+  fatherLastName: text("father_last_name"),
+  fatherPhone: text("father_phone"),
+  motherFirstName: text("mother_first_name"),
+  motherLastName: text("mother_last_name"),
+  motherPhone: text("mother_phone"),
   address: text("address"),
   interestedProgram: text("interested_program"),
   admissionLikelihood: text("admission_likelihood"),
@@ -324,8 +328,12 @@ export const recentlyDeletedLeads = pgTable("recently_deleted_leads", {
   last_contacted_at: timestamp("last_contacted_at"),
   admission_likelihood: decimal("admission_likelihood", { precision: 5, scale: 2 }),
   notes: text("notes"),
-  parent_name: text("parent_name"),
-  parent_phone: text("parent_phone"),
+  father_first_name: text("father_first_name"),
+  father_last_name: text("father_last_name"),
+  father_phone: text("father_phone"),
+  mother_first_name: text("mother_first_name"),
+  mother_last_name: text("mother_last_name"),
+  mother_phone: text("mother_phone"),
   address: text("address"),
   interested_program: text("interested_program"),
   deleted_at: timestamp("deleted_at").notNull(),
@@ -511,10 +519,18 @@ export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, creat
     name: z.string()
       .min(1, { message: "Name is required" })
       .refine((val) => val.trim().split(/\s+/).length >= 2, { message: "Please enter both First and Last name" }),
-    phone: z.string()
-      .regex(/^\d{10}$/, { message: "Phone number must be exactly 10 digits" }),
-    parentName: z.string()
-      .min(1, { message: "Parent name is required" }),
+    fatherFirstName: z.string()
+      .min(1, { message: "Father's name is required" }),
+    fatherLastName: z.string()
+      .min(1, { message: "Father's last name is required" }),
+    fatherPhone: z.string()
+      .regex(/^\d{10}$/, { message: "Father phone must be exactly 10 digits" }),
+    motherFirstName: z.string().optional().or(z.literal("")),
+    motherLastName: z.string().optional().or(z.literal("")),
+    motherPhone: z.string()
+      .regex(/^\d{10}$/, { message: "Mother phone must be exactly 10 digits" })
+      .optional()
+      .or(z.literal("")),
     address: z.string()
       .min(1, { message: "Address is required" }),
     email: z.string()

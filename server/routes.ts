@@ -2871,6 +2871,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 4. Get Regular Fee Structure (if any)
       const feeStructure = await storage.getFeeStructureByStudent(studentId);
 
+      // Fix: Construct parentName from father/mother fields for invoice compatibility
+      if (studentData) {
+        const anyStudent = studentData as any;
+        // Prioritize Father's name and phone
+        if (anyStudent.fatherFirstName) {
+          anyStudent.parentName = `${anyStudent.fatherFirstName} ${anyStudent.fatherLastName || ''}`.trim();
+          if (anyStudent.fatherPhone) {
+            anyStudent.phone = anyStudent.fatherPhone;
+          }
+        }
+        // Fallback to Mother's name and phone if Father's name is missing
+        else if (anyStudent.motherFirstName) {
+          anyStudent.parentName = `${anyStudent.motherFirstName} ${anyStudent.motherLastName || ''}`.trim();
+          if (anyStudent.motherPhone) {
+            anyStudent.phone = anyStudent.motherPhone;
+          }
+        }
+      }
+
       res.json({
         student: studentData,
         emiPlan: activePlan,
