@@ -83,6 +83,14 @@ export const generateInvoicePDF = (data: InvoiceData) => {
 
     let yPosition = margin + 10;
 
+    // ========== ORGANIZATION NAME HEADER ==========
+    doc.setFontSize(22);
+    doc.setFont("times", "bold");
+    doc.setTextColor(100, 58, 229); // Brand Purple #643ae5
+    doc.text(data.organization.name, pageWidth / 2, yPosition + 5, { align: "center" });
+
+    yPosition += 15;
+
     // ========== HEADER SECTION ==========
     // Left box - Invoice details
     doc.setDrawColor(lightGrayR, lightGrayG, lightGrayB);
@@ -275,14 +283,13 @@ export const generateInvoicePDF = (data: InvoiceData) => {
     const discount = data.emiPlan ? parseFloat(data.emiPlan.discount || "0") : 0;
     const totalPaid = data.payments.reduce((s, p) => s + parseFloat(p.amount), 0);
 
-    // Calculate tax (0% for educational institution)
-    const taxRate = 0;
+    // Calculate total (no tax for educational institution)
     const subtotal = totalAmount;
-    const tax = subtotal * taxRate;
-    const total = subtotal + tax - discount;
+    const total = subtotal - discount;
 
     const totalsBoxWidth = 90;
-    const totalsBoxHeight = 40;
+    // Dynamic height: base 26 (Subtotal + Total), add 7 if discount > 0
+    const totalsBoxHeight = discount > 0 ? 33 : 26;
     const totalsX = pageWidth - margin - totalsBoxWidth;
 
     // Draw totals box
@@ -302,17 +309,13 @@ export const generateInvoicePDF = (data: InvoiceData) => {
     doc.text(`Rs. ${formatCurrency(subtotal)}`,
         totalsX + totalsBoxWidth - 5, totalY, { align: "right" });
 
-    // Tax
-    totalY += lineSpacing;
-    doc.text(`Tax (${(taxRate * 100).toFixed(0)}%):`, totalsX + 5, totalY);
-    doc.text(`Rs. ${formatCurrency(tax)}`,
-        totalsX + totalsBoxWidth - 5, totalY, { align: "right" });
-
-    // Discount
-    totalY += lineSpacing;
-    doc.text("Discount:", totalsX + 5, totalY);
-    doc.text(`Rs. ${formatCurrency(discount)}`,
-        totalsX + totalsBoxWidth - 5, totalY, { align: "right" });
+    // Discount (only show if discount > 0)
+    if (discount > 0) {
+        totalY += lineSpacing;
+        doc.text("Discount:", totalsX + 5, totalY);
+        doc.text(`Rs. ${formatCurrency(discount)}`,
+            totalsX + totalsBoxWidth - 5, totalY, { align: "right" });
+    }
 
     // Total (Bold)
     totalY += lineSpacing;

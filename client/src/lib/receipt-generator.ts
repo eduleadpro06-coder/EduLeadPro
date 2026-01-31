@@ -49,7 +49,8 @@ function drawReceipt(
 ) {
     // Brand colors (Generic Green or pass as prop)
     const brandColor: [number, number, number] = [0, 100, 0]; // Dark Green generic
-    const lightBg: [number, number, number] = [245, 245, 245];
+    const lightBg: [number, number, number] = [240, 255, 240]; // Light mint green
+
 
     // Card background
     doc.setFillColor(...lightBg);

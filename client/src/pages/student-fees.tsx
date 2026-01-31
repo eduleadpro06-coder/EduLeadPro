@@ -360,7 +360,20 @@ export default function StudentFees() {
     phone: hookOrgPhone,
     orgData: hookOrgData
   } = useOrganization();
-  const [academicYear, setAcademicYear] = useState(globalAcademicYear || "2026-27");
+
+  // Dynamic academic year helper
+  const getCurrentAcademicYear = () => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    if (currentMonth >= 1 && currentMonth <= 3) {
+      return `${currentYear - 1}-${String(currentYear).slice(2)}`;
+    } else {
+      return `${currentYear}-${String(currentYear + 1).slice(2)}`;
+    }
+  };
+
+  const [academicYear, setAcademicYear] = useState(globalAcademicYear || getCurrentAcademicYear());
 
   // Sync with global academic year when it changes
   useEffect(() => {

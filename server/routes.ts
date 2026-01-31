@@ -21,6 +21,21 @@ import mobileLogsRouter from "./routes/mobile-logs.js"; // Mobile app logging
 import { comparePassword } from "./utils/password.js"; // Security: bcrypt password comparison
 import { supabase } from "./supabase.js"; // Shared Supabase client with Service Role Key
 
+// Helper function to get current academic year
+function getCurrentAcademicYear(): string {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 0-indexed, so add 1
+
+  // Academic year typically runs from April to March in India
+  // If current month is Jan-March, we're in the previous year's academic year
+  if (currentMonth >= 1 && currentMonth <= 3) {
+    return `${currentYear - 1}-${String(currentYear).slice(2)}`;
+  } else {
+    return `${currentYear}-${String(currentYear + 1).slice(2)}`;
+  }
+}
+
 // ...
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -2452,8 +2467,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: Ensure receipt number is generated and persisted if not provided
       if (!feePayment.receiptNumber) {
         try {
-          const academicYear = "2025-26";
-          const receiptNumber = `MEL / ${academicYear}/${String(feePayment.id).padStart(6, '0')}`;
+          // Get organization for dynamic prefix and academic year
+          const organization = await storage.getOrganization(organizationId);
+
+          // Use organization's configured academic year if available, otherwise fallback to current logic
+          const orgSettings = organization?.settings as any || {};
+          const configuredAcademicYear = orgSettings.academicYear;
+
+          // Fallback to 2026-27 to match client-side default if not configured
+          const academicYear = configuredAcademicYear || "2026-27";
+
+          const orgPrefix = organization?.name
+            ? organization.name.substring(0, 3).toUpperCase()
+            : "ORG";
+          const receiptNumber = `${orgPrefix} / ${academicYear}/${String(feePayment.id).padStart(6, '0')}`;
           console.log(`Generating persistent receipt number for payment ${feePayment.id}: ${receiptNumber}`);
 
           const updatedPayment = await storage.updateFeePayment(feePayment.id, { receiptNumber });
@@ -2505,8 +2532,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const payment of allPayments) {
         if (!payment.receiptNumber) {
           const academicYear = "2025-26";
+          // Get organization for dynamic prefix
+          const organization = payment.organizationId
+            ? await storage.getOrganization(payment.organizationId)
+            : null;
+          const orgPrefix = organization?.name
+            ? organization.name.substring(0, 3).toUpperCase()
+            : "ORG";
           // Use payment ID to ensure uniqueness and persistence
-          const receiptNumber = `MEL/${academicYear}/${String(payment.id).padStart(6, '0')}`;
+          const receiptNumber = `${orgPrefix}/${academicYear}/${String(payment.id).padStart(6, '0')}`;
           await storage.updateFeePayment(payment.id, { receiptNumber });
           updatedCount++;
         }
@@ -2702,8 +2736,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Generate receipt number if not provided
         if (!payment.receiptNumber) {
-          const academicYear = "2025-26";
-          const generatedReceiptNumber = `MEL/${academicYear}/${String(payment.id).padStart(6, '0')}`;
+          // Get organization for dynamic prefix and academic year
+          const organization = await storage.getOrganization(organizationId);
+
+          const orgSettings = organization?.settings as any || {};
+          const configuredAcademicYear = orgSettings.academicYear;
+          // Fallback to 2026-27 to match client-side default
+          const academicYear = configuredAcademicYear || "2026-27";
+
+          const orgPrefix = organization?.name
+            ? organization.name.substring(0, 3).toUpperCase()
+            : "ORG";
+          const generatedReceiptNumber = `${orgPrefix}/${academicYear}/${String(payment.id).padStart(6, '0')}`;
           const updatedPayment = await storage.updateFeePayment(payment.id, { receiptNumber: generatedReceiptNumber });
           if (updatedPayment) {
             registrationFeeData = updatedPayment;

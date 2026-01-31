@@ -31,6 +31,7 @@ interface DashboardAnalytics {
     bestPerformingSource: string;
     engagementCurve: Array<{ date: string; impressions: number; conversions: number }>;
     funnelData: Array<{ month: string; captured: number; engaged: number; qualified: number; readyForAdmission: number; converted: number }>;
+    statusTotals: { new: number; contacted: number; interested: number; readyForAdmission: number; enrolled: number };
   };
   feeAnalytics: {
     paidVsPending: Array<{ label: string; value: number }>;
@@ -247,10 +248,10 @@ export default function Dashboard() {
                     <Pie
                       data={(() => {
                         const funnelData = [
-                          { label: 'New', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.captured || 0, color: '#3b82f6' },
-                          { label: 'Interested', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.qualified || 0, color: '#f59e0b' },
-                          { label: 'Ready for Admission', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.readyForAdmission || 0, color: '#14b8a6' },
-                          { label: 'Enrolled', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.converted || 0, color: '#10b981' }
+                          { label: 'New', value: analytics.leadAnalytics.statusTotals?.new || 0, color: '#3b82f6' },
+                          { label: 'Interested', value: analytics.leadAnalytics.statusTotals?.interested || 0, color: '#f59e0b' },
+                          { label: 'Ready for Admission', value: analytics.leadAnalytics.statusTotals?.readyForAdmission || 0, color: '#14b8a6' },
+                          { label: 'Enrolled', value: analytics.leadAnalytics.statusTotals?.enrolled || 0, color: '#10b981' }
                         ];
                         return funnelData.filter(item => item.value > 0);
                       })()}
@@ -258,10 +259,10 @@ export default function Dashboard() {
                     >
                       {(() => {
                         const funnelData = [
-                          { label: 'New', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.captured || 0, color: '#3b82f6' },
-                          { label: 'Interested', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.qualified || 0, color: '#f59e0b' },
-                          { label: 'Ready for Admission', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.readyForAdmission || 0, color: '#14b8a6' },
-                          { label: 'Enrolled', value: analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.converted || 0, color: '#10b981' }
+                          { label: 'New', value: analytics.leadAnalytics.statusTotals?.new || 0, color: '#3b82f6' },
+                          { label: 'Interested', value: analytics.leadAnalytics.statusTotals?.interested || 0, color: '#f59e0b' },
+                          { label: 'Ready for Admission', value: analytics.leadAnalytics.statusTotals?.readyForAdmission || 0, color: '#14b8a6' },
+                          { label: 'Enrolled', value: analytics.leadAnalytics.statusTotals?.enrolled || 0, color: '#10b981' }
                         ];
                         return funnelData.filter(item => item.value > 0).map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
@@ -275,19 +276,19 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-2 mt-4 w-full">
                 <div className="text-center py-1.5 bg-blue-50/50 rounded-lg">
                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">New</p>
-                  <p className="text-sm font-bold text-blue-600">{analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.captured || 0}</p>
+                  <p className="text-sm font-bold text-blue-600">{analytics.leadAnalytics.statusTotals?.new || 0}</p>
                 </div>
                 <div className="text-center py-1.5 bg-amber-50/50 rounded-lg">
                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Interested</p>
-                  <p className="text-sm font-bold text-amber-600">{analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.qualified || 0}</p>
+                  <p className="text-sm font-bold text-amber-600">{analytics.leadAnalytics.statusTotals?.interested || 0}</p>
                 </div>
                 <div className="text-center py-1.5 bg-teal-50/50 rounded-lg">
                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Ready for Admission</p>
-                  <p className="text-sm font-bold text-teal-600">{analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.readyForAdmission || 0}</p>
+                  <p className="text-sm font-bold text-teal-600">{analytics.leadAnalytics.statusTotals?.readyForAdmission || 0}</p>
                 </div>
                 <div className="text-center py-1.5 bg-green-50/50 rounded-lg">
                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Enrolled</p>
-                  <p className="text-sm font-bold text-green-600">{analytics.leadAnalytics.funnelData[analytics.leadAnalytics.funnelData.length - 1]?.converted || 0}</p>
+                  <p className="text-sm font-bold text-green-600">{analytics.leadAnalytics.statusTotals?.enrolled || 0}</p>
                 </div>
               </div>
             </CardContent>

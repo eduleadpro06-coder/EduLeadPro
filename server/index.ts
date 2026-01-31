@@ -118,6 +118,24 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
+  // Health check endpoint (before Vite middleware)
+  app.get('/health', (_req, res) => {
+    console.log('[HEALTH] Health check endpoint hit!');
+    try {
+      const healthData = {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV
+      };
+      console.log('[HEALTH] Sending response:', healthData);
+      res.json(healthData);
+      console.log('[HEALTH] Response sent successfully');
+    } catch (error) {
+      console.error('[HEALTH] Error in health check:', error);
+      res.status(500).json({ status: 'error', error: String(error) });
+    }
+  });
+
   // Initialize daycare cron jobs for automated tasks
   // Initialize cron jobs for automated tasks
   initializeCronJobs();
@@ -157,4 +175,4 @@ app.use((req, res, next) => {
     );
   });
 })();
-// Trigger restart 2025-12-31-DEBUG-LOGS
+// Trigger restart 2026-01-31-TAILWIND-FIX

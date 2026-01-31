@@ -1096,6 +1096,7 @@ export class DatabaseStorage implements IStorage {
       bestPerformingSource: string;
       engagementCurve: Array<{ date: string; impressions: number; conversions: number }>; // New Chart Data
       funnelData: Array<{ month: string; captured: number; engaged: number; qualified: number; converted: number }>; // Updated for monthly trend
+      statusTotals: { new: number; contacted: number; interested: number; readyForAdmission: number; enrolled: number }; // All-time status counts
     };
     feeAnalytics: {
       paidVsPending: Array<{ label: string; value: number }>;
@@ -1874,6 +1875,26 @@ export class DatabaseStorage implements IStorage {
       converted: f.converted
     }));
 
+    // All-time status totals for Lead Funnel (not grouped by month)
+    const statusTotalsData = await db
+      .select({
+        new: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'new') as integer)`,
+        contacted: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'contacted') as integer)`,
+        interested: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'interested') as integer)`,
+        readyForAdmission: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'ready_for_admission') as integer)`,
+        enrolled: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'enrolled') as integer)`
+      })
+      .from(schema.leads)
+      .where(organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`);
+
+    const statusTotals = {
+      new: statusTotalsData[0]?.new || 0,
+      contacted: statusTotalsData[0]?.contacted || 0,
+      interested: statusTotalsData[0]?.interested || 0,
+      readyForAdmission: statusTotalsData[0]?.readyForAdmission || 0,
+      enrolled: statusTotalsData[0]?.enrolled || 0
+    };
+
     // 6. RECENT ACTIVITY (Last 10 notifications)
     const recentActivity = await db
       .select()
@@ -1942,7 +1963,8 @@ export class DatabaseStorage implements IStorage {
         conversionRate: Math.round(conversionRate * 100) / 100,
         bestPerformingSource,
         engagementCurve,
-        funnelData
+        funnelData,
+        statusTotals
       },
       feeAnalytics: {
         paidVsPending,
