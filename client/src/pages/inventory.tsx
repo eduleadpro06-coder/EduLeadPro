@@ -5,7 +5,7 @@ import { apiRequest } from "@/lib/utils";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Package, TrendingDown, AlertTriangle, DollarSign, Download, Settings, List, History, Pencil, Trash2 } from "lucide-react";
+import { Plus, Package, TrendingDown, AlertTriangle, DollarSign, Download, Settings, List, History, Pencil, Trash2, ShoppingCart } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,11 +17,13 @@ import { EditItemModal } from "@/components/inventory/edit-item-modal";
 import { StockTransactionModal } from "@/components/inventory/stock-transaction-modal";
 import { CategorySupplierManager } from "@/components/inventory/category-supplier-manager";
 import { TransactionsTab } from "@/components/inventory/transactions-tab";
+import { SellOrdersTab } from "@/components/inventory/sell-orders-tab";
+import { CreateSellOrderModal } from "@/components/inventory/create-sell-order-modal";
 
 export default function Inventory() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const [activeTab, setActiveTab] = useQueryState<"items" | "transactions">("tab", "items");
+    const [activeTab, setActiveTab] = useQueryState<"sell-orders" | "items" | "transactions">("tab", "sell-orders");
     const [searchTerm, setSearchTerm] = useState("");
     const [categoryFilter, setCategoryFilter] = useState("all");
     const [supplierFilter, setSupplierFilter] = useState("all");
@@ -33,6 +35,7 @@ export default function Inventory() {
     const [managerModalOpen, setManagerModalOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [itemToEdit, setItemToEdit] = useState<any>(null);
+    const [createSellOrderOpen, setCreateSellOrderOpen] = useState(false);
 
     // Fetch inventory stats
     const { data: stats, isLoading: statsLoading } = useQuery({
@@ -145,6 +148,14 @@ export default function Inventory() {
                     {/* Tab Navigation */}
                     <div className="flex gap-2 -mb-px">
                         <Button
+                            variant={activeTab === "sell-orders" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("sell-orders")}
+                            className="rounded-b-none"
+                        >
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            Sell Orders
+                        </Button>
+                        <Button
                             variant={activeTab === "items" ? "default" : "ghost"}
                             onClick={() => setActiveTab("items")}
                             className="rounded-b-none"
@@ -178,6 +189,13 @@ export default function Inventory() {
                         </Button>
                     </div>
                 </div>
+
+                {/* Sell Orders Tab Content */}
+                {activeTab === "sell-orders" && (
+                    <SellOrdersTab
+                        onCreateOrder={() => setCreateSellOrderOpen(true)}
+                    />
+                )}
 
                 {/* Items Tab Content */}
                 {activeTab === "items" && (
@@ -473,6 +491,10 @@ export default function Inventory() {
                     item={selectedItem}
                 />
             )}
+            <CreateSellOrderModal
+                open={createSellOrderOpen}
+                onOpenChange={setCreateSellOrderOpen}
+            />
             <Dialog open={managerModalOpen} onOpenChange={setManagerModalOpen}>
                 <DialogContent className="max-w-[600px]">
                     <DialogHeader>

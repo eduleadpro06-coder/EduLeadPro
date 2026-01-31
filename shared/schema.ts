@@ -165,6 +165,7 @@ export const expenses = pgTable("expenses", {
   receiptUrl: varchar("receipt_url", { length: 500 }),
   status: varchar("status", { length: 20 }).default("pending"), // pending, approved, rejected
   inventoryItemId: integer("inventory_item_id"), // Link to inventory purchases - will add reference after inventory tables are defined
+  deductFromBudget: boolean("deduct_from_budget").default(false), // Whether this expense should deduct from budget
   organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1085,6 +1086,73 @@ export const lowStockAlerts = pgTable("low_stock_alerts", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// 6. Sell Orders - Track sales to enrolled parents/students with GST
+export const sellOrders = pgTable("sell_orders", {
+  id: serial("id").primaryKey(),
+  orderNumber: varchar("order_number", { length: 50 }).unique().notNull(),
+  leadId: integer("lead_id").references(() => leads.id).notNull(), // Enrolled parent/student
+  parentName: varchar("parent_name", { length: 200 }).notNull(), // Snapshot of parent name
+
+  // Amounts
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(), // Total before GST
+  gstRate: decimal("gst_rate", { precision: 5, scale: 2 }).default("18.00").notNull(), // GST percentage
+  gstAmount: decimal("gst_amount", { precision: 10, scale: 2 }).notNull(), // Calculated GST
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(), // Grand total (subtotal + GST)
+
+  // Payment information
+  paymentStatus: varchar("payment_status", { length: 20 }).default("pending"), // pending, paid, partial
+  paymentMode: varchar("payment_mode", { length: 30 }), // UPI, Cash, Card, Cheque, Bank Transfer
+  paymentDate: date("payment_date"),
+  transactionId: varchar("transaction_id", { length: 100 }),
+
+  // Additional info
+  notes: text("notes"),
+  billGeneratedBy: integer("bill_generated_by").references(() => users.id),
+
+  // Multi-tenant
+  organizationId: integer("organization_id").references(() => organizations.id),
+
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 7. Sell Order Items - Line items for each sell order
+export const sellOrderItems = pgTable("sell_order_items", {
+  id: serial("id").primaryKey(),
+  sellOrderId: integer("sell_order_id").references(() => sellOrders.id).notNull(),
+  inventoryItemId: integer("inventory_item_id").references(() => inventoryItems.id).notNull(),
+
+  // Item details (snapshot at time of sale)
+  itemName: varchar("item_name", { length: 200 }).notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(), // Price per unit
+
+  // Calculated amounts
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(), // quantity * unitPrice
+  gstAmount: decimal("gst_amount", { precision: 10, scale: 2 }).notNull(), // GST for this item
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(), // subtotal + gstAmount
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Insert Schemas for Sell Orders
+export const insertSellOrderSchema = createInsertSchema(sellOrders).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSellOrderItemSchema = createInsertSchema(sellOrderItems).omit({ id: true, createdAt: true });
+
+// Types for Sell Orders
+export type SellOrder = typeof sellOrders.$inferSelect;
+export type SellOrderItem = typeof sellOrderItems.$inferSelect;
+
+export type InsertSellOrder = z.infer<typeof insertSellOrderSchema>;
+export type InsertSellOrderItem = z.infer<typeof insertSellOrderItemSchema>;
+
+// Complex type for sell order with items
+export type SellOrderWithItems = SellOrder & {
+  items: SellOrderItem[];
+  lead?: Lead;
+};
+
 // Insert Schemas for Inventory
 export const insertInventoryCategorySchema = createInsertSchema(inventoryCategories).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInventorySupplierSchema = createInsertSchema(inventorySuppliers).omit({ id: true, createdAt: true, updatedAt: true });
@@ -1117,6 +1185,7 @@ export type InventoryTransactionWithItem = InventoryTransaction & {
   item: InventoryItem;
   user?: User;
 };
+
 
 // =====================================================
 // META MARKETING INTEGRATION

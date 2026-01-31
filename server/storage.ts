@@ -4988,7 +4988,224 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // ===== SELL ORDERS - Stock Sales Management =====
+
+  // Generate unique order number
+  private async generateOrderNumber(organizationId: number): Promise<string> {
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+
+    // Count today's orders
+    const todayOrders = await db.select({ count: sql<number>`count(*)` })
+      .from(schema.sellOrders)
+      .where(and(
+        eq(schema.sellOrders.organizationId, organizationId),
+        sql`DATE(${schema.sellOrders.createdAt}) = ${today.toISOString().split('T')[0]}`
+      ));
+
+    const orderCount = parseInt(todayOrders[0]?.count?.toString() || '0') + 1;
+    return `SO-${dateStr}-${orderCount.toString().padStart(4, '0')}`;
+  }
+
+  async createSellOrder(orderData: {
+    leadId: number;
+    parentName: string;
+    items: Array<{
+      inventoryItemId: number;
+      itemName: string;
+      quantity: number;
+      unitPrice: string;
+    }>;
+    organizationId: number;
+    billGeneratedBy?: number;
+    notes?: string;
+    paymentMode?: string;
+    paymentStatus?: string;
+  }) {
+    return await db.transaction(async (tx) => {
+      // 1. Generate order number
+      const orderNumber = await this.generateOrderNumber(orderData.organizationId);
+
+      // 2. Calculate totals
+      let subtotal = 0;
+      const itemsWithCalculations = orderData.items.map(item => {
+        const itemSubtotal = parseFloat(item.unitPrice) * item.quantity;
+        const gstAmount = itemSubtotal * 0.18; // 18% GST
+        const totalPrice = itemSubtotal + gstAmount;
+
+        subtotal += itemSubtotal;
+
+        return {
+          ...item,
+          subtotal: itemSubtotal.toFixed(2),
+          gstAmount: gstAmount.toFixed(2),
+          totalPrice: totalPrice.toFixed(2)
+        };
+      });
+
+      const gstAmount = subtotal * 0.18;
+      const totalAmount = subtotal + gstAmount;
+
+      // 3. Validate stock availability
+      for (const item of orderData.items) {
+        const [inventoryItem] = await tx.select()
+          .from(schema.inventoryItems)
+          .where(eq(schema.inventoryItems.id, item.inventoryItemId));
+
+        if (!inventoryItem) {
+          throw new Error(`Item not found: ${item.itemName}`);
+        }
+
+        if ((inventoryItem.currentStock || 0) < item.quantity) {
+          throw new Error(`Insufficient stock for ${item.itemName}. Available: ${inventoryItem.currentStock}, Requested: ${item.quantity}`);
+        }
+      }
+
+      // 4. Create sell order
+      const [sellOrder] = await tx.insert(schema.sellOrders).values({
+        orderNumber,
+        leadId: orderData.leadId,
+        parentName: orderData.parentName,
+        subtotal: subtotal.toFixed(2),
+        gstRate: "18.00",
+        gstAmount: gstAmount.toFixed(2),
+        totalAmount: totalAmount.toFixed(2),
+        paymentStatus: orderData.paymentStatus || "pending",
+        paymentMode: orderData.paymentMode,
+        notes: orderData.notes,
+        billGeneratedBy: orderData.billGeneratedBy,
+        organizationId: orderData.organizationId
+      }).returning();
+
+      // 5. Create sell order items and deduct stock
+      for (const item of itemsWithCalculations) {
+        // Insert order item
+        await tx.insert(schema.sellOrderItems).values({
+          sellOrderId: sellOrder.id,
+          inventoryItemId: item.inventoryItemId,
+          itemName: item.itemName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          subtotal: item.subtotal,
+          gstAmount: item.gstAmount,
+          totalPrice: item.totalPrice
+        });
+
+        // Get current stock
+        const [inventoryItem] = await tx.select()
+          .from(schema.inventoryItems)
+          .where(eq(schema.inventoryItems.id, item.inventoryItemId));
+
+        const stockBefore = inventoryItem?.currentStock || 0;
+        const stockAfter = stockBefore - item.quantity;
+
+        // Create inventory transaction (stock out)
+        await tx.insert(schema.inventoryTransactions).values({
+          itemId: item.inventoryItemId,
+          transactionType: 'out',
+          quantity: item.quantity,
+          stockBefore,
+          stockAfter,
+          reason: 'sale',
+          reference: orderNumber,
+          notes: `Sold to ${orderData.parentName}`,
+          unitCost: item.unitPrice,
+          totalCost: item.subtotal,
+          leadId: orderData.leadId,
+          userId: orderData.billGeneratedBy
+        });
+
+        // Update inventory stock
+        await tx.update(schema.inventoryItems)
+          .set({
+            currentStock: stockAfter,
+            updatedAt: new Date()
+          })
+          .where(eq(schema.inventoryItems.id, item.inventoryItemId));
+      }
+
+      return sellOrder;
+    });
+  }
+
+  async getSellOrders(organizationId: number, filters?: {
+    leadId?: number;
+    paymentStatus?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }) {
+    const conditions = [eq(schema.sellOrders.organizationId, organizationId)];
+
+    if (filters?.leadId) {
+      conditions.push(eq(schema.sellOrders.leadId, filters.leadId));
+    }
+    if (filters?.paymentStatus) {
+      conditions.push(eq(schema.sellOrders.paymentStatus, filters.paymentStatus));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(schema.sellOrders.createdAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(schema.sellOrders.createdAt, filters.endDate));
+    }
+
+    const results = await db.select({
+      order: schema.sellOrders,
+      lead: schema.leads
+    })
+      .from(schema.sellOrders)
+      .leftJoin(schema.leads, eq(schema.sellOrders.leadId, schema.leads.id))
+      .where(and(...conditions))
+      .orderBy(desc(schema.sellOrders.createdAt));
+
+    return results.map(({ order, lead }) => ({ ...order, lead }));
+  }
+
+  async getSellOrderById(id: number, organizationId: number) {
+    const [result] = await db.select({
+      order: schema.sellOrders,
+      lead: schema.leads
+    })
+      .from(schema.sellOrders)
+      .leftJoin(schema.leads, eq(schema.sellOrders.leadId, schema.leads.id))
+      .where(and(
+        eq(schema.sellOrders.id, id),
+        eq(schema.sellOrders.organizationId, organizationId)
+      ));
+
+    if (!result) return undefined;
+
+    // Get order items
+    const items = await db.select()
+      .from(schema.sellOrderItems)
+      .where(eq(schema.sellOrderItems.sellOrderId, id));
+
+    return {
+      ...result.order,
+      lead: result.lead,
+      items
+    };
+  }
+
+  async updateSellOrderPayment(id: number, paymentData: {
+    paymentStatus: string;
+    paymentMode?: string;
+    paymentDate?: string;
+    transactionId?: string;
+  }) {
+    const [result] = await db.update(schema.sellOrders)
+      .set({
+        ...paymentData,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.sellOrders.id, id))
+      .returning();
+
+    return result;
+  }
+
   // Bus Management Implementation
+
   async getBusRoutes(organizationId: number): Promise<BusRoute[]> {
     return await db.select().from(schema.busRoutes).where(eq(schema.busRoutes.organizationId, organizationId));
   }

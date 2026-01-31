@@ -18,6 +18,7 @@ import { eq, inArray, sql, and, or, desc } from 'drizzle-orm';
 import { pushTokens, users, leads } from "../shared/schema.js";
 import accountingRouter from "./routes/accounting.js";
 import mobileLogsRouter from "./routes/mobile-logs.js"; // Mobile app logging
+import inventoryRouter from "./routes/inventory.js"; // Inventory & Sell Orders
 import { comparePassword } from "./utils/password.js"; // Security: bcrypt password comparison
 import { supabase } from "./supabase.js"; // Shared Supabase client with Service Role Key
 
@@ -57,6 +58,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // NEW: Accounting Module
   app.use("/api/accounting", accountingRouter);
   console.log("✅ Mounted Accounting API at /api/accounting");
+
+  // NEW: Inventory & Sell Orders Module
+  app.use("/api/inventory", inventoryRouter);
+  console.log("✅ Mounted Inventory API at /api/inventory");
 
   // Test route to verify routes are working
   app.get("/api/test", (req, res) => {

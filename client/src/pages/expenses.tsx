@@ -11,7 +11,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge"; // Ensure Badge is imported
 import { format } from "date-fns";
@@ -21,7 +21,7 @@ const categories = [
   "School Supplies",
   "Salaries",
   "Rent",
-  "Utilities",
+  "Utilities and Bills",
   "Marketing",
   "Software Subscriptions",
   "Maintenance",
@@ -36,10 +36,7 @@ const categories = [
 
 const COLORS = ['#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#6366f1', '#a855f7', '#d946ef', '#f43f5e', '#f97316'];
 
-interface CategoryBudget {
-  category: string;
-  amount: number;
-}
+
 
 interface Expense {
   id: number;
@@ -48,12 +45,13 @@ interface Expense {
   createdAt: string;
   description: string;
   category: string;
+  deductFromBudget?: boolean;
 }
 
 export default function Expenses() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ description: "", amount: "", category: categories[0] });
+  const [form, setForm] = useState({ description: "", amount: "", category: categories[0], deductFromBudget: false });
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
 
@@ -66,14 +64,10 @@ export default function Expenses() {
     const saved = localStorage.getItem("monthlyBudget");
     return saved ? parseInt(saved) : 100000;
   });
-  const [categoryBudgets, setCategoryBudgets] = useState<CategoryBudget[]>(() => {
-    const saved = localStorage.getItem("categoryBudgets");
-    return saved ? JSON.parse(saved) : categories.map(cat => ({ category: cat, amount: 0 }));
-  });
+
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
   const [newBudget, setNewBudget] = useState(monthlyBudget.toString());
-  const [activeTab, setActiveTab] = useQueryState("tab", "overall");
-  const [selectedCategory, setSelectedCategory] = useState(categories[0]);
+
 
   // Fetch all expenses
   const { data: allExpenses = [], isLoading } = useQuery({
@@ -91,7 +85,7 @@ export default function Expenses() {
     return (m - 1) === parseInt(selectedMonth) && y === parseInt(selectedYear);
   });
 
-  const totalExpenses = expenses.reduce((sum: number, exp: Expense) => sum + Number(exp.amount), 0);
+  const totalExpenses = expenses.filter((exp: Expense) => exp.deductFromBudget).reduce((sum: number, exp: Expense) => sum + Number(exp.amount), 0);
   const remainingBudget = monthlyBudget - totalExpenses;
 
   // Handle division by zero
@@ -121,7 +115,7 @@ export default function Expenses() {
       queryClient.invalidateQueries({ queryKey: ['/api/expenses'] });
       invalidateNotifications(queryClient);
       toast({ title: "Success", description: "Expense added successfully" });
-      setForm({ description: "", amount: "", category: categories[0] });
+      setForm({ description: "", amount: "", category: categories[0], deductFromBudget: false });
       setEditingExpense(null);
       setIsAddExpenseOpen(false);
     },
@@ -139,7 +133,7 @@ export default function Expenses() {
       queryClient.invalidateQueries({ queryKey: ['/api/expenses'] });
       invalidateNotifications(queryClient);
       toast({ title: "Success", description: "Expense updated successfully" });
-      setForm({ description: "", amount: "", category: categories[0] });
+      setForm({ description: "", amount: "", category: categories[0], deductFromBudget: false });
       setEditingExpense(null);
       setIsAddExpenseOpen(false);
     },
@@ -179,14 +173,16 @@ export default function Expenses() {
         description: form.description,
         amount: form.amount,
         category: form.category,
-        date: dateStr
+        date: dateStr,
+        deductFromBudget: form.deductFromBudget,
       });
     } else {
       createExpenseMutation.mutate({
         description: form.description,
         amount: form.amount,
         category: form.category,
-        date: dateStr
+        date: dateStr,
+        deductFromBudget: form.deductFromBudget,
       });
     }
   };
@@ -197,6 +193,7 @@ export default function Expenses() {
       description: expense.description,
       amount: expense.amount.toString(),
       category: expense.category,
+      deductFromBudget: expense.deductFromBudget ?? false,
     });
     setIsAddExpenseOpen(true);
   };
@@ -214,21 +211,11 @@ export default function Expenses() {
     setIsBudgetDialogOpen(false);
   };
 
-  const handleCategoryBudgetUpdate = (category: string, amount: string) => {
-    const newAmount = parseInt(amount);
-    if (isNaN(newAmount) || newAmount < 0) return;
 
-    const updatedBudgets = categoryBudgets.map(cb =>
-      cb.category === category ? { ...cb, amount: newAmount } : cb
-    );
-
-    setCategoryBudgets(updatedBudgets);
-    localStorage.setItem("categoryBudgets", JSON.stringify(updatedBudgets));
-  };
 
   const openAddModal = () => {
     setEditingExpense(null);
-    setForm({ description: "", amount: "", category: categories[0] });
+    setForm({ description: "", amount: "", category: categories[0], deductFromBudget: false });
     setIsAddExpenseOpen(true);
   }
 
@@ -289,7 +276,7 @@ export default function Expenses() {
                 {monthlyBudget > 0 ? (
                   <>
                     <span className="text-purple-600 font-medium">{budgetUtilization.toFixed(0)}%</span>
-                    <span className="ml-1">of monthly budget</span>
+                    <span className="ml-1">of budget</span>
                   </>
                 ) : (
                   <span className="text-gray-400 font-medium">No budget limit set</span>
@@ -319,7 +306,7 @@ export default function Expenses() {
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Monthly Budget</p>
+                  <p className="text-sm font-medium text-gray-500">Budget</p>
                   <h3 className="text-2xl font-bold text-gray-900 mt-2">₹{monthlyBudget.toLocaleString()}</h3>
                 </div>
                 <div className="p-2 bg-blue-50 rounded-lg">
@@ -389,9 +376,17 @@ export default function Expenses() {
                               {exp.description}
                             </td>
                             <td className="px-6 py-4">
-                              <Badge variant="secondary" className="bg-gray-100 text-gray-700 hover:bg-gray-200 border-0 font-normal">
-                                {exp.category}
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="bg-gray-100 text-gray-700 hover:bg-gray-200 border-0 font-normal">
+                                  {exp.category}
+                                </Badge>
+                                {exp.deductFromBudget && (
+                                  <Badge className="bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 border border-purple-200 font-medium shadow-sm">
+                                    <Wallet className="h-3 w-3 mr-1" />
+                                    Budget
+                                  </Badge>
+                                )}
+                              </div>
                             </td>
                             <td className="px-6 py-4 font-semibold text-gray-900">
                               ₹{exp.amount.toLocaleString()}
@@ -428,43 +423,50 @@ export default function Expenses() {
 
         </div>
 
-        {/* Add/Edit Expense Modal */}
+        {/* Add/Edit Expense Modal - Premium Design */}
         <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
-          <DialogContent className="sm:max-w-[450px]">
-            <DialogHeader>
-              <DialogTitle>{editingExpense ? "Edit Expense" : "Log New Expense"}</DialogTitle>
-              <DialogDescription>
+          <DialogContent className="sm:max-w-[500px] border-0 shadow-2xl bg-gradient-to-br from-white via-white to-purple-50/30 backdrop-blur-xl">
+            <DialogHeader className="pb-4 border-b border-purple-100/50">
+              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                {editingExpense ? "Edit Expense" : "Log New Expense"}
+              </DialogTitle>
+              <DialogDescription className="text-gray-600">
                 {editingExpense ? "Update the details of this transaction." : "Enter the details of the new business expense."}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+            <div className="grid gap-5 py-5">
+              <div className="space-y-2.5">
+                <Label htmlFor="description" className="text-sm font-semibold text-gray-700">Description</Label>
                 <Input
                   id="description"
                   name="description"
                   placeholder="e.g. Printer Paper, Annual Party"
                   value={form.description}
                   onChange={handleChange}
+                  className="h-11 border-gray-200 focus:border-purple-400 focus:ring-purple-400/20 transition-all duration-200"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <select
-                    id="category"
-                    name="category"
+                <div className="space-y-2.5">
+                  <Label htmlFor="category" className="text-sm font-semibold text-gray-700">Category</Label>
+                  <Select
                     value={form.category}
-                    onChange={handleChange}
-                    className="input-standard w-full"
+                    onValueChange={(value) => setForm({ ...form, category: value })}
                   >
-                    {categories.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-11 border-gray-200 focus:ring-purple-400/20 focus:border-purple-400">
+                      <SelectValue placeholder="Select Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (₹)</Label>
+                <div className="space-y-2.5">
+                  <Label htmlFor="amount" className="text-sm font-semibold text-gray-700">Amount (₹)</Label>
                   <Input
                     id="amount"
                     name="amount"
@@ -473,26 +475,60 @@ export default function Expenses() {
                     value={form.amount}
                     onChange={handleChange}
                     min="0"
+                    className="h-11 border-gray-200 focus:border-purple-400 focus:ring-purple-400/20 transition-all duration-200"
                   />
                 </div>
               </div>
 
-              <div className="bg-blue-50 p-3 rounded-md flex gap-2 items-start text-xs text-blue-700">
-                <Calendar className="h-4 w-4 mt-0.5 shrink-0" />
-                <span>
+              {/* Budget Deduction Checkbox - Premium Design */}
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-100/50 shadow-sm transition-all duration-200 hover:shadow-md">
+                <div className="flex items-start gap-3">
+                  <div className="flex items-center h-6">
+                    <input
+                      type="checkbox"
+                      id="deductFromBudget"
+                      checked={form.deductFromBudget}
+                      onChange={(e) => setForm({ ...form, deductFromBudget: e.target.checked })}
+                      className="w-5 h-5 text-purple-600 bg-white border-purple-300 rounded focus:ring-purple-500 focus:ring-2 transition-all duration-200 cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label htmlFor="deductFromBudget" className="text-sm font-semibold text-gray-800 cursor-pointer flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-purple-600" />
+                      Deduct from Budget
+                    </label>
+                    <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                      Check this if this expense should reduce your available budget. Leave unchecked for tracking-only expenses.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50/50 p-3.5 rounded-lg flex gap-2.5 items-start text-xs text-blue-700 border border-blue-100/50">
+                <Calendar className="h-4 w-4 mt-0.5 shrink-0 text-blue-600" />
+                <span className="leading-relaxed">
                   {(() => {
                     const now = new Date();
                     const isCurrentMonth = parseInt(selectedMonth) === now.getMonth() && parseInt(selectedYear) === now.getFullYear();
                     const effectiveDay = isCurrentMonth ? now.getDate() : 1;
                     const effectiveDate = new Date(parseInt(selectedYear), parseInt(selectedMonth), effectiveDay);
-                    return <>This expense will be recorded for <strong>{format(effectiveDate, "MMMM d, yyyy")}</strong>.</>;
+                    return <>This expense will be recorded for <strong className="font-semibold">{format(effectiveDate, "MMMM d, yyyy")}</strong>.</>;
                   })()}
                 </span>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddExpenseOpen(false)}>Cancel</Button>
-              <Button onClick={handleAddExpense} className="bg-purple-600 hover:bg-purple-700">
+            <DialogFooter className="pt-4 border-t border-purple-100/50 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsAddExpenseOpen(false)}
+                className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddExpense}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              >
                 {editingExpense ? "Save Changes" : "Create Expense"}
               </Button>
             </DialogFooter>
@@ -505,80 +541,31 @@ export default function Expenses() {
             <DialogHeader>
               <DialogTitle className="text-xl">Budget Settings</DialogTitle>
             </DialogHeader>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="overall">Overall Budget</TabsTrigger>
-                <TabsTrigger value="categories">Category Budgets</TabsTrigger>
-              </TabsList>
-              <TabsContent value="overall" className="space-y-6 pt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="budget" className="text-sm font-medium">Monthly Budget Amount (₹)</Label>
-                  <Input
-                    id="budget"
-                    type="number"
-                    value={newBudget}
-                    onChange={(e) => setNewBudget(e.target.value)}
-                    min="0"
-                    step="1000"
-                    className="h-10"
-                  />
-                </div>
-                <div className="flex justify-end gap-3">
-                  <Button variant="outline" onClick={() => setIsBudgetDialogOpen(false)} className="h-10">
-                    Cancel
-                  </Button>
-                  <Button onClick={handleBudgetUpdate} className="h-10">
-                    Save Budget
-                  </Button>
-                </div>
-              </TabsContent>
-              <TabsContent value="categories" className="space-y-6 pt-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Category</Label>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full border rounded-md px-3 py-2 h-10 text-sm"
-                  >
-                    {categories.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-                {/* Show budget and utilization for selected category */}
-                {(() => {
-                  const catBudget = categoryBudgets.find(cb => cb.category === selectedCategory)?.amount || 0;
-                  const catExpense = expenses.filter((exp: Expense) => exp.category === selectedCategory).reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
-                  const catUtilization = catBudget > 0 ? (catExpense / catBudget) * 100 : 0;
-                  return (
-                    <div className="space-y-4 mt-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">{selectedCategory} Budget (₹)</Label>
-                        <Input
-                          type="number"
-                          value={catBudget}
-                          min="0"
-                          step="100"
-                          onChange={e => handleCategoryBudgetUpdate(selectedCategory, e.target.value)}
-                          className="h-10"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-caption">Total Expenses</CardTitle>
-                          <Wallet className="h-4 w-4 text-gray-500" />
-                        </CardHeader>
-                        <Progress value={catUtilization} className="h-2" />
-                        <div className="text-xs text-gray-500">Spent: ₹{catExpense.toLocaleString()} / ₹{catBudget.toLocaleString()}</div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </TabsContent>
-            </Tabs>
+            <div className="space-y-6 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="budget" className="text-sm font-medium">Budget Amount (₹)</Label>
+                <Input
+                  id="budget"
+                  type="number"
+                  value={newBudget}
+                  onChange={(e) => setNewBudget(e.target.value)}
+                  min="0"
+                  step="1000"
+                  className="h-10"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setIsBudgetDialogOpen(false)} className="h-10">
+                  Cancel
+                </Button>
+                <Button onClick={handleBudgetUpdate} className="h-10">
+                  Save Budget
+                </Button>
+              </div>
+            </div>
           </DialogContent>
-        </Dialog>
-      </main>
-    </div>
+        </Dialog >
+      </main >
+    </div >
   );
 }
