@@ -31,6 +31,7 @@ export function useDaycareStats() {
             if (!response.ok) throw new Error("Failed to fetch daycare stats");
             return response.json();
         },
+        staleTime: 0, // Override global Infinity to ensure refetch on invalidation
     });
 }
 
@@ -47,6 +48,7 @@ export function useDaycareChildren(includeDeleted = false) {
             if (!response.ok) throw new Error("Failed to fetch children");
             return response.json();
         },
+        staleTime: 0, // Override global Infinity to ensure refetch on invalidation
     });
 }
 
@@ -113,6 +115,7 @@ export function useDaycareInquiries(status?: string) {
             if (!response.ok) throw new Error("Failed to fetch inquiries");
             return response.json();
         },
+        staleTime: 0, // Override global Infinity to ensure refetch on invalidation
     });
 }
 
@@ -221,6 +224,7 @@ export function useDaycareEnrollments(includeInactive = false) {
             if (!response.ok) throw new Error("Failed to fetch enrollments");
             return response.json();
         },
+        staleTime: 0, // Override global Infinity to ensure refetch on invalidation
     });
 }
 
@@ -256,6 +260,7 @@ export function useDaycarePayments() {
             if (!response.ok) throw new Error("Failed to fetch payments");
             return response.json();
         },
+        staleTime: 0, // Override global Infinity to ensure refetch on invalidation
     });
 }
 

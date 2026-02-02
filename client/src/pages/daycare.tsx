@@ -708,12 +708,18 @@ export default function Daycare() {
                                             };
                                             createChild.mutate(data, {
                                                 onSuccess: () => {
+                                                    // Close modal first to ensure it happens even if other operations fail
+                                                    setIsAddChildOpen(false);
+
+                                                    // Explicitly invalidate queries to ensure data refresh
+                                                    queryClient.invalidateQueries({ queryKey: ["/api/daycare/children"] });
+                                                    queryClient.invalidateQueries({ queryKey: ["/api/daycare/stats"] });
+
                                                     toast({
                                                         title: "Child profile created",
                                                         description: `${data.childName} has been added successfully.`
                                                     });
                                                     form.reset(); // Use captured form reference
-                                                    setIsAddChildOpen(false);
                                                 },
                                                 onError: (error: any) => { // Added type for error
                                                     toast({
@@ -833,6 +839,13 @@ export default function Daycare() {
                                                 customMonthlyRate: (rate * days).toString() // Explicit formula: Hourly Rate * Total Hours
                                             }, {
                                                 onSuccess: (enrollment) => {
+                                                    // Close modal first to ensure it happens even if other operations fail
+                                                    setIsEnrollmentOpen(false);
+
+                                                    // Explicitly invalidate queries to ensure data refresh
+                                                    queryClient.invalidateQueries({ queryKey: ["/api/daycare/enrollments"] });
+                                                    queryClient.invalidateQueries({ queryKey: ["/api/daycare/stats"] });
+
                                                     toast({ title: "Enrollment created successfully" });
 
                                                     // Record explicit monthly fee payment as PENDING
@@ -859,7 +872,6 @@ export default function Daycare() {
                                                     // Reset state
                                                     setDailyHours('8');
                                                     setPaymentAmount('');
-                                                    setIsEnrollmentOpen(false);
                                                 }
                                             });
                                         }}>
