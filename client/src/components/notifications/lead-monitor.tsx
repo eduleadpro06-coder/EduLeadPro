@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/utils";
 
 // Simple beep sound
 const playBeep = () => {
@@ -17,7 +16,7 @@ const playBeep = () => {
         gain.connect(ctx.destination);
 
         osc.type = "sine";
-        osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1);
 
         gain.gain.setValueAtTime(0.5, ctx.currentTime);
@@ -30,7 +29,7 @@ const playBeep = () => {
     }
 };
 
-interface LatestLead {
+interface Lead {
     id: number;
     name: string;
     source: string;
@@ -43,19 +42,18 @@ export default function LeadMonitor() {
     const lastProcessedId = useRef<number | null>(null);
     const [isInitialized, setIsInitialized] = useState(false);
 
-    // Poll for the latest lead every 10 seconds
-    const { data: latestLead } = useQuery<LatestLead>({
-        queryKey: ["/api/leads/latest"],
-        queryFn: async () => {
-            const res = await apiRequest("GET", "/leads/latest");
-            return res.json();
-        },
-        refetchInterval: 10000, // Poll every 10 seconds
+    // Reuse the existing /api/leads endpoint (just take the first result)
+    const { data: leads } = useQuery<Lead[]>({
+        queryKey: ["/api/leads"],
+        refetchInterval: 15000, // Poll every 15 seconds
         refetchOnWindowFocus: true,
     });
 
     useEffect(() => {
-        if (!latestLead) return;
+        if (!leads || leads.length === 0) return;
+
+        // Get the most recent lead (first in array if sorted by newest)
+        const latestLead = leads[0];
 
         // On first load, just set the baseline ID, don't notify
         if (!isInitialized) {
@@ -66,32 +64,31 @@ export default function LeadMonitor() {
 
         // Check if we have a NEW lead (ID is higher than what we last saw)
         if (latestLead.id > (lastProcessedId.current || 0)) {
-            console.log("New Lead Detected:", latestLead);
+            console.log("🔔 New Lead Detected:", latestLead);
 
             // 1. Play Sound
             playBeep();
 
             // 2. Determine Message based on source
             const sourceDisplay = latestLead.source === 'facebook_ads' ? 'Facebook Ads' :
-                latestLead.source.includes('google') ? 'Google Form' :
+                latestLead.source.includes('google') || latestLead.source.includes('Walk-in') ? 'Google Form Walk-in' :
                     latestLead.source;
 
             // 3. Show Toast
             toast({
                 title: "New Lead Received! 🎉",
-                description: `New query from ${latestLead.name} via ${sourceDisplay}`,
+                description: `${latestLead.name} via ${sourceDisplay}`,
                 variant: "default",
                 duration: 5000,
             });
 
-            // 4. Refresh Data
-            queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+            // 4. Refresh Dashboard (leads list is already auto-updated by React Query)
             queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
 
             // Update tracker
             lastProcessedId.current = latestLead.id;
         }
-    }, [latestLead, isInitialized, queryClient, toast]);
+    }, [leads, isInitialized, queryClient, toast]);
 
     return null;
 }
