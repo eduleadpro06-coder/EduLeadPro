@@ -81,8 +81,18 @@ export function registerMetaWebhookRoutes(app: Express) {
 
                                 if (leadDetails) {
                                     const mappedLead = mapLeadData(leadDetails);
-                                    await db.insert(leads).values(mappedLead);
+                                    const newLead = await db.insert(leads).values(mappedLead).returning();
                                     console.log("Successfully inserted Meta lead:", mappedLead.name);
+
+                                    // Notify Frontend via Socket.IO
+                                    const io = req.app.get('io');
+                                    if (io) {
+                                        io.emit('lead:new', {
+                                            type: 'meta',
+                                            message: `New Facebook Lead: ${mappedLead.name}`,
+                                            leadId: newLead[0]?.id
+                                        });
+                                    }
                                 }
                             }
                         }

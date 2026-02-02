@@ -5979,7 +5979,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
   const BusTrackingWebSocket = (await import('./websocket.js')).default;
   const busTracking = new BusTrackingWebSocket(httpServer);
-  console.log('✅ WebSocket server initialized for bus tracking');
+  app.set('io', busTracking.getIO()); // Expose IO to routes
+  console.log('✅ WebSocket server initialized for bus tracking & notifications');
 
   // Toggle lead app access
   app.patch("/api/leads/:id/app-access", async (req, res) => {

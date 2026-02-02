@@ -38,6 +38,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
 import FollowUpMonitor from "@/components/notifications/follow-up-monitor";
+import LeadMonitor from "@/components/notifications/lead-monitor";
 
 function Router() {
   return (
@@ -359,6 +360,7 @@ function App() {
           <NotificationProvider>
             <TooltipProvider>
               <FollowUpMonitor />
+              <LeadMonitor />
               <Toaster />
               <Router />
               <EnvironmentInfo />

@@ -196,6 +196,16 @@ export function registerIntegrationRoutes(app: Express) {
                     organizationId: orgId
                 }).returning();
 
+                // Notify Frontend via Socket.IO
+                const io = req.app.get('io');
+                if (io) {
+                    io.emit('lead:new', {
+                        type: 'walkin',
+                        message: `New Walk-in: ${name}`,
+                        leadId: newLead[0].id
+                    });
+                }
+
                 res.json({ success: true, action: "created", leadId: newLead[0].id });
             }
 
