@@ -6040,8 +6040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const organizationId = await getOrganizationId(req);
       if (!organizationId) return res.status(403).json({ message: "Unauthorized" });
 
-      const { desc, eq } = await import('drizzle-orm');
-
+      // Use top-level imports to avoid "function invocation failed"
       const latestLead = await db
         .select({ id: schema.leads.id, name: schema.leads.name, source: schema.leads.source, createdAt: schema.leads.createdAt })
         .from(schema.leads)
@@ -6055,8 +6054,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({ id: 0, name: "", createdAt: null });
       }
     } catch (error) {
-      console.error("Error fetching latest lead:", error);
-      res.status(500).json({ message: "Failed to fetch latest lead" });
+      console.error("Error fetching latest lead details:", error);
+      res.status(500).json({ message: "Failed to fetch latest lead", error: String(error) });
     }
   });
 
