@@ -6034,6 +6034,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // LIGHTWEIGHT POLLING ENDPOINT FOR NOTIFICATIONS
+  app.get("/api/leads/latest", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) return res.status(403).json({ message: "Unauthorized" });
+
+      const { desc, eq } = await import('drizzle-orm');
+
+      const latestLead = await db
+        .select({ id: schema.leads.id, name: schema.leads.name, source: schema.leads.source, createdAt: schema.leads.createdAt })
+        .from(schema.leads)
+        .where(eq(schema.leads.organizationId, organizationId))
+        .orderBy(desc(schema.leads.id))
+        .limit(1);
+
+      if (latestLead.length > 0) {
+        res.json(latestLead[0]);
+      } else {
+        res.json({ id: 0, name: "", createdAt: null });
+      }
+    } catch (error) {
+      console.error("Error fetching latest lead:", error);
+      res.status(500).json({ message: "Failed to fetch latest lead" });
+    }
+  });
+
   // Create route
   app.post("/api/bus/routes", async (req, res) => {
     try {

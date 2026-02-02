@@ -1,9 +1,9 @@
-import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { io } from "socket.io-client";
+import { apiRequest } from "@/lib/utils";
 
-// Simple beep sound (reuse from FollowUpMonitor or import)
+// Simple beep sound
 const playBeep = () => {
     try {
         const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -30,47 +30,68 @@ const playBeep = () => {
     }
 };
 
+interface LatestLead {
+    id: number;
+    name: string;
+    source: string;
+    createdAt: string;
+}
+
 export default function LeadMonitor() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
+    const lastProcessedId = useRef<number | null>(null);
+    const [isInitialized, setIsInitialized] = useState(false);
+
+    // Poll for the latest lead every 10 seconds
+    const { data: latestLead } = useQuery<LatestLead>({
+        queryKey: ["/api/leads/latest"],
+        queryFn: async () => {
+            const res = await apiRequest("GET", "/leads/latest");
+            return res.json();
+        },
+        refetchInterval: 10000, // Poll every 10 seconds
+        refetchOnWindowFocus: true,
+    });
 
     useEffect(() => {
-        // Connect to Socket.IO
-        // Note: In development, Vite proxy handles /socket.io. In PROD, it connects to domain.
-        const socket = io({
-            path: "/socket.io",
-            transports: ["websocket", "polling"],
-        });
+        if (!latestLead) return;
 
-        socket.on("connect", () => {
-            console.log("LeadMonitor connected to WebSocket");
-        });
+        // On first load, just set the baseline ID, don't notify
+        if (!isInitialized) {
+            lastProcessedId.current = latestLead.id;
+            setIsInitialized(true);
+            return;
+        }
 
-        // Listen for new leads
-        socket.on("lead:new", (data: { type: string, message: string, leadId: number }) => {
-            console.log("New Lead Received:", data);
+        // Check if we have a NEW lead (ID is higher than what we last saw)
+        if (latestLead.id > (lastProcessedId.current || 0)) {
+            console.log("New Lead Detected:", latestLead);
 
             // 1. Play Sound
             playBeep();
 
-            // 2. Show Toast
+            // 2. Determine Message based on source
+            const sourceDisplay = latestLead.source === 'facebook_ads' ? 'Facebook Ads' :
+                latestLead.source.includes('google') ? 'Google Form' :
+                    latestLead.source;
+
+            // 3. Show Toast
             toast({
                 title: "New Lead Received! 🎉",
-                description: data.message,
-                variant: "default", // or custom style
+                description: `New query from ${latestLead.name} via ${sourceDisplay}`,
+                variant: "default",
                 duration: 5000,
             });
 
-            // 3. Refresh Data
-            // Invalidating "leads" queries matches /api/leads, /api/dashboard/leads, etc.
+            // 4. Refresh Data
             queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
             queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-        });
 
-        return () => {
-            socket.disconnect();
-        };
-    }, [queryClient, toast]);
+            // Update tracker
+            lastProcessedId.current = latestLead.id;
+        }
+    }, [latestLead, isInitialized, queryClient, toast]);
 
     return null;
 }
