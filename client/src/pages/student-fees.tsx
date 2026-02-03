@@ -39,7 +39,8 @@ import {
   Edit,
   Printer,
   GraduationCap,
-  ListFilter
+  ListFilter,
+  BookOpenCheck
 } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import { generateFeeReceipt, type FeeReceiptData } from "@/lib/receipt-generator";
@@ -342,6 +343,74 @@ export default function StudentFees() {
   const [emiModalOpen, setEmiModalOpen] = useState(false);
   const [emiEditingFee, setEmiEditingFee] = useState<FeeStructure | null>(null);
   const [emiData, setEmiData] = useState<Record<number, { emiPeriod: string, paidAmount: string, emiDues: string }>>({});
+
+  // EMI Edit State
+  const [editEmiModalOpen, setEditEmiModalOpen] = useState(false);
+  const [selectedEmiPlanForEdit, setSelectedEmiPlanForEdit] = useState<any>(null);
+  const [editEmiFormData, setEditEmiFormData] = useState({
+    totalAmount: '',
+    recalculate: false,
+    strategy: 'distribute' as 'distribute' | 'add_installments' | 'remove_installments',
+    numNewInstallments: 1,
+    newInstallmentDates: [] as string[],
+    numInstallmentsToRemove: 1
+  });
+
+  const handleUpdateEmiPlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEmiPlanForEdit) return;
+
+    try {
+      const payload: any = {
+        totalAmount: editEmiFormData.totalAmount,
+        recalculate: editEmiFormData.recalculate
+      };
+
+      if (editEmiFormData.recalculate) {
+        payload.strategy = editEmiFormData.strategy;
+
+        if (editEmiFormData.strategy === 'add_installments') {
+          const oldTotal = parseFloat(selectedEmiPlanForEdit.totalAmount || '0');
+          const newTotal = parseFloat(editEmiFormData.totalAmount);
+          const difference = newTotal - oldTotal;
+          const perInstallment = (difference / editEmiFormData.numNewInstallments).toFixed(2);
+
+          payload.newInstallments = editEmiFormData.newInstallmentDates.map((date, idx) => ({
+            amount: idx === editEmiFormData.numNewInstallments - 1
+              ? (difference - parseFloat(perInstallment) * (editEmiFormData.numNewInstallments - 1)).toFixed(2)
+              : perInstallment,
+            dueDate: date
+          }));
+        }
+
+        if (editEmiFormData.strategy === 'remove_installments') {
+          payload.numInstallmentsToRemove = editEmiFormData.numInstallmentsToRemove;
+        }
+      }
+
+      const response = await fetch(`/api/emi-plans/${selectedEmiPlanForEdit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update EMI plan');
+      }
+
+      await refetchEmiPlans();
+      setEditEmiModalOpen(false);
+      toast({ title: "Success", description: "EMI plan updated successfully" });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const [classFilter, setClassFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [studentPaymentStatusFilter, setStudentPaymentStatusFilter] = useState('all');
@@ -906,8 +975,8 @@ export default function StudentFees() {
       name: lead.name,
       studentId: `L${lead.id}`,
       class: lead.class,
-      parentName: lead.parentName,
-      parentPhone: lead.parentPhone,
+      parentName: lead.fatherFirstName ? `${lead.fatherFirstName} ${lead.fatherLastName || ''}`.trim() : (lead.motherFirstName ? `${lead.motherFirstName} ${lead.motherLastName || ''}`.trim() : "Unknown"),
+      parentPhone: lead.fatherPhone || lead.motherPhone || "",
       type: 'enrolled_lead' as const,
       source: lead.source,
       counselor: lead.counselor,
@@ -2299,6 +2368,27 @@ export default function StudentFees() {
                                         variant="outline"
                                         size="sm"
                                         className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                                        onClick={() => {
+                                          setSelectedEmiPlanForEdit(plan);
+                                          setEditEmiFormData({
+                                            totalAmount: plan.totalAmount || "0",
+                                            recalculate: false,
+                                            strategy: 'distribute',
+                                            numNewInstallments: 1,
+                                            newInstallmentDates: []
+                                          });
+                                          setEditEmiModalOpen(true);
+                                        }}
+                                      >
+                                        <Edit className="mr-1 h-3 w-3" />
+                                        Edit
+                                      </Button>
+                                    )}
+                                    {plan.status !== 'cancelled' && plan.status !== 'completed' && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-orange-500 text-orange-600 hover:bg-orange-50"
                                         onClick={async () => {
                                           if (confirm('Cancel this EMI plan? This will mark it as cancelled.')) {
                                             try {
@@ -2500,6 +2590,7 @@ export default function StudentFees() {
                                   className="bg-gray-100 cursor-not-allowed"
                                 />
                               </div>
+
                               <div className="grid gap-2">
                                 <Label htmlFor="discount">Discount (₹)</Label>
                                 <Input
@@ -2609,7 +2700,7 @@ export default function StudentFees() {
                                   name="startDate"
                                   type="date"
                                   required
-                                  min={new Date().toISOString().split('T')[0]}
+                                  // min={new Date().toISOString().split('T')[0]}
                                   value={emiFormData.startDate}
                                   onChange={(e) => setEmiFormData(prev => ({ ...prev, startDate: e.target.value }))}
                                 />
@@ -2779,6 +2870,253 @@ export default function StudentFees() {
         </main >
       </div >
 
+
+      {/* Edit EMI Plan Dialog */}
+      <Dialog open={editEmiModalOpen} onOpenChange={setEditEmiModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit EMI Plan</DialogTitle>
+            <DialogDescription>
+              Update total amount and recalculate installments if needed.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateEmiPlan} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Current EMI Plan Details</Label>
+              <div className="text-sm text-gray-500">
+                Total Amount: ₹{selectedEmiPlanForEdit?.totalAmount}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editTotalAmount">New Total Amount (₹)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="editTotalAmount"
+                  type="number"
+                  required
+                  value={editEmiFormData.totalAmount}
+                  onChange={e => setEditEmiFormData({ ...editEmiFormData, totalAmount: e.target.value })}
+                />
+                {selectedStudent && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    title="Apply standard class fee"
+                    onClick={() => {
+                      const standardFee = globalClassFees.find(gcf =>
+                        gcf.className === selectedStudent.class &&
+                        gcf.academicYear === academicYear
+                      );
+                      if (standardFee) {
+                        // Calculate outstanding: class fee - tuition paid
+                        const classFeeAmount = parseFloat(standardFee.amount);
+                        const tuitionPaid = calculateTuitionPaidAmount(getStudentPayments(selectedStudent.id));
+                        const outstanding = Math.max(0, classFeeAmount - tuitionPaid);
+
+                        setEditEmiFormData(prev => ({ ...prev, totalAmount: outstanding.toString() }));
+                        toast({
+                          title: "Applied Class Fee",
+                          description: `Class Fee: ₹${classFeeAmount.toLocaleString()}, Paid: ₹${tuitionPaid.toLocaleString()}, Outstanding: ₹${outstanding.toLocaleString()}`
+                        });
+                      } else {
+                        toast({ title: "Fee Not Found", description: `No standard fee structure found for Class: ${selectedStudent.class}`, variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <BookOpenCheck className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              {selectedStudent && (
+                <p className="text-xs text-muted-foreground">
+                  Current Class: {selectedStudent.class}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="recalculate"
+                className="h-4 w-4 rounded border-gray-300 text-[#643ae5] focus:ring-[#643ae5]"
+                checked={editEmiFormData.recalculate}
+                onChange={e => setEditEmiFormData({ ...editEmiFormData, recalculate: e.target.checked })}
+              />
+              <Label htmlFor="recalculate" className="font-normal cursor-pointer">
+                Recalculate remaining installments?
+              </Label>
+            </div>
+            {editEmiFormData.recalculate && (
+              <>
+                <div className="space-y-2 border-t pt-3">
+                  <Label>Recalculation Method</Label>
+                  <div className="grid grid-cols-1 gap-2">
+                    <div
+                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${editEmiFormData.strategy === 'distribute' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      onClick={() => setEditEmiFormData(prev => ({ ...prev, strategy: 'distribute' }))}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="strategy"
+                          value="distribute"
+                          checked={editEmiFormData.strategy === 'distribute'}
+                          onChange={() => setEditEmiFormData(prev => ({ ...prev, strategy: 'distribute' }))}
+                          className="text-primary"
+                        />
+                        <div>
+                          <div className="font-medium">Distribute over existing</div>
+                          <div className="text-xs text-muted-foreground">Increase amount of unpaid installments</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${editEmiFormData.strategy === 'add_installments' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      onClick={() => {
+                        setEditEmiFormData(prev => {
+                          // Initialize dates if switching to add_installments
+                          if (prev.strategy !== 'add_installments' && prev.newInstallmentDates.length === 0) {
+                            const date = new Date();
+                            date.setMonth(date.getMonth() + 1);
+                            return {
+                              ...prev,
+                              strategy: 'add_installments',
+                              newInstallmentDates: [date.toISOString().split('T')[0]]
+                            };
+                          }
+                          return { ...prev, strategy: 'add_installments' };
+                        });
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="strategy"
+                          value="add_installments"
+                          checked={editEmiFormData.strategy === 'add_installments'}
+                          onChange={() => {
+                            setEditEmiFormData(prev => {
+                              // Initialize dates if switching to add_installments
+                              if (prev.strategy !== 'add_installments' && prev.newInstallmentDates.length === 0) {
+                                const date = new Date();
+                                date.setMonth(date.getMonth() + 1);
+                                return {
+                                  ...prev,
+                                  strategy: 'add_installments',
+                                  newInstallmentDates: [date.toISOString().split('T')[0]]
+                                };
+                              }
+                              return { ...prev, strategy: 'add_installments' };
+                            });
+                          }}
+                          className="text-primary"
+                        />
+                        <div>
+                          <div className="font-medium">Add new installments</div>
+                          <div className="text-xs text-muted-foreground">Create additional EMI installments</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${editEmiFormData.strategy === 'remove_installments' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      onClick={() => setEditEmiFormData(prev => ({ ...prev, strategy: 'remove_installments' }))}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="strategy"
+                          value="remove_installments"
+                          checked={editEmiFormData.strategy === 'remove_installments'}
+                          onChange={() => setEditEmiFormData(prev => ({ ...prev, strategy: 'remove_installments' }))}
+                          className="text-primary"
+                        />
+                        <div>
+                          <div className="font-medium">Remove last installments</div>
+                          <div className="text-xs text-muted-foreground">Delete unnecessary unpaid installments</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {editEmiFormData.strategy === 'add_installments' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="numNewInstallments">Number of New Installments</Label>
+                    <Input
+                      id="numNewInstallments"
+                      type="number"
+                      min="1"
+                      max="12"
+                      value={editEmiFormData.numNewInstallments}
+                      onChange={(e) => {
+                        const num = parseInt(e.target.value) || 1;
+                        setEditEmiFormData(prev => ({
+                          ...prev,
+                          numNewInstallments: num,
+                          newInstallmentDates: Array(num).fill('').map((_, i) => {
+                            const date = new Date();
+                            date.setMonth(date.getMonth() + i + 1);
+                            return date.toISOString().split('T')[0];
+                          })
+                        }));
+                      }}
+                    />
+                    <div className="space-y-2 mt-3">
+                      <Label>Due Dates for New Installments</Label>
+                      {editEmiFormData.newInstallmentDates.map((date, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <Label className="w-24 text-sm">Inst #{(selectedEmiPlanForEdit?.numberOfInstallments || 0) + idx + 1}</Label>
+                          <Input
+                            type="date"
+                            value={date}
+                            onChange={(e) => {
+                              const newDates = [...editEmiFormData.newInstallmentDates];
+                              newDates[idx] = e.target.value;
+                              setEditEmiFormData(prev => ({ ...prev, newInstallmentDates: newDates }));
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {editEmiFormData.strategy === 'remove_installments' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="numInstallmentsToRemove">Number of Installments to Remove</Label>
+                    <Input
+                      id="numInstallmentsToRemove"
+                      type="number"
+                      min="1"
+                      max={selectedEmiPlanForEdit?.numberOfInstallments || 1}
+                      value={editEmiFormData.numInstallmentsToRemove}
+                      onChange={e => setEditEmiFormData(prev => ({ ...prev, numInstallmentsToRemove: parseInt(e.target.value) || 1 }))}
+                    />
+                    <p className="text-xs text-amber-600">
+                      ⚠ This will delete the last {editEmiFormData.numInstallmentsToRemove} unpaid installment(s)
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+            <p className="text-xs text-amber-600">
+              * {editEmiFormData.strategy === 'distribute'
+                ? 'Recalculating will distribute the remaining amount evenly across unpaid installments.'
+                : 'New installments will be added for the fee increase.'}
+            </p>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditEmiModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-[#643ae5] text-white hover:bg-[#552dbf]">
+                Update Plan
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       {/* Student Edit Modal */}
       {
         selectedStudent && (

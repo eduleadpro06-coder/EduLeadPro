@@ -247,6 +247,14 @@ export interface IStorage {
   createEmiPlan(emiPlan: InsertEmiPlan, installments?: { amount: string, dueDate: string }[]): Promise<EmiPlan>;
   updateEmiPlan(id: number, updates: Partial<EmiPlan>): Promise<EmiPlan | undefined>;
   deleteEmiPlan(id: number): Promise<boolean>;
+  updateEmiPlanWithRecalculation(
+    id: number,
+    newTotalAmount: number,
+    options?: {
+      strategy?: 'distribute' | 'add_installments';
+      newInstallments?: { amount: string; dueDate: string }[];
+    }
+  ): Promise<EmiPlan | undefined>;
 
   // EMI Payment tracking operations
   getPendingEmisForPlan(emiPlanId: number): Promise<any[]>;
@@ -3871,6 +3879,194 @@ export class DatabaseStorage implements IStorage {
       );
     }
     return plan;
+  }
+
+  async updateEmiPlanWithRecalculation(
+    id: number,
+    newTotalAmount: number,
+    options?: {
+      strategy?: 'distribute' | 'add_installments' | 'remove_installments';
+      newInstallments?: { amount: string; dueDate: string }[];
+      numInstallmentsToRemove?: number;
+    }
+  ): Promise<EmiPlan | undefined> {
+    const strategy = options?.strategy || 'distribute';
+
+    return await db.transaction(async (tx) => {
+      // 1. Get plan
+      const [plan] = await tx.select().from(schema.emiPlans).where(eq(schema.emiPlans.id, id));
+      if (!plan) return undefined;
+
+      // 2. Get all payments/schedule items
+      const scheduleItems = await tx.select().from(schema.emiSchedule).where(eq(schema.emiSchedule.emiPlanId, id));
+
+      const paidItems = scheduleItems.filter(item => item.status === 'paid');
+      const unpaidItems = scheduleItems.filter(item => item.status !== 'paid');
+
+      const totalPaid = paidItems.reduce((sum, item) => sum + Number(item.amount), 0);
+
+      // 3. Validate
+      if (newTotalAmount < totalPaid) {
+        throw new Error(`New total amount (${newTotalAmount}) cannot be less than already paid amount (${totalPaid})`);
+      }
+
+      // If no change, return
+      if (Number(plan.totalAmount) === newTotalAmount) return plan;
+
+      const remainingAmount = newTotalAmount - totalPaid;
+
+      // 4. Update Plan
+      const [updatedPlan] = await tx.update(schema.emiPlans)
+        .set({
+          totalAmount: newTotalAmount.toString(),
+          updatedAt: new Date()
+        })
+        .where(eq(schema.emiPlans.id, id))
+        .returning();
+
+      // 5. Apply Strategy
+      if (strategy === 'add_installments' && options?.newInstallments && options.newInstallments.length > 0) {
+        // Add new installments strategy
+        const newInstallmentRecords = options.newInstallments;
+
+        // Get max installment number
+        const maxNumber = Math.max(...scheduleItems.map(s => s.installmentNumber), 0);
+
+        // Insert new schedule items
+        for (let i = 0; i < newInstallmentRecords.length; i++) {
+          await tx.insert(schema.emiSchedule).values({
+            studentId: plan.studentId,
+            emiPlanId: plan.id,
+            installmentNumber: maxNumber + i + 1,
+            amount: newInstallmentRecords[i].amount,
+            dueDate: newInstallmentRecords[i].dueDate,
+            status: 'pending'
+          });
+        }
+
+        // Calculate average for updated plan's installment amount display
+        const totalInstallments = scheduleItems.length + newInstallmentRecords.length;
+        const avgAmount = (newTotalAmount / totalInstallments).toFixed(2);
+
+        await tx.update(schema.emiPlans)
+          .set({
+            installmentAmount: avgAmount,
+            numberOfInstallments: totalInstallments
+          })
+          .where(eq(schema.emiPlans.id, id));
+
+      } else if (strategy === 'remove_installments' && options?.numInstallmentsToRemove && options.numInstallmentsToRemove > 0) {
+        // Remove last unpaid installments strategy
+        const numToRemove = Math.min(options.numInstallmentsToRemove, unpaidItems.length);
+
+        if (numToRemove === 0) {
+          throw new Error("No unpaid installments to remove");
+        }
+
+        // Sort unpaid items by installment number (descending) to delete from last
+        const sortedUnpaid = [...unpaidItems].sort((a, b) => b.installmentNumber - a.installmentNumber);
+        const itemsToDelete = sortedUnpaid.slice(0, numToRemove);
+        const remainingUnpaid = unpaidItems.filter(item => !itemsToDelete.some(d => d.id === item.id));
+
+        // Delete the last N unpaid installments
+        for (const item of itemsToDelete) {
+          await tx.delete(schema.emiSchedule).where(eq(schema.emiSchedule.id, item.id));
+        }
+
+        // Calculate new totals
+        const totalInstallments = scheduleItems.length - numToRemove;
+        const avgAmount = totalInstallments > 0 ? (newTotalAmount / totalInstallments).toFixed(2) : "0";
+
+        // Update plan
+        await tx.update(schema.emiPlans)
+          .set({
+            installmentAmount: avgAmount,
+            numberOfInstallments: totalInstallments
+          })
+          .where(eq(schema.emiPlans.id, id));
+
+        // Recalculate remaining unpaid installments
+        if (remainingUnpaid.length > 0) {
+          const newInstallmentAmount = (remainingAmount / remainingUnpaid.length).toFixed(2);
+          let accumulatedAmount = 0;
+
+          for (let i = 0; i < remainingUnpaid.length; i++) {
+            const item = remainingUnpaid[i];
+            let amount = parseFloat(newInstallmentAmount);
+
+            // Adjust last item for rounding
+            if (i === remainingUnpaid.length - 1) {
+              const currentTotal = totalPaid + accumulatedAmount + amount;
+              const diff = newTotalAmount - currentTotal;
+              if (Math.abs(diff) > 0.001) {
+                amount += diff;
+              }
+            }
+
+            accumulatedAmount += amount;
+            await tx.update(schema.emiSchedule)
+              .set({ amount: amount.toFixed(2) })
+              .where(eq(schema.emiSchedule.id, item.id));
+          }
+        }
+
+      } else {
+        // Distribute over existing unpaid installments
+        if (unpaidItems.length === 0 && newTotalAmount > totalPaid) {
+          throw new Error("Cannot recalculate COMPLETED plan. Please create a new EMI plan for the difference.");
+        }
+
+        const newInstallmentAmount = unpaidItems.length > 0 ? (remainingAmount / unpaidItems.length).toFixed(2) : "0";
+
+        // Update Plan with new installment amount
+        await tx.update(schema.emiPlans)
+          .set({ installmentAmount: newInstallmentAmount })
+          .where(eq(schema.emiPlans.id, id));
+
+        // Update Unpaid Schedule Items
+        let accumulatedAmount = 0;
+        for (let i = 0; i < unpaidItems.length; i++) {
+          const item = unpaidItems[i];
+          let amount = parseFloat(newInstallmentAmount);
+
+          // Adjust last item for rounding
+          if (i === unpaidItems.length - 1) {
+            const currentTotal = totalPaid + accumulatedAmount + amount;
+            const diff = newTotalAmount - currentTotal;
+            if (Math.abs(diff) > 0.001) {
+              amount += diff;
+            }
+          }
+
+          accumulatedAmount += amount;
+
+          await tx.update(schema.emiSchedule)
+            .set({ amount: amount.toFixed(2) })
+            .where(eq(schema.emiSchedule.id, item.id));
+        }
+      }
+
+      // Invalidate cache
+      if (updatedPlan.organizationId) {
+        cacheService.invalidateOrganization(updatedPlan.organizationId);
+      }
+      cacheService.invalidate('dashboard:*');
+
+      // Notify
+      const lead = await this.getLead(updatedPlan.studentId);
+      const studentName = lead ? lead.name : `Student ${updatedPlan.studentId}`;
+
+      await this.notifyChange(
+        'emi',
+        'EMI Plan Recalculated',
+        `EMI plan for ${studentName} recalculated. New Total: ${newTotalAmount}`,
+        'medium',
+        'view_emi_plan',
+        updatedPlan.id.toString()
+      );
+
+      return updatedPlan;
+    });
   }
 
   async deleteEmiPlan(id: number): Promise<boolean> {
