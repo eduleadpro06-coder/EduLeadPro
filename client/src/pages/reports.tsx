@@ -94,6 +94,7 @@ export default function Reports() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="not_paid">Not Paid</SelectItem>
                         <SelectItem value="partially_paid">Partially Paid</SelectItem>
                         <SelectItem value="fully_paid">Fully Paid</SelectItem>
