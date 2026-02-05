@@ -75,11 +75,12 @@ export default function FollowUpMonitor() {
 
             // If new, create notification
             try {
+                const leadName = (followUp as any).studentName || `Lead #${followUp.leadId}`;
                 await createNotification({
                     userId: 1, // Default to admin/current user for now. Ideally from auth context.
                     type: "followup",
                     title: "Follow-up Due",
-                    message: `Follow-up for lead #${followUp.leadId} is due.`,
+                    message: `Follow-up for ${leadName} is due.`,
                     priority: "high",
                     read: false,
                     actionType: "view_lead",

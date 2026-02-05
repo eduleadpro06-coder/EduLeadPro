@@ -130,7 +130,15 @@ export default function NotificationCenter() {
                           <p className="font-medium text-gray-900">{notification.title}</p>
                           <p className="text-sm text-gray-600">{notification.message}</p>
                           <p className="text-xs text-gray-500 mt-1">
-                            {formatDateTimeIST(notification.createdAt)}
+                            {new Date(notification.createdAt).toLocaleString('en-IN', {
+                              timeZone: 'Asia/Kolkata',
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
                           </p>
                         </div>
                       </div>

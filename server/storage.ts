@@ -921,11 +921,29 @@ export class DatabaseStorage implements IStorage {
 
   async getOverdueFollowUps(): Promise<FollowUp[]> {
     const now = new Date();
-    return await db.select().from(schema.followUps)
+    const followUps = await db.select()
+      .from(schema.followUps)
       .where(and(
         isNull(schema.followUps.completedAt),
         lt(schema.followUps.scheduledAt, now)
       ));
+
+    // Enrich with student names
+    const enriched = await Promise.all(
+      followUps.map(async (followUp) => {
+        const lead = await db.select({ name: schema.leads.name })
+          .from(schema.leads)
+          .where(eq(schema.leads.id, followUp.leadId))
+          .limit(1);
+
+        return {
+          ...followUp,
+          studentName: lead[0]?.name || null
+        };
+      })
+    );
+
+    return enriched as any;
   }
 
   // Lead source operations

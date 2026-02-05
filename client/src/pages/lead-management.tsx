@@ -492,7 +492,7 @@ export default function LeadManagement() {
                       setSortKey("student");
                       setSortOrder(sortKey === "student" && sortOrder === "asc" ? "desc" : "asc");
                     }}
-                    className="px-6 py-3 text-left table-header tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left table-header tracking-wider cursor-pointer"
                   >
                     <span className="flex items-center gap-1">
                       Student Details
@@ -501,7 +501,7 @@ export default function LeadManagement() {
                       ) : null}
                     </span>
                   </th>
-                  <th className="px-6 py-3 text-left table-header tracking-wider">
+                  <th className="px-4 py-3 text-left table-header tracking-wider">
                     Contact Info
                   </th>
                   <th
@@ -532,22 +532,13 @@ export default function LeadManagement() {
                       ) : null}
                     </span>
                   </th>
-                  <th
-                    onClick={() => {
-                      setSortKey("source");
-                      setSortOrder(sortKey === "source" && sortOrder === "asc" ? "desc" : "asc");
-                    }}
-                    className="px-6 py-3 text-left table-header tracking-wider cursor-pointer"
-                  >
+                  <th className="px-6 py-3 text-left table-header tracking-wider cursor-pointer">
                     <span className="flex items-center gap-1">
                       Source
                       {sortKey === "source" ? (
                         sortOrder === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                       ) : null}
                     </span>
-                  </th>
-                  <th className="px-6 py-3 text-left table-header tracking-wider">
-                    Counselor
                   </th>
                   <th
                     onClick={() => {
@@ -585,7 +576,7 @@ export default function LeadManagement() {
                 ) : (
                   paginatedLeads.map((lead) => (
                     <tr key={lead.id} className="hover:bg-primary/10 cursor-pointer transition-colors text-gray-800">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10">
                             <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
@@ -596,17 +587,14 @@ export default function LeadManagement() {
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-800">{lead.name}</div>
-                            <div className="text-sm text-gray-800/70">
-                              ID: {lead.id}
-                            </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-800">{lead.phone}</div>
                         <div className="text-sm text-gray-800/70">{lead.email || "No email"}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800">
                         {lead.class} {lead.stream}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
@@ -614,17 +602,14 @@ export default function LeadManagement() {
                           {lead.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800">
                         {lead.source.charAt(0).toUpperCase() + lead.source.slice(1).replace('_', ' ')}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
-                        {lead.counselor?.name || "Unassigned"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800/70">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800/70">
                         {formatDate(lead.lastContactedAt)}
                       </td>
 
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex space-x-2">
                           <Button
                             size="sm"

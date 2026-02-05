@@ -32,11 +32,27 @@ export function registerIntegrationRoutes(app: Express) {
 
             // Logic: 
             // - 'child_name' (Custom Form Field) -> Lead Name (Student)
-            // - 'name' (FB Profile Name) -> Parent Name
+            // - 'name' (FB Profile Name) -> Father's Name (split into first/last)
+            // - 'phone' -> Primary phone AND father's phone
             // - 'street_address' -> Address
 
             const studentName = child_name || name || "Unknown Lead";
-            const parentName = child_name ? name : null; // If child name exists, the FB name is likely the parent
+
+            // Parse parent name (FB profile name) into first and last name for father fields
+            const parentFullName = child_name ? name : null; // If child name exists, the FB name is likely the parent
+            let fatherFirstName = null;
+            let fatherLastName = null;
+
+            if (parentFullName) {
+                const nameParts = parentFullName.trim().split(/\s+/);
+                fatherFirstName = nameParts[0] || null;
+                fatherLastName = nameParts.slice(1).join(" ") || nameParts[0] || null; // Use first name as fallback
+            } else if (!child_name && name) {
+                // If no child_name, the 'name' field is the parent, use it for father
+                const nameParts = name.trim().split(/\s+/);
+                fatherFirstName = nameParts[0] || null;
+                fatherLastName = nameParts.slice(1).join(" ") || nameParts[0] || null;
+            }
 
             // Phone Cleaning Logic:
             // 1. Try to strip non-digits
@@ -48,15 +64,17 @@ export function registerIntegrationRoutes(app: Express) {
             // Insert into DB
             const newLead = await db.insert(leads).values({
                 name: studentName,
-                parentName: parentName,
+                fatherFirstName: fatherFirstName,
+                fatherLastName: fatherLastName,
+                fatherPhone: finalPhone, // Map phone to father's phone
                 email: email || null,
-                phone: finalPhone, // Use the smarter logic
+                phone: finalPhone, // Primary phone field
                 class: "Unknown", // User removed 'program' field
-                source: "facebook_make",
+                source: "Meta Marketing", // Changed from "facebook_make"
                 status: "new",
                 address: street_address || null, // Updated from city
                 metaLeadId: meta_lead_id || null,
-                notes: "Imported via Make.com",
+                notes: "Imported via Meta Marketing", // Changed from "Imported via Make.com"
                 organizationId: orgId
             }).returning();
 

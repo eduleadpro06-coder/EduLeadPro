@@ -53,8 +53,12 @@ export default function Leads() {
 
   // Filter leads based on search and filters
   const filteredLeads = leads.filter(lead => {
+    const parentName = [lead.fatherFirstName, lead.fatherLastName, lead.motherFirstName, lead.motherLastName]
+      .filter(Boolean)
+      .join(" ");
+
     const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (lead.parentName?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+      parentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lead.phone.includes(searchTerm);
 
     const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
@@ -179,53 +183,67 @@ export default function Leads() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b bg-gray-50">
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Student</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Parent</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Contact</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Source</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Counselor</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Follow-up</th>
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Student Details</th>
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Contact Info</th>
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Class/Stream</th>
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Source</th>
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Contacted</th>
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredLeads.map((lead) => (
                       <tr key={lead.id} className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-4 align-top">
+                        <td className="py-3 px-3 align-top min-w-[180px]">
                           <div>
                             <div className="flex items-center gap-2">
-                              <p className="font-medium text-sm text-gray-900">{lead.name}</p>
-                              {isNewLead(lead.createdAt) && (
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-800">
-                                  New
-                                </Badge>
-                              )}
+                              {/* Avatar Circle with Initial */}
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${(lead.id % 5 === 0) ? 'bg-red-100 text-red-700' :
+                                (lead.id % 5 === 1) ? 'bg-blue-100 text-blue-700' :
+                                  (lead.id % 5 === 2) ? 'bg-green-100 text-green-700' :
+                                    (lead.id % 5 === 3) ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-purple-100 text-purple-700'
+                                }`}>
+                                {lead.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-sm text-gray-900">{lead.name}</p>
+                                  {isNewLead(lead.createdAt) && (
+                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-800">
+                                      New
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-gray-500">ID: {lead.id}</p>
+                                {(lead.fatherFirstName || lead.fatherLastName) && (
+                                  <p className="text-[11px] text-gray-500 mt-0.5" title="Parent Name">
+                                    {([lead.fatherFirstName, lead.fatherLastName].filter(Boolean).join(" "))}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                            <p className="text-xs text-gray-500">{lead.class}</p>
-
                           </div>
                         </td>
-                        <td className="py-3 px-4 align-top">
-                          <p className="text-sm text-gray-900">{lead.parentName}</p>
-                        </td>
-                        <td className="py-3 px-4 align-top">
+                        <td className="py-3 px-3 align-top min-w-[140px]">
                           <div className="space-y-1">
                             <div className="flex items-center text-xs text-gray-600">
                               <Phone className="w-3 h-3 mr-1" />
-                              {lead.phone}
+                              <span className="font-medium text-gray-900">{lead.phone}</span>
                             </div>
-                            {lead.email && (
-                              <div className="flex items-center text-xs text-gray-600">
-                                <Mail className="w-3 h-3 mr-1" />
-                                <div className="truncate max-w-[120px]" title={lead.email}>
-                                  {lead.email}
-                                </div>
+                            <div className="flex items-center text-xs text-gray-500">
+                              <Mail className="w-3 h-3 mr-1" />
+                              <div className="truncate max-w-[120px]" title={lead.email || "No email"}>
+                                {lead.email || "No email"}
                               </div>
-                            )}
+                            </div>
                           </div>
                         </td>
-                        <td className="py-3 px-4 align-top">
+                        <td className="py-3 px-3 align-top">
+                          <p className="text-sm text-gray-900">{lead.class || "Unknown"}</p>
+                        </td>
+                        <td className="py-3 px-3 align-top">
                           <Select
                             value={lead.status}
                             onValueChange={(newStatus) =>
@@ -241,7 +259,6 @@ export default function Leads() {
                               <SelectItem value="new">New</SelectItem>
                               <SelectItem value="contacted">Contacted</SelectItem>
                               <SelectItem value="interested">Interested</SelectItem>
-                              <SelectItem value="interested">Interested</SelectItem>
                               <SelectItem value="ready_for_admission">Ready for Admission</SelectItem>
                               <SelectItem value="future_intake">Future Intake</SelectItem>
                               <SelectItem value="enrolled">Enrolled</SelectItem>
@@ -249,26 +266,24 @@ export default function Leads() {
                             </SelectContent>
                           </Select>
                         </td>
-                        <td className="py-3 px-4 text-sm text-gray-600">{lead.source}</td>
-                        <td className="py-3 px-4">
-                          <p className="text-sm text-gray-900">{lead.counselor?.name || "Unassigned"}</p>
-                        </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-3 text-sm text-gray-600">{lead.source}</td>
+                        <td className="py-3 px-3">
                           <div className="flex items-center text-xs text-gray-600">
-                            <Calendar className="w-3 h-3 mr-1" />
                             {formatDate(lead.lastContactedAt)}
                           </div>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-3 px-3">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setEditingLead(lead)}
                           >
-                            <Edit className="w-4 h-4 text-gray-500" />
+                            <span className="sr-only">View</span>
+                            <div className="border border-purple-500 text-purple-600 rounded-md px-3 py-1 text-xs font-medium hover:bg-purple-50">
+                              View
+                            </div>
                           </Button>
                         </td>
-
                       </tr>
                     ))}
                   </tbody>
