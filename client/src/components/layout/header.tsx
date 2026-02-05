@@ -7,6 +7,8 @@ import NotificationCenter from "@/components/notifications/notification-center";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 
+import { useSidebar } from "@/contexts/SidebarContext";
+
 interface HeaderProps {
   title?: string;
   subtitle?: string;
@@ -20,6 +22,17 @@ export default function Header({ title, subtitle, className, onMenuClick }: Head
   const { theme, toggleTheme } = useTheme();
   const { user, signOut } = useAuth();
 
+  // Try to use sidebar context, fail gracefully if not available (e.g. tests)
+  let sidebarToggle = () => { };
+  try {
+    const { toggle } = useSidebar();
+    sidebarToggle = toggle;
+  } catch (e) {
+    // Ignore
+  }
+
+  const handleMenuClick = onMenuClick || sidebarToggle;
+
   return (
     <header className={`bg-white shadow-sm border-b border-gray-200 px-4 lg:px-6 py-4 ${className || ''}`}>
       <div className="flex items-center justify-between lg:pl-2">
@@ -28,7 +41,7 @@ export default function Header({ title, subtitle, className, onMenuClick }: Head
             variant="ghost"
             size="icon"
             className="lg:hidden -ml-2 text-gray-500 hover:text-gray-700"
-            onClick={onMenuClick}
+            onClick={handleMenuClick}
           >
             <Menu className="h-6 w-6" />
           </Button>

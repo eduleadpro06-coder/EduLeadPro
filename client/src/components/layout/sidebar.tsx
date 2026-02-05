@@ -20,6 +20,7 @@ import {
 import { useState, useEffect } from "react";
 import { getActiveAIFeatures, getComingSoonFeatures, isAIFeaturePath } from "@/config/aiFeatures";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -41,9 +42,27 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen: propsIsOpen, onClose: propsOnClose }: SidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
+
+  // Integrate Context
+  let contextIsOpen = false;
+  let contextClose = () => { };
+
+  try {
+    const context = useSidebar();
+    contextIsOpen = context.isOpen;
+    contextClose = context.close;
+  } catch (e) {
+    // Fallback if not inside provider (though it should be)
+    console.warn("Sidebar rendered outside SidebarContext");
+  }
+
+  // Prefer props if provided (for testing or overrides), otherwise context
+  const isOpen = propsIsOpen ?? contextIsOpen;
+  const onClose = propsOnClose ?? contextClose;
+
   const [customInstituteName, setCustomInstituteName] = useState(() => {
     return localStorage.getItem("customInstituteName") || "";
   });
@@ -101,173 +120,181 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   };
 
   return (
-    <div className={`
-      fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-xl border-r border-gray-200 flex flex-col justify-between transition-transform duration-300 ease-in-out
-      ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-    `}>
-      <div>
-        <div className="p-6 pb-2">
-          <Link href="/landing">
-            <div className="flex flex-col items-start justify-center select-none">
-              <span className="text-2xl font-extrabold tracking-tight">
-                <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">YONERRA</span>
-              </span>
-              <span className="text-xs font-medium text-muted-foreground mt-1 ml-0">Campus</span>
-            </div>
-          </Link>
-        </div>
-        {user?.organizationName && (
-          <div className="px-6 py-4 bg-purple-50 border-b border-purple-100">
-            <div className="flex items-start space-x-2">
-              <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse mt-2 shrink-0"></div>
-              <p className="text-sm font-semibold text-purple-700 leading-tight break-words">
-                {user.organizationName}
-              </p>
-            </div>
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden transition-opacity duration-300 backdrop-blur-sm"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={`
+        fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-xl border-r border-gray-200 flex flex-col justify-between transition-transform duration-300 ease-in-out
+        ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+      `}>
+        <div>
+          <div className="p-6 pb-2">
+            <Link href="/landing">
+              <div className="flex flex-col items-start justify-center select-none cursor-pointer">
+                <span className="text-2xl font-extrabold tracking-tight">
+                  <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">YONERRA</span>
+                </span>
+                <span className="text-xs font-medium text-muted-foreground mt-1 ml-0">Campus</span>
+              </div>
+            </Link>
           </div>
-        )}
-        <nav className="mt-6 px-3">
-          <div className="space-y-2">
-            {navigation.map((item, idx) => {
-              const isActive = location === item.href;
-              const Icon = item.icon;
-              // Add divider after Daycare Management (index 3)
-              const dividerAfter = idx === 3;
-              // Add divider before item if separator flag is true
-              const dividerBefore = (item as any).separator === true;
-              return (
-                <>
-                  {dividerBefore && (
-                    <div className="my-2 border-t border-gray-200 mx-2"></div>
-                  )}
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                  >
-                    <div
-                      className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer relative group 
-                        ${isActive ? 'bg-purple-50 border-l-4 border-[#a259ff]' : 'hover:bg-gray-100 hover:text-purple-600'}
-                      `}
+          {user?.organizationName && (
+            <div className="px-6 py-4 bg-purple-50 border-b border-purple-100">
+              <div className="flex items-start space-x-2">
+                <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse mt-2 shrink-0"></div>
+                <p className="text-sm font-semibold text-purple-700 leading-tight break-words">
+                  {user.organizationName}
+                </p>
+              </div>
+            </div>
+          )}
+          <nav className="mt-6 px-3 overflow-y-auto max-h-[calc(100vh-180px)] custom-scrollbar">
+            <div className="space-y-2 pb-6">
+              {navigation.map((item, idx) => {
+                const isActive = location === item.href;
+                const Icon = item.icon;
+                // Add divider after Daycare Management (index 3)
+                const dividerAfter = idx === 3;
+                // Add divider before item if separator flag is true
+                const dividerBefore = (item as any).separator === true;
+                return (
+                  <div key={item.name}>
+                    {dividerBefore && (
+                      <div className="my-2 border-t border-gray-200 mx-2"></div>
+                    )}
+                    <Link
+                      href={item.href}
+                      onClick={() => {
+                        // Close sidebar on mobile when a link is clicked
+                        if (window.innerWidth < 1024) {
+                          onClose();
+                        }
+                      }}
                     >
-                      <span className={isActive ? 'text-[#a259ff]' : 'text-gray-500 group-hover:text-purple-600'}>
-                        <Icon size={18} />
+                      <div
+                        className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer relative group 
+                          ${isActive ? 'bg-purple-50 border-l-4 border-[#a259ff]' : 'hover:bg-gray-100 hover:text-purple-600'}
+                        `}
+                      >
+                        <span className={isActive ? 'text-[#a259ff]' : 'text-gray-500 group-hover:text-purple-600'}>
+                          <Icon size={18} />
+                        </span>
+                        <span className={`font-medium text-sm ${isActive ? 'text-[#a259ff]' : 'text-gray-600 group-hover:text-purple-600'}`}>
+                          {item.name}
+                        </span>
+                      </div>
+                    </Link>
+                    {dividerAfter && (
+                      <div className="my-2 border-t border-gray-200 mx-2"></div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* AI Features Section */}
+              {showAIFeatures && (
+                <div className="mt-4">
+                  <div
+                    onClick={() => setIsAIExpanded(!isAIExpanded)}
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer group hover:bg-gray-100`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <span className="text-gray-500 group-hover:text-purple-600">
+                        <Sparkles size={18} />
                       </span>
-                      <span className={`font-medium text-sm ${isActive ? 'text-[#a259ff]' : 'text-gray-600 group-hover:text-purple-600'}`}>
-                        {item.name}
+                      <span className="font-medium text-sm text-gray-600 group-hover:text-purple-600">
+                        AI Features
                       </span>
                     </div>
-                  </Link>
-                  {dividerAfter && (
-                    <div className="my-2 border-t border-gray-200 mx-2"></div>
-                  )}
-                </>
-              );
-            })}
-
-            {/* AI Features Section */}
-            {showAIFeatures && (
-              <div className="mt-4">
-                <div
-                  onClick={() => setIsAIExpanded(!isAIExpanded)}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer group hover:bg-gray-100`}
-                >
-                  <div className="flex items-center space-x-3">
                     <span className="text-gray-500 group-hover:text-purple-600">
-                      <Sparkles size={18} />
-                    </span>
-                    <span className="font-medium text-sm text-gray-600 group-hover:text-purple-600">
-                      AI Features
+                      {isAIExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                     </span>
                   </div>
-                  <span className="text-gray-500 group-hover:text-purple-600">
-                    {isAIExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  </span>
-                </div>
 
-                {/* AI Features Submenu */}
-                <div className={`overflow-hidden transition-all duration-300 ${isAIExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <div className="ml-6 mt-2 space-y-1">
-                    {/* Active AI Features */}
-                    {activeAIFeatures.map((feature) => {
-                      const isActive = location === feature.href;
-                      const Icon = feature.icon;
-                      return (
-                        <Link key={feature.id} href={feature.href}>
-                          <div
-                            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer relative group
-                              ${isActive ? 'bg-purple-50 border-l-4 border-[#a259ff]' : 'hover:bg-gray-100 hover:text-purple-600'}
-                            `}
-                          >
-                            <span className={isActive ? 'text-[#a259ff]' : 'text-gray-500 group-hover:text-purple-600'}>
-                              <Icon size={16} />
-                            </span>
-                            <div className="flex-1">
-                              <span className={`font-medium text-sm ${isActive ? 'text-[#a259ff]' : 'text-gray-600 group-hover:text-purple-600'}`}>
-                                {feature.name}
-                              </span>
-                              <div className={`text-xs ${isActive ? 'text-[#a259ff]/70' : 'text-gray-500 group-hover:text-purple-600/70'}`}>
-                                {feature.description}
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      );
-                    })}
-
-                    {/* Coming Soon Features */}
-                    {comingSoonFeatures.length > 0 && (
-                      <>
-                        <div className="px-3 py-2 mt-3">
-                          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Coming Soon
-                          </div>
-                        </div>
-                        {comingSoonFeatures.map((feature) => {
-                          const Icon = feature.icon;
-                          return (
+                  {/* AI Features Submenu */}
+                  <div className={`overflow-hidden transition-all duration-300 ${isAIExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                    <div className="ml-6 mt-2 space-y-1">
+                      {/* Active AI Features */}
+                      {activeAIFeatures.map((feature) => {
+                        const isActive = location === feature.href;
+                        const Icon = feature.icon;
+                        return (
+                          <Link key={feature.id} href={feature.href} onClick={() => window.innerWidth < 1024 && onClose()}>
                             <div
-                              key={feature.id}
-                              className="flex items-center space-x-3 px-3 py-2 rounded-lg opacity-60 cursor-not-allowed"
+                              className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer relative group
+                                ${isActive ? 'bg-purple-50 border-l-4 border-[#a259ff]' : 'hover:bg-gray-100 hover:text-purple-600'}
+                              `}
                             >
-                              <span className="text-gray-400">
+                              <span className={isActive ? 'text-[#a259ff]' : 'text-gray-500 group-hover:text-purple-600'}>
                                 <Icon size={16} />
                               </span>
                               <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-sm text-gray-400">
-                                    {feature.name}
-                                  </span>
-                                  <Clock size={12} className="text-gray-400" />
-                                </div>
-                                <div className="text-xs text-gray-400">
+                                <span className={`font-medium text-sm ${isActive ? 'text-[#a259ff]' : 'text-gray-600 group-hover:text-purple-600'}`}>
+                                  {feature.name}
+                                </span>
+                                <div className={`text-xs ${isActive ? 'text-[#a259ff]/70' : 'text-gray-500 group-hover:text-purple-600/70'}`}>
                                   {feature.description}
                                 </div>
                               </div>
                             </div>
-                          );
-                        })}
-                      </>
-                    )}
+                          </Link>
+                        );
+                      })}
+
+                      {/* Coming Soon Features */}
+                      {comingSoonFeatures.length > 0 && (
+                        <>
+                          <div className="px-3 py-2 mt-3">
+                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Coming Soon
+                            </div>
+                          </div>
+                          {comingSoonFeatures.map((feature) => {
+                            const Icon = feature.icon;
+                            return (
+                              <div
+                                key={feature.id}
+                                className="flex items-center space-x-3 px-3 py-2 rounded-lg opacity-60 cursor-not-allowed"
+                              >
+                                <span className="text-gray-400">
+                                  <Icon size={16} />
+                                </span>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-sm text-gray-400">
+                                      {feature.name}
+                                    </span>
+                                    <Clock size={12} className="text-gray-400" />
+                                  </div>
+                                  <div className="text-xs text-gray-400">
+                                    {feature.description}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Divider after AI Features */}
-            <div className="my-2 border-t border-gray-200 mx-2"></div>
-          </div>
-        </nav>
-      </div>
-      {/* Bottom section for settings or template pages if needed */}
-      {/* <div className="px-3 pb-6">
-        <div className="my-2 border-t border-[#232a3a] mx-2"></div>
-        <Link href="/settings">
-          <div className="flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer group hover:bg-[#131b2d]">
-            <Settings className="text-[#bfc8e6] group-hover:text-[#a084fa]" size={18} />
-            <span className="font-medium text-sm text-[#bfc8e6] group-hover:text-[#a084fa]">Settings</span>
-          </div>
-        </Link>
-      </div> */}
-    </div >
+              {/* Divider after AI Features */}
+              <div className="my-2 border-t border-gray-200 mx-2"></div>
+            </div>
+          </nav>
+        </div>
+        {/* Bottom section if needed */}
+      </div >
+    </>
   );
 }

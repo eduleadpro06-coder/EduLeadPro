@@ -24,7 +24,7 @@ export default function SidebarPageHeader({
 }: SidebarPageHeaderProps) {
     return (
         <div className="w-full bg-gray-50 border-b border-gray-200">
-            <div className="px-6 py-4">
+            <div className="px-2 sm:px-4 lg:px-6 py-4">
                 {/* Search and Filters Row */}
                 {(showSearch || filters || primaryActions) && (
                     <div className="flex flex-wrap items-center gap-3 justify-between">

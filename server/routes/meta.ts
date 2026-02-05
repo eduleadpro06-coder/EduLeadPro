@@ -14,10 +14,23 @@ function mapLeadData(leadData: any) {
         });
     }
 
-    const name = fields["full_name"] || fields["name"] || leadData.full_name || "Meta Lead";
+    // Get the full name for father's name mapping
+    const fullName = fields["full_name"] || fields["name"] || leadData.full_name || "Meta Lead";
+
+    // Split full name into first and last name for father's name
+    const nameParts = fullName.trim().split(/\s+/);
+    const fatherFirstName = nameParts[0] || fullName;
+    const fatherLastName = nameParts.slice(1).join(" ") || nameParts[0]; // Use first name as fallback for last name
+
+    // Get child's name (if provided separately)
+    const childName = fields["child_name"] || fields["child's_name"] || fullName;
+
     const email = fields["email"] || fields["email_address"] || leadData.email || null;
-    const phone = fields["phone_number"] || fields["phone"] || leadData.phone_number || "0000000000";
-    const city = fields["city"] || fields["location"] || ""; // Map city to address
+
+    // Map WhatsApp number to PRIMARY phone field
+    const whatsappNumber = fields["phone_number"] || fields["phone"] || fields["whatsapp_number"] || leadData.phone_number || "0000000000";
+
+    const city = fields["city"] || fields["location"] || fields["street_address"] || ""; // Map city/address
 
     let className = "Unknown";
     Object.keys(fields).forEach(key => {
@@ -27,17 +40,21 @@ function mapLeadData(leadData: any) {
     });
 
     return {
-        name,
+        name: childName,
         email,
-        phone: phone.replace(/\D/g, '').slice(-10),
+        phone: whatsappNumber.replace(/\D/g, '').slice(-10), // PRIMARY phone - WhatsApp number
+        fatherFirstName,
+        fatherLastName,
+        fatherPhone: whatsappNumber.replace(/\D/g, '').slice(-10), // Also save to father's phone
         class: className,
-        source: "facebook_ads",
+        source: "Meta Marketing", // Changed from "facebook_ads" to "Meta Marketing"
         status: "new",
         address: city,
-        notes: `Meta Lead ID: ${leadData.id}. Form ID: ${leadData.form_id}.`,
+        notes: `Imported via Meta Marketing. Lead ID: ${leadData.id}`, // Updated notes format
         metaLeadId: leadData.id // Save the ID for CAPI
     };
 }
+
 
 export function registerMetaWebhookRoutes(app: Express) {
 

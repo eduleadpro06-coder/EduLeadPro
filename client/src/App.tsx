@@ -25,7 +25,8 @@ import EMandate from "@/pages/e-mandate";
 import StudentFees from "@/pages/student-fees";
 import StaffAI from "@/pages/staff-ai";
 import Daycare from "@/pages/daycare";
-import Sidebar from "@/components/layout/sidebar";
+import Shell from "@/components/layout/Shell";
+import { SidebarProvider } from "@/contexts/SidebarContext";
 import NotFound from "@/pages/not-found";
 import Expenses from "@/pages/expenses";
 import Accounts from "@/pages/accounts";
@@ -51,60 +52,45 @@ function Router() {
       <Route path="/dashboard">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <Dashboard />
-              </div>
-            </div>
+            <Shell>
+              <Dashboard />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/leads">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <LeadManagement />
-              </div>
-            </div>
+            <Shell>
+              <LeadManagement />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/leads/add">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <AddLeadPage />
-              </div>
-            </div>
+            <Shell>
+              <AddLeadPage />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/ai-forecasting">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <AIForecasting />
-              </div>
-            </div>
+            <Shell>
+              <AIForecasting />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/ai-marketing">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <AIMarketing />
-              </div>
-            </div>
+            <Shell>
+              <AIMarketing />
+            </Shell>
           )} />
         )}
       </Route>
@@ -116,168 +102,126 @@ function Router() {
       <Route path="/ai-comprehensive">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <ComprehensiveAIDashboard />
-              </div>
-            </div>
+            <Shell>
+              <ComprehensiveAIDashboard />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/reports">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <Reports />
-              </div>
-            </div>
+            <Shell>
+              <Reports />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/settings">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <Settings />
-              </div>
-            </div>
+            <Shell>
+              <Settings />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/expenses">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <Expenses />
-              </div>
-            </div>
+            <Shell>
+              <Expenses />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/accounts">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <Accounts />
-              </div>
-            </div>
+            <Shell>
+              <Accounts />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/students">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <Students />
-              </div>
-            </div>
+            <Shell>
+              <Students />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/e-mandate">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <EMandate />
-              </div>
-            </div>
+            <Shell>
+              <EMandate />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/student-fees">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <StudentFees />
-              </div>
-            </div>
+            <Shell>
+              <StudentFees />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/daycare">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <Daycare />
-              </div>
-            </div>
+            <Shell>
+              <Daycare />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/staff-ai">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <StaffAI />
-              </div>
-            </div>
+            <Shell>
+              <StaffAI />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/communication">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <Communication />
-              </div>
-            </div>
+            <Shell>
+              <Communication />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/inventory">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <Inventory />
-              </div>
-            </div>
+            <Shell>
+              <Inventory />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/meta-marketing">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <MetaMarketing />
-              </div>
-            </div>
+            <Shell>
+              <MetaMarketing />
+            </Shell>
           )} />
         )}
       </Route>
       <Route path="/app-management">
         {() => (
           <ProtectedRoute component={() => (
-            <div className="min-h-screen flex bg-gradient-to-br from-slate-50 to-blue-50">
-              <Sidebar />
-              <div className="flex-1 ml-64">
-                <AppManagement />
-              </div>
-            </div>
+            <Shell>
+              <AppManagement />
+            </Shell>
           )} />
         )}
       </Route>
@@ -358,13 +302,15 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <NotificationProvider>
-            <TooltipProvider>
-              <FollowUpMonitor />
-              <LeadMonitor />
-              <Toaster />
-              <Router />
-              <EnvironmentInfo />
-            </TooltipProvider>
+            <SidebarProvider>
+              <TooltipProvider>
+                <FollowUpMonitor />
+                <LeadMonitor />
+                <Toaster />
+                <Router />
+                <EnvironmentInfo />
+              </TooltipProvider>
+            </SidebarProvider>
           </NotificationProvider>
         </AuthProvider>
       </ThemeProvider>

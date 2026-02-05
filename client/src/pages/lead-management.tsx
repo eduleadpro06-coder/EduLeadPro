@@ -481,7 +481,7 @@ export default function LeadManagement() {
           </div>
         }
       />
-      <div className="px-6 pb-6">
+      <div className="px-2 sm:px-4 lg:px-6 pb-6">
         <div className="border rounded-xl overflow-hidden shadow-lg mt-4">
           <div className="overflow-x-auto">
             <table className="w-full glass-card rounded-lg border bg-card text-gray-800 shadow-lg">

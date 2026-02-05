@@ -151,7 +151,7 @@ export default function Dashboard() {
       <div className="min-h-screen w-full bg-gray-50 text-gray-900 px-4 pb-8">
 
         {/* KPI Cards - 8 Total */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <KPICard
             title="Total Leads"
             value={analytics.kpis.leadManagement.value}
