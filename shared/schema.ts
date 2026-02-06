@@ -88,6 +88,7 @@ export const followUps = pgTable("follow_ups", {
   completedAt: timestamp("completed_at"),
   remarks: text("remarks"),
   outcome: text("outcome"), // interested, not_interested, needs_more_info, enrolled, etc.
+  organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -243,10 +243,18 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
   const createFollowUpMutation = useMutation({
     mutationFn: async (followUpData: any) => {
       try {
+        // Get valid counselorId - use lead's counselor or first available counselor
+        const validCounselorId = lead?.counselorId ||
+          (counselors && counselors.length > 0 ? counselors[0].id : null);
+
+        if (!validCounselorId) {
+          throw new Error("No counselor available. Please assign a counselor to this lead first.");
+        }
+
         const response = await apiRequest("POST", "/follow-ups", {
           ...followUpData,
           leadId: lead?.id,
-          counselorId: lead?.counselorId || 1
+          counselorId: validCounselorId
         });
 
         // Check content type to ensure we're receiving JSON

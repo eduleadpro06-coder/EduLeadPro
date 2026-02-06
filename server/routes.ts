@@ -1856,6 +1856,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error.name === "ZodError") {
         return res.status(400).json({ message: "Invalid follow-up data", errors: error.errors });
       }
+      console.error("Error creating follow-up:", error);
       res.status(500).json({ message: "Failed to create follow-up" });
     }
   });
