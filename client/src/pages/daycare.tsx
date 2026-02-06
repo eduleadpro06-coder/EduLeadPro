@@ -8,11 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Baby, Users, UserPlus, Calendar, IndianRupee, Settings as SettingsIcon, TrendingUp, Plus, Clock, CheckCircle, UserCheck, LogOut, AlertTriangle, Phone, Mail, Eye, FileText, Download, Filter, InfoIcon, AlertCircle, User2, Trash2 } from "lucide-react";
+import { Baby, Users, UserPlus, Calendar, IndianRupee, Settings as SettingsIcon, TrendingUp, Plus, Clock, CheckCircle, UserCheck, LogOut, AlertTriangle, Phone, Mail, Eye, FileText, Download, Filter, InfoIcon, AlertCircle, User2, Trash2, Pencil } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import { useState, useEffect, useMemo } from "react";
 import { useQueryState } from "@/hooks/use-query-state";
-import { useDaycareStats, useCurrentlyCheckedIn, useDaycareChildren, useDaycareInquiries, useDaycareEnrollments, useTodayAttendance, useDaycarePayments, useActiveBillingConfig, useCreateDaycareChild, useCreateDaycareInquiry, useCreateEnrollment, useCheckInChild, useCheckOutChild, useRecordPayment, useUpdateBillingConfig, useAttendanceReport } from "@/hooks/use-daycare";
+import { useDaycareStats, useCurrentlyCheckedIn, useDaycareChildren, useDaycareInquiries, useDaycareEnrollments, useTodayAttendance, useDaycarePayments, useActiveBillingConfig, useCreateDaycareChild, useUpdateDaycareChild, useCreateDaycareInquiry, useCreateEnrollment, useCheckInChild, useCheckOutChild, useRecordPayment, useUpdateBillingConfig, useAttendanceReport } from "@/hooks/use-daycare";
 import { useOrganization } from "@/hooks/use-organization";
 import { generateDaycareAttendancePDF } from "@/lib/daycare-report-generator";
 import { generateDaycareReceiptPDF } from "@/lib/daycare-receipt-generator";
@@ -37,6 +37,8 @@ export default function Daycare() {
     const [selectedReportChildId, setSelectedReportChildId] = useState<string>("");
     const [isAddChildOpen, setIsAddChildOpen] = useState(false);
     const [isEnrollmentOpen, setIsEnrollmentOpen] = useState(false);
+    const [isEditChildOpen, setIsEditChildOpen] = useState(false);
+    const [editingChild, setEditingChild] = useState<any>(null);
 
     const { toast } = useToast();
 
@@ -72,6 +74,7 @@ export default function Daycare() {
 
     // Mutations
     const createChild = useCreateDaycareChild();
+    const updateChild = useUpdateDaycareChild();
     const createInquiry = useCreateDaycareInquiry();
     const createEnrollmentMutation = useCreateEnrollment();
     const checkIn = useCheckInChild();
@@ -120,6 +123,8 @@ export default function Daycare() {
     });
 
     const [selectedPayment, setSelectedPayment] = useState<any>(null);
+    const [recordPaymentChildId, setRecordPaymentChildId] = useState<string>("");
+    const [recordPaymentMode, setRecordPaymentMode] = useState<string>("");
 
     const updatePaymentMutation = useMutation({
         mutationFn: async (data: any) => {
@@ -711,9 +716,9 @@ export default function Daycare() {
                                                     // Close modal first to ensure it happens even if other operations fail
                                                     setIsAddChildOpen(false);
 
-                                                    // Explicitly invalidate queries to ensure data refresh
-                                                    queryClient.invalidateQueries({ queryKey: ["/api/daycare/children"] });
-                                                    queryClient.invalidateQueries({ queryKey: ["/api/daycare/stats"] });
+                                                    // Force immediate refetch to show new child
+                                                    queryClient.refetchQueries({ queryKey: ["/api/daycare/children"] });
+                                                    queryClient.refetchQueries({ queryKey: ["/api/daycare/stats"] });
 
                                                     toast({
                                                         title: "Child profile created",
@@ -805,6 +810,138 @@ export default function Daycare() {
                                         </form>
                                     </DialogContent>
                                 </Dialog>
+
+                                {/* Edit Child Modal */}
+                                <Dialog open={isEditChildOpen} onOpenChange={setIsEditChildOpen}>
+                                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                                        <DialogHeader>
+                                            <DialogTitle>Edit Child Profile</DialogTitle>
+                                            <DialogDescription>Update child information</DialogDescription>
+                                        </DialogHeader>
+                                        {editingChild && (
+                                            <form onSubmit={(e) => {
+                                                e.preventDefault();
+                                                const formData = new FormData(e.currentTarget);
+                                                const data = {
+                                                    childName: formData.get('childName'),
+                                                    dateOfBirth: formData.get('dateOfBirth'),
+                                                    gender: formData.get('gender'),
+                                                    parentName: formData.get('parentName'),
+                                                    parentPhone: formData.get('parentPhone'),
+                                                    parentEmail: formData.get('parentEmail'),
+                                                    address: formData.get('address'),
+                                                    emergencyContactName: formData.get('emergencyContactName'),
+                                                    emergencyContactRelation: 'Guardian',
+                                                    emergencyContactPhone: formData.get('emergencyContactPhone'),
+                                                    bloodGroup: formData.get('bloodGroup'),
+                                                    allergies: formData.get('allergies'),
+                                                    medicalConditions: formData.get('medicalConditions'),
+                                                };
+                                                updateChild.mutate({
+                                                    id: editingChild.id,
+                                                    updates: data
+                                                }, {
+                                                    onSuccess: () => {
+                                                        setIsEditChildOpen(false);
+                                                        setEditingChild(null);
+                                                        queryClient.refetchQueries({ queryKey: ["/api/daycare/children"] });
+                                                        toast({
+                                                            title: "Profile updated",
+                                                            description: `${data.childName}'s information has been updated.`
+                                                        });
+                                                    },
+                                                    onError: (error: any) => {
+                                                        toast({
+                                                            title: "Update failed",
+                                                            description: error.message,
+                                                            variant: "destructive"
+                                                        });
+                                                    }
+                                                });
+                                            }}
+                                                className="space-y-4 py-4"
+                                            >
+                                                <div className="space-y-4 py-4">
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <Label htmlFor="edit_childName">Child Name *</Label>
+                                                            <Input id="edit_childName" name="childName" defaultValue={editingChild.childName} required />
+                                                        </div>
+                                                        <div>
+                                                            <Label htmlFor="edit_dateOfBirth">Date of Birth *</Label>
+                                                            <Input id="edit_dateOfBirth" name="dateOfBirth" type="date" defaultValue={editingChild.dateOfBirth?.split('T')[0]} required />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <Label htmlFor="edit_gender">Gender</Label>
+                                                        <Select name="gender" defaultValue={editingChild.gender}>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Select gender" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="male">Male</SelectItem>
+                                                                <SelectItem value="female">Female</SelectItem>
+                                                                <SelectItem value="other">Other</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <Label htmlFor="edit_parentName">Parent Name *</Label>
+                                                            <Input id="edit_parentName" name="parentName" defaultValue={editingChild.parentName} required />
+                                                        </div>
+                                                        <div>
+                                                            <Label htmlFor="edit_parentPhone">Parent Phone *</Label>
+                                                            <Input id="edit_parentPhone" name="parentPhone" defaultValue={editingChild.parentPhone} required />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <Label htmlFor="edit_parentEmail">Parent Email</Label>
+                                                        <Input id="edit_parentEmail" name="parentEmail" type="email" defaultValue={editingChild.parentEmail || ''} />
+                                                    </div>
+                                                    <div>
+                                                        <Label htmlFor="edit_address">Address</Label>
+                                                        <Textarea id="edit_address" name="address" rows={2} defaultValue={editingChild.address || ''} />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <Label htmlFor="edit_emergencyContactName">Emergency Contact</Label>
+                                                            <Input id="edit_emergencyContactName" name="emergencyContactName" defaultValue={editingChild.emergencyContactName || ''} />
+                                                        </div>
+                                                        <div>
+                                                            <Label htmlFor="edit_emergencyContactPhone">Emergency Phone</Label>
+                                                            <Input id="edit_emergencyContactPhone" name="emergencyContactPhone" defaultValue={editingChild.emergencyContactPhone || ''} />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <Label htmlFor="edit_bloodGroup">Blood Group</Label>
+                                                        <Input id="edit_bloodGroup" name="bloodGroup" placeholder="e.g., O+" defaultValue={editingChild.bloodGroup || ''} />
+                                                    </div>
+                                                    <div>
+                                                        <Label htmlFor="edit_allergies">Allergies</Label>
+                                                        <Textarea id="edit_allergies" name="allergies" rows={2} placeholder="List any allergies" defaultValue={editingChild.allergies || ''} />
+                                                    </div>
+                                                    <div>
+                                                        <Label htmlFor="edit_medicalConditions">Medical Conditions</Label>
+                                                        <Textarea id="edit_medicalConditions" name="medicalConditions" rows={2} defaultValue={editingChild.medicalConditions || ''} />
+                                                    </div>
+                                                </div>
+                                                <DialogFooter>
+                                                    <Button type="button" variant="outline" onClick={() => {
+                                                        setIsEditChildOpen(false);
+                                                        setEditingChild(null);
+                                                    }}>
+                                                        Cancel
+                                                    </Button>
+                                                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={updateChild.isPending}>
+                                                        {updateChild.isPending ? "Updating..." : "Update Child"}
+                                                    </Button>
+                                                </DialogFooter>
+                                            </form>
+                                        )}
+                                    </DialogContent>
+                                </Dialog>
+
                                 <Dialog open={isEnrollmentOpen} onOpenChange={setIsEnrollmentOpen}>
                                     <DialogTrigger asChild>
                                         <Button variant="outline">
@@ -839,12 +976,9 @@ export default function Daycare() {
                                                 customMonthlyRate: (rate * days).toString() // Explicit formula: Hourly Rate * Total Hours
                                             }, {
                                                 onSuccess: (enrollment) => {
-                                                    // Close modal first to ensure it happens even if other operations fail
-                                                    setIsEnrollmentOpen(false);
-
-                                                    // Explicitly invalidate queries to ensure data refresh
-                                                    queryClient.invalidateQueries({ queryKey: ["/api/daycare/enrollments"] });
-                                                    queryClient.invalidateQueries({ queryKey: ["/api/daycare/stats"] });
+                                                    // Force immediate refetch instead of just invalidating
+                                                    queryClient.refetchQueries({ queryKey: ["/api/daycare/enrollments"] });
+                                                    queryClient.refetchQueries({ queryKey: ["/api/daycare/stats"] });
 
                                                     toast({ title: "Enrollment created successfully" });
 
@@ -872,6 +1006,17 @@ export default function Daycare() {
                                                     // Reset state
                                                     setDailyHours('8');
                                                     setPaymentAmount('');
+                                                },
+                                                onError: (error: any) => {
+                                                    toast({
+                                                        title: "Failed to create enrollment",
+                                                        description: error.message,
+                                                        variant: "destructive"
+                                                    });
+                                                },
+                                                onSettled: () => {
+                                                    // Always close modal when mutation settles (success or error)
+                                                    setIsEnrollmentOpen(false);
                                                 }
                                             });
                                         }}>
@@ -1109,6 +1254,17 @@ export default function Daycare() {
                                                                     <Button
                                                                         size="sm"
                                                                         variant="ghost"
+                                                                        className="h-8 w-8 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                                                                        onClick={() => {
+                                                                            setEditingChild(child);
+                                                                            setIsEditChildOpen(true);
+                                                                        }}
+                                                                    >
+                                                                        <Pencil className="h-4 w-4" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
                                                                         className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                                                                         onClick={() => {
                                                                             if (confirm(`Are you sure you want to delete ${child.childName}? This will remove them from the active list.`)) {
@@ -1295,199 +1451,226 @@ export default function Daycare() {
                         </Dialog>
                     </CardContent>
                 </Card>
-            </div>)}
+            </div>)
+            }
 
             {/* Billing & Payments Tab */}
-            {activeTab === "billing" && (<div className="space-y-6 px-6 py-6">
-                <Card className="bg-white">
-                    <CardHeader>
-                        <div className="flex items-end justify-between">
-                            <div>
-                                <CardTitle>Billing & Payments History</CardTitle>
-                                <CardDescription>Track all payment records and transactions</CardDescription>
-                            </div>
-                            <Dialog>
-                                <DialogTrigger asChild>
-                                    <Button className="bg-purple-600 hover:bg-purple-700">
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Record Payment
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>Record Payment</DialogTitle>
-                                        <DialogDescription>Record a payment with transaction details</DialogDescription>
-                                    </DialogHeader>
-                                    <form onSubmit={(e) => {
-                                        e.preventDefault();
-                                        const formData = new FormData(e.currentTarget);
-                                        recordPayment.mutate({
-                                            childId: parseInt(formData.get('childId') as string),
-                                            amount: parseFloat(formData.get('amount') as string),
-                                            paymentMode: formData.get('paymentMode'),
-                                            userId: 1,
-                                            paymentType: 'monthly_fee'
-                                        }, {
-                                            onSuccess: () => {
-                                                toast({ title: "Payment recorded successfully" });
-                                                e.currentTarget.reset();
-                                            }
-                                        });
-                                    }}>
-                                        <div className="space-y-4 py-4">
-                                            <div>
-                                                <Label htmlFor="childId">Select Child *</Label>
-                                                <Select name="childId" required>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Choose a child" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {children.data?.map((child: any) => (
-                                                            <SelectItem key={child.id} value={child.id.toString()}>
-                                                                {child.childName} ({child.childId})
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="amount">Amount (₹) *</Label>
-                                                <Input id="amount" name="amount" type="number" step="0.01" required />
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="paymentMode">Payment Mode *</Label>
-                                                <Select name="paymentMode" required>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select mode" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="UPI">UPI</SelectItem>
-                                                        <SelectItem value="Cash">Cash</SelectItem>
-                                                        <SelectItem value="Card">Card</SelectItem>
-                                                        <SelectItem value="Cheque">Cheque</SelectItem>
-                                                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="transactionId">Transaction ID</Label>
-                                                <Input id="transactionId" name="transactionId" placeholder="Optional" />
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
-                                                Record Payment
-                                            </Button>
-                                        </DialogFooter>
-                                    </form>
-                                </DialogContent>
-                            </Dialog>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-
-
-
-                        {/* Payment History */}
-                        <div className="mt-8">
-                            <h3 className="text-lg font-semibold mb-4">Payment History</h3>
-                            {payments.isLoading ? (
-                                <div className="text-center py-8">Loading...</div>
-                            ) : !payments.data || payments.data.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    <IndianRupee className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                                    <p>No payments recorded</p>
+            {
+                activeTab === "billing" && (<div className="space-y-6 px-6 py-6">
+                    <Card className="bg-white">
+                        <CardHeader>
+                            <div className="flex items-end justify-between">
+                                <div>
+                                    <CardTitle>Billing & Payments History</CardTitle>
+                                    <CardDescription>Track all payment records and transactions</CardDescription>
                                 </div>
-                            ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Receipt #</TableHead>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Child</TableHead>
-                                            <TableHead className="text-right">Amount</TableHead>
-                                            <TableHead>Mode</TableHead>
-                                            <TableHead>Transaction ID</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {payments.data.map((payment: any) => {
-                                            const child = children.data?.find((c: any) => c.id === payment.childId);
-                                            return (
-                                                <TableRow key={payment.id}>
-                                                    <TableCell className="font-medium">{payment.receiptNumber}</TableCell>
-                                                    <TableCell>{new Date(payment.paymentDate).toLocaleDateString('en-IN')}</TableCell>
-                                                    <TableCell>{child?.childName || 'Unknown'}</TableCell>
-                                                    <TableCell className="text-right font-semibold">
-                                                        ₹{parseFloat(payment.totalAmount).toLocaleString('en-IN')}
-                                                    </TableCell>
-                                                    <TableCell className="capitalize">{payment.paymentMode?.replace('_', ' ')}</TableCell>
-                                                    <TableCell className="font-mono text-xs">{payment.transactionId || '-'}</TableCell>
-                                                    <TableCell>
-                                                        <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'} className="capitalize">
-                                                            {payment.status}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <div className="flex justify-end items-center gap-1">
-                                                            {payment.status === 'completed' && (
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button className="bg-purple-600 hover:bg-purple-700">
+                                            <Plus className="h-4 w-4 mr-2" />
+                                            Record Payment
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Record Payment</DialogTitle>
+                                            <DialogDescription>Record a payment with transaction details</DialogDescription>
+                                        </DialogHeader>
+                                        <form onSubmit={(e) => {
+                                            e.preventDefault();
+                                            const formData = new FormData(e.currentTarget);
+
+                                            // Validate required fields from controlled state
+                                            if (!recordPaymentChildId || !recordPaymentMode) {
+                                                toast({
+                                                    title: "Missing Information",
+                                                    description: "Please select a child and payment mode",
+                                                    variant: "destructive"
+                                                });
+                                                return;
+                                            }
+
+                                            const amount = parseFloat(formData.get('amount') as string);
+                                            if (isNaN(amount) || amount <= 0) {
+                                                toast({
+                                                    title: "Invalid Amount",
+                                                    description: "Please enter a valid amount",
+                                                    variant: "destructive"
+                                                });
+                                                return;
+                                            }
+
+                                            recordPayment.mutate({
+                                                childId: parseInt(recordPaymentChildId),
+                                                amount: amount,
+                                                paymentMode: recordPaymentMode,
+                                                transactionId: formData.get('transactionId') as string || undefined,
+                                                userId: 1,
+                                                paymentType: 'monthly_fee',
+                                                status: 'completed'
+                                            }, {
+                                                onSuccess: () => {
+                                                    toast({ title: "Payment recorded successfully" });
+                                                    e.currentTarget.reset();
+                                                    setRecordPaymentChildId("");
+                                                    setRecordPaymentMode("");
+                                                }
+                                            });
+                                        }}>
+                                            <div className="space-y-4 py-4">
+                                                <div>
+                                                    <Label htmlFor="childId">Select Child *</Label>
+                                                    <Select value={recordPaymentChildId} onValueChange={setRecordPaymentChildId} required>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Choose a child" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {children.data?.map((child: any) => (
+                                                                <SelectItem key={child.id} value={child.id.toString()}>
+                                                                    {child.childName} ({child.childId})
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="amount">Amount (₹) *</Label>
+                                                    <Input id="amount" name="amount" type="number" step="0.01" required />
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="paymentMode">Payment Mode *</Label>
+                                                    <Select value={recordPaymentMode} onValueChange={setRecordPaymentMode} required>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select mode" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="UPI">UPI</SelectItem>
+                                                            <SelectItem value="Cash">Cash</SelectItem>
+                                                            <SelectItem value="Card">Card</SelectItem>
+                                                            <SelectItem value="Cheque">Cheque</SelectItem>
+                                                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="transactionId">Transaction ID</Label>
+                                                    <Input id="transactionId" name="transactionId" placeholder="Optional" />
+                                                </div>
+                                            </div>
+                                            <DialogFooter>
+                                                <Button type="submit" className="bg-purple-600 hover:bg-purple-700" disabled={recordPayment.isPending}>
+                                                    {recordPayment.isPending ? "Recording..." : "Record Payment"}
+                                                </Button>
+                                            </DialogFooter>
+                                        </form>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+
+
+
+                            {/* Payment History */}
+                            <div className="mt-8">
+                                <h3 className="text-lg font-semibold mb-4">Payment History</h3>
+                                {payments.isLoading ? (
+                                    <div className="text-center py-8">Loading...</div>
+                                ) : !payments.data || payments.data.length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <IndianRupee className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+                                        <p>No payments recorded</p>
+                                    </div>
+                                ) : (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Receipt #</TableHead>
+                                                <TableHead>Date</TableHead>
+                                                <TableHead>Child</TableHead>
+                                                <TableHead className="text-right">Amount</TableHead>
+                                                <TableHead>Mode</TableHead>
+                                                <TableHead>Transaction ID</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead className="text-right">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {payments.data.map((payment: any) => {
+                                                const child = children.data?.find((c: any) => c.id === payment.childId);
+                                                return (
+                                                    <TableRow key={payment.id}>
+                                                        <TableCell className="font-medium">{payment.receiptNumber}</TableCell>
+                                                        <TableCell>{new Date(payment.paymentDate).toLocaleDateString('en-IN')}</TableCell>
+                                                        <TableCell>{child?.childName || 'Unknown'}</TableCell>
+                                                        <TableCell className="text-right font-semibold">
+                                                            ₹{parseFloat(payment.totalAmount).toLocaleString('en-IN')}
+                                                        </TableCell>
+                                                        <TableCell className="capitalize">{payment.paymentMode?.replace('_', ' ')}</TableCell>
+                                                        <TableCell className="font-mono text-xs">{payment.transactionId || '-'}</TableCell>
+                                                        <TableCell>
+                                                            <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'} className="capitalize">
+                                                                {payment.status}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <div className="flex justify-end items-center gap-1">
+                                                                {payment.status === 'completed' && (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                                                        onClick={() => generateDaycareReceiptPDF({
+                                                                            receiptNumber: payment.receiptNumber,
+                                                                            paymentDate: payment.paymentDate,
+                                                                            childName: child?.childName || 'N/A',
+                                                                            amount: payment.totalAmount,
+                                                                            paymentMode: payment.paymentMode,
+                                                                            transactionId: payment.transactionId,
+                                                                            organization: {
+                                                                                name: org.name,
+                                                                                address: org.address,
+                                                                                phone: org.phone
+                                                                            }
+                                                                        })}
+                                                                        title="Print Receipt"
+                                                                    >
+                                                                        <FileText className="h-4 w-4" />
+                                                                    </Button>
+                                                                )}
+                                                                {payment.status === 'pending' && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        className="h-7 bg-amber-500 hover:bg-amber-600 text-white px-2"
+                                                                        onClick={() => setSelectedPayment(payment)}
+                                                                    >
+                                                                        Pay
+                                                                    </Button>
+                                                                )}
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="icon"
-                                                                    className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                                                                    onClick={() => generateDaycareReceiptPDF({
-                                                                        receiptNumber: payment.receiptNumber,
-                                                                        paymentDate: payment.paymentDate,
-                                                                        childName: child?.childName || 'N/A',
-                                                                        amount: payment.totalAmount,
-                                                                        paymentMode: payment.paymentMode,
-                                                                        transactionId: payment.transactionId,
-                                                                        organization: {
-                                                                            name: org.name,
-                                                                            address: org.address,
-                                                                            phone: org.phone
+                                                                    className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                                    onClick={() => {
+                                                                        if (confirm("Are you sure you want to delete this payment record?")) {
+                                                                            deletePaymentMutation.mutate(payment.id);
                                                                         }
-                                                                    })}
-                                                                    title="Print Receipt"
+                                                                    }}
                                                                 >
-                                                                    <FileText className="h-4 w-4" />
+                                                                    <Trash2 className="h-4 w-4" />
                                                                 </Button>
-                                                            )}
-                                                            {payment.status === 'pending' && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    className="h-7 bg-amber-500 hover:bg-amber-600 text-white px-2"
-                                                                    onClick={() => setSelectedPayment(payment)}
-                                                                >
-                                                                    Pay
-                                                                </Button>
-                                                            )}
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                                onClick={() => {
-                                                                    if (confirm("Are you sure you want to delete this payment record?")) {
-                                                                        deletePaymentMutation.mutate(payment.id);
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </TableBody>
-                                </Table>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>)
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>)
             }
 
             {

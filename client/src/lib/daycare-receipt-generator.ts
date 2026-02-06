@@ -121,7 +121,7 @@ function drawReceipt(
     doc.setFontSize(12);
     doc.setTextColor(255, 255, 255);
     doc.text("Amount Received:", 30, currentY + 10);
-    doc.text(`₹ ${parseFloat(data.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 180, currentY + 10, { align: "right" });
+    doc.text(`Rs. ${parseFloat(data.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 180, currentY + 10, { align: "right" });
 
     // Signature Area
     const sigY = y + 135;

@@ -278,8 +278,8 @@ export function useRecordPayment() {
             return response.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/daycare/payments"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/daycare/stats"] });
+            queryClient.refetchQueries({ queryKey: ["/api/daycare/payments"] });
+            queryClient.refetchQueries({ queryKey: ["/api/daycare/stats"] });
         },
     });
 }

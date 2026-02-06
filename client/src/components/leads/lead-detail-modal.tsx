@@ -65,9 +65,11 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
   const queryClient = useQueryClient();
 
   // Initialize form with react-hook-form
+  // Note: We don't use extendedLeadSchema resolver for editing because it's too strict
+  // for partial updates (e.g., Google Form leads with missing fields)
   const form = useForm<InsertLead>({
-    resolver: zodResolver(extendedLeadSchema),
-    mode: "onChange",
+    mode: "onSubmit", // Changed from onChange to prevent validation errors during editing
+    reValidateMode: "onSubmit",
     defaultValues: {
       name: "",
       email: "",
@@ -172,9 +174,22 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
     enabled: !!lead?.id,
   });
 
+  // Build class options: include active classes from globalFees, plus "Unknown" for Google Form leads
   const classOptions = globalFees
-    ? Array.from(new Set(globalFees.filter(f => f.isActive).map(f => f.className))).sort()
-    : [];
+    ? (() => {
+      const activeClasses = Array.from(new Set(globalFees.filter(f => f.isActive).map(f => f.className))).sort();
+      // Always include "Unknown" for Google Form leads
+      if (!activeClasses.includes("Unknown")) {
+        activeClasses.unshift("Unknown");
+      }
+      // If the lead has a class value that's not in the list, add it to preserve existing data
+      if (lead?.class && !activeClasses.includes(lead.class)) {
+        activeClasses.push(lead.class);
+        activeClasses.sort();
+      }
+      return activeClasses;
+    })()
+    : lead?.class ? [lead.class, "Unknown"] : ["Unknown"];
 
   const updateLeadMutation = useMutation({
     mutationFn: async (updates: any) => {
@@ -320,6 +335,9 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
 
 
   const onSave = (data: InsertLead) => {
+    console.log("[Lead Edit] onSave triggered with data:", data);
+    console.log("[Lead Edit] Form errors:", form.formState.errors);
+
     // Sanitize data similar to create
     const sanitizedData: Partial<InsertLead> = {};
     Object.keys(data).forEach(key => {
@@ -330,11 +348,14 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
       }
     });
 
+    console.log("[Lead Edit] Sanitized data:", sanitizedData);
+
     // Ensure lastContactedAt is treated correctly if cleared or set
     if (data.lastContactedAt) {
       sanitizedData.lastContactedAt = new Date(data.lastContactedAt);
     }
 
+    console.log("[Lead Edit] Final data to send:", sanitizedData);
     updateLeadMutation.mutate(sanitizedData);
   };
 
@@ -438,6 +459,9 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                       onClick={() => {
                         if (isEditing) {
                           form.reset(); // Cancel editing resets form to initial values
+                        } else {
+                          // Clear any validation errors when entering edit mode
+                          form.clearErrors();
                         }
                         setIsEditing(!isEditing);
                       }}
@@ -506,7 +530,18 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                 {
                   isEditing ? (
                     <Form {...form}>
-                      <form id="lead-edit-form" onSubmit={form.handleSubmit(onSave)} className="space-y-4 px-1">
+                      <form
+                        id="lead-edit-form"
+                        onSubmit={form.handleSubmit(onSave, (errors) => {
+                          console.error("[Lead Edit] Form validation failed:", errors);
+                          toast({
+                            title: "Validation Error",
+                            description: "Please fill in all required fields correctly",
+                            variant: "destructive"
+                          });
+                        })}
+                        className="space-y-4 px-1"
+                      >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {/* Student Name */}
                           <FormField
@@ -735,6 +770,37 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                                     <SelectItem value="future_intake">Future Intake</SelectItem>
                                     <SelectItem value="enrolled">Enrolled</SelectItem>
                                     <SelectItem value="dropped">Dropped</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Source */}
+                          <FormField
+                            control={form.control}
+                            name="source"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Source</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select Source" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="Walk-in">Walk-in</SelectItem>
+                                    <SelectItem value="Walk-in (Google Form)">Walk-in (Google Form)</SelectItem>
+                                    <SelectItem value="Phone Call">Phone Call</SelectItem>
+                                    <SelectItem value="Email">Email</SelectItem>
+                                    <SelectItem value="Website">Website</SelectItem>
+                                    <SelectItem value="Social Media">Social Media</SelectItem>
+                                    <SelectItem value="Referral">Referral</SelectItem>
+                                    <SelectItem value="Advertisement">Advertisement</SelectItem>
+                                    <SelectItem value="Event">Event</SelectItem>
+                                    <SelectItem value="Other">Other</SelectItem>
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
