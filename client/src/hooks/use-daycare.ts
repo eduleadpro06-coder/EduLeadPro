@@ -6,12 +6,11 @@ const getAuthHeaders = (): HeadersInit => {
         const userStr = localStorage.getItem('auth_user');
         if (userStr) {
             const user = JSON.parse(userStr);
-            if (user.email) {
-                return {
-                    'Content-Type': 'application/json',
-                    'x-user-name': user.email
-                };
-            }
+            const email = user.email || user.username;
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (email) headers['x-user-name'] = email;
+            if (user.organizationId) headers['x-organization-id'] = String(user.organizationId);
+            return headers;
         }
     } catch (e) {
         console.error("Error parsing auth user for headers:", e);
@@ -278,8 +277,8 @@ export function useRecordPayment() {
             return response.json();
         },
         onSuccess: () => {
-            queryClient.refetchQueries({ queryKey: ["/api/daycare/payments"] });
-            queryClient.refetchQueries({ queryKey: ["/api/daycare/stats"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/daycare/payments"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/daycare/stats"] });
         },
     });
 }

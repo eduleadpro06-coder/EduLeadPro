@@ -33,7 +33,12 @@ export class DaycareStorage {
         }
 
         if (organizationId) {
-            conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+            conditions.push(
+                or(
+                    eq(schema.daycareChildren.organizationId, organizationId),
+                    isNull(schema.daycareChildren.organizationId)
+                )!
+            );
         }
 
         let query = db.select().from(schema.daycareChildren);
@@ -99,7 +104,12 @@ export class DaycareStorage {
         ];
 
         if (organizationId) {
-            conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+            conditions.push(
+                or(
+                    eq(schema.daycareChildren.organizationId, organizationId),
+                    isNull(schema.daycareChildren.organizationId)
+                )!
+            );
         }
 
         const result = await db.select().from(schema.daycareChildren)
@@ -114,7 +124,12 @@ export class DaycareStorage {
         ];
 
         if (organizationId) {
-            conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+            conditions.push(
+                or(
+                    eq(schema.daycareChildren.organizationId, organizationId),
+                    isNull(schema.daycareChildren.organizationId)
+                )!
+            );
         }
 
         const result = await db.select().from(schema.daycareChildren)
@@ -130,7 +145,12 @@ export class DaycareStorage {
     async getAllDaycareInquiries(organizationId?: number): Promise<DaycareInquiry[]> {
         if (organizationId) {
             return await db.select().from(schema.daycareInquiries)
-                .where(eq(schema.daycareInquiries.organizationId, organizationId))
+                .where(
+                    or(
+                        eq(schema.daycareInquiries.organizationId, organizationId),
+                        isNull(schema.daycareInquiries.organizationId)
+                    )
+                )
                 .orderBy(desc(schema.daycareInquiries.createdAt));
         }
         return await db.select().from(schema.daycareInquiries)
@@ -299,7 +319,12 @@ export class DaycareStorage {
         }
 
         if (organizationId) {
-            conditions.push(eq(schema.daycareEnrollments.organizationId, organizationId));
+            conditions.push(
+                or(
+                    eq(schema.daycareEnrollments.organizationId, organizationId),
+                    isNull(schema.daycareEnrollments.organizationId)
+                )!
+            );
         }
 
         return await db.select()
@@ -332,7 +357,7 @@ export class DaycareStorage {
             .returning();
 
         // Invalidate dashboard cache
-        cacheService.clearAll();
+        cacheService.flush();
         return result[0];
     }
 
@@ -646,7 +671,12 @@ export class DaycareStorage {
     async getAllDaycarePayments(organizationId?: number): Promise<DaycarePayment[]> {
         const conditions: SQL[] = [];
         if (organizationId) {
-            conditions.push(eq(schema.daycareChildren.organizationId, organizationId));
+            conditions.push(
+                or(
+                    eq(schema.daycareChildren.organizationId, organizationId),
+                    isNull(schema.daycareChildren.organizationId)
+                )!
+            );
         }
 
         const result = await db.select()
@@ -705,10 +735,12 @@ export class DaycareStorage {
         childId: number,
         amount: number,
         paymentMode: string,
-        userId: number,
+        userId: number | undefined,
         paymentType: string,
         enrollmentId?: number,
-        status: string = "completed"
+        status: string = "completed",
+        transactionId?: string,
+        notes?: string
     ): Promise<DaycarePayment> {
         const result = await this.createDaycarePayment({
             childId,
@@ -721,11 +753,13 @@ export class DaycareStorage {
             paymentMode,
             paymentType,
             status,
-            collectedBy: userId
+            collectedBy: userId ?? null,
+            transactionId: transactionId ?? null,
+            notes: notes ?? null,
         } as any);
 
         // Invalidate dashboard cache
-        cacheService.clearAll();
+        cacheService.flush();
         return result;
     }
 
@@ -736,7 +770,7 @@ export class DaycareStorage {
             .returning();
 
         // Invalidate dashboard cache
-        cacheService.clearAll();
+        cacheService.flush();
         return result[0];
     }
 
@@ -746,7 +780,7 @@ export class DaycareStorage {
             .returning();
 
         // Invalidate dashboard cache
-        cacheService.clearAll();
+        cacheService.flush();
         return result.length > 0;
     }
 
@@ -1014,17 +1048,17 @@ export class DaycareStorage {
 
     private async generatePaymentNumber(): Promise<string> {
         const year = new Date().getFullYear();
-        const count = await db.select({ count: sql<number>`count(*)` })
+        const result = await db.select({ maxId: sql<number>`COALESCE(MAX(id), 0)` })
             .from(schema.daycarePayments);
-        const nextNumber = (count[0].count + 1).toString().padStart(4, '0');
+        const nextNumber = (parseInt(String(result[0].maxId)) + 1).toString().padStart(4, '0');
         return `PAY${year}${nextNumber}`;
     }
 
     private async generateReceiptNumber(): Promise<string> {
         const year = new Date().getFullYear();
-        const count = await db.select({ count: sql<number>`count(*)` })
+        const result = await db.select({ maxId: sql<number>`COALESCE(MAX(id), 0)` })
             .from(schema.daycarePayments);
-        const nextNumber = (count[0].count + 1).toString().padStart(4, '0');
+        const nextNumber = (parseInt(String(result[0].maxId)) + 1).toString().padStart(4, '0');
         return `RCP${year}${nextNumber}`;
     }
 

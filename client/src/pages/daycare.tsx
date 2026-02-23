@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import Header from "@/components/layout/header";
+import { authService } from "@/lib/auth";
 
 export default function Daycare() {
     const [activeTab, setActiveTab] = useQueryState("tab", "dashboard");
@@ -125,6 +126,7 @@ export default function Daycare() {
     const [selectedPayment, setSelectedPayment] = useState<any>(null);
     const [recordPaymentChildId, setRecordPaymentChildId] = useState<string>("");
     const [recordPaymentMode, setRecordPaymentMode] = useState<string>("");
+    const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
 
     const updatePaymentMutation = useMutation({
         mutationFn: async (data: any) => {
@@ -1290,6 +1292,9 @@ export default function Daycare() {
                                                 <TableHead>Enrollment #</TableHead>
                                                 <TableHead>Child Name</TableHead>
                                                 <TableHead>Start Date</TableHead>
+                                                <TableHead>End Date</TableHead>
+                                                <TableHead className="text-right">Hourly Rate (₹/hr)</TableHead>
+                                                <TableHead className="text-right">Monthly Rate (₹)</TableHead>
                                                 <TableHead>Status</TableHead>
                                                 <TableHead className="text-right">Actions</TableHead>
                                             </TableRow>
@@ -1310,7 +1315,10 @@ export default function Daycare() {
                                                                 </div>
                                                             ) : 'Unknown Child'}
                                                         </TableCell>
-                                                        <TableCell>{new Date(enrollment.startDate).toLocaleDateString()}</TableCell>
+                                                        <TableCell>{new Date(enrollment.startDate).toLocaleDateString('en-GB')}</TableCell>
+                                                        <TableCell>{enrollment.endDate ? new Date(enrollment.endDate).toLocaleDateString('en-GB') : '-'}</TableCell>
+                                                        <TableCell className="text-right font-medium">{enrollment.customHourlyRate ? `₹${parseFloat(enrollment.customHourlyRate).toLocaleString('en-IN')}` : '-'}</TableCell>
+                                                        <TableCell className="text-right font-semibold">{enrollment.customMonthlyRate ? `₹${parseFloat(enrollment.customMonthlyRate).toLocaleString('en-IN')}` : '-'}</TableCell>
                                                         <TableCell>
                                                             <Badge variant={enrollment.status === 'active' ? 'default' : 'secondary'} className={enrollment.status === 'active' ? 'bg-green-100 text-green-700' : ''}>
                                                                 {enrollment.status}
@@ -1335,7 +1343,7 @@ export default function Daycare() {
                                             })}
                                             {(!enrollments.data || enrollments.data.length === 0) && (
                                                 <TableRow>
-                                                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                                                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                                                         No active enrollments found
                                                     </TableCell>
                                                 </TableRow>
@@ -1464,7 +1472,7 @@ export default function Daycare() {
                                     <CardTitle>Billing & Payments History</CardTitle>
                                     <CardDescription>Track all payment records and transactions</CardDescription>
                                 </div>
-                                <Dialog>
+                                <Dialog open={isRecordPaymentOpen} onOpenChange={setIsRecordPaymentOpen}>
                                     <DialogTrigger asChild>
                                         <Button className="bg-purple-600 hover:bg-purple-700">
                                             <Plus className="h-4 w-4 mr-2" />
@@ -1505,13 +1513,15 @@ export default function Daycare() {
                                                 amount: amount,
                                                 paymentMode: recordPaymentMode,
                                                 transactionId: formData.get('transactionId') as string || undefined,
-                                                userId: 1,
                                                 paymentType: 'monthly_fee',
-                                                status: 'completed'
+                                                status: 'completed',
+                                                enrollmentId: enrollments.data?.find(
+                                                    (e: any) => e.childId === parseInt(recordPaymentChildId) && e.status === 'active'
+                                                )?.id ?? undefined,
                                             }, {
                                                 onSuccess: () => {
                                                     toast({ title: "Payment recorded successfully" });
-                                                    e.currentTarget.reset();
+                                                    setIsRecordPaymentOpen(false);
                                                     setRecordPaymentChildId("");
                                                     setRecordPaymentMode("");
                                                 }

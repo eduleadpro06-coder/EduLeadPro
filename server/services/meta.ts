@@ -45,7 +45,11 @@ export class MetaService {
         }
     }
 
-    async sendConversionEvent(lead: typeof leads.$inferSelect, eventNames: string[]) {
+    async sendConversionEvent(
+        lead: typeof leads.$inferSelect,
+        eventNames: string[],
+        context?: { clientIp?: string; clientUserAgent?: string; actionSource?: string }
+    ) {
         if (!this.accessToken || !this.pixelId) {
             console.warn("Meta CAPI: Missing Access Token or Pixel ID. Skipping event.");
             return;
@@ -59,14 +63,26 @@ export class MetaService {
         if (lead.phone) userData.ph = [this.hashData(lead.phone)];
         if (lead.metaLeadId) userData.lead_id = lead.metaLeadId;
 
+        // Add client IP and User Agent if available (improves match quality)
+        if (context?.clientIp) userData.client_ip_address = context.clientIp;
+        if (context?.clientUserAgent) userData.client_user_agent = context.clientUserAgent;
+
+        if (lead.fatherFirstName) userData.fn = [this.hashData(lead.fatherFirstName)];
+        if (lead.fatherLastName) userData.ln = [this.hashData(lead.fatherLastName)];
+
         // If we have no identifiers, we can't send
         if (Object.keys(userData).length === 0) return;
 
         const events = eventNames.map(eventName => ({
             event_name: eventName,
             event_time: Math.floor(Date.now() / 1000),
-            action_source: "system_generated",
+            action_source: context?.actionSource || "system_generated",
             user_data: userData,
+            custom_data: {
+                lead_id: String(lead.id),
+                status: lead.status,
+                source: lead.source
+            }
         }));
 
         try {
@@ -79,16 +95,17 @@ export class MetaService {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     data: events,
-                    // test_event_code: "TEST12345" // Use this for testing in Graph Explorer if needed
+                    // test_event_code: "TEST12345" // Optional: process.env.META_TEST_CODE
                 })
             });
 
             if (!response.ok) {
                 const errText = await response.text();
+                // Don't throw, just log to avoid disrupting the main flow
                 console.error("Meta CAPI Error:", errText);
             } else {
                 const resJson = await response.json();
-                console.log("Meta CAPI Success:", resJson);
+                console.log("Meta CAPI Success:", JSON.stringify(resJson));
             }
 
         } catch (error) {

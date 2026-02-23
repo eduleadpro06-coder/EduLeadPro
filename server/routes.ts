@@ -1680,6 +1680,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Creating lead with sanitized data...");
       const lead = await storage.createLead(sanitizedData);
       console.log("Lead created successfully:", lead.id);
+
+      // META CAPI INTEGRATION: Send "Lead" event
+      try {
+        const { metaService } = await import("./services/meta.js");
+        metaService.sendConversionEvent(lead, ["Lead"], {
+          clientIp: req.ip,
+          clientUserAgent: req.get('User-Agent')
+        }).catch(err => console.error("Background CAPI error (Lead):", err));
+      } catch (metaError) {
+        console.error("Failed to init Meta service:", metaError);
+      }
       res.status(201).json(lead);
     } catch (error: any) {
       console.error("ERROR in POST /api/leads:", error);
@@ -1851,6 +1862,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertFollowUpSchema.parse(req.body) as any;
       validatedData.organizationId = organizationId;
       const followUp = await storage.createFollowUp(validatedData);
+
+      // META CAPI INTEGRATION: Send "Contact" event
+      try {
+        // Fetch lead details for CAPI matching
+        const lead = await storage.getLead(validatedData.leadId);
+        if (lead) {
+          const { metaService } = await import("./services/meta.js");
+          metaService.sendConversionEvent(lead, ["Contact"], {
+            clientIp: req.ip,
+            clientUserAgent: req.get('User-Agent'),
+            actionSource: "system_generated" // or "website" if from web UI
+          }).catch(err => console.error("Background CAPI error (Contact):", err));
+        }
+      } catch (metaError) {
+        console.error("Failed to send CAPI Contact event:", metaError);
+      }
+
       res.status(201).json(followUp);
     } catch (error: any) {
       if (error.name === "ZodError") {
