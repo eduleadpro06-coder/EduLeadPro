@@ -101,6 +101,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setLoading(true)
+
+    // Safety timeout: if Supabase never fires INITIAL_SESSION (e.g. network issues,
+    // no valid Supabase session for custom-auth users), stop loading after 3 seconds
+    // so the app can render using the cached localStorage user.
+    const safetyTimeout = setTimeout(() => {
+      setLoading((prev) => {
+        if (prev) {
+          console.warn('Auth loading safety timeout reached — ending loading state');
+        }
+        return false;
+      });
+    }, 3000);
+
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
         const sessionUser = session?.user
@@ -237,6 +250,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     init()
 
     return () => {
+      clearTimeout(safetyTimeout);
       sub.subscription.unsubscribe()
     }
   }, [])

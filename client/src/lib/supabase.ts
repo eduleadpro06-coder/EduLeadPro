@@ -6,9 +6,9 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 // Check if environment variables are properly set
-const isConfigured = !!supabaseUrl && !!supabaseAnonKey && 
-                     supabaseUrl !== 'https://your-project.supabase.co' && 
-                     supabaseAnonKey !== 'your-anon-key-here'
+const isConfigured = !!supabaseUrl && !!supabaseAnonKey &&
+  supabaseUrl !== 'https://your-project.supabase.co' &&
+  supabaseAnonKey !== 'your-anon-key-here'
 
 // Log detailed information about the configuration
 if (!isConfigured) {
@@ -18,13 +18,13 @@ if (!isConfigured) {
   } else if (supabaseUrl === 'https://your-project.supabase.co') {
     console.error('- VITE_SUPABASE_URL is set to the example value, not a real Supabase URL')
   }
-  
+
   if (!supabaseAnonKey) {
     console.error('- VITE_SUPABASE_ANON_KEY is missing')
   } else if (supabaseAnonKey === 'your-anon-key-here') {
     console.error('- VITE_SUPABASE_ANON_KEY is set to the example value, not a real anon key')
   }
-  
+
   console.error('Please set these environment variables in your Vercel project settings.')
 }
 
@@ -34,16 +34,16 @@ const getRedirectUrl = () => {
     const hostname = window.location.hostname;
     const port = window.location.port;
     const protocol = window.location.protocol;
-    
+
     // For local development (localhost or 127.0.0.1)
     if (hostname.includes('localhost') || hostname === '127.0.0.1') {
       return `${protocol}//${hostname}${port ? ':' + port : ''}/auth/callback`;
     }
-    
+
     // For production or deployed environments
     return `${window.location.origin}/auth/callback`;
   }
-  
+
   // Fallback for server-side rendering
   return 'http://localhost:5000/auth/callback';
 };
@@ -55,10 +55,9 @@ export const supabase = createClient(
   {
     auth: {
       persistSession: true,
-      autoRefreshToken: true,
+      autoRefreshToken: false,
       detectSessionInUrl: true,
       storageKey: 'eduleadpro.auth',
-      redirectTo: getRedirectUrl(),
     },
   }
 )
@@ -72,11 +71,11 @@ export const getAuthConfigStatus = () => {
     isConfigured,
     supabaseUrlSet: !!supabaseUrl && supabaseUrl !== 'https://your-project.supabase.co',
     supabaseKeySet: !!supabaseAnonKey && supabaseAnonKey !== 'your-anon-key-here',
-    url: supabaseUrl ? 
-         (supabaseUrl === 'https://your-project.supabase.co' ? 'example-value' : 'custom-value') : 
-         'missing',
-    key: supabaseAnonKey ? 
-         (supabaseAnonKey === 'your-anon-key-here' ? 'example-value' : 'custom-value') : 
-         'missing'
+    url: supabaseUrl ?
+      (supabaseUrl === 'https://your-project.supabase.co' ? 'example-value' : 'custom-value') :
+      'missing',
+    key: supabaseAnonKey ?
+      (supabaseAnonKey === 'your-anon-key-here' ? 'example-value' : 'custom-value') :
+      'missing'
   }
 }
