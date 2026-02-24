@@ -139,6 +139,17 @@ function drawReceipt(
 }
 
 /* ============================
+   RECEIPT OPTIONS
+============================ */
+
+export interface ReceiptOptions {
+    /** 'download' saves a PDF file; 'print' opens browser print dialog */
+    mode?: 'download' | 'print';
+    /** 'parent' = parent copy only; 'both' = parent + office copy */
+    copyType?: 'parent' | 'both';
+}
+
+/* ============================
    MAIN FUNCTION
 ============================ */
 
@@ -146,23 +157,71 @@ function drawReceipt(
  * Generate PDF Receipt
  * @param data Receipt details
  * @param existingReceiptNo Optional receipt number
+ * @param options Controls download vs print and copy type
  */
-export function generateFeeReceipt(data: FeeReceiptData, existingReceiptNo?: string): void {
+export function generateFeeReceipt(
+    data: FeeReceiptData,
+    existingReceiptNo?: string,
+    options?: ReceiptOptions
+): void {
+    const mode = options?.mode ?? 'download';
+    const copyType = options?.copyType ?? (mode === 'print' ? 'both' : 'parent');
+
     const doc = new jsPDF("p", "mm", "a4");
     const receiptNo = existingReceiptNo || generateReceiptNo(data.academicYear);
 
     // Parent copy (Top)
     drawReceipt(doc, 0, receiptNo, data, "PARENT COPY");
 
-    // Dotted cut line
-    (doc as any).setLineDash([3, 3], 0);
-    doc.setDrawColor(160);
-    doc.line(10, 148, 200, 148);
+    if (copyType === 'both') {
+        // Dotted cut line
+        (doc as any).setLineDash([3, 3], 0);
+        doc.setDrawColor(160);
+        doc.line(10, 148, 200, 148);
 
-    // Office copy (Bottom)
-    drawReceipt(doc, 148, receiptNo, data, "OFFICE COPY");
+        // Office copy (Bottom)
+        drawReceipt(doc, 148, receiptNo, data, "OFFICE COPY");
+    }
 
-    doc.save(`Fee_Receipt_${receiptNo.replace(/\//g, "-")}.pdf`);
+    if (mode === 'print') {
+        // Use a hidden iframe to trigger print in the same tab
+        const pdfBlob = doc.output('blob');
+        const blobUrl = URL.createObjectURL(pdfBlob);
+
+        // Remove any existing print iframe
+        const existingFrame = document.getElementById('receipt-print-frame');
+        if (existingFrame) existingFrame.remove();
+
+        const iframe = document.createElement('iframe');
+        iframe.id = 'receipt-print-frame';
+        iframe.style.position = 'fixed';
+        iframe.style.top = '-10000px';
+        iframe.style.left = '-10000px';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        iframe.src = blobUrl;
+
+        iframe.onload = () => {
+            try {
+                iframe.contentWindow?.focus();
+                iframe.contentWindow?.print();
+            } catch (_) {
+                // Fallback: open in new tab if iframe print fails
+                window.open(blobUrl, '_blank');
+            }
+            // Clean up after a delay to allow print dialog to appear
+            setTimeout(() => {
+                URL.revokeObjectURL(blobUrl);
+                iframe.remove();
+            }, 60000);
+        };
+
+        document.body.appendChild(iframe);
+    } else {
+
+        // Download mode
+        doc.save(`Fee_Receipt_${receiptNo.replace(/\//g, "-")}.pdf`);
+    }
 }
-
 

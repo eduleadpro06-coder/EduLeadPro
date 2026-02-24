@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface NavBarProps {
   items: Array<{ name: string; url: string; icon: React.ElementType }>;
@@ -18,6 +19,20 @@ interface NavBarProps {
 const NavBar = ({ items, className, setLocation, user, loading, activeTab, setActiveTab, handleNavClick }: NavBarProps) => {
   const [location] = useLocation();
   const [isMobile, setIsMobile] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Prefetch dashboard data on hover so it loads instantly on click
+  const handleDashboardHover = useCallback(() => {
+    queryClient.prefetchQuery({
+      queryKey: ['/api/dashboard/analytics'],
+      queryFn: async () => {
+        const res = await fetch('/api/dashboard/analytics');
+        if (!res.ok) throw new Error('Failed to fetch');
+        return res.json();
+      },
+      staleTime: 30000, // Consider fresh for 30s
+    });
+  }, [queryClient]);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     handleResize();
@@ -79,10 +94,13 @@ const NavBar = ({ items, className, setLocation, user, loading, activeTab, setAc
             </a>
           );
         })}
-        {/* Hide auth CTA while auth is loading to avoid flicker */}
-        {loading ? null : user ? (
+        {/* Auth CTA: skeleton while loading, then button based on auth state */}
+        {loading ? (
+          <div className="rounded-full px-6 py-2 w-[180px] h-[36px] bg-white/10 animate-pulse" />
+        ) : user ? (
           <Button
             onClick={() => (setLocation ? setLocation('/dashboard') : window.location.href = '/dashboard')}
+            onMouseEnter={handleDashboardHover}
             className="rounded-full px-6 py-2 font-semibold text-white bg-gradient-to-r from-blue-500 to-purple-500 shadow hover:scale-105 hover:brightness-110 transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             Return to Dashboard
@@ -95,6 +113,7 @@ const NavBar = ({ items, className, setLocation, user, loading, activeTab, setAc
             Login
           </Button>
         )}
+
       </div>
     </div>
   );

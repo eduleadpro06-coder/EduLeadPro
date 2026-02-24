@@ -2015,38 +2015,62 @@ export default function StudentFees() {
                                   <Eye className="mr-1 h-3 w-3" />
                                   View Details
                                 </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={async () => {
-                                    const receiptData: FeeReceiptData = {
-                                      studentName: selectedStudent.name,
-                                      className: selectedStudent.class,
-                                      paymentMode: payment.paymentMode,
-                                      amount: payment.amount,
-                                      date: format(new Date(payment.paymentDate), "dd-MM-yyyy"),
-                                      organizationName: hookOrgName,
-                                      organizationPhone: hookOrgPhone,
-                                      organizationAddress: (() => {
-                                        const addr = hookOrgAddress || hookOrgData?.address;
-                                        if (!addr) return undefined;
-                                        const parts = [addr];
-                                        // Build city/state/pincode as single space-separated string
-                                        const locationParts = [];
-                                        if (hookOrgData?.city) locationParts.push(hookOrgData.city);
-                                        if (hookOrgData?.state) locationParts.push(hookOrgData.state);
-                                        if (hookOrgData?.pincode) locationParts.push(hookOrgData.pincode);
-                                        if (locationParts.length > 0) parts.push(locationParts.join(' '));
-                                        return parts.filter(Boolean).join(', ');
-                                      })(),
-                                      academicYear: academicYear // Use the component's academicYear state
-                                    };
-                                    generateFeeReceipt(receiptData, payment.receiptNumber);
-                                  }}
-                                >
-                                  <Printer className="mr-1 h-3 w-3" />
-                                  Print
-                                </Button>
+                                {(() => {
+                                  const buildReceiptData = (): FeeReceiptData => ({
+                                    studentName: selectedStudent.name,
+                                    className: selectedStudent.class,
+                                    paymentMode: payment.paymentMode,
+                                    amount: payment.amount,
+                                    date: format(new Date(payment.paymentDate), "dd-MM-yyyy"),
+                                    organizationName: hookOrgName,
+                                    organizationPhone: hookOrgPhone,
+                                    organizationAddress: (() => {
+                                      const addr = hookOrgAddress || hookOrgData?.address;
+                                      if (!addr) return undefined;
+                                      const parts = [addr];
+                                      const locationParts = [];
+                                      if (hookOrgData?.city) locationParts.push(hookOrgData.city);
+                                      if (hookOrgData?.state) locationParts.push(hookOrgData.state);
+                                      if (hookOrgData?.pincode) locationParts.push(hookOrgData.pincode);
+                                      if (locationParts.length > 0) parts.push(locationParts.join(' '));
+                                      return parts.filter(Boolean).join(', ');
+                                    })(),
+                                    academicYear: academicYear
+                                  });
+                                  return (
+                                    <>
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => generateFeeReceipt(buildReceiptData(), payment.receiptNumber, { mode: 'download', copyType: 'parent' })}
+                                            >
+                                              <Download className="h-4 w-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Download Parent Copy</TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => generateFeeReceipt(buildReceiptData(), payment.receiptNumber, { mode: 'print', copyType: 'both' })}
+                                            >
+                                              <Printer className="h-4 w-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Print Receipt</TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    </>
+                                  );
+                                })()}
+
                                 <Button variant="destructive" size="sm" className="bg-red-600 text-white rounded-lg" onClick={() => deletePaymentMutation.mutate(payment.id)}>Delete</Button>
                               </div>
                             </TableCell>

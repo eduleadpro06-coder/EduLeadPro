@@ -40,7 +40,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     return null;
   })
-  const [loading, setLoading] = useState(true)
+  // If we have a cached user, skip the loading state so UI renders instantly
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !localStorage.getItem('auth_user');
+    }
+    return true;
+  })
+
 
   useEffect(() => {
     const init = async () => {
