@@ -116,27 +116,34 @@ function drawReceipt(
     doc.setFontSize(8);
     doc.text(`Academic Year: ${data.academicYear || "2025-26"}`, 15, footerY);
 
-    // Dynamic Footer Address
+    // Dynamic Footer Address — wrap long text to fit within receipt
     const footerAddress = data.organizationAddress
         ? `${data.organizationName || "Organization"}, ${data.organizationAddress} | Ph: ${data.organizationPhone || "N/A"}`
         : "Authorized Signatory";
 
-    doc.text(
-        footerAddress,
-        105,
-        y + 132,
-        { align: "center" }
-    );
+    doc.setFontSize(7);
+    const maxWidth = 180; // receipt inner width (10 to 190)
+    const addressLines = doc.splitTextToSize(footerAddress, maxWidth);
+    const addressStartY = y + 132;
+    addressLines.forEach((line: string, i: number) => {
+        doc.text(line, 105, addressStartY + (i * 3.5), { align: "center" });
+    });
 
+    const afterAddressY = addressStartY + (addressLines.length * 3.5);
+
+    doc.setFontSize(8);
+    doc.setTextColor(200, 0, 0);
     doc.text(
         "This is a computer-generated receipt and does not require a signature.",
         105,
-        y + 138,
+        afterAddressY + 2,
         { align: "center" }
     );
+    doc.setTextColor(0, 0, 0);
 
-    doc.text("Authorized Signatory", 185, y + 144, { align: "right" });
+    doc.text("Authorized Signatory", 185, afterAddressY + 8, { align: "right" });
 }
+
 
 /* ============================
    RECEIPT OPTIONS
