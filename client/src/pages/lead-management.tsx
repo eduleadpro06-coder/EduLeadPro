@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,6 +58,7 @@ export default function LeadManagement() {
   };
 
   const [selectedLead, setSelectedLead] = useState<LeadWithCounselor | null>(null);
+  const searchString = useSearch();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isCSVImportOpen, setIsCSVImportOpen] = useState(false);
@@ -115,8 +117,22 @@ export default function LeadManagement() {
   useEffect(() => {
     if (Array.isArray(data)) {
       setLeadsState(data);
+
+      // Handle deep linking from notification/URL
+      // Extract ID from current URL search params (reactive via useSearch)
+      const searchParams = new URLSearchParams(searchString);
+      const leadId = searchParams.get('id');
+      
+      if (leadId && data.length > 0) {
+        const id = parseInt(leadId);
+        const lead = data.find(l => l.id === id);
+        if (lead) {
+          setSelectedLead(lead);
+          setIsDetailModalOpen(true);
+        }
+      }
     }
-  }, [data]);
+  }, [data, searchString]);
 
   // Filter out deleted leads for main view
   const activeLeads = leadsState.filter(lead => lead.status !== "deleted");

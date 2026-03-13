@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -707,6 +708,20 @@ export default function StudentFees() {
 
   // Fetch data
   const { data: students = [] } = useQuery<Student[]>({ queryKey: ["/api/students"] });
+
+  useEffect(() => {
+    // Handle deep linking from notification/URL
+    const searchParams = new URLSearchParams(window.location.search);
+    const studentId = searchParams.get('id');
+    
+    if (studentId && students.length > 0) {
+      const id = parseInt(studentId);
+      const student = students.find(s => s.id === id);
+      if (student) {
+        setSelectedStudent(student);
+      }
+    }
+  }, [students]);
   const { data: feeStructures = [] } = useQuery<FeeStructure[]>({ queryKey: ["/api/fee-structures"] });
   const { data: feePayments = [] } = useQuery<FeePayment[]>({ queryKey: ["/api/fee-payments"] });
   const { data: eMandates = [], refetch: refetchEMandates } = useQuery<EMandate[]>({ queryKey: ["/api/e-mandates"] });

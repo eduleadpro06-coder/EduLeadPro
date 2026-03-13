@@ -67,6 +67,22 @@ export default function Daycare() {
     const billingConfig = useActiveBillingConfig();
     const org = useOrganization();
 
+    useEffect(() => {
+        // Handle deep linking from notification/URL
+        const searchParams = new URLSearchParams(window.location.search);
+        const childId = searchParams.get('id');
+        
+        if (childId && children.data && children.data.length > 0) {
+            const id = parseInt(childId);
+            const child = children.data.find((c: any) => c.id === id);
+            if (child) {
+                setSelectedChild(child);
+                // Switch to children tab to show the selection/modal context if needed
+                setActiveTab("children");
+            }
+        }
+    }, [children.data]);
+
     const attendanceReport = useAttendanceReport(
         selectedReportChildId ? parseInt(selectedReportChildId) : null,
         selectedYear,
