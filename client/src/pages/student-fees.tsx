@@ -709,9 +709,11 @@ export default function StudentFees() {
   // Fetch data
   const { data: students = [] } = useQuery<Student[]>({ queryKey: ["/api/students"] });
 
+  const searchString = useSearch();
+
   useEffect(() => {
     // Handle deep linking from notification/URL
-    const searchParams = new URLSearchParams(window.location.search);
+    const searchParams = new URLSearchParams(searchString);
     const studentId = searchParams.get('id');
     
     if (studentId && students.length > 0) {
@@ -721,7 +723,7 @@ export default function StudentFees() {
         setSelectedStudent(student);
       }
     }
-  }, [students]);
+  }, [students, searchString]);
   const { data: feeStructures = [] } = useQuery<FeeStructure[]>({ queryKey: ["/api/fee-structures"] });
   const { data: feePayments = [] } = useQuery<FeePayment[]>({ queryKey: ["/api/fee-payments"] });
   const { data: eMandates = [], refetch: refetchEMandates } = useQuery<EMandate[]>({ queryKey: ["/api/e-mandates"] });

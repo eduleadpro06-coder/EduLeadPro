@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Baby, Users, UserPlus, Calendar, IndianRupee, Settings as SettingsIcon, TrendingUp, Plus, Clock, CheckCircle, UserCheck, LogOut, AlertTriangle, Phone, Mail, Eye, FileText, Download, Filter, InfoIcon, AlertCircle, User2, Trash2, Pencil } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import { useState, useEffect, useMemo } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useQueryState } from "@/hooks/use-query-state";
 import { useDaycareStats, useCurrentlyCheckedIn, useDaycareChildren, useDaycareInquiries, useDaycareEnrollments, useTodayAttendance, useDaycarePayments, useActiveBillingConfig, useCreateDaycareChild, useUpdateDaycareChild, useCreateDaycareInquiry, useCreateEnrollment, useCheckInChild, useCheckOutChild, useRecordPayment, useUpdateBillingConfig, useAttendanceReport } from "@/hooks/use-daycare";
 import { useOrganization } from "@/hooks/use-organization";
@@ -67,9 +68,11 @@ export default function Daycare() {
     const billingConfig = useActiveBillingConfig();
     const org = useOrganization();
 
+    const searchString = useSearch();
+
     useEffect(() => {
         // Handle deep linking from notification/URL
-        const searchParams = new URLSearchParams(window.location.search);
+        const searchParams = new URLSearchParams(searchString);
         const childId = searchParams.get('id');
         
         if (childId && children.data && children.data.length > 0) {
@@ -81,7 +84,7 @@ export default function Daycare() {
                 setActiveTab("children");
             }
         }
-    }, [children.data]);
+    }, [children.data, searchString]);
 
     const attendanceReport = useAttendanceReport(
         selectedReportChildId ? parseInt(selectedReportChildId) : null,
