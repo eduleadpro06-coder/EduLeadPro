@@ -4480,7 +4480,7 @@ export class DatabaseStorage implements IStorage {
       cacheService.invalidate('dashboard:*');
 
       // 2. If it's an EMI payment (has installment number), revert schedule status
-      if (payment.installmentNumber && payment.installmentNumber > 0) {
+      if (payment.installmentNumber !== null && payment.installmentNumber !== undefined) {
         // Find the EMI plan for this student
         const [plan] = await tx.select().from(schema.emiPlans)
           .where(eq(schema.emiPlans.studentId, payment.leadId))

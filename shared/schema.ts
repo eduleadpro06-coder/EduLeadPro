@@ -525,7 +525,7 @@ export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, creat
       .min(1, { message: "Name is required" })
       .refine((val) => val.trim().split(/\s+/).length >= 2, { message: "Please enter both First and Last name" }),
     fatherFirstName: z.string()
-      .min(1, { message: "Father's name is required" }),
+      .min(1, { message: "Father's first name is required" }),
     fatherLastName: z.string()
       .min(1, { message: "Father's last name is required" }),
     fatherPhone: z.string()

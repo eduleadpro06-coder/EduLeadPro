@@ -3683,7 +3683,14 @@ export default function StudentFees() {
                     >
                       Record Payment
                     </Button>
-             {/* Payment Details Modal */}
+                  </DialogFooter>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
+        )}
+
+      {/* Payment Details Modal */}
       {selectedPaymentForDetails && (
         <Dialog open={paymentDetailsOpen} onOpenChange={setPaymentDetailsOpen}>
           <DialogContent className="max-w-md">
@@ -3799,12 +3806,12 @@ export default function StudentFees() {
               {itemToDelete?.type === 'emi_plan' ? (
                 <>
                   Are you sure you want to delete this EMI plan? This will also remove the payment schedule.
-                  <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive-foreground">
+                  <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive font-medium">
                     <strong>Warning:</strong> This action cannot be undone. All pending installments for this plan will be removed.
                   </div>
                   <div className="mt-4 space-y-2">
                     <Label htmlFor="confirm-delete" className="text-foreground">Type <span className="font-bold">DELETE</span> to confirm:</Label>
-                    <Input 
+                    <Input
                       id="confirm-delete"
                       value={confirmText}
                       onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
@@ -3816,15 +3823,15 @@ export default function StudentFees() {
               ) : itemToDelete?.type === 'emi_cancel' ? (
                 <>
                   Are you sure you want to cancel this EMI plan?
-                  <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md text-sm text-amber-800 dark:text-amber-400">
+                  <div className="mt-2 p-3 bg-amber-100 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-md text-sm text-amber-950 dark:text-amber-200 font-medium">
                     The plan will be marked as <strong>Cancelled</strong>. Existing payments will remain.
                   </div>
                 </>
               ) : (
                 <>
-                  Are you sure you want to delete this payment record? 
+                  Are you sure you want to delete this payment record?
                   {itemToDelete?.details && <div className="mt-1 font-medium text-foreground">{itemToDelete.details}</div>}
-                  <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md text-sm text-amber-800 dark:text-amber-400">
+                  <div className="mt-2 p-3 bg-amber-100 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-md text-sm text-amber-950 dark:text-amber-200 font-medium">
                     If this was an EMI payment, the installment will be marked as <strong>Pending</strong> again.
                   </div>
                 </>
@@ -3837,32 +3844,24 @@ export default function StudentFees() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={itemToDelete?.type === 'emi_plan' && confirmText !== "DELETE"}
               onClick={() => {
-                if (itemToDelete) {
-                  if (itemToDelete.type === 'emi_plan') {
-                    handleDeleteEmiPlan(itemToDelete.id);
-                  } else if (itemToDelete.type === 'emi_cancel') {
-                    handleCancelEmiPlan(itemToDelete.id);
-                  } else {
-                    deletePaymentMutation.mutate(itemToDelete.id);
+                  if (itemToDelete) {
+                    if (itemToDelete.type === 'emi_plan') {
+                      handleDeleteEmiPlan(itemToDelete.id);
+                    } else if (itemToDelete.type === 'emi_cancel') {
+                      handleCancelEmiPlan(itemToDelete.id);
+                    } else {
+                      deletePaymentMutation.mutate(itemToDelete.id);
+                    }
                   }
-                }
-                setConfirmText("");
-                setDeleteConfirmOpen(false);
-              }}
-            >
-              {itemToDelete?.type === 'emi_cancel' ? 'Cancel Plan' : 'Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
-}
-: 'Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
-}
+                  setConfirmText("");
+                  setDeleteConfirmOpen(false);
+                }}
+              >
+                {itemToDelete?.type === 'emi_cancel' ? 'Cancel Plan' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  }

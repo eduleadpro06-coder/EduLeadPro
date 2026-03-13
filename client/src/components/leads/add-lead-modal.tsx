@@ -188,6 +188,24 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
   });
 
   const onSubmit = (data: InsertLead) => {
+    // Perform final split for Father's name
+    if (data.fatherFirstName) {
+      const parts = data.fatherFirstName.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        data.fatherFirstName = parts[0];
+        data.fatherLastName = parts.slice(1).join(' ');
+      }
+    }
+
+    // Perform final split for Mother's name
+    if (data.motherFirstName) {
+      const parts = data.motherFirstName.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        data.motherFirstName = parts[0];
+        data.motherLastName = parts.slice(1).join(' ');
+      }
+    }
+
     // Map fatherPhone to phone field if phone is empty (phone is required by schema)
     if (!data.phone && data.fatherPhone) {
       data.phone = data.fatherPhone;
@@ -245,35 +263,31 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
               <FormField
                 control={form.control}
                 name="fatherFirstName"
-                render={({ field }) => {
-                  const fatherFirstName = form.watch('fatherFirstName') || '';
-                  const fatherLastName = form.watch('fatherLastName') || '';
-                  const displayValue = `${fatherFirstName} ${fatherLastName}`.trim();
-
-                  return (
-                    <FormItem>
-                      <FormLabel>Father First and Last Name *</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter father's full name"
-                          value={displayValue}
-                          onChange={(e) => {
-                            const fullName = e.target.value;
-                            const parts = fullName.trim().split(/\s+/);
-                            if (parts.length >= 2) {
-                              form.setValue('fatherFirstName', parts[0]);
-                              form.setValue('fatherLastName', parts.slice(1).join(' '));
-                            } else {
-                              form.setValue('fatherFirstName', fullName);
-                              form.setValue('fatherLastName', '');
-                            }
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Father First and Last Name *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter father's full name"
+                        {...field}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          field.onChange(val);
+                          
+                          // Proactively set last name to satisfy validation
+                          const parts = val.trim().split(/\s+/);
+                          if (parts.length >= 2) {
+                             // We set the last name so the form becomes valid
+                             form.setValue('fatherLastName', parts.slice(1).join(' '), { shouldValidate: true });
+                          } else {
+                             form.setValue('fatherLastName', '');
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
               <FormField
                 control={form.control}
@@ -294,42 +308,36 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
               <FormField
                 control={form.control}
                 name="motherFirstName"
-                render={({ field }) => {
-                  const motherFirstName = form.watch('motherFirstName') || '';
-                  const motherLastName = form.watch('motherLastName') || '';
-                  const displayValue = `${motherFirstName} ${motherLastName}`.trim();
-
-                  return (
-                    <FormItem>
-                      <FormLabel>Mother First and Last Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter mother's full name (optional)"
-                          value={displayValue}
-                          onChange={(e) => {
-                            const fullName = e.target.value;
-                            const parts = fullName.trim().split(/\s+/);
-                            if (parts.length >= 2) {
-                              form.setValue('motherFirstName', parts[0]);
-                              form.setValue('motherLastName', parts.slice(1).join(' '));
-                            } else {
-                              form.setValue('motherFirstName', fullName);
-                              form.setValue('motherLastName', '');
-                            }
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mother First and Last Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter mother's full name (optional)"
+                        {...field}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          field.onChange(val);
+                          
+                          const parts = val.trim().split(/\s+/);
+                          if (parts.length >= 2) {
+                            form.setValue('motherLastName', parts.slice(1).join(' '), { shouldValidate: true });
+                          } else {
+                            form.setValue('motherLastName', '');
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
               <FormField
                 control={form.control}
                 name="motherPhone"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mother Phone *</FormLabel>
+                   <FormItem>
+                    <FormLabel>Mother Phone (Optional)</FormLabel>
                     <FormControl>
                       <Input placeholder="10 digit number" {...field} value={field.value ?? ""} />
                     </FormControl>

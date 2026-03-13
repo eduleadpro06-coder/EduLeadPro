@@ -2809,16 +2809,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "EMI plan not found" });
       }
 
-      // Check if plan has payments
-      const payments = await storage.getEmiPlanPayments(planId);
-      if (payments.length > 0) {
-        return res.status(409).json({
-          message: "Cannot delete EMI plan with existing payments. Cancel the plan instead.",
-          paymentCount: payments.length
-        });
-      }
-
-      // Delete the plan
+      // Delete the plan and its schedule
+      // Note: Associated fee_payments are kept for accounting history
       await storage.deleteEmiPlan(planId);
       res.json({ message: "EMI plan deleted successfully" });
     } catch (error) {
@@ -2973,29 +2965,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/emi-plans/:id", async (req, res) => {
-    try {
-      const emiPlan = await storage.updateEmiPlan(parseInt(req.params.id), req.body);
-      if (!emiPlan) {
-        return res.status(404).json({ message: "EMI plan not found" });
-      }
-      res.json(emiPlan);
-    } catch (error) {
-      console.error("EMI plan update error:", error);
-      res.status(500).json({ message: "Failed to update EMI plan" });
-    }
-  });
-
-  app.delete("/api/emi-plans/:id", async (req, res) => {
-    try {
-      const emiPlan = await storage.getEmiPlan(parseInt(req.params.id));
-      if (!emiPlan) return res.status(404).json({ message: "Not found" });
-      await storage.deleteEmiPlan(emiPlan.id);
-      res.json({ message: "EMI plan deleted successfully" });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to delete EMI plan" });
-    }
-  });
 
 
 
