@@ -84,7 +84,7 @@ export default function FollowUpMonitor() {
                     priority: "high",
                     read: false,
                     actionType: "view_lead",
-                    actionId: String(followUp.id), // Store follow-up ID
+                    actionId: String(followUp.leadId), // Store lead ID for navigation
                     metadata: JSON.stringify({ leadId: followUp.leadId, scheduledAt: followUp.scheduledAt })
                 });
 

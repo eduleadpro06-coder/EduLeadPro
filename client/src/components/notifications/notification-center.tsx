@@ -18,6 +18,7 @@ import type { Notification } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useNotificationContext } from "@/contexts/NotificationContext";
+import { useLocation } from "wouter";
 
 interface NotificationCategory {
   type: string;
@@ -28,6 +29,7 @@ interface NotificationCategory {
 export default function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const {
     notifications,
@@ -38,6 +40,58 @@ export default function NotificationCenter() {
     clearAll,
     refresh
   } = useNotificationContext();
+
+  const handleNotificationClick = (notification: Notification) => {
+    markAsRead(notification.id);
+    
+    // Close the dropdown
+    setIsOpen(false);
+
+    // Navigate based on actionType
+    if (notification.actionType && notification.actionId) {
+      switch (notification.actionType) {
+        case 'view_lead':
+          setLocation(`/leads?id=${notification.actionId}`);
+          break;
+        case 'view_student_fees':
+          setLocation(`/student-fees?id=${notification.actionId}`);
+          break;
+        case 'view_daycare_inquiry':
+          setLocation(`/daycare?id=${notification.actionId}`);
+          break;
+        case 'view_staff':
+          setLocation(`/staff-directory?id=${notification.actionId}`);
+          break;
+        case 'view_admission':
+          setLocation(`/students?id=${notification.actionId}`);
+          break;
+        default:
+          // Fallback based on type if actionType is generic or missing
+          if (notification.type === 'lead' || notification.type === 'followup') {
+            setLocation(`/leads?id=${notification.actionId}`);
+          } else if (notification.type === 'payment') {
+            setLocation(`/student-fees?id=${notification.actionId}`);
+          }
+      }
+    } else {
+      // General fallbacks based on type if no specific action meta
+      switch (notification.type) {
+        case 'lead':
+        case 'followup':
+          setLocation('/leads');
+          break;
+        case 'payment':
+          setLocation('/student-fees');
+          break;
+        case 'daycare':
+          setLocation('/daycare');
+          break;
+        case 'staff':
+          setLocation('/staff-directory');
+          break;
+      }
+    }
+  };
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -119,7 +173,7 @@ export default function NotificationCenter() {
                       !notification.read && "border-l-4 border-l-purple-500",
                       notification.read && "border-l-4 border-l-transparent"
                     )}
-                    onClick={() => markAsRead(notification.id)}
+                    onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="flex items-start justify-between w-full">
                       <div className="flex items-start gap-3">

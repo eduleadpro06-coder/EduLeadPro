@@ -289,8 +289,8 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
     const discount = invoiceData.emiPlan ? parseFloat(invoiceData.emiPlan.discount || "0") : 0;
 
     // Subtotal is the gross total amount (before discount)
-    const subtotal = totalAmount + discount;
-    const total = totalAmount;
+    const subtotal = totalAmount;
+    const total = totalAmount - discount;
 
     const totalsBoxWidth = 90;
     // Dynamic height: base 26 (Subtotal + Total), add 7 if discount > 0
