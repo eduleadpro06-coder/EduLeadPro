@@ -50,7 +50,7 @@ interface InvoiceData {
     }>;
 }
 
-export const generateInvoicePDF = (data: InvoiceData) => {
+export const generateInvoicePDF = (invoiceData: InvoiceData) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
@@ -62,7 +62,7 @@ export const generateInvoicePDF = (data: InvoiceData) => {
     const lightGrayR = 200, lightGrayG = 200, lightGrayB = 200;
 
     // Invoice Number format: INV-{YYYY}-{StudentID}
-    const studentIdStr = data.student.studentId || data.student.id?.toString() || '0088';
+    const studentIdStr = invoiceData.student.studentId || invoiceData.student.id?.toString() || '0088';
     const invoiceNo = `INV-${new Date().getFullYear()}-${studentIdStr.padStart(4, '0')}`;
     const invoiceDate = formatDateIST(new Date());
 
@@ -87,7 +87,7 @@ export const generateInvoicePDF = (data: InvoiceData) => {
     doc.setFontSize(22);
     doc.setFont("times", "bold");
     doc.setTextColor(100, 58, 229); // Brand Purple #643ae5
-    doc.text(data.organization.name, pageWidth / 2, yPosition + 5, { align: "center" });
+    doc.text(invoiceData.organization.name, pageWidth / 2, yPosition + 5, { align: "center" });
 
     yPosition += 15;
 
@@ -144,16 +144,16 @@ export const generateInvoicePDF = (data: InvoiceData) => {
     doc.setFont("helvetica", "normal");
 
     leftY += 6;
-    doc.text(data.organization.name, leftX, leftY);
+    doc.text(invoiceData.organization.name, leftX, leftY);
 
     leftY += 5;
-    const orgAddressLines = doc.splitTextToSize(data.organization.address, halfWidth - 15);
+    const orgAddressLines = doc.splitTextToSize(invoiceData.organization.address, halfWidth - 15);
     doc.text(orgAddressLines, leftX, leftY);
     leftY += orgAddressLines.length * 5;
 
-    doc.text(`Email: ${data.organization.email}`, leftX, leftY);
+    doc.text(`Email: ${invoiceData.organization.email}`, leftX, leftY);
     leftY += 5;
-    doc.text(`Phone: ${data.organization.phone}`, leftX, leftY);
+    doc.text(`Phone: ${invoiceData.organization.phone}`, leftX, leftY);
 
     // RIGHT SIDE - Bill To
     const rightX = margin + halfWidth + 5;
@@ -164,24 +164,24 @@ export const generateInvoicePDF = (data: InvoiceData) => {
     doc.setFont("helvetica", "normal");
 
     rightY += 6;
-    doc.text(`Parent Name: ${data.student.parentName || 'N/A'}`, rightX, rightY);
+    doc.text(`Parent Name: ${invoiceData.student.parentName || 'N/A'}`, rightX, rightY);
 
     rightY += 5;
-    doc.text(`Student Name: ${data.student.name}`, rightX, rightY);
+    doc.text(`Student Name: ${invoiceData.student.name}`, rightX, rightY);
 
     rightY += 5;
-    if (data.student.address) {
-        const studentAddressLines = doc.splitTextToSize(data.student.address, halfWidth - 15);
+    if (invoiceData.student.address) {
+        const studentAddressLines = doc.splitTextToSize(invoiceData.student.address, halfWidth - 15);
         doc.text(studentAddressLines, rightX, rightY);
         rightY += studentAddressLines.length * 5;
     }
 
-    if (data.student.email) {
-        doc.text(`Email: ${data.student.email}`, rightX, rightY);
+    if (invoiceData.student.email) {
+        doc.text(`Email: ${invoiceData.student.email}`, rightX, rightY);
         rightY += 5;
     }
-    if (data.student.phone) {
-        doc.text(`Phone: ${data.student.phone}`, rightX, rightY);
+    if (invoiceData.student.phone) {
+        doc.text(`Phone: ${invoiceData.student.phone}`, rightX, rightY);
     }
 
     yPosition += billingSectionHeight + 10;
@@ -195,24 +195,28 @@ export const generateInvoicePDF = (data: InvoiceData) => {
     // ========== SERVICE/ITEM TABLE ==========
     const tableBody: string[][] = [];
 
-    if (data.emiPlan) {
-        const totalFee = parseFloat(data.emiPlan.totalAmount);
+    if (invoiceData.emiPlan) {
+        // Show the base Course Fee minus any discount to form the true "Subtotal" on the invoice,
+        // but wait, let's just show the raw Course Fee as the first item.
+        const totalFee = parseFloat(invoiceData.emiPlan.totalAmount);
         tableBody.push([
-            `Course Fee: ${data.student.class || 'Program'}`,
+            `Course Fee: ${invoiceData.student.class || 'Program'}`,
             `Rs. ${formatCurrency(totalFee)}`
         ]);
 
-        // Add pending installments as separate line items
-        const pendingInstallments = data.emiSchedule.filter(s => s.status === 'pending');
-        pendingInstallments.forEach(inst => {
+        // Add all installments as separate line items for reference (showing how it is split)
+        // Sort by installment number to be safe
+        const allInstallments = [...invoiceData.emiSchedule].sort((a, b) => a.installmentNumber - b.installmentNumber);
+        allInstallments.forEach(inst => {
+            const statusText = inst.status === 'paid' ? ' (Paid)' : ` (Due ${format(new Date(inst.dueDate), "MMM dd, yyyy")})`;
             tableBody.push([
-                `Installment #${inst.installmentNumber} (Due ${format(new Date(inst.dueDate), "MMM dd, yyyy")})`,
+                `Installment #${inst.installmentNumber}${statusText}`,
                 `Rs. ${formatCurrency(parseFloat(inst.amount))}`
             ]);
         });
     } else {
         // Flat fees
-        data.feeStructure.forEach(fee => {
+        invoiceData.feeStructure.forEach(fee => {
             tableBody.push([
                 fee.feeType,
                 `Rs. ${formatCurrency(parseFloat(fee.amount))}`
@@ -246,26 +250,28 @@ export const generateInvoicePDF = (data: InvoiceData) => {
             1: { cellWidth: 50, halign: 'right' }
         },
         margin: { left: margin, right: margin },
-        didDrawCell: (data) => {
-            // Highlight the Course Fee row (first row in body)
-            if (data.section === 'body' && data.row.index === 0) {
-                const cell = data.cell;
-                // Add light orange background to Course Fee row
-                doc.setFillColor(255, 248, 230); // Light orange/yellow
-                doc.rect(cell.x, cell.y, cell.width, cell.height, 'F');
-
-                // Redraw cell content with bold text
-                doc.setTextColor(darkTextR, darkTextG, darkTextB);
-                doc.setFontSize(10);
-                doc.setFont("helvetica", "bold");
-
-                if (data.column.index === 0) {
-                    doc.text(cell.text[0], cell.x + 5, cell.y + cell.height / 2 + 2);
-                } else {
-                    doc.text(cell.text[0], cell.x + cell.width - 5, cell.y + cell.height / 2 + 2, { align: 'right' });
+        didParseCell: (hookData) => {
+            if (hookData.section === 'body') {
+                // Course Fee row (first row)
+                if (hookData.row.index === 0) {
+                    hookData.cell.styles.fontStyle = 'bold';
+                    hookData.cell.styles.fillColor = [255, 248, 230]; // Light orange/yellow
+                } else if (invoiceData.emiPlan) {
+                    // Installment rows
+                    hookData.cell.styles.textColor = [100, 100, 100];
+                    hookData.cell.styles.fontStyle = 'italic';
+                    hookData.cell.styles.fontSize = 9;
+                    if (hookData.column.index === 0) {
+                        // Indent the installment text natively
+                        hookData.cell.text[0] = `  • ${hookData.cell.text[0]}`;
+                    }
                 }
-
-                // Redraw borders
+            }
+        },
+        didDrawCell: (hookData) => {
+            if (hookData.section === 'body') {
+                const cell = hookData.cell;
+                // Redraw borders since fillColor might cover them
                 doc.setDrawColor(orangeR, orangeG, orangeB);
                 doc.setLineWidth(0.5);
                 doc.rect(cell.x, cell.y, cell.width, cell.height);
@@ -277,15 +283,14 @@ export const generateInvoicePDF = (data: InvoiceData) => {
     yPosition = doc.lastAutoTable.finalY + 10;
 
     // ========== TOTALS SECTION (Right aligned) ==========
-    const totalAmount = data.emiPlan
-        ? parseFloat(data.emiPlan.totalAmount)
-        : data.feeStructure.reduce((s, f) => s + parseFloat(f.amount), 0);
-    const discount = data.emiPlan ? parseFloat(data.emiPlan.discount || "0") : 0;
-    const totalPaid = data.payments.reduce((s, p) => s + parseFloat(p.amount), 0);
+    const totalAmount = invoiceData.emiPlan
+        ? parseFloat(invoiceData.emiPlan.totalAmount)
+        : invoiceData.feeStructure.reduce((s, f) => s + parseFloat(f.amount), 0);
+    const discount = invoiceData.emiPlan ? parseFloat(invoiceData.emiPlan.discount || "0") : 0;
 
-    // Calculate total (no tax for educational institution)
-    const subtotal = totalAmount;
-    const total = subtotal - discount;
+    // Subtotal is the gross total amount (before discount)
+    const subtotal = totalAmount + discount;
+    const total = totalAmount;
 
     const totalsBoxWidth = 90;
     // Dynamic height: base 26 (Subtotal + Total), add 7 if discount > 0
@@ -364,5 +369,5 @@ export const generateInvoicePDF = (data: InvoiceData) => {
     doc.text("(School Stamp & Sign)", signatureX, notesSignatureY + 6, { align: "center" });
 
     // Save the PDF
-    doc.save(`Invoice_${invoiceNo}_${data.student.name.replace(/\s+/g, "_")}.pdf`);
+    doc.save(`Invoice_${invoiceNo}_${invoiceData.student.name.replace(/\s+/g, "_")}.pdf`);
 };

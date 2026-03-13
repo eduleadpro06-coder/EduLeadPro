@@ -259,7 +259,9 @@ export const emiSchedule = pgTable("emi_schedule", {
   emiPlanId: integer("emi_plan_id").references(() => emiPlans.id), // Link to parent plan
   eMandateId: integer("e_mandate_id").references(() => eMandates.id),
   installmentNumber: integer("installment_number").notNull(),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Effective due = scheduledAmount + carryoverAmount
+  scheduledAmount: decimal("scheduled_amount", { precision: 10, scale: 2 }), // Original planned amount (immutable after set)
+  carryoverAmount: decimal("carryover_amount", { precision: 10, scale: 2 }).default("0"), // Shortfall carried from previous installment
   dueDate: date("due_date").notNull(),
   paidDate: date("paid_date"),
   status: varchar("status", { length: 20 }).default("pending"), // pending, paid, failed, overdue
@@ -276,6 +278,7 @@ export const emiPlans = pgTable("emi_plans", {
   id: serial("id").primaryKey(),
   studentId: integer("student_id").references(() => leads.id).notNull(),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
   numberOfInstallments: integer("number_of_installments").notNull(),
   installmentAmount: decimal("installment_amount", { precision: 10, scale: 2 }).notNull(),
   startDate: date("start_date").notNull(),

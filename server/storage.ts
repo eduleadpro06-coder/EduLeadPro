@@ -261,6 +261,10 @@ export interface IStorage {
   getEmiPlanSchedule(emiPlanId: number): Promise<any[]>;
   getEmiPaymentProgress(emiPlanId: number): Promise<any>;
   checkEmiPlanCompletion(emiPlanId: number): Promise<boolean>;
+  recordPartialEmiPayment(emiPlanId: number, installmentNumber: number, amountPaid: number, paymentData: { paymentDate: string; paymentMode: string; transactionId?: string | null; organizationId?: number | null; }): Promise<{ payment: FeePayment; scheduleItem?: any; nextScheduleItem?: any; shortfall: number }>;
+  adjustEmiScheduleAmount(scheduleId: number, newScheduledAmount: number): Promise<{ updated: any; lastAdjusted?: any }>;
+
+
 
   // Fee Payment Deletion
   deleteFeePayment(id: number): Promise<boolean>;
@@ -3803,10 +3807,7 @@ export class DatabaseStorage implements IStorage {
 
   async getEmiPlanByStudentId(studentId: number) {
     const result = await db.select().from(schema.emiPlans)
-      .where(and(
-        eq(schema.emiPlans.studentId, studentId),
-        eq(schema.emiPlans.status, 'active')
-      ))
+      .where(eq(schema.emiPlans.studentId, studentId))
       .orderBy(desc(schema.emiPlans.createdAt))
       .limit(1);
     return result[0];
@@ -4287,6 +4288,164 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  /**
+   * Record a (potentially partial) EMI payment and carry over any shortfall to the next installment.
+   * Returns the created fee payment and the updated next schedule item (if shortfall existed).
+   */
+  async recordPartialEmiPayment(
+    emiPlanId: number,
+    installmentNumber: number,
+    amountPaid: number,
+    paymentData: {
+      paymentDate: string;
+      paymentMode: string;
+      transactionId?: string | null;
+      organizationId?: number | null;
+    }
+  ): Promise<{ payment: FeePayment; scheduleItem?: any; nextScheduleItem?: any; shortfall: number }> {
+    return await db.transaction(async (tx) => {
+      // 1. Fetch the plan
+      const [plan] = await tx.select().from(schema.emiPlans).where(eq(schema.emiPlans.id, emiPlanId));
+      if (!plan) throw new Error("EMI plan not found");
+
+      // 2. Fetch the schedule item for this installment
+      const scheduleItems = await tx.select().from(schema.emiSchedule)
+        .where(and(
+          eq(schema.emiSchedule.emiPlanId, emiPlanId),
+          eq(schema.emiSchedule.installmentNumber, installmentNumber)
+        ));
+
+      const scheduleItem = scheduleItems[0];
+
+      // Effective due amount (could include carryover from previous)
+      const effectiveDue = scheduleItem
+        ? parseFloat(String(scheduleItem.amount))
+        : parseFloat(String(plan.installmentAmount));
+
+      // 3. Create fee payment record
+      const paymentRecord = await tx.insert(schema.feePayments).values({
+        leadId: plan.studentId,
+        amount: String(amountPaid),
+        paymentDate: paymentData.paymentDate,
+        paymentMode: paymentData.paymentMode,
+        transactionId: paymentData.transactionId || null,
+        installmentNumber,
+        status: 'completed',
+        organizationId: paymentData.organizationId || plan.organizationId,
+      }).returning();
+      const payment = paymentRecord[0];
+
+      // 4. Mark schedule item as paid (if one exists)
+      if (scheduleItem) {
+        await tx.update(schema.emiSchedule).set({
+          status: 'paid',
+          paidDate: paymentData.paymentDate,
+          updatedAt: new Date()
+        }).where(eq(schema.emiSchedule.id, scheduleItem.id));
+      }
+
+      // 5. Calculate shortfall
+      const shortfall = Math.max(0, effectiveDue - amountPaid);
+
+      let nextScheduleItem = undefined;
+
+      // 6. If shortfall > 0, add carryover to the next unpaid installment
+      if (shortfall > 0) {
+        const nextItems = await tx.select().from(schema.emiSchedule)
+          .where(and(
+            eq(schema.emiSchedule.emiPlanId, emiPlanId),
+            eq(schema.emiSchedule.installmentNumber, installmentNumber + 1)
+          ));
+
+        if (nextItems.length > 0) {
+          const nextItem = nextItems[0];
+          const existingCarryover = parseFloat(String(nextItem.carryoverAmount ?? '0'));
+          const newCarryover = existingCarryover + shortfall;
+          const scheduledAmt = parseFloat(String(nextItem.scheduledAmount ?? nextItem.amount));
+          const newEffective = scheduledAmt + newCarryover;
+
+          const [updated] = await tx.update(schema.emiSchedule).set({
+            carryoverAmount: String(newCarryover),
+            amount: String(newEffective),
+            updatedAt: new Date()
+          }).where(eq(schema.emiSchedule.id, nextItem.id)).returning();
+          nextScheduleItem = updated;
+        }
+      }
+
+      // 7. Invalidate caches
+      if (plan.organizationId) cacheService.invalidateOrganization(plan.organizationId);
+      cacheService.invalidate('dashboard:*');
+
+      return { payment, scheduleItem, nextScheduleItem, shortfall };
+    });
+  }
+
+  /**
+   * Manually adjust the scheduled amount for a specific future (unpaid) EMI schedule item.
+   * Redistributes the difference to the last unpaid installment of the same plan.
+   */
+  async adjustEmiScheduleAmount(
+    scheduleId: number,
+    newScheduledAmount: number
+  ): Promise<{ updated: any; lastAdjusted?: any }> {
+    return await db.transaction(async (tx) => {
+      // 1. Fetch the schedule item
+      const [item] = await tx.select().from(schema.emiSchedule).where(eq(schema.emiSchedule.id, scheduleId));
+      if (!item) throw new Error("EMI schedule item not found");
+      if (item.status === 'paid') throw new Error("Cannot adjust an already paid installment");
+
+      const emiPlanId = item.emiPlanId!;
+
+      // 2. Fetch all unpaid items for this plan, sorted by installment number
+      const unpaidItems = await tx.select().from(schema.emiSchedule)
+        .where(and(
+          eq(schema.emiSchedule.emiPlanId, emiPlanId),
+          ne(schema.emiSchedule.status, 'paid')
+        ));
+      unpaidItems.sort((a, b) => a.installmentNumber - b.installmentNumber);
+
+      const oldScheduledAmount = parseFloat(String(item.scheduledAmount ?? item.amount));
+      const delta = newScheduledAmount - oldScheduledAmount;
+
+      // 3. Update this item
+      const currentCarryover = parseFloat(String(item.carryoverAmount ?? '0'));
+      const [updated] = await tx.update(schema.emiSchedule).set({
+        scheduledAmount: String(newScheduledAmount),
+        amount: String(newScheduledAmount + currentCarryover),
+        updatedAt: new Date()
+      }).where(eq(schema.emiSchedule.id, scheduleId)).returning();
+
+      // 4. Absorb delta in the last unpaid installment (if it's not the same item)
+      let lastAdjusted = undefined;
+      const lastItem = unpaidItems[unpaidItems.length - 1];
+      if (lastItem && lastItem.id !== scheduleId && Math.abs(delta) > 0.001) {
+        const lastScheduled = parseFloat(String(lastItem.scheduledAmount ?? lastItem.amount));
+        const lastCarryover = parseFloat(String(lastItem.carryoverAmount ?? '0'));
+        const newLastScheduled = Math.max(0, lastScheduled - delta);
+        const [adj] = await tx.update(schema.emiSchedule).set({
+          scheduledAmount: String(newLastScheduled),
+          amount: String(newLastScheduled + lastCarryover),
+          updatedAt: new Date()
+        }).where(eq(schema.emiSchedule.id, lastItem.id)).returning();
+        lastAdjusted = adj;
+      }
+
+      // 5. Update plan's installment amount (average of unpaid scheduled amounts)
+      const updatedUnpaid = await tx.select().from(schema.emiSchedule)
+        .where(and(eq(schema.emiSchedule.emiPlanId, emiPlanId), ne(schema.emiSchedule.status, 'paid')));
+      if (updatedUnpaid.length > 0) {
+        const avgAmt = updatedUnpaid.reduce((s, i) => s + parseFloat(String(i.scheduledAmount ?? i.amount)), 0) / updatedUnpaid.length;
+        await tx.update(schema.emiPlans).set({ installmentAmount: String(avgAmt.toFixed(2)), updatedAt: new Date() })
+          .where(eq(schema.emiPlans.id, emiPlanId));
+      }
+
+      return { updated, lastAdjusted };
+    });
+  }
+
+
+
   private calculateEmiDueDate(startDate: string, installmentNumber: number, frequency: string): string {
     const start = new Date(startDate);
     let dueDate = new Date(start);
@@ -4311,12 +4470,49 @@ export class DatabaseStorage implements IStorage {
   // Fee Payment Deletion
   async deleteFeePayment(id: number): Promise<boolean> {
     const payment = await this.getFeePayment(id);
-    if (payment && payment.organizationId) {
-      cacheService.invalidateOrganization(payment.organizationId);
+    if (!payment) return false;
+
+    return await db.transaction(async (tx) => {
+      // 1. Invalidate caches
+      if (payment.organizationId) {
+        cacheService.invalidateOrganization(payment.organizationId);
+      }
       cacheService.invalidate('dashboard:*');
-    }
-    await db.delete(schema.feePayments).where(eq(schema.feePayments.id, id));
-    return true;
+
+      // 2. If it's an EMI payment (has installment number), revert schedule status
+      if (payment.installmentNumber && payment.installmentNumber > 0) {
+        // Find the EMI plan for this student
+        const [plan] = await tx.select().from(schema.emiPlans)
+          .where(eq(schema.emiPlans.studentId, payment.leadId))
+          .orderBy(desc(schema.emiPlans.createdAt))
+          .limit(1);
+
+        if (plan) {
+          // Revert the schedule item to pending
+          await tx.update(schema.emiSchedule)
+            .set({
+              status: 'pending',
+              paidDate: null,
+              updatedAt: new Date()
+            })
+            .where(and(
+              eq(schema.emiSchedule.emiPlanId, plan.id),
+              eq(schema.emiSchedule.installmentNumber, payment.installmentNumber)
+            ));
+
+          // If the plan was completed, mark it back to active
+          if (plan.status === 'completed') {
+            await tx.update(schema.emiPlans)
+              .set({ status: 'active', updatedAt: new Date() })
+              .where(eq(schema.emiPlans.id, plan.id));
+          }
+        }
+      }
+
+      // 3. Delete the payment
+      await tx.delete(schema.feePayments).where(eq(schema.feePayments.id, id));
+      return true;
+    });
   }
 
   // Notifications

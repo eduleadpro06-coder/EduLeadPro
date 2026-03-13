@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +49,22 @@ import { format } from "date-fns";
 import { formatDateTimeIST } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useQueryState } from "@/hooks/use-query-state";
+import { type LeadWithCounselor } from "@shared/schema";
+import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useOrganization } from "@/hooks/use-organization";
 
 // Helper function to get parent contact info
 const getParentContact = (student: any, parentType: 'father' | 'mother') => {
@@ -66,13 +82,6 @@ const getParentContact = (student: any, parentType: 'father' | 'mother') => {
     phone: phone || '-'
   };
 };
-
-import { type LeadWithCounselor } from "@shared/schema";
-import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { useOrganization } from "@/hooks/use-organization";
 
 interface Student {
   id: number;
@@ -203,10 +212,10 @@ interface EmiPlan {
 // EMI Payment Progress Component
 function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, status, totalAmount }: { planId: number; totalInstallments: number; installmentAmount: string; status?: string, totalAmount?: string }) {
   const queryClient = useQueryClient();
-  const { data: payments, isLoading } = useQuery({
-    queryKey: [`/api/emi-plans/${planId}/payments`],
+  const { data: schedule, isLoading } = useQuery({
+    queryKey: [`/api/emi-plans/${planId}/schedule`],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/emi-plans/${planId}/payments`);
+      const res = await apiRequest("GET", `/api/emi-plans/${planId}/schedule`);
       return res.json();
     }
   });
@@ -221,36 +230,19 @@ function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, stat
     }
   });
 
-  // Dynamic calculation based on amount with tolerance
-  const totalPaid = payments?.reduce((sum: number, p: any) => sum + parseFloat(p.amount || 0), 0) || 0;
-  const instAmount = parseFloat(installmentAmount);
-  const totalCost = parseFloat(totalAmount || "0");
-  const TOLERANCE = 10;
-
-  // Calculate down payment (difference between total cost and sum of installments)
-  const totalInstallmentCost = instAmount * totalInstallments;
-  // Use a small epsilon for float comparison if needed, but Math.max(0) handles negatives
-  const downPayment = Math.max(0, totalCost - totalInstallmentCost);
-
-  // Effective paid amount towards installments (after covering down payment)
-  const effectivePaid = Math.max(0, totalPaid - downPayment);
-
-  let paidCount = 0;
-  if (instAmount > 0) {
-    paidCount = Math.floor((effectivePaid + TOLERANCE) / instAmount);
-  }
-  // Cap at totalInstallments
-  paidCount = Math.min(paidCount, totalInstallments);
-
+  // Calculate paid count simply by counting schedule items with status = paid
+  const paidCount = schedule?.filter((item: any) => item.status === 'paid').length || 0;
   const progress = (paidCount / totalInstallments) * 100;
+  const instAmount = parseFloat(installmentAmount || "0");
 
   useEffect(() => {
-    // Check if covered total cost
-    const isFullyPaid = totalPaid >= (totalCost - TOLERANCE);
-    if (!isLoading && (progress === 100 || isFullyPaid) && status !== 'completed') {
+    // Check if fully paid
+    const isFullyPaid = schedule && schedule.length > 0 && schedule.every((item: any) => item.status === 'paid');
+    
+    if (!isLoading && isFullyPaid && status !== 'completed') {
       updateStatusMutation.mutate();
     }
-  }, [isLoading, progress, status, updateStatusMutation, totalPaid, totalCost]);
+  }, [isLoading, schedule, status, updateStatusMutation]);
 
   if (isLoading) {
     return <div className="text-sm text-gray-500">Loading...</div>;
@@ -276,29 +268,24 @@ function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, stat
 
 // Record Payment Button Component - checks if all payments are complete
 function RecordPaymentButton({ plan, onClick }: { plan: any; onClick: () => void }) {
-  const { data: payments, isLoading } = useQuery({
-    queryKey: [`/api/emi-plans/${plan.id}/payments`],
+  const { data: schedule, isLoading } = useQuery({
+    queryKey: [`/api/emi-plans/${plan.id}/schedule`],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/emi-plans/${plan.id}/payments`);
+      const res = await apiRequest("GET", `/api/emi-plans/${plan.id}/schedule`);
       return res.json();
     }
   });
 
-  // Check if fully paid efficiently using amounts with tolerance
-  const totalPaid = payments?.reduce((sum: number, p: any) => sum + parseFloat(p.amount || 0), 0) || 0;
-  const totalPlanAmount = parseFloat(plan.totalAmount || 0);
-  const TOLERANCE = 10;
-
-  // Also check explicit "all installments paid" logic if needed, but amount is safer for rounding
-  const allPaid = totalPaid >= (totalPlanAmount - TOLERANCE);
+  // Check if fully paid efficiently by seeing if all items in schedule are paid
+  const allPaid = schedule && schedule.length > 0 && schedule.every((item: any) => item.status === 'paid');
 
   return (
     <Button
       variant="outline"
       size="sm"
       className={allPaid ? "border-gray-300 text-gray-400 cursor-not-allowed" : "border-[#643ae5] text-[#643ae5] hover:bg-slate-50"}
-      onClick={onClick}
-      disabled={allPaid || isLoading}
+      onClick={allPaid ? undefined : onClick}
+      disabled={allPaid}
     >
       <CreditCard className="mr-1 h-3 w-3" />
       Record Payment
@@ -570,15 +557,73 @@ export default function StudentFees() {
   // EMI Payment Modal state
   const [emiPaymentModalOpen, setEmiPaymentModalOpen] = useState(false);
   const [selectedEmiPlan, setSelectedEmiPlan] = useState<EmiPlan | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ type: 'emi_plan' | 'payment' | 'emi_cancel', id: number, details?: string } | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+
+  const handleDeleteEmiPlan = async (id: number) => {
+    try {
+      const response = await fetch(`/api/emi-plans/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to delete EMI plan");
+      }
+
+      await refetchEmiPlans();
+      await queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/fee-stats"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/emi-progress"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/pending-emis"] });
+      
+      toast({
+        title: "Success",
+        description: "EMI plan deleted successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Cannot Delete",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCancelEmiPlan = async (id: number) => {
+    try {
+      const response = await fetch(`/api/emi-plans/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled' })
+      });
+      if (!response.ok) throw new Error('Failed to cancel EMI plan');
+      await refetchEmiPlans();
+      await queryClient.invalidateQueries({ queryKey: ["/api/emi-progress"] });
+      toast({ title: "EMI plan cancelled" });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Fee categories for the standard fee structure
   const [emiPaymentFormData, setEmiPaymentFormData] = useState({
     installmentNumber: 1,
-    amount: '',
+    amount: '', // Scheduled/effective due amount (read-only display)
+    actualAmountReceived: '', // Editable: what the parent actually paid
     paymentDate: new Date().toISOString().split('T')[0],
     paymentMode: '',
     receiptNumber: '',
     transactionId: '',
     status: 'completed'
   });
+
 
   // EMI Payment Progress state
   const [emiPaymentProgress, setEmiPaymentProgress] = useState<any>(null);
@@ -868,24 +913,26 @@ export default function StudentFees() {
       .reduce((sum, p) => sum + parseFloat(p.amount), 0));
   };
 
+  const calculateTotalDiscounts = (student: Student | CombinedStudent) => {
+    const payments = getStudentPayments(student.id);
+    const paymentDiscounts = payments.reduce((sum, p) => sum + (parseFloat(p.discount || "0") || 0), 0);
+    const studentEmiPlans = emiPlans.filter(p => p.studentId === student.id && p.status !== 'cancelled');
+    const emiPlanDiscounts = studentEmiPlans.reduce((sum, p) => sum + (parseFloat(p.discount || "0") || 0), 0);
+    return paymentDiscounts + emiPlanDiscounts;
+  };
+
   const calculateOutstanding = (student: Student | CombinedStudent) => {
     const fees = getStudentFeesWithGlobal(student);
     const payments = getStudentPayments(student.id);
 
     const totalFees = Math.round(fees.reduce((sum, fee) => sum + parseFloat(fee.amount), 0));
+    const totalDiscounts = calculateTotalDiscounts(student);
+    const netFees = Math.max(0, totalFees - totalDiscounts);
+
     // Only count tuition payments towards outstanding
-    const totalPaid = calculateTuitionPaidAmount(payments);
+    const tuitionPaid = calculateTuitionPaidAmount(payments);
 
-    // Calculate total discounts from payments
-    const paymentDiscounts = payments.reduce((sum, p) => sum + (parseFloat(p.discount || "0") || 0), 0);
-
-    // Calculate discounts from active/completed EMI plans
-    const studentEmiPlans = emiPlans.filter(p => p.studentId === student.id && p.status !== 'cancelled');
-    const emiPlanDiscounts = studentEmiPlans.reduce((sum, p) => sum + (parseFloat(p.discount || "0") || 0), 0);
-
-    const totalDiscounts = paymentDiscounts + emiPlanDiscounts;
-
-    return Math.max(0, totalFees - totalPaid - totalDiscounts);
+    return Math.max(0, netFees - tuitionPaid);
   };
 
   const getFeeStatusColor = (status: string) => {
@@ -1252,60 +1299,66 @@ export default function StudentFees() {
     setSelectedStudentForEMI(null);
   };
 
-  const handleEmiPayment = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleEmiPayment = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!selectedEmiPlan) {
-      toast({
-        title: "Error",
-        description: "No EMI plan selected",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "No EMI plan selected", variant: "destructive" });
       return;
     }
 
-    const data = {
-      leadId: selectedEmiPlan.studentId,
-      amount: emiPaymentFormData.amount,
-      discount: "0",
-      paymentDate: emiPaymentFormData.paymentDate,
-      paymentMode: emiPaymentFormData.paymentMode,
-      receiptNumber: emiPaymentFormData.receiptNumber || undefined,
-      installmentNumber: parseInt(emiPaymentFormData.installmentNumber.toString()),
-      transactionId: emiPaymentFormData.transactionId || undefined,
-      status: emiPaymentFormData.status
-    };
+    const scheduledAmount = parseFloat(emiPaymentFormData.amount) || 0;
+    const actualAmount = parseFloat(emiPaymentFormData.actualAmountReceived || emiPaymentFormData.amount) || 0;
 
-    console.log("Recording EMI payment with data:", data);
+    if (actualAmount <= 0) {
+      toast({ title: "Error", description: "Please enter a valid amount", variant: "destructive" });
+      return;
+    }
 
-    addPaymentMutation.mutate(data, {
-      onSuccess: () => {
-        refetchEmiProgress();
-        refetchPendingEmis();
-        refetchEmiPlans();
-        toast({
-          title: "Success",
-          description: "EMI payment recorded and UI updated.",
-        });
-        // Auto-advance or close modal as before
-        if (pendingEmis.length > 1) {
-          setEmiPaymentFormData(prev => ({
-            ...prev,
-            installmentNumber: pendingEmis[1].installmentNumber,
-            amount: pendingEmis[1].amount
-          }));
-        } else {
-          setEmiPaymentModalOpen(false);
-          resetEmiPaymentForm();
-        }
-      }
-    });
+    try {
+      const res = await fetch(`/api/emi-plans/${selectedEmiPlan.id}/record-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          installmentNumber: parseInt(emiPaymentFormData.installmentNumber.toString()),
+          amountPaid: actualAmount,
+          paymentDate: emiPaymentFormData.paymentDate,
+          paymentMode: emiPaymentFormData.paymentMode,
+          transactionId: emiPaymentFormData.transactionId || null,
+        })
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || 'Failed to record payment');
+
+      await refetchEmiProgress();
+      await refetchPendingEmis();
+      await refetchEmiPlans();
+      queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/emi-plans/${selectedEmiPlan.id}/schedule`] });
+
+      const shortfall = result.data?.shortfall || 0;
+      toast({
+        title: "Payment Recorded",
+        description: shortfall > 0
+          ? `₹${actualAmount.toLocaleString()} received. ₹${shortfall.toLocaleString()} carried over to next EMI.`
+          : `₹${actualAmount.toLocaleString()} recorded successfully.`
+      });
+
+      // Always close modal after successful payment
+      setEmiPaymentModalOpen(false);
+      resetEmiPaymentForm();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || 'Failed to record EMI payment', variant: "destructive" });
+    }
   };
+
 
   const resetEmiPaymentForm = () => {
     setEmiPaymentFormData({
       installmentNumber: 1,
       amount: '',
+      actualAmountReceived: '',
       paymentDate: new Date().toISOString().split('T')[0],
       paymentMode: '',
       receiptNumber: '',
@@ -1315,6 +1368,7 @@ export default function StudentFees() {
     setSelectedEmiPlan(null);
   };
 
+
   // Update EMI payment form when EMI plan is selected
   useEffect(() => {
     if (selectedEmiPlan) {
@@ -1322,6 +1376,7 @@ export default function StudentFees() {
       setEmiPaymentFormData(prev => ({
         ...prev,
         amount: selectedEmiPlan.installmentAmount,
+        actualAmountReceived: selectedEmiPlan.installmentAmount,
         installmentNumber: 1
       }));
 
@@ -1330,7 +1385,8 @@ export default function StudentFees() {
         setEmiPaymentFormData(prev => ({
           ...prev,
           installmentNumber: pendingEmis[0].installmentNumber,
-          amount: pendingEmis[0].amount
+          amount: pendingEmis[0].amount,
+          actualAmountReceived: pendingEmis[0].amount
         }));
       }
     }
@@ -1455,6 +1511,11 @@ export default function StudentFees() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fee-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/emi-plans"] });
+      if (selectedStudent) {
+        queryClient.invalidateQueries({ queryKey: [`/api/emi-progress/${selectedStudent.id}`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/pending-emis/${selectedStudent.id}`] });
+      }
       toast({
         title: "Success",
         description: "Payment deleted successfully",
@@ -1905,9 +1966,29 @@ export default function StudentFees() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          <div><span className="font-semibold text-gray-700">Tuition Fees:</span> ₹{calculateTotalFees(getStudentFeesWithGlobal(selectedStudent)).toLocaleString()}</div>
-                          <div><span className="font-semibold text-gray-700">Tuition Paid:</span> <span className="text-green-600">₹{calculateTuitionPaidAmount(getStudentPayments(selectedStudent.id)).toLocaleString()}</span></div>
-                          <div><span className="font-semibold text-gray-700">Outstanding:</span> <span className="text-red-500">₹{calculateOutstanding(selectedStudent).toLocaleString()}</span></div>
+                          {(() => {
+                            const totalFees = calculateTotalFees(getStudentFeesWithGlobal(selectedStudent));
+                            const totalDiscounts = calculateTotalDiscounts(selectedStudent);
+                            const netFees = Math.max(0, totalFees - totalDiscounts);
+                            const tuitionPaid = calculateTuitionPaidAmount(getStudentPayments(selectedStudent.id));
+                            const outstanding = calculateOutstanding(selectedStudent);
+
+                            return (
+                              <>
+                                <div><span className="font-semibold text-gray-700">Tuition Fees:</span> ₹{totalFees.toLocaleString()}</div>
+                                {totalDiscounts > 0 && (
+                                  <div><span className="font-semibold text-gray-700">Discount:</span> <span className="text-green-600">-₹{totalDiscounts.toLocaleString()}</span></div>
+                                )}
+                                {totalDiscounts > 0 && (
+                                  <div><span className="font-semibold text-gray-700">Net Tuition Payable:</span> ₹{netFees.toLocaleString()}</div>
+                                )}
+                                {totalDiscounts === 0 && (
+                                  <div><span className="font-semibold text-gray-700">Tuition Paid:</span> <span className="text-green-600">₹{tuitionPaid.toLocaleString()}</span></div>
+                                )}
+                                <div><span className="font-semibold text-gray-700">Outstanding:</span> <span className="text-red-500">₹{outstanding.toLocaleString()}</span></div>
+                              </>
+                            );
+                          })()}
 
                           <div className="my-2 border-t border-gray-100"></div>
 
@@ -2071,7 +2152,21 @@ export default function StudentFees() {
                                   );
                                 })()}
 
-                                <Button variant="destructive" size="sm" className="bg-red-600 text-white rounded-lg" onClick={() => deletePaymentMutation.mutate(payment.id)}>Delete</Button>
+                                <Button 
+                                  variant="destructive" 
+                                  size="sm" 
+                                  className="bg-red-600 text-white rounded-lg" 
+                                  onClick={() => {
+                                    setItemToDelete({ 
+                                      id: payment.id, 
+                                      type: 'payment', 
+                                      details: `₹${parseFloat(payment.amount).toLocaleString()} on ${formatDate(payment.paymentDate)}`
+                                    });
+                                    setDeleteConfirmOpen(true);
+                                  }}
+                                >
+                                  Delete
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -2343,11 +2438,11 @@ export default function StudentFees() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="font-medium text-gray-900">
-                                    ₹{parseFloat(plan.totalAmount).toLocaleString()}
+                                    ₹{parseFloat(plan.totalAmount || "0").toLocaleString()}
                                   </div>
-                                  {parseFloat(plan.discount) > 0 && (
+                                  {parseFloat(plan.discount || "0") > 0 && (
                                     <div className="text-sm text-green-600">
-                                      -₹{parseFloat(plan.discount).toLocaleString()} discount
+                                      -₹{parseFloat(plan.discount || "0").toLocaleString()} discount
                                     </div>
                                   )}
                                 </TableCell>
@@ -2399,7 +2494,8 @@ export default function StudentFees() {
                                             recalculate: false,
                                             strategy: 'distribute',
                                             numNewInstallments: 1,
-                                            newInstallmentDates: []
+                                            newInstallmentDates: [],
+                                            numInstallmentsToRemove: 0
                                           });
                                           setEditEmiModalOpen(true);
                                         }}
@@ -2413,25 +2509,13 @@ export default function StudentFees() {
                                         variant="outline"
                                         size="sm"
                                         className="border-orange-500 text-orange-600 hover:bg-orange-50"
-                                        onClick={async () => {
-                                          if (confirm('Cancel this EMI plan? This will mark it as cancelled.')) {
-                                            try {
-                                              const response = await fetch(`/api/emi-plans/${plan.id}`, {
-                                                method: 'PATCH',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ status: 'cancelled' })
-                                              });
-                                              if (!response.ok) throw new Error('Failed to cancel EMI plan');
-                                              await refetchEmiPlans();
-                                              toast({ title: "EMI plan cancelled" });
-                                            } catch (error: any) {
-                                              toast({
-                                                title: "Error",
-                                                description: error.message,
-                                                variant: "destructive"
-                                              });
-                                            }
-                                          }
+                                        onClick={() => {
+                                          setItemToDelete({
+                                            id: plan.id,
+                                            type: 'emi_cancel',
+                                            details: `EMI Plan: ₹${parseFloat(plan.totalAmount).toLocaleString()}`
+                                          });
+                                          setDeleteConfirmOpen(true);
                                         }}
                                       >
                                         Cancel Plan
@@ -2441,38 +2525,16 @@ export default function StudentFees() {
                                       variant="destructive"
                                       size="sm"
                                       className="bg-red-600 text-white rounded-lg"
-                                      onClick={async () => {
-                                        if (!confirm(`Are you sure you want to delete the EMI plan? This action cannot be undone.`)) return;
-
-                                        try {
-                                          const response = await fetch(`/api/emi-plans/${plan.id}`, {
-                                            method: "DELETE",
-                                            headers: { "Content-Type": "application/json" },
-                                          });
-
-                                          if (!response.ok) {
-                                            const error = await response.json();
-                                            throw new Error(error.message || "Failed to delete EMI plan");
-                                          }
-
-                                          await refetchEmiPlans();
-                                          await queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
-                                          await queryClient.invalidateQueries({ queryKey: ["/api/fee-stats"] });
-                                          toast({
-                                            title: "Success",
-                                            description: "EMI plan deleted successfully",
-                                          });
-                                        } catch (error: any) {
-                                          toast({
-                                            title: "Cannot Delete",
-                                            description: error.message,
-                                            variant: "destructive",
-                                          });
-                                        }
+                                      onClick={() => {
+                                        setItemToDelete({
+                                          id: plan.id,
+                                          type: 'emi_plan',
+                                          details: `EMI Plan: ₹${parseFloat(plan.totalAmount).toLocaleString()}`
+                                        });
+                                        setDeleteConfirmOpen(true);
                                       }}
                                     >
-                                      <Settings className="mr-1 h-3 w-3" />
-                                      Delete Plan
+                                      Delete
                                     </Button>
                                   </div>
                                 </TableCell>
@@ -2520,12 +2582,14 @@ export default function StudentFees() {
                               addPaymentMutation.mutate({
                                 leadId: selectedStudentForEMI.id,
                                 amount: finalAmount.toString(),
+                                discount: discount.toString(),
                                 paymentDate: emiFormData.startDate,
                                 paymentMode: 'cash', // Default, can be modified if needed
                                 receiptNumber: null, // System-generated
                                 transactionId: emiFormData.transactionId || null,
                                 status: 'completed',
                                 installmentNumber: null,
+                                paymentCategory: 'fee_payment',
                               });
                             } else {
                               // For EMI payment, create EMI plan
@@ -2742,10 +2806,10 @@ export default function StudentFees() {
                               </div>
                             </div>
 
-                            {/* Installment Schedule (Editable) */}
-                            {paymentType === 'emi' && emiFormData.installments.length > 0 && (
+                              {paymentType === 'emi' && emiFormData.installments.length > 0 && (
                               <div className="mt-4">
                                 <Label className="block mb-2 text-base font-medium">Installment Schedule</Label>
+                                <p className="text-xs text-muted-foreground mb-2">You can manually adjust individual installment amounts below. The last installment auto-balances to maintain the total.</p>
                                 <div className="border rounded-md overflow-hidden bg-white">
                                   <Table>
                                     <TableHeader>
@@ -2756,34 +2820,69 @@ export default function StudentFees() {
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {emiFormData.installments.map((inst, idx) => (
-                                        <TableRow key={idx}>
-                                          <TableCell>{idx + 1}</TableCell>
-                                          <TableCell>
-                                            <Input
-                                              type="date"
-                                              value={inst.dueDate}
-                                              onChange={(e) => {
-                                                const newDate = e.target.value;
-                                                setEmiFormData(prev => {
-                                                  const newInstallments = [...prev.installments];
-                                                  newInstallments[idx] = { ...newInstallments[idx], dueDate: newDate };
-                                                  return { ...prev, installments: newInstallments };
-                                                });
-                                              }}
-                                              className="h-8 w-full"
-                                            />
-                                          </TableCell>
-                                          <TableCell className="text-right font-medium">
-                                            ₹{parseFloat(inst.amount).toLocaleString()}
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
+                                      {emiFormData.installments.map((inst, idx) => {
+                                        const isLast = idx === emiFormData.installments.length - 1;
+                                        return (
+                                          <TableRow key={idx}>
+                                            <TableCell>{idx + 1}</TableCell>
+                                            <TableCell>
+                                              <Input
+                                                type="date"
+                                                value={inst.dueDate}
+                                                onChange={(e) => {
+                                                  const newDate = e.target.value;
+                                                  setEmiFormData(prev => {
+                                                    const newInstallments = [...prev.installments];
+                                                    newInstallments[idx] = { ...newInstallments[idx], dueDate: newDate };
+                                                    return { ...prev, installments: newInstallments };
+                                                  });
+                                                }}
+                                                className="h-8 w-full"
+                                              />
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                              <Input
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                value={inst.amount}
+                                                readOnly={isLast}
+                                                className={`h-8 w-32 ml-auto text-right ${isLast ? 'bg-gray-50 cursor-not-allowed font-semibold text-purple-700' : ''}`}
+                                                title={isLast ? 'Auto-calculated to balance total' : 'Edit this installment amount'}
+                                                onChange={(e) => {
+                                                  if (isLast) return; // Last is auto-calculated
+                                                  const newAmount = e.target.value;
+                                                  setEmiFormData(prev => {
+                                                    const newInstallments = [...prev.installments];
+                                                    newInstallments[idx] = { ...newInstallments[idx], amount: newAmount };
+                                                    // Recompute last installment to balance total
+                                                    const total = parseFloat(prev.totalAmount) || 0;
+                                                    const regFee = parseFloat(prev.registrationFee) || 0;
+                                                    const disc = parseFloat(prev.discount) || 0;
+                                                    const payable = Math.max(0, total - regFee - disc);
+                                                    const sumExcludingLast = newInstallments
+                                                      .slice(0, newInstallments.length - 1)
+                                                      .reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+                                                    const lastAmount = Math.max(0, payable - sumExcludingLast);
+                                                    newInstallments[newInstallments.length - 1] = {
+                                                      ...newInstallments[newInstallments.length - 1],
+                                                      amount: Math.round(lastAmount).toString()
+                                                    };
+                                                    return { ...prev, installments: newInstallments };
+                                                  });
+                                                }}
+                                              />
+                                              {isLast && <div className="text-[10px] text-purple-500 text-right mt-0.5">auto-balanced</div>}
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
                                     </TableBody>
                                   </Table>
                                 </div>
                               </div>
                             )}
+
                             {/* Payment Summary */}
                             <Card className="bg-gray-50">
                               <CardHeader className="pb-3">
@@ -3441,257 +3540,329 @@ export default function StudentFees() {
               <DialogHeader>
                 <DialogTitle>Record EMI Payment</DialogTitle>
                 <DialogDescription>
-                  Record a payment for this EMI plan
+                  Record a payment for this EMI plan. Enter the actual amount received — any shortfall will be carried over to the next installment automatically.
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                const installmentNumber = parseInt(formData.get('installmentNumber') as string);
-
-                // Check for duplicate payment
-                try {
-                  const paymentsRes = await fetch(`/api/emi-plans/${selectedEmiPlan.id}/payments`);
-                  if (paymentsRes.ok) {
-                    const existingPayments = await paymentsRes.json();
-                    const alreadyPaid = existingPayments.some((p: any) => p.installmentNumber === installmentNumber);
-
-                    if (alreadyPaid) {
-                      toast({
-                        title: "Duplicate Payment",
-                        description: `Installment #${installmentNumber} has already been paid`,
-                        variant: "destructive"
-                      });
-                      return;
-                    }
-                  }
-                } catch (error) {
-                  console.error("Error checking payments:", error);
-                }
-
-                // Proceed with payment
-                addPaymentMutation.mutate({
-                  leadId: selectedEmiPlan.studentId,
-                  amount: formData.get('amount'),
-                  discount: '0',
-                  paymentDate: formData.get('paymentDate'),
-                  paymentMode: formData.get('paymentMode'),
-                  receiptNumber: formData.get('receiptNumber'),
-                  transactionId: formData.get('transactionId'),
-                  installmentNumber: installmentNumber,
-                  status: 'completed'
-                });
-
-                // Invalidate EMI plan payments query to refresh progress
-                setTimeout(() => {
-                  queryClient.invalidateQueries({ queryKey: [`/api/emi-plans/${selectedEmiPlan.id}/payments`] });
-                  queryClient.invalidateQueries({ queryKey: ["/api/emi-plans"] });
-                }, 500);
-
-                setEmiPaymentModalOpen(false);
-              }}>
-                <div className="space-y-4">
-                  <div className="bg-slate-50 p-4 rounded-lg">
-                    <h4 className="font-semibold mb-2">EMI Plan Details</h4>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><span className="text-gray-600">Total Amount:</span> ₹{parseFloat(selectedEmiPlan.totalAmount).toLocaleString()}</div>
-                      <div><span className="text-gray-600">Installment Amount:</span> ₹{parseFloat(selectedEmiPlan.installmentAmount).toLocaleString()}</div>
-                      <div><span className="text-gray-600">Number of Installments:</span> {selectedEmiPlan.numberOfInstallments}</div>
-                      <div><span className="text-gray-600">Status:</span> {selectedEmiPlan.status}</div>
+              {selectedEmiPlan && (
+                <form onSubmit={handleEmiPayment}>
+                  <div className="space-y-4">
+                    {/* EMI Plan Summary */}
+                    <div className="bg-slate-50 p-4 rounded-lg">
+                      <h4 className="font-semibold mb-2">EMI Plan Details</h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div><span className="text-gray-600">Total Amount:</span> ₹{parseFloat(selectedEmiPlan.totalAmount).toLocaleString()}</div>
+                        <div><span className="text-gray-600">Base Installment:</span> ₹{parseFloat(selectedEmiPlan.installmentAmount).toLocaleString()}</div>
+                        <div><span className="text-gray-600">Installments:</span> {selectedEmiPlan.numberOfInstallments}</div>
+                        <div><span className="text-gray-600">Status:</span> {selectedEmiPlan.status}</div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                    {/* Pending EMI selector */}
+                    {pendingEmis.length > 0 && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <p className="text-sm font-semibold text-amber-800 mb-2">Pending Installments</p>
+                        <div className="flex flex-wrap gap-2">
+                          {pendingEmis.map((emi: any) => (
+                            <button
+                              key={emi.installmentNumber}
+                              type="button"
+                              onClick={() => setEmiPaymentFormData(prev => ({
+                                ...prev,
+                                installmentNumber: emi.installmentNumber,
+                                amount: emi.amount,
+                                actualAmountReceived: emi.amount
+                              }))}
+                              className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${emiPaymentFormData.installmentNumber === emi.installmentNumber
+                                  ? 'bg-[#643ae5] text-white border-[#643ae5]'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:border-[#643ae5]'
+                                }`}
+                            >
+                              #{emi.installmentNumber} — ₹{parseFloat(emi.amount).toLocaleString()}
+                              {parseFloat(emi.carryoverAmount || '0') > 0 && (
+                                <span className="ml-1 text-orange-500">(+₹{parseFloat(emi.carryoverAmount).toLocaleString()} carryover)</span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Scheduled vs Actual Amount */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Scheduled Due Amount</Label>
+                        <div className="flex items-center h-10 px-3 rounded-md border bg-gray-50 font-semibold text-gray-700">
+                          ₹{parseFloat(emiPaymentFormData.amount || '0').toLocaleString()}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Includes any carryover from previous</p>
+                      </div>
+                      <div>
+                        <Label htmlFor="actualAmountReceived">Actual Amount Received *</Label>
+                        <Input
+                          id="actualAmountReceived"
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          required
+                          value={emiPaymentFormData.actualAmountReceived || ''}
+                          onChange={e => setEmiPaymentFormData(prev => ({ ...prev, actualAmountReceived: e.target.value }))}
+                          className="font-medium"
+                          placeholder="Enter amount received"
+                        />
+                        {/* Shortfall / Excess indicator */}
+                        {emiPaymentFormData.actualAmountReceived && emiPaymentFormData.amount && (() => {
+                          const scheduled = parseFloat(emiPaymentFormData.amount);
+                          const actual = parseFloat(emiPaymentFormData.actualAmountReceived);
+                          const diff = actual - scheduled;
+                          if (Math.abs(diff) < 0.01) return null;
+                          return (
+                            <div className={`mt-1 text-xs font-medium px-2 py-1 rounded ${diff < 0 ? 'bg-orange-50 text-orange-700' : 'bg-green-50 text-green-700'}`}>
+                              {diff < 0
+                                ? `⚠ ₹${Math.abs(diff).toLocaleString()} shortfall → will carry over to next EMI`
+                                : `✓ ₹${diff.toLocaleString()} excess received`}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Date and Mode */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="emiPayDate">Payment Date *</Label>
+                        <Input
+                          id="emiPayDate"
+                          type="date"
+                          required
+                          value={emiPaymentFormData.paymentDate}
+                          onChange={e => setEmiPaymentFormData(prev => ({ ...prev, paymentDate: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label>Payment Mode *</Label>
+                        <Select
+                          value={emiPaymentFormData.paymentMode}
+                          onValueChange={v => setEmiPaymentFormData(prev => ({ ...prev, paymentMode: v }))}
+                          required
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select mode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="UPI">UPI</SelectItem>
+                            <SelectItem value="Cash">Cash</SelectItem>
+                            <SelectItem value="Card">Card</SelectItem>
+                            <SelectItem value="Cheque">Cheque</SelectItem>
+                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Transaction ID */}
                     <div>
-                      <Label htmlFor="installmentNumber">Installment Number *</Label>
+                      <Label htmlFor="emiTransId">Transaction ID (Optional)</Label>
                       <Input
-                        id="installmentNumber"
-                        name="installmentNumber"
-                        type="number"
-                        min="1"
-                        max={selectedEmiPlan.numberOfInstallments}
-                        defaultValue={nextInstallmentNumber}
-                        key={`installment-${nextInstallmentNumber}`}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="amount">Amount *</Label>
-                      <Input
-                        id="amount"
-                        name="amount"
-                        type="number"
-                        step="0.01"
-                        defaultValue={selectedEmiPlan.installmentAmount}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="paymentDate">Payment Date *</Label>
-                      <Input
-                        id="paymentDate"
-                        name="paymentDate"
-                        type="date"
-                        defaultValue={format(new Date(), 'yyyy-MM-dd')}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="paymentMode">Payment Mode *</Label>
-                      <Select name="paymentMode" required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select mode" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="card">Card</SelectItem>
-                          <SelectItem value="upi">UPI</SelectItem>
-                          <SelectItem value="net_banking">Net Banking</SelectItem>
-                          <SelectItem value="cheque">Cheque</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4">
-                    <div>
-                      <Label htmlFor="transactionId">Transaction ID</Label>
-                      <Input
-                        id="transactionId"
-                        name="transactionId"
+                        id="emiTransId"
                         type="text"
                         placeholder="Optional"
+                        value={emiPaymentFormData.transactionId || ''}
+                        onChange={e => setEmiPaymentFormData(prev => ({ ...prev, transactionId: e.target.value }))}
                       />
                     </div>
                   </div>
-                </div>
 
-                <DialogFooter className="mt-6">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEmiPaymentModalOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="bg-[#643ae5] hover:bg-[#552dbf]">
-                    Record Payment
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )
-      }
-
-      {/* Payment Details Modal */}
-      {
-        selectedPaymentForDetails && (
-          <Dialog open={paymentDetailsOpen} onOpenChange={setPaymentDetailsOpen}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Payment Details</DialogTitle>
-                <DialogDescription>
-                  View complete payment information
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-gray-500">Amount</Label>
-                    <div className="font-semibold text-lg">₹{parseFloat(selectedPaymentForDetails.amount).toLocaleString()}</div>
-                  </div>
-                  <div>
-                    <Label className="text-gray-500">Payment Date</Label>
-                    <div className="font-medium">{format(new Date(selectedPaymentForDetails.paymentDate), "MMM dd, yyyy")}</div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-gray-500">Payment Mode</Label>
-                    <div className="font-medium capitalize">{selectedPaymentForDetails.paymentMode}</div>
-                  </div>
-                  <div>
-                    <Label className="text-gray-500">Status</Label>
-                    <Badge className={selectedPaymentForDetails.status === 'completed' ? 'bg-green-500' : 'bg-orange-500'}>
-                      {selectedPaymentForDetails.status}
-                    </Badge>
-                  </div>
-                </div>
-
-                {selectedPaymentForDetails.installmentNumber && selectedPaymentForDetails.installmentNumber > 0 && (
-                  <div>
-                    <Label className="text-gray-500">Installment Number</Label>
-                    <div className="font-medium">#{selectedPaymentForDetails.installmentNumber}</div>
-                  </div>
-                )}
-
+                  <DialogFooter className="mt-6">
+                    <Button type="button" variant="outline" onClick={() => setEmiPaymentModalOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="bg-[#643ae5] hover:bg-[#552dbf]"
+                      disabled={!emiPaymentFormData.paymentMode || !emiPaymentFormData.actualAmountReceived}
+                    >
+                      Record Payment
+                    </Button>
+             {/* Payment Details Modal */}
+      {selectedPaymentForDetails && (
+        <Dialog open={paymentDetailsOpen} onOpenChange={setPaymentDetailsOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Payment Details</DialogTitle>
+              <DialogDescription>
+                View complete payment information
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-gray-500">Payment Type</Label>
-                  <div className="font-medium">
-                    {selectedPaymentForDetails.paymentCategory === 'additional_charge' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-800">
-                        {selectedPaymentForDetails.chargeType ?
-                          selectedPaymentForDetails.chargeType.split('_').map((word: string) =>
-                            word.charAt(0).toUpperCase() + word.slice(1)
-                          ).join(' ')
-                          : 'Additional Charge'}
-                      </span>
-                    ) : selectedPaymentForDetails.installmentNumber === 0 ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                        Registration Fee
-                      </span>
-                    ) : selectedPaymentForDetails.installmentNumber > 0 ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                        EMI Installment #{selectedPaymentForDetails.installmentNumber}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
-                        Fee Payment
-                      </span>
-                    )}
-                  </div>
+                  <Label className="text-gray-500">Amount</Label>
+                  <div className="font-semibold text-lg">₹{parseFloat(selectedPaymentForDetails.amount).toLocaleString()}</div>
                 </div>
-
-                {selectedPaymentForDetails.receiptNumber && (
-                  <div>
-                    <Label className="text-gray-500">Receipt Number</Label>
-                    <div className="font-medium">{selectedPaymentForDetails.receiptNumber}</div>
-                  </div>
-                )}
-
-                {selectedPaymentForDetails.transactionId && (
-                  <div>
-                    <Label className="text-gray-500">Transaction ID</Label>
-                    <div className="font-mono text-sm bg-slate-100 p-2 rounded">{selectedPaymentForDetails.transactionId}</div>
-                  </div>
-                )}
-
-                {selectedPaymentForDetails.discount && parseFloat(selectedPaymentForDetails.discount) > 0 && (
-                  <div>
-                    <Label className="text-gray-500">Discount Applied</Label>
-                    <div className="font-medium text-green-600">₹{parseFloat(selectedPaymentForDetails.discount).toLocaleString()}</div>
-                  </div>
-                )}
-
-                <div className="border-t pt-4">
-                  <Label className="text-gray-500">Recorded On</Label>
-                  <div className="text-sm text-gray-600">{selectedPaymentForDetails.createdAt ? formatDateTimeIST(selectedPaymentForDetails.createdAt) : 'N/A'}</div>
+                <div>
+                  <Label className="text-gray-500">Payment Date</Label>
+                  <div className="font-medium">{format(new Date(selectedPaymentForDetails.paymentDate), "MMM dd, yyyy")}</div>
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setPaymentDetailsOpen(false)}>
-                  Close
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )
-      }
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-gray-500">Payment Mode</Label>
+                  <div className="font-medium capitalize">{selectedPaymentForDetails.paymentMode}</div>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Status</Label>
+                  <Badge className={selectedPaymentForDetails.status === 'completed' ? 'bg-green-500' : 'bg-orange-500'}>
+                    {selectedPaymentForDetails.status}
+                  </Badge>
+                </div>
+              </div>
+
+              {selectedPaymentForDetails.installmentNumber !== null && selectedPaymentForDetails.installmentNumber !== undefined && (
+                <div>
+                  <Label className="text-gray-500">Installment Number</Label>
+                  <div className="font-medium">#{selectedPaymentForDetails.installmentNumber}</div>
+                </div>
+              )}
+
+              <div>
+                <Label className="text-gray-500">Payment Type</Label>
+                <div className="font-medium">
+                  {selectedPaymentForDetails.paymentCategory === 'additional_charge' ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-800">
+                      {selectedPaymentForDetails.chargeType ?
+                        selectedPaymentForDetails.chargeType.split('_').map((word: string) =>
+                          word.charAt(0).toUpperCase() + word.slice(1)
+                        ).join(' ')
+                        : 'Additional Charge'}
+                    </span>
+                  ) : selectedPaymentForDetails.installmentNumber === 0 ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                      Registration Fee
+                    </span>
+                  ) : selectedPaymentForDetails.installmentNumber && selectedPaymentForDetails.installmentNumber > 0 ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                      EMI Installment #{selectedPaymentForDetails.installmentNumber}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+                      Fee Payment
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {selectedPaymentForDetails.receiptNumber && (
+                <div>
+                  <Label className="text-gray-500">Receipt Number</Label>
+                  <div className="font-medium">{selectedPaymentForDetails.receiptNumber}</div>
+                </div>
+              )}
+
+              {selectedPaymentForDetails.transactionId && (
+                <div>
+                  <Label className="text-gray-500">Transaction ID</Label>
+                  <div className="font-mono text-sm bg-slate-100 p-2 rounded">{selectedPaymentForDetails.transactionId}</div>
+                </div>
+              )}
+
+              {selectedPaymentForDetails.discount && parseFloat(selectedPaymentForDetails.discount) > 0 && (
+                <div>
+                  <Label className="text-gray-500">Discount Applied</Label>
+                  <div className="font-medium text-green-600">₹{parseFloat(selectedPaymentForDetails.discount).toLocaleString()}</div>
+                </div>
+              )}
+
+              <div className="border-t pt-4">
+                <Label className="text-gray-500">Recorded On</Label>
+                <div className="text-sm text-gray-600">{selectedPaymentForDetails.createdAt ? formatDateTimeIST(selectedPaymentForDetails.createdAt) : 'N/A'}</div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPaymentDetailsOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Deletion Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              {itemToDelete?.type === 'emi_cancel' ? 'Cancel EMI Plan' : 'Confirm Deletion'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {itemToDelete?.type === 'emi_plan' ? (
+                <>
+                  Are you sure you want to delete this EMI plan? This will also remove the payment schedule.
+                  <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive-foreground">
+                    <strong>Warning:</strong> This action cannot be undone. All pending installments for this plan will be removed.
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <Label htmlFor="confirm-delete" className="text-foreground">Type <span className="font-bold">DELETE</span> to confirm:</Label>
+                    <Input 
+                      id="confirm-delete"
+                      value={confirmText}
+                      onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
+                      placeholder="Type DELETE"
+                      className="border-destructive/20 focus-visible:ring-destructive"
+                    />
+                  </div>
+                </>
+              ) : itemToDelete?.type === 'emi_cancel' ? (
+                <>
+                  Are you sure you want to cancel this EMI plan?
+                  <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md text-sm text-amber-800 dark:text-amber-400">
+                    The plan will be marked as <strong>Cancelled</strong>. Existing payments will remain.
+                  </div>
+                </>
+              ) : (
+                <>
+                  Are you sure you want to delete this payment record? 
+                  {itemToDelete?.details && <div className="mt-1 font-medium text-foreground">{itemToDelete.details}</div>}
+                  <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md text-sm text-amber-800 dark:text-amber-400">
+                    If this was an EMI payment, the installment will be marked as <strong>Pending</strong> again.
+                  </div>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmText("")}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={itemToDelete?.type === 'emi_plan' && confirmText !== "DELETE"}
+              onClick={() => {
+                if (itemToDelete) {
+                  if (itemToDelete.type === 'emi_plan') {
+                    handleDeleteEmiPlan(itemToDelete.id);
+                  } else if (itemToDelete.type === 'emi_cancel') {
+                    handleCancelEmiPlan(itemToDelete.id);
+                  } else {
+                    deletePaymentMutation.mutate(itemToDelete.id);
+                  }
+                }
+                setConfirmText("");
+                setDeleteConfirmOpen(false);
+              }}
+            >
+              {itemToDelete?.type === 'emi_cancel' ? 'Cancel Plan' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+: 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -2485,6 +2485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const feePaymentData = {
         leadId: req.body.leadId,
         amount: String(Number(req.body.amount)),
+        discount: req.body.discount ? String(Number(req.body.discount)) : "0",
         paymentDate: req.body.paymentDate,
         paymentMode: req.body.paymentMode,
         receiptNumber: req.body.receiptNumber,
@@ -2690,6 +2691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const {
         studentId,
         totalAmount,
+        discount,
         numberOfInstallments,
         installmentAmount,
         startDate,
@@ -2731,6 +2733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const finalPlanData: InsertEmiPlan = {
         studentId: parseInt(studentId),
         totalAmount: String(totalAmount),
+        discount: discount ? String(discount) : "0",
         numberOfInstallments: parseInt(numberOfInstallments),
         installmentAmount: String(installmentAmount),
         startDate: startDate, // Already in YYYY-MM-DD format from frontend
@@ -2880,6 +2883,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST: Record a partial EMI payment (with carryover to next installment)
+  app.post("/api/emi-plans/:id/record-payment", async (req, res) => {
+    try {
+      const planId = parseInt(req.params.id);
+      if (isNaN(planId)) return res.status(400).json({ message: "Invalid plan ID" });
+
+      const { installmentNumber, amountPaid, paymentDate, paymentMode, transactionId } = req.body;
+      if (!installmentNumber || !amountPaid || !paymentDate || !paymentMode) {
+        return res.status(400).json({ message: "Missing required fields: installmentNumber, amountPaid, paymentDate, paymentMode" });
+      }
+
+      const parsedAmount = parseFloat(amountPaid);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ message: "Invalid amount" });
+      }
+
+      const organizationId = await getOrganizationId(req);
+
+      const result = await storage.recordPartialEmiPayment(
+        planId,
+        parseInt(installmentNumber),
+        parsedAmount,
+        { paymentDate, paymentMode, transactionId: transactionId || null, organizationId }
+      );
+
+      // Generate receipt number for the payment
+      if (!result.payment.receiptNumber) {
+        try {
+          const organization = organizationId ? await storage.getOrganization(organizationId) : null;
+          const orgSettings = (organization?.settings as any) || {};
+          const academicYear = orgSettings.academicYear || "2026-27";
+          const orgPrefix = organization?.name ? organization.name.substring(0, 3).toUpperCase() : "ORG";
+          const receiptNumber = `${orgPrefix} / ${academicYear}/${String(result.payment.id).padStart(6, '0')}`;
+          const updatedPayment = await storage.updateFeePayment(result.payment.id, { receiptNumber });
+          if (updatedPayment) result.payment = updatedPayment as any;
+        } catch (e) {
+          console.error("Failed to generate receipt number:", e);
+        }
+      }
+
+      res.status(201).json({
+        success: true,
+        data: result,
+        message: result.shortfall > 0
+          ? `Payment recorded. ₹${result.shortfall.toFixed(2)} carried over to next installment.`
+          : "Payment recorded successfully."
+      });
+    } catch (error) {
+      console.error("Partial EMI payment error:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to record payment" });
+    }
+  });
+
+  // PATCH: Manually adjust a future EMI schedule item's scheduled amount
+  app.patch("/api/emi-schedule/:scheduleId", async (req, res) => {
+    try {
+      const scheduleId = parseInt(req.params.scheduleId);
+      if (isNaN(scheduleId)) return res.status(400).json({ message: "Invalid schedule ID" });
+
+      const { scheduledAmount } = req.body;
+      if (scheduledAmount === undefined || scheduledAmount === null) {
+        return res.status(400).json({ message: "scheduledAmount is required" });
+      }
+
+      const parsedAmount = parseFloat(scheduledAmount);
+      if (isNaN(parsedAmount) || parsedAmount < 0) {
+        return res.status(400).json({ message: "Invalid scheduledAmount value" });
+      }
+
+      const result = await storage.adjustEmiScheduleAmount(scheduleId, parsedAmount);
+      res.json({ success: true, data: result, message: "Schedule item adjusted successfully" });
+    } catch (error) {
+      console.error("EMI schedule adjust error:", error);
+      const msg = error instanceof Error ? error.message : "Failed to adjust schedule item";
+      res.status(msg.includes("not found") || msg.includes("paid") ? 400 : 500).json({ message: msg });
+    }
+  });
+
+  // GET: Fetch full EMI schedule for a plan (with carryover details)
+  app.get("/api/emi-plans/:id/schedule", async (req, res) => {
+    try {
+      const planId = parseInt(req.params.id);
+      const schedule = await storage.getEmiPlanSchedule(planId);
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error fetching EMI schedule:", error);
+      res.status(500).json({ message: "Failed to fetch EMI schedule" });
+    }
+  });
+
   app.patch("/api/emi-plans/:id", async (req, res) => {
     try {
       const emiPlan = await storage.updateEmiPlan(parseInt(req.params.id), req.body);
@@ -2903,6 +2996,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to delete EMI plan" });
     }
   });
+
+
 
   // Student Management Routes
   app.get("/api/students", async (req, res) => {
