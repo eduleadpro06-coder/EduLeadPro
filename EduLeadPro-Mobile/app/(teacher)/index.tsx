@@ -18,7 +18,7 @@ import {
     StatusBar,
     BackHandler,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../src/store/authStore';
@@ -175,7 +175,7 @@ export default function TeacherHomeScreen() {
                     <View style={styles.headerContent}>
                         <View style={{ flex: 1 }}>
                             <TouchableOpacity style={styles.menuBtn} onPress={() => setDrawerVisible(true)}>
-                                <Feather name="menu" size={24} color={colors.textPrimary} />
+                                <Ionicons name="grid-outline" size={26} color={colors.textPrimary} />
                             </TouchableOpacity>
                             <View style={{ marginTop: 12 }}>
                                 <Text style={styles.dateText}>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>

@@ -112,7 +112,7 @@ export default function LoginScreen() {
                     />
                 </View>
                 <Text style={styles.title}>Parent Portal</Text>
-                <Text style={styles.subtitle}>Powered by Yonerra</Text>
+                <Text style={styles.subtitle}>Powered by Bloomdale Preschool | Dedicated to Excellence</Text>
             </Animated.View>
 
             {/* Login Form Card */}
@@ -192,15 +192,15 @@ const styles = StyleSheet.create({
         marginBottom: spacing.xl,
     },
     logoContainer: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
+        width: 120,
+        height: 120,
+        borderRadius: 60,
         backgroundColor: colors.surface,
         overflow: 'hidden',
         marginBottom: spacing.md,
-        ...shadows.md,
-        borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.1)',
+        ...shadows.lg,
+        borderWidth: 3,
+        borderColor: 'rgba(255,255,255,0.2)',
         alignItems: 'center',
         justifyContent: 'center',
     },

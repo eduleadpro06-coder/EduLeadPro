@@ -254,11 +254,10 @@ router.post('/auth/login', async (req: Request, res: Response) => {
             }
         }
 
-        // If not staff, check for PARENT (existing logic)
         const { data: students, error: fetchError } = await supabase
             .from('leads')
-            .select('id, name, class, status, parent_name, parent_phone, phone, app_password, organization_id, is_app_active, father_first_name, father_last_name, father_phone, mother_first_name, mother_last_name, mother_phone')
-            .or(`parent_phone.eq."${phone}",phone.eq."${phone}"`);
+            .select('id, name, class, status, father_first_name, father_last_name, father_phone, mother_first_name, mother_last_name, mother_phone, phone, app_password, organization_id, is_app_active')
+            .or(`phone.eq."${phone}",father_phone.eq."${phone}",mother_phone.eq."${phone}"`);
 
         if (fetchError) {
             console.error('[Login] Parent/Student fetch error:', fetchError);
@@ -314,17 +313,24 @@ router.post('/auth/login', async (req: Request, res: Response) => {
             }
         }
 
+        // Determine what phone number to use as "parent" phone for tokens
+        const matchingStudent = students.find(s => 
+            s.phone === phone || s.father_phone === phone || s.mother_phone === phone
+        );
+        const activeParentPhone = matchingStudent ? 
+            (matchingStudent.father_phone === phone ? matchingStudent.father_phone : 
+             matchingStudent.mother_phone === phone ? matchingStudent.mother_phone : matchingStudent.phone) : phone;
+
         // Generate JWT tokens for parent
-        // Use lead_id as userId for parents (linked to first child)
         const accessToken = generateAccessToken(
             parentRecord.id,
-            parentRecord.parent_phone,
+            activeParentPhone,
             'parent',
             parentRecord.organization_id
         );
         const refreshToken = generateRefreshToken(
             parentRecord.id,
-            parentRecord.parent_phone,
+            activeParentPhone,
             'parent',
             parentRecord.organization_id
         );
@@ -345,10 +351,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
                     }
                     return pr.parent_name || 'Parent';
                 })(),
-                phone: (() => {
-                    const pr = parentRecord as any;
-                    return pr.father_phone || pr.mother_phone || pr.parent_phone;
-                })(),
+                phone: activeParentPhone,
                 role: 'parent',
                 organization_id: parentRecord.organization_id,
                 organization_id: parentRecord.organization_id,
@@ -392,7 +395,7 @@ router.post('/auth/change-password', async (req: Request, res: Response) => {
         const { data: leads, error: findError } = await supabase
             .from('leads')
             .select('id')
-            .or(`parent_phone.eq."${phone}",phone.eq."${phone}"`);
+            .or(`phone.eq."${phone}",father_phone.eq."${phone}",mother_phone.eq."${phone}"`);
 
         if (findError) {
             console.error('Error finding user for password change:', findError);
@@ -565,7 +568,7 @@ router.get('/teacher/dashboard/:staffId', async (req: Request, res: Response) =>
         // Get enrolled students for this organization (teacher sees all students)
         const { data: students } = await supabase
             .from('leads')
-            .select('id, name, class, parent_phone')
+            .select('id, name, class, father_phone, mother_phone, phone')
             .eq('organization_id', teacher.organization_id)
             .eq('status', 'enrolled')
             .order('class', { ascending: true });
@@ -729,7 +732,7 @@ router.get('/driver/dashboard/:staffId', async (req: Request, res: Response) => 
                 const leadIds = studentAssignments.map(sa => sa.lead_id);
                 const { data: students } = await supabase
                     .from('leads')
-                    .select('id, name, class, parent_phone')
+                    .select('id, name, class, father_phone, mother_phone, phone')
                     .in('id', leadIds);
 
                 assignedStudents = students || [];

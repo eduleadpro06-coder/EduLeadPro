@@ -107,17 +107,35 @@ router.get('/children', async (req: Request, res: Response) => {
         const { supabase } = await import('../../supabase.js');
         const { data: children, error } = await supabase
             .from('leads')
-            .select('id, name, class, parent_name, parent_phone, phone, email, status, organization_id')
+            .select('id, name, class, father_first_name, father_last_name, mother_first_name, mother_last_name, father_phone, mother_phone, phone, email, status, organization_id')
             .eq('organization_id', organizationId)
-            .or(`parent_phone.eq.${parentPhone},phone.eq.${parentPhone}`)
+            .or(`phone.eq."${parentPhone}",father_phone.eq."${parentPhone}",mother_phone.eq."${parentPhone}"`)
             .in('status', ['enrolled', 'active']);
 
         if (error) throw error;
 
+        // Map correct parent phone and name for compatibility
+        const mappedChildren = (children || []).map(child => {
+            let pName = 'Parent';
+            let pPhone = parentPhone;
+
+            if (child.father_phone === parentPhone) {
+                pName = `${child.father_first_name || ''} ${child.father_last_name || ''}`.trim() || 'Father';
+            } else if (child.mother_phone === parentPhone) {
+                pName = `${child.mother_first_name || ''} ${child.mother_last_name || ''}`.trim() || 'Mother';
+            }
+
+            return {
+                ...child,
+                parent_name: pName,
+                parent_phone: pPhone
+            };
+        });
+
         res.json({
             success: true,
             data: {
-                children: children || []
+                children: mappedChildren || []
             }
         });
     } catch (error) {

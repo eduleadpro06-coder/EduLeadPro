@@ -94,7 +94,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
                 const studentIds = assignments.map(a => a.student_id);
                 const { data: students, error: studError } = await supabase
                     .from('leads')
-                    .select('id, name, class, parent_phone')
+                    .select('id, name, class, father_phone, mother_phone, phone')
                     .in('id', studentIds);
 
                 if (studError) {

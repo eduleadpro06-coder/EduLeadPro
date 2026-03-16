@@ -1,7 +1,7 @@
 export default {
   expo: {
-    name: 'Yonerra',
-    slug: 'yonerra',
+    name: 'Bloomdale Preschool',
+    slug: 'bloomdale-preschool',
     version: '2.0.0',
     orientation: 'portrait',
     icon: './assets/logo.png',
@@ -14,14 +14,14 @@ export default {
     assetBundlePatterns: ['**/*'],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'com.yonerra.app',
+      bundleIdentifier: 'com.bloomdale.app',
     },
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/logo.png',
         backgroundColor: '#ffffff',
       },
-      package: 'com.yonerra.app',
+      package: 'com.bloomdale.app',
       softwareKeyboardLayoutMode: 'resize',
       versionCode: 3,
     },
@@ -37,7 +37,7 @@ export default {
       [
         'expo-camera',
         {
-          cameraPermission: 'Allow Yonerra to access camera for attendance',
+          cameraPermission: 'Allow Bloomdale Preschool to access camera for attendance',
         },
       ],
     ],
@@ -53,6 +53,6 @@ export default {
       },
     },
     owner: 'gauravkachwaha',
-    scheme: 'yonerra',
+    scheme: 'bloomdale',
   },
 };

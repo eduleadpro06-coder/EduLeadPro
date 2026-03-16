@@ -1314,6 +1314,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`,
+            eq(schema.expenses.type, 'outward'),
             gte(schema.expenses.date, currentMonthStart.toISOString().split('T')[0]),
             lte(schema.expenses.date, currentMonthEnd.toISOString().split('T')[0])
           )
@@ -1323,13 +1324,19 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`,
+            eq(schema.expenses.type, 'outward'),
             gte(schema.expenses.date, prevMonthStart.toISOString().split('T')[0]),
             lte(schema.expenses.date, prevMonthEnd.toISOString().split('T')[0])
           )
         ),
       db.select({ total: sql<number>`cast(coalesce(sum(${schema.expenses.amount}), 0) as integer)` })
         .from(schema.expenses)
-        .where(organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`)
+        .where(
+          and(
+            organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`,
+            eq(schema.expenses.type, 'outward')
+          )
+        )
     ]);
 
     const monthlyExpenses = currentExpenses[0]?.total || 0;
@@ -1621,7 +1628,12 @@ export class DatabaseStorage implements IStorage {
         total: sql<number>`cast(coalesce(sum(${schema.expenses.amount}), 0) as integer)`
       })
       .from(schema.expenses)
-      .where(organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`)
+      .where(
+        and(
+          organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`,
+          eq(schema.expenses.type, 'outward')
+        )
+      )
       .groupBy(schema.expenses.category);
 
     const categoryBreakdown = categoryData.map(c => ({
@@ -1639,6 +1651,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`,
+          eq(schema.expenses.type, 'outward'),
           gte(schema.expenses.date, new Date(currentYear, currentMonth - 5, 1).toISOString().split('T')[0])
         )
       )

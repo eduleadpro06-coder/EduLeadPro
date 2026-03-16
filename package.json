@@ -10,6 +10,7 @@
     "start": "cross-env NODE_ENV=production node dist/server/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
+    "launchexpo": "npm run --prefix EduLeadPro-Mobile launchexpo",
     "vercel-build": "vite build && npm run build:server"
   },
   "dependencies": {

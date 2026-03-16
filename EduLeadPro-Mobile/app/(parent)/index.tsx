@@ -173,7 +173,7 @@ export default function ParentHomeScreen() {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity style={styles.headerButton} onPress={() => setIsMenuOpen(true)}>
-                    <Feather name="menu" size={24} color="#1F2937" />
+                    <Ionicons name="grid-outline" size={26} color="#1F2937" />
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
                     <Text style={styles.headerSubtitle}>{(user as any)?.organizationName || 'EduConnect'}</Text>

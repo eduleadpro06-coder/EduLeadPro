@@ -103,8 +103,8 @@ router.post('/login', async (req: Request, res: Response) => {
         // If not staff, check for PARENT (existing logic)
         const { data: students, error: fetchError } = await supabase
             .from('leads')
-            .select('id, name, class, status, parent_name, parent_phone, phone, app_password, organization_id, is_app_active')
-            .or(`parent_phone.eq."${phone}",phone.eq."${phone}"`);
+            .select('id, name, class, status, father_first_name, father_last_name, mother_first_name, mother_last_name, father_phone, mother_phone, phone, app_password, organization_id, is_app_active')
+            .or(`phone.eq."${phone}",father_phone.eq."${phone}",mother_phone.eq."${phone}"`);
 
         if (fetchError) {
             console.error('[Login] Parent/Student fetch error:', fetchError);
@@ -156,16 +156,35 @@ router.post('/login', async (req: Request, res: Response) => {
             }
         }
 
+        // Determine what phone number and name to return as "parent" info
+        // Based on which one matched the login phone
+        let activeParentPhone = phone;
+        let activeParentName = 'Parent';
+
+        const matchingStudent = students.find(s => 
+            s.phone === phone || s.father_phone === phone || s.mother_phone === phone
+        );
+
+        if (matchingStudent) {
+            if (matchingStudent.father_phone === phone) {
+                activeParentName = `${matchingStudent.father_first_name || ''} ${matchingStudent.father_last_name || ''}`.trim() || 'Father';
+            } else if (matchingStudent.mother_phone === phone) {
+                activeParentName = `${matchingStudent.mother_first_name || ''} ${matchingStudent.mother_last_name || ''}`.trim() || 'Mother';
+            } else {
+                activeParentName = matchingStudent.name; // Use student name if logged in via student phone
+            }
+        }
+
         // Generate JWT tokens for parent
         const accessToken = generateAccessToken(
             parentRecord.id,
-            parentRecord.parent_phone,
+            activeParentPhone,
             'parent',
             parentRecord.organization_id
         );
         const refreshToken = generateRefreshToken(
             parentRecord.id,
-            parentRecord.parent_phone,
+            activeParentPhone,
             'parent',
             parentRecord.organization_id
         );
@@ -185,8 +204,8 @@ router.post('/login', async (req: Request, res: Response) => {
             refreshToken,
             user: {
                 userId: parentRecord.id,
-                name: parentRecord.parent_name || 'Parent',
-                phone: parentRecord.parent_phone,
+                name: activeParentName,
+                phone: activeParentPhone,
                 role: 'parent',
                 organization_id: parentRecord.organization_id,
                 organizationName: organizationName,
@@ -219,7 +238,7 @@ router.post('/change-password', async (req: Request, res: Response) => {
         const { data: leads, error: findError } = await supabase
             .from('leads')
             .select('id')
-            .or(`parent_phone.eq."${phone}",phone.eq."${phone}"`);
+            .or(`phone.eq."${phone}",father_phone.eq."${phone}",mother_phone.eq."${phone}"`);
 
         if (findError) throw findError;
 
