@@ -12,6 +12,9 @@ export default {
       backgroundColor: '#ffffff',
     },
     assetBundlePatterns: ['**/*'],
+    updates: {
+      enabled: false,
+    },
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.bloomdale.app',
