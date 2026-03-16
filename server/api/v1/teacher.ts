@@ -185,13 +185,14 @@ router.get('/students', async (req: Request, res: Response) => {
                 .in('id', assignedStudentIds)
                 .order('class', { ascending: true });
         } else {
-            // No assignments - show all students (legacy behavior)
-            query = supabase
-                .from('leads')
-                .select('id, name, class, section')
-                .eq('organization_id', organizationId)
-                .eq('status', 'enrolled')
-                .order('class', { ascending: true });
+            // No assignments - return empty list (per user request: "teacher no student is assigned still teacher able to see all students")
+            return res.json({
+                success: true,
+                data: {
+                    students: [],
+                    filteredByAssignments: true
+                }
+            });
         }
 
         if (classFilter) {

@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import Header from "@/components/layout/header";
 import { TeacherAssignmentDropdown } from "@/components/teacher-assignment-dropdown";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TaskManagement from "@/components/mobile/task-management";
 import ActivityApproval from "@/components/mobile/activity-approval";
 import StopSelectionMap from "@/components/StopSelectionMap";
@@ -180,6 +181,8 @@ export default function AppManagement() {
     const [mainTab, setMainTab] = useQueryState<string>("tab", "users");
     const [activeTab, setActiveTab] = useQueryState<string>("subtab", "parents");
     const [searchTerm, setSearchTerm] = useState("");
+    const [classFilter, setClassFilter] = useState("all");
+    const [teacherFilter, setTeacherFilter] = useState("all");
     const { toast } = useToast();
 
     // Form States
@@ -587,6 +590,18 @@ export default function AppManagement() {
         const hasParentInfo = parentPhone || l.phone;
         if (lead.status !== 'enrolled' || !hasParentInfo) return false;
 
+        // Apply Class Filter
+        if (classFilter !== "all" && lead.class !== classFilter) return false;
+
+        // Apply Teacher Filter
+        if (teacherFilter !== "all") {
+            const isAssignedToTeacher = assignments.some(a =>
+                a.student_lead_id === lead.id &&
+                a.teacher_staff_id === Number(teacherFilter)
+            );
+            if (!isAssignedToTeacher) return false;
+        }
+
         if (!searchTerm) return true;
 
         const lowerSearch = searchTerm.toLowerCase();
@@ -597,6 +612,29 @@ export default function AppManagement() {
             (parentPhone && parentPhone.includes(searchTerm))
         );
     });
+
+    // Get unique classes for filter
+    const uniqueClasses = useMemo(() => {
+        const enrolledLeads = leads.filter(l => l.status === 'enrolled');
+        const classes = enrolledLeads.map(l => l.class).filter(Boolean) as string[];
+        return Array.from(new Set(classes)).sort();
+    }, [leads]);
+
+    // Helper for class colors
+    const getClassColor = (className: string) => {
+        const colors: Record<string, string> = {
+            'playgroup': 'bg-pink-100 text-pink-700 border-pink-200',
+            'nursery': 'bg-orange-100 text-orange-700 border-orange-200',
+            'lkg': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            'ukg': 'bg-blue-100 text-blue-700 border-blue-200',
+            'daycare': 'bg-purple-100 text-purple-700 border-purple-200',
+        };
+        const lowerClass = className.toLowerCase();
+        for (const [key, value] of Object.entries(colors)) {
+            if (lowerClass.includes(key)) return value;
+        }
+        return 'bg-gray-100 text-gray-700 border-gray-200';
+    };
 
     return (
         <div className="min-h-screen bg-gray-50/50">
@@ -690,14 +728,42 @@ export default function AppManagement() {
                                             </span>
                                         </CardDescription>
                                     </div>
-                                    <div className="relative w-72">
-                                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-                                        <Input
-                                            placeholder="Search by name or phone..."
-                                            className="pl-8"
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
+                                    <div className="flex gap-2 items-center">
+                                        <div className="relative w-48">
+                                            <Select value={classFilter} onValueChange={setClassFilter}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="All Classes" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">All Classes</SelectItem>
+                                                    {uniqueClasses.map(c => (
+                                                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="relative w-48">
+                                            <Select value={teacherFilter} onValueChange={setTeacherFilter}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="All Teachers" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">All Teachers</SelectItem>
+                                                    {teachers.map(t => (
+                                                        <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="relative w-72">
+                                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+                                            <Input
+                                                placeholder="Search by name or phone..."
+                                                className="pl-8"
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </CardHeader>
@@ -709,6 +775,7 @@ export default function AppManagement() {
                                                 <TableHead>Student Name</TableHead>
                                                 <TableHead>Parent Name</TableHead>
                                                 <TableHead>Phone Number</TableHead>
+                                                <TableHead>Class</TableHead>
                                                 <TableHead>Assigned Teacher</TableHead>
                                                 <TableHead>App Access</TableHead>
                                                 <TableHead className="text-right">Actions</TableHead>
@@ -735,7 +802,7 @@ export default function AppManagement() {
                                                                 if (lead.motherFirstName) {
                                                                     return `${lead.motherFirstName} ${lead.motherLastName || ''}`.trim();
                                                                 }
-                                                                return lead.parentName || '-';
+                                                                return (lead as any).parentName || '-';
                                                             })()}
                                                         </TableCell>
                                                         <TableCell>
@@ -747,6 +814,11 @@ export default function AppManagement() {
                                                             </div>
                                                         </TableCell>
                                                         <TableCell>
+                                                            <Badge variant="outline" className={getClassColor(lead.class || '')}>
+                                                                {lead.class || 'N/A'}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell>
                                                             <TeacherAssignmentDropdown
                                                                 leadId={lead.id}
                                                             />
@@ -754,7 +826,7 @@ export default function AppManagement() {
                                                         <TableCell>
                                                             <div className="flex items-center space-x-2">
                                                                 <Switch
-                                                                    checked={lead.isAppActive !== false} // Default to true if undefined
+                                                                    checked={lead.isAppActive === true}
                                                                     onCheckedChange={(checked) => {
                                                                         toggleAppAccessMutation.mutate({
                                                                             id: lead.id,
@@ -764,7 +836,7 @@ export default function AppManagement() {
                                                                     disabled={toggleAppAccessMutation.isPending}
                                                                 />
                                                                 <span className="text-sm text-gray-500">
-                                                                    {lead.isAppActive !== false ? 'Active' : 'Inactive'}
+                                                                    {lead.isAppActive === true ? 'Active' : 'Inactive'}
                                                                 </span>
                                                             </div>
                                                         </TableCell>
