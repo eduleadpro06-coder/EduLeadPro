@@ -167,6 +167,8 @@ export const expenses = pgTable("expenses", {
   status: varchar("status", { length: 20 }).default("pending"), // pending, approved, rejected
   inventoryItemId: integer("inventory_item_id"), // Link to inventory purchases - will add reference after inventory tables are defined
   deductFromBudget: boolean("deduct_from_budget").default(false), // Whether this expense should deduct from budget
+  type: varchar("type", { length: 20 }).default("outward"), // 'inward' (budget/income) or 'outward' (expense)
+  receiptNumber: varchar("receipt_number", { length: 100 }), // Optional receipt or reference number
   organizationId: integer("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
