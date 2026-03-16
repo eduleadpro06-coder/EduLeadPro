@@ -65,6 +65,13 @@ export const authAPI = {
         const token = await SecureStore.getItemAsync(STORAGE_KEYS.AUTH_TOKEN);
         return !!token;
     },
+
+    /**
+     * Change Password
+     */
+    async changePassword(phone: string, newPassword: string): Promise<any> {
+        return await apiClient.post('/auth/change-password', { phone, newPassword });
+    }
 };
 
 export default authAPI;

@@ -39,6 +39,7 @@ export interface LoginResponse {
     token?: string; // Kept for legacy compatibility if any
     refreshToken: string;
     user: User;
+    requiresPasswordChange?: boolean;
 }
 
 export interface AuthState {

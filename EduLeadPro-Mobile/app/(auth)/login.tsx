@@ -70,8 +70,12 @@ export default function LoginScreen() {
 
         setLoading(true);
         try {
-            await login(phone, password);
-            // Navigation happens automatically via _layout.tsx auth state
+            const response = await login(phone, password);
+
+            if (response.requiresPasswordChange) {
+                setShowChangePassword(true);
+            }
+            // Navigation happens automatically via _layout.tsx auth state if not showing modal
         } catch (error: any) {
             console.error(error);
             const errorMessage = error?.response?.data?.error || error?.message || 'Invalid credentials';
@@ -90,6 +94,44 @@ export default function LoginScreen() {
             setLoading(false);
         }
     };
+
+    const handlePasswordChange = async () => {
+        if (!newPassword || !confirmPassword) {
+            Alert.alert('Error', 'Please fill all fields');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            Alert.alert('Error', 'Passwords do not match');
+            return;
+        }
+
+        if (newPassword.length < 4) {
+            Alert.alert('Error', 'Password must be at least 4 characters');
+            return;
+        }
+
+        setChangeLoading(true);
+        try {
+            const { authAPI } = require('../../src/services/api/auth.api');
+            const response = await authAPI.changePassword(phone, newPassword);
+
+            if (response.success) {
+                Alert.alert('Success', 'Password updated successfully. Please login with your new password.');
+                setShowChangePassword(false);
+                logout(); // Logout after password change to force fresh login
+            } else {
+                Alert.alert('Update Failed', response.message || 'Could not update password');
+            }
+        } catch (error: any) {
+            console.error('Password change error:', error);
+            Alert.alert('Error', error.message || 'Failed to update password');
+        } finally {
+            setChangeLoading(false);
+        }
+    };
+
+    const logout = useAuthStore(state => state.logout);
 
     return (
         <View style={styles.container}>
@@ -172,6 +214,47 @@ export default function LoginScreen() {
                     </PremiumCard>
                 </Animated.View>
             </KeyboardAvoidingView>
+
+            {/* Change Password Modal */}
+            <Modal
+                visible={showChangePassword}
+                animationType="slide"
+                transparent={true}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Reset Password</Text>
+                        <Text style={styles.modalSub}>For security, please change your default password.</Text>
+
+                        <PremiumInput
+                            label="New Password"
+                            placeholder="Min 4 characters"
+                            icon="lock"
+                            secureTextEntry
+                            value={newPassword}
+                            onChangeText={setNewPassword}
+                        />
+
+                        <PremiumInput
+                            label="Confirm Password"
+                            placeholder="Re-enter password"
+                            icon="check-circle"
+                            secureTextEntry
+                            value={confirmPassword}
+                            onChangeText={setConfirmPassword}
+                        />
+
+                        <View style={{ height: spacing.lg }} />
+
+                        <PremiumButton
+                            title="Update Password"
+                            onPress={handlePasswordChange}
+                            loading={changeLoading}
+                            icon="save"
+                        />
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -260,5 +343,29 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: colors.textTertiary,
         marginHorizontal: spacing.sm,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.lg,
+    },
+    modalContent: {
+        backgroundColor: colors.surface,
+        borderRadius: 24,
+        padding: spacing.xl,
+        width: '100%',
+        ...shadows.lg,
+    },
+    modalTitle: {
+        ...typography.h2,
+        color: colors.primary,
+        marginBottom: spacing.xs,
+    },
+    modalSub: {
+        ...typography.body,
+        color: colors.textSecondary,
+        marginBottom: spacing.lg,
     },
 });

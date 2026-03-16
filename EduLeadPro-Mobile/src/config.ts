@@ -4,8 +4,8 @@
 import Constants from 'expo-constants';
 
 // Get API URL from environment
-export const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:5000/api/mobile';
-export const WS_URL = Constants.expoConfig?.extra?.wsUrl || 'ws://localhost:5000';
+export const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl || 'http://192.168.29.166:5000/api/v1/mobile';
+export const WS_URL = Constants.expoConfig?.extra?.wsUrl || 'ws://192.168.29.166:5000';
 export const OLA_MAPS_API_KEY = Constants.expoConfig?.extra?.olaMapsApiKey || '';
 
 // API endpoints

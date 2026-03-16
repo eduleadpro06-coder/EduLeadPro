@@ -3,11 +3,11 @@
  */
 
 import { create } from 'zustand';
-import { User, AuthState } from '../types/user.types';
+import { User, AuthState, LoginResponse } from '../types/user.types';
 import authAPI from '../services/api/auth.api';
 
 interface AuthStore extends AuthState {
-    login: (phone: string, password: string) => Promise<void>;
+    login: (phone: string, password: string) => Promise<LoginResponse>;
     logout: () => Promise<void>;
     reset: () => void; // Local cleanup without API call
     loadUser: () => Promise<void>;
@@ -59,6 +59,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
                     isAuthenticated: true,
                     isLoading: false,
                 });
+                return response;
             } else {
                 throw new Error('Login failed');
             }
