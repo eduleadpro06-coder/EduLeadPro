@@ -337,6 +337,10 @@ export default function StudentFees() {
   const [selectedEmiPlanForEdit, setSelectedEmiPlanForEdit] = useState<any>(null);
   const [editEmiFormData, setEditEmiFormData] = useState({
     totalAmount: '',
+    registrationFee: '0',
+    discount: '0',
+    emiPeriod: '2',
+    installments: [] as { installmentNumber: number, amount: string, dueDate: string }[],
     recalculate: false,
     strategy: 'distribute' as 'distribute' | 'add_installments' | 'remove_installments',
     numNewInstallments: 1,
@@ -351,6 +355,8 @@ export default function StudentFees() {
     try {
       const payload: any = {
         totalAmount: editEmiFormData.totalAmount,
+        discount: editEmiFormData.discount,
+        numberOfInstallments: editEmiFormData.emiPeriod,
         recalculate: editEmiFormData.recalculate
       };
 
@@ -374,6 +380,11 @@ export default function StudentFees() {
         if (editEmiFormData.strategy === 'remove_installments') {
           payload.numInstallmentsToRemove = editEmiFormData.numInstallmentsToRemove;
         }
+      }
+
+      // If user manually edited installments, send them directly
+      if (editEmiFormData.installments.length > 0 && !editEmiFormData.recalculate) {
+        payload.customInstallments = editEmiFormData.installments;
       }
 
       const response = await fetch(`/api/emi-plans/${selectedEmiPlanForEdit.id}`, {
@@ -2506,15 +2517,44 @@ export default function StudentFees() {
                                         className="border-orange-500 text-orange-600 hover:bg-orange-50"
                                         onClick={() => {
                                           setSelectedEmiPlanForEdit(plan);
-                                          setEditEmiFormData({
-                                            totalAmount: plan.totalAmount || "0",
-                                            recalculate: false,
-                                            strategy: 'distribute',
-                                            numNewInstallments: 1,
-                                            newInstallmentDates: [],
-                                            numInstallmentsToRemove: 0
-                                          });
-                                          setEditEmiModalOpen(true);
+                                          // Fetch schedule details
+                                          apiRequest("GET", `/api/emi-plans/${plan.id}/schedule`)
+                                            .then(res => res.json())
+                                            .then(schedule => {
+                                              setEditEmiFormData({
+                                                totalAmount: plan.totalAmount || "0",
+                                                registrationFee: (plan as any).registrationFee || '0',
+                                                discount: (plan as any).discount || plan.discount || '0',
+                                                emiPeriod: String(plan.numberOfInstallments || '2'),
+                                                installments: Array.isArray(schedule) ? schedule.map((s: any) => ({
+                                                  installmentNumber: s.installmentNumber,
+                                                  amount: s.amount,
+                                                  dueDate: s.dueDate
+                                                })) : [],
+                                                recalculate: false,
+                                                strategy: 'distribute',
+                                                numNewInstallments: 1,
+                                                newInstallmentDates: [],
+                                                numInstallmentsToRemove: 0
+                                              });
+                                              setEditEmiModalOpen(true);
+                                            })
+                                            .catch(err => {
+                                              console.error("Failed to fetch EMI schedule", err);
+                                              setEditEmiFormData({
+                                                totalAmount: plan.totalAmount || "0",
+                                                registrationFee: (plan as any).registrationFee || '0',
+                                                discount: (plan as any).discount || plan.discount || '0',
+                                                emiPeriod: String(plan.numberOfInstallments || '2'),
+                                                installments: [],
+                                                recalculate: false,
+                                                strategy: 'distribute',
+                                                numNewInstallments: 1,
+                                                newInstallmentDates: [],
+                                                numInstallmentsToRemove: 0
+                                              });
+                                              setEditEmiModalOpen(true);
+                                            });
                                         }}
                                       >
                                         <Edit className="mr-1 h-3 w-3" />
@@ -3013,7 +3053,7 @@ export default function StudentFees() {
 
       {/* Edit EMI Plan Dialog */}
       <Dialog open={editEmiModalOpen} onOpenChange={setEditEmiModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit EMI Plan</DialogTitle>
             <DialogDescription>
@@ -3021,58 +3061,238 @@ export default function StudentFees() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleUpdateEmiPlan} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Current EMI Plan Details</Label>
-              <div className="text-sm text-gray-500">
-                Total Amount: ₹{selectedEmiPlanForEdit?.totalAmount}
-              </div>
+            {/* Current & New Amount Row */}
+            <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-500 space-y-1">
+              <p><span className="font-medium">Current Total:</span> ₹{selectedEmiPlanForEdit?.totalAmount}</p>
+              <p><span className="font-medium">Current EMIs:</span> {selectedEmiPlanForEdit?.numberOfInstallments}</p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="editTotalAmount">New Total Amount (₹)</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="editTotalAmount"
-                  type="number"
-                  required
-                  value={editEmiFormData.totalAmount}
-                  onChange={e => setEditEmiFormData({ ...editEmiFormData, totalAmount: e.target.value })}
-                />
-                {selectedStudent && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    title="Apply standard class fee"
-                    onClick={() => {
-                      const standardFee = globalClassFees.find(gcf =>
-                        gcf.className === selectedStudent.class &&
-                        gcf.academicYear === academicYear
-                      );
-                      if (standardFee) {
-                        // Calculate outstanding: class fee - tuition paid
-                        const classFeeAmount = parseFloat(standardFee.amount);
-                        const tuitionPaid = calculateTuitionPaidAmount(getStudentPayments(selectedStudent.id));
-                        const outstanding = Math.max(0, classFeeAmount - tuitionPaid);
 
-                        setEditEmiFormData(prev => ({ ...prev, totalAmount: outstanding.toString() }));
-                        toast({
-                          title: "Applied Class Fee",
-                          description: `Class Fee: ₹${classFeeAmount.toLocaleString()}, Paid: ₹${tuitionPaid.toLocaleString()}, Outstanding: ₹${outstanding.toLocaleString()}`
-                        });
-                      } else {
-                        toast({ title: "Fee Not Found", description: `No standard fee structure found for Class: ${selectedStudent.class}`, variant: "destructive" });
-                      }
+            <div className="grid grid-cols-2 gap-4">
+              {/* Total Amount */}
+              <div className="space-y-1.5">
+                <Label htmlFor="editTotalAmount">Total Amount (₹)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="editTotalAmount"
+                    type="number"
+                    required
+                    value={editEmiFormData.totalAmount}
+                    onChange={e => {
+                      const totalAmount = e.target.value;
+                      setEditEmiFormData(prev => {
+                        const count = parseInt(prev.emiPeriod) || 0;
+                        const total = parseFloat(totalAmount) || 0;
+                        const reg = parseFloat(prev.registrationFee) || 0;
+                        const disc = parseFloat(prev.discount) || 0;
+                        const payable = Math.max(0, total - reg - disc);
+                        const newInst = count > 0 && payable > 0
+                          ? Array.from({ length: count }, (_, i) => ({
+                              installmentNumber: i + 1,
+                              amount: Math.round(payable / count).toString(),
+                              dueDate: prev.installments[i]?.dueDate || new Date().toISOString().split('T')[0]
+                            }))
+                          : prev.installments;
+                        return { ...prev, totalAmount, installments: newInst };
+                      });
                     }}
-                  >
-                    <BookOpenCheck className="h-4 w-4" />
-                  </Button>
+                  />
+                  {selectedStudent && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      title="Apply standard class fee"
+                      onClick={() => {
+                        const standardFee = globalClassFees.find(gcf =>
+                          gcf.className === selectedStudent.class &&
+                          gcf.academicYear === academicYear
+                        );
+                        if (standardFee) {
+                          const classFeeAmount = parseFloat(standardFee.amount);
+                          const tuitionPaid = calculateTuitionPaidAmount(getStudentPayments(selectedStudent.id));
+                          const outstanding = Math.max(0, classFeeAmount - tuitionPaid);
+                          setEditEmiFormData(prev => ({ ...prev, totalAmount: outstanding.toString() }));
+                          toast({
+                            title: "Applied Class Fee",
+                            description: `Outstanding: ₹${outstanding.toLocaleString()}`
+                          });
+                        } else {
+                          toast({ title: "Fee Not Found", description: `No standard fee for Class: ${selectedStudent.class}`, variant: "destructive" });
+                        }
+                      }}
+                    >
+                      <BookOpenCheck className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {selectedStudent && (
+                  <p className="text-xs text-muted-foreground">Class: {selectedStudent.class}</p>
                 )}
               </div>
-              {selectedStudent && (
-                <p className="text-xs text-muted-foreground">
-                  Current Class: {selectedStudent.class}
-                </p>
-              )}
+
+              {/* Number of EMIs */}
+              <div className="space-y-1.5">
+                <Label htmlFor="editEmiPeriod">Number of EMIs</Label>
+                <Select
+                  value={editEmiFormData.emiPeriod}
+                  onValueChange={(value) => {
+                    setEditEmiFormData(prev => {
+                      const count = parseInt(value) || 0;
+                      const total = parseFloat(prev.totalAmount) || 0;
+                      const reg = parseFloat(prev.registrationFee) || 0;
+                      const disc = parseFloat(prev.discount) || 0;
+                      const payable = Math.max(0, total - reg - disc);
+                      const newInst = count > 0 && payable > 0
+                        ? Array.from({ length: count }, (_, i) => ({
+                            installmentNumber: i + 1,
+                            amount: Math.round(payable / count).toString(),
+                            dueDate: prev.installments[i]?.dueDate || new Date().toISOString().split('T')[0]
+                          }))
+                        : [];
+                      return { ...prev, emiPeriod: value, installments: newInst };
+                    });
+                  }}
+                >
+                  <SelectTrigger id="editEmiPeriod">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['2','3','4','5','6','9','12'].map(v => (
+                      <SelectItem key={v} value={v}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Registration Fee */}
+              <div className="space-y-1.5">
+                <Label htmlFor="editRegFee">Registration Fee (₹)</Label>
+                <Input
+                  id="editRegFee"
+                  type="number"
+                  min="0"
+                  value={editEmiFormData.registrationFee}
+                  onChange={e => {
+                    const registrationFee = e.target.value;
+                    setEditEmiFormData(prev => {
+                      const count = parseInt(prev.emiPeriod) || 0;
+                      const total = parseFloat(prev.totalAmount) || 0;
+                      const reg = parseFloat(registrationFee) || 0;
+                      const disc = parseFloat(prev.discount) || 0;
+                      const payable = Math.max(0, total - reg - disc);
+                      const newInst = count > 0 && payable > 0 && prev.installments.length === count
+                        ? prev.installments.map((inst, i) => ({
+                            ...inst,
+                            amount: Math.round(payable / count).toString()
+                          }))
+                        : prev.installments;
+                      return { ...prev, registrationFee, installments: newInst };
+                    });
+                  }}
+                />
+              </div>
+
+              {/* Discount */}
+              <div className="space-y-1.5">
+                <Label htmlFor="editDiscount">Discount (₹)</Label>
+                <Input
+                  id="editDiscount"
+                  type="number"
+                  min="0"
+                  value={editEmiFormData.discount}
+                  onChange={e => {
+                    const discount = e.target.value;
+                    setEditEmiFormData(prev => {
+                      const count = parseInt(prev.emiPeriod) || 0;
+                      const total = parseFloat(prev.totalAmount) || 0;
+                      const reg = parseFloat(prev.registrationFee) || 0;
+                      const disc = parseFloat(discount) || 0;
+                      const payable = Math.max(0, total - reg - disc);
+                      const newInst = count > 0 && payable > 0 && prev.installments.length === count
+                        ? prev.installments.map(inst => ({
+                            ...inst,
+                            amount: Math.round(payable / count).toString()
+                          }))
+                        : prev.installments;
+                      return { ...prev, discount, installments: newInst };
+                    });
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Editable Installments Table */}
+            {editEmiFormData.installments.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-base font-medium">Installment Schedule</Label>
+                <p className="text-xs text-muted-foreground">Manually adjust individual installment amounts. The last installment auto-balances.</p>
+                <div className="border rounded-md overflow-hidden bg-white">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50">
+                        <TableHead className="w-[60px]">#</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead className="text-right">Amount (₹)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {editEmiFormData.installments.map((inst, idx) => {
+                        const isLast = idx === editEmiFormData.installments.length - 1;
+                        return (
+                          <TableRow key={idx}>
+                            <TableCell>{idx + 1}</TableCell>
+                            <TableCell>
+                              <Input
+                                type="date"
+                                value={inst.dueDate}
+                                onChange={(e) => {
+                                  const newDate = e.target.value;
+                                  setEditEmiFormData(prev => {
+                                    const newInst = [...prev.installments];
+                                    newInst[idx] = { ...newInst[idx], dueDate: newDate };
+                                    return { ...prev, installments: newInst };
+                                  });
+                                }}
+                                className="h-8 w-full"
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={inst.amount}
+                                readOnly={isLast}
+                                className={`h-8 w-32 ml-auto text-right ${isLast ? 'bg-gray-50 cursor-not-allowed font-semibold text-purple-700' : ''}`}
+                                title={isLast ? 'Auto-calculated to balance total' : 'Edit this installment amount'}
+                                onChange={(e) => {
+                                  if (isLast) return;
+                                  const newAmount = e.target.value;
+                                  setEditEmiFormData(prev => {
+                                    const newInst = [...prev.installments];
+                                    newInst[idx] = { ...newInst[idx], amount: newAmount };
+                                    const total = parseFloat(prev.totalAmount) || 0;
+                                    const reg = parseFloat(prev.registrationFee) || 0;
+                                    const disc = parseFloat(prev.discount) || 0;
+                                    const payable = Math.max(0, total - reg - disc);
+                                    const sumExcludingLast = newInst.slice(0, newInst.length - 1).reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+                                    newInst[newInst.length - 1] = { ...newInst[newInst.length - 1], amount: Math.max(0, Math.round(payable - sumExcludingLast)).toString() };
+                                    return { ...prev, installments: newInst };
+                                  });
+                                }}
+                              />
+                              {isLast && <div className="text-[10px] text-purple-500 text-right mt-0.5">auto-balanced</div>}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"

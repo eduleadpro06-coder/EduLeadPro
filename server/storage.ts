@@ -3871,13 +3871,49 @@ export class DatabaseStorage implements IStorage {
     return plan;
   }
 
-  async updateEmiPlan(id: number, updates: Partial<EmiPlan>): Promise<EmiPlan | undefined> {
-    const result = await db.update(schema.emiPlans).set({
-      ...updates,
-      updatedAt: new Date()
-    }).where(eq(schema.emiPlans.id, id)).returning();
-    const plan = result[0];
-    if (plan) {
+  async updateEmiPlan(id: number, updates: Partial<EmiPlan>, customInstallments?: any[]): Promise<EmiPlan | undefined> {
+    return await db.transaction(async (tx) => {
+      const result = await tx.update(schema.emiPlans).set({
+        ...updates,
+        updatedAt: new Date()
+      }).where(eq(schema.emiPlans.id, id)).returning();
+      
+      const plan = result[0];
+      if (!plan) return undefined;
+
+      // Handle custom schedule updates if provided
+      if (customInstallments && customInstallments.length > 0) {
+        // Get existing schedule to check for paid items
+        const currentSchedule = await tx.select().from(schema.emiSchedule)
+          .where(eq(schema.emiSchedule.emiPlanId, id));
+        
+        const paidNumbers = new Set(
+          currentSchedule.filter(s => s.status === 'paid').map(s => s.installmentNumber)
+        );
+
+        // Delete all unpaid schedule items for this plan
+        await tx.delete(schema.emiSchedule).where(
+          and(
+            eq(schema.emiSchedule.emiPlanId, id),
+            ne(schema.emiSchedule.status, 'paid')
+          )
+        );
+
+        // Insert new custom installments (skipping those that were already paid)
+        for (const inst of customInstallments) {
+          if (!paidNumbers.has(inst.installmentNumber)) {
+            await tx.insert(schema.emiSchedule).values({
+              studentId: plan.studentId,
+              emiPlanId: plan.id,
+              installmentNumber: inst.installmentNumber,
+              amount: inst.amount,
+              dueDate: inst.dueDate,
+              status: 'pending'
+            });
+          }
+        }
+      }
+
       // Invalidate dashboard and organization cache
       if (plan.organizationId) {
         cacheService.invalidateOrganization(plan.organizationId);
@@ -3896,8 +3932,9 @@ export class DatabaseStorage implements IStorage {
         'view_emi_plan',
         plan.id.toString()
       );
-    }
-    return plan;
+
+      return plan;
+    });
   }
 
   async updateEmiPlanWithRecalculation(

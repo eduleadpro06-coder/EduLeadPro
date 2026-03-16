@@ -2822,7 +2822,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/emi-plans/:id", async (req, res) => {
     try {
       const planId = parseInt(req.params.id);
-      const { status, totalAmount, recalculate, strategy, newInstallments, numInstallmentsToRemove } = req.body;
+      const { 
+        status, 
+        totalAmount, 
+        discount, 
+        numberOfInstallments, 
+        recalculate, 
+        strategy, 
+        newInstallments, 
+        numInstallmentsToRemove,
+        customInstallments
+      } = req.body;
 
       // Handle recalculation request
       if (recalculate && totalAmount) {
@@ -2852,7 +2862,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update the plan
-      const updatedPlan = await storage.updateEmiPlan(planId, { status, ...(totalAmount && { totalAmount }) });
+      const updates: any = {};
+      if (status) updates.status = status;
+      if (totalAmount) updates.totalAmount = totalAmount;
+      if (discount) updates.discount = discount;
+      if (numberOfInstallments) updates.numberOfInstallments = parseInt(numberOfInstallments);
+
+      const updatedPlan = await storage.updateEmiPlan(planId, updates, customInstallments);
       if (!updatedPlan) {
         return res.status(404).json({ message: "EMI plan not found" });
       }
