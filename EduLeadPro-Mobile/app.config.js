@@ -1,7 +1,7 @@
 export default {
   expo: {
     name: 'Bloomdale Preschool',
-    slug: 'bloomdale-preschool',
+    slug: 'yonerra',
     version: '2.0.0',
     orientation: 'portrait',
     icon: './assets/logo.png',
