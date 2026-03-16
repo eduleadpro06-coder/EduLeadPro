@@ -152,7 +152,13 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
 
   useEffect(() => {
     if (open) {
-      setActiveTab("details");
+      // Respect URL hash if present, otherwise default to details
+      const hash = window.location.hash.slice(1);
+      if (hash === "followups") {
+        setActiveTab("followups");
+      } else {
+        setActiveTab("details");
+      }
     }
   }, [open, setActiveTab]);
 
@@ -1013,8 +1019,8 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                               <div className="flex justify-between items-start mb-2">
                                 <div className="flex items-center gap-2">
                                   <Calendar size={14} className="text-gray-500" />
-                                  <span className="text-sm font-medium">{new Date(fp.scheduledAt).toLocaleDateString()}</span>
-                                  <span className="text-xs text-gray-500">{new Date(fp.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                  <span className="text-sm font-medium">{new Date(fp.scheduledAt).toLocaleDateString('en-IN')}</span>
+                                  <span className="text-xs text-gray-500">{new Date(fp.scheduledAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
                                 </div>
                                 {fp.completedAt ? (
                                   <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Completed</Badge>

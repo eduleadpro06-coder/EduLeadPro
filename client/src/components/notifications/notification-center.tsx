@@ -51,7 +51,8 @@ export default function NotificationCenter() {
     if (notification.actionType && notification.actionId) {
       switch (notification.actionType) {
         case 'view_lead':
-          setLocation(`/leads?id=${notification.actionId}`);
+          const hashSuffix = notification.type === 'followup' ? '#followups' : '';
+          setLocation(`/leads?id=${notification.actionId}${hashSuffix}`);
           break;
         case 'view_student_fees':
           setLocation(`/student-fees?id=${notification.actionId}`);
@@ -67,8 +68,10 @@ export default function NotificationCenter() {
           break;
         default:
           // Fallback based on type if actionType is generic or missing
-          if (notification.type === 'lead' || notification.type === 'followup') {
+          if (notification.type === 'lead') {
             setLocation(`/leads?id=${notification.actionId}`);
+          } else if (notification.type === 'followup') {
+            setLocation(`/leads?id=${notification.actionId}#followups`);
           } else if (notification.type === 'payment') {
             setLocation(`/student-fees?id=${notification.actionId}`);
           }
