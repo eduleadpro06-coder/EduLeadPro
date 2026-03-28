@@ -91,7 +91,7 @@ export default function Leads() {
 
   const formatDate = (date: Date | string | null) => {
     if (!date) return "Not set";
-    return new Date(date).toLocaleDateString();
+    return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(date));
   };
 
   const isNewLead = (createdAt: Date | string) => {

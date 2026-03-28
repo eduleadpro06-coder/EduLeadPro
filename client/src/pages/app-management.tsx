@@ -162,7 +162,7 @@ function LiveBusTrackingMap() {
                                                 <span>Speed: {bus.currentLocation.speed || 0} km/h</span>
                                             </div>
                                             <div className="pt-2 border-t text-xs text-gray-500">
-                                                Last updated: {new Date(bus.lastUpdated).toLocaleTimeString()}
+                                                Last updated: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }).format(new Date(bus.lastUpdated))}
                                             </div>
                                         </div>
                                     </div>
@@ -1611,7 +1611,7 @@ export default function AppManagement() {
                                                         <TableCell>
                                                             {assignment.pickupStopId ? (busStops.find(s => s.id === assignment.pickupStopId)?.stopName || 'Unknown Stop') : <span className="text-gray-400 italic">Direct Route</span>}
                                                         </TableCell>
-                                                        <TableCell>{assignment.assignedAt ? new Date(assignment.assignedAt).toLocaleDateString() : '-'}</TableCell>
+                                                        <TableCell>{assignment.assignedAt ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(assignment.assignedAt)) : '-'}</TableCell>
                                                         <TableCell>
                                                             <Button variant="ghost" size="sm" onClick={() => {
                                                                 if (confirm("Remove this assignment?")) deleteBusAssignmentMutation.mutate(assignment.id);
@@ -1799,8 +1799,8 @@ export default function AppManagement() {
                                             announcements.map((ann) => (
                                                 <TableRow key={ann.id}>
                                                     <TableCell className="font-medium">{ann.title}</TableCell>
-                                                    <TableCell>{new Date(ann.publishedAt!).toLocaleDateString()}</TableCell>
-                                                    <TableCell>{ann.expiresAt ? new Date(ann.expiresAt).toLocaleDateString() : '-'}</TableCell>
+                                                    <TableCell>{new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(ann.publishedAt!))}</TableCell>
+                                                    <TableCell>{ann.expiresAt ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(ann.expiresAt)) : '-'}</TableCell>
                                                     <TableCell className="text-right">
                                                         <Button variant="ghost" size="sm" onClick={() => {
                                                             if (confirm("Delete this announcement?")) deleteAnnouncementMutation.mutate(ann.id);

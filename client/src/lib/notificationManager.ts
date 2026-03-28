@@ -20,7 +20,7 @@ export class NotificationManager {
       userId: 1, // Default to admin
       type: "followup",
       title: "Follow-up Scheduled",
-      message: `Follow-up scheduled for ${followUpData.leadName} on ${new Date(followUpData.scheduledAt).toLocaleDateString()} by ${followUpData.counselorName}`,
+      message: `Follow-up scheduled for ${followUpData.leadName} on ${new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(followUpData.scheduledAt))} by ${followUpData.counselorName}`,
       priority: "medium",
       read: false,
       actionType: "view_followup",

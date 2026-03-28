@@ -1091,11 +1091,12 @@ export default function StudentFees() {
 
   const formatDate = (dateString: string | Date | null) => {
     if (!dateString) return "Not set";
-    return new Date(dateString).toLocaleDateString('en-IN', {
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
       month: 'short',
       day: 'numeric',
       year: 'numeric'
-    });
+    }).format(new Date(dateString));
   };
 
   // Reset currentPage when filters/search/page size change
@@ -3640,7 +3641,7 @@ export default function StudentFees() {
                             <div key={payment.id} className="flex justify-between items-center bg-white p-3 rounded border-l-4 border-red-400">
                               <div>
                                 <p className="font-medium">Installment #{payment.installmentNumber}</p>
-                                <p className="text-sm text-gray-600">Due: {new Date(payment.dueDate).toLocaleDateString()}</p>
+                                <p className="text-sm text-gray-600">Due: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(payment.dueDate))}</p>
                                 <p className="text-sm">
                                   <span className={`px-2 py-1 rounded-full text-xs ${payment.status === 'overdue' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                                     }`}>
@@ -3673,7 +3674,7 @@ export default function StudentFees() {
                                     {plan.numberOfInstallments} installments of ₹{plan.installmentAmount.toLocaleString()} each
                                   </p>
                                   <p className="text-sm text-gray-600">
-                                    Period: {new Date(plan.startDate).toLocaleDateString()} to {new Date(plan.endDate).toLocaleDateString()}
+                                    Period: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(plan.startDate))} to {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(plan.endDate))}
                                   </p>
                                 </div>
                                 <div className="text-right">
@@ -3706,7 +3707,7 @@ export default function StudentFees() {
                                   {payment.installmentNumber && (
                                     <p className="text-sm text-gray-600">Installment: #{payment.installmentNumber}</p>
                                   )}
-                                  <p className="text-sm text-gray-600">Due: {new Date(payment.paymentDate).toLocaleDateString()}</p>
+                                  <p className="text-sm text-gray-600">Due: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(payment.paymentDate))}</p>
                                 </div>
                                 <div className="text-right">
                                   <p className="font-semibold text-lg">₹{payment.amount.toLocaleString()}</p>
@@ -3733,7 +3734,7 @@ export default function StudentFees() {
                                   <p className="text-sm text-gray-600">{mandate.bankName}</p>
                                   <p className="text-sm text-gray-600">Account: {mandate.bankAccount}</p>
                                   <p className="text-sm text-gray-600">
-                                    Valid: {new Date(mandate.startDate).toLocaleDateString()} to {mandate.endDate ? new Date(mandate.endDate).toLocaleDateString() : 'Ongoing'}
+                                    Valid: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(mandate.startDate))} to {mandate.endDate ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(mandate.endDate)) : 'Ongoing'}
                                   </p>
                                 </div>
                                 <div className="text-right">

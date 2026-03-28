@@ -189,3 +189,37 @@ export function nowIST(): Date {
   return toIST(new Date());
 }
 
+/**
+ * Format a date as a short IST date string (e.g. "28 Mar 2026")
+ * Always uses Asia/Kolkata timezone so dates never flip due to UTC offset.
+ */
+export function formatDateOnlyIST(date: string | Date | number | null | undefined): string {
+  if (!date) return '-';
+  try {
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date(date));
+  } catch {
+    return '-';
+  }
+}
+
+/**
+ * Format a time as IST (e.g. "05:19 PM")
+ */
+export function formatTimeIST(date: string | Date | number | null | undefined): string {
+  if (!date) return '-';
+  try {
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).format(new Date(date));
+  } catch {
+    return '-';
+  }
+}

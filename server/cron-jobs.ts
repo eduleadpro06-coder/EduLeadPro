@@ -45,7 +45,7 @@ export function initializeCronJobs() {
                             userId: followup.assignedTo || 1,
                             type: 'daycare',
                             title: 'Overdue Daycare Follow-up',
-                            message: `Follow-up for ${inquiry.parentName} (${inquiry.childName}) was scheduled for ${new Date(followup.scheduledAt).toLocaleDateString()} and is now overdue.`,
+                            message: `Follow-up for ${inquiry.parentName} (${inquiry.childName}) was scheduled for ${new Date(followup.scheduledAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })} and is now overdue.`,
                             priority: 'high',
                             actionType: 'view_daycare_inquiry',
                             actionId: inquiry.id.toString()

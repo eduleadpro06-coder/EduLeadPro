@@ -244,11 +244,12 @@ export default function LeadManagement() {
 
   const formatDate = (dateString: string | Date | null) => {
     if (!dateString) return "Not contacted";
-    return new Date(dateString).toLocaleDateString('en-IN', {
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
       month: 'short',
       day: 'numeric',
       year: 'numeric'
-    });
+    }).format(new Date(dateString));
   };
 
   const exportLeads = () => {

@@ -116,7 +116,7 @@ export default function Reports() {
                           row.parentPhone,
                           row.program,
                           row.invoiceNumber,
-                          new Date(row.admissionDate).toLocaleDateString(),
+                          new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(row.admissionDate)),
                           row.invoiceAmount,
                           row.collectedTuition || 0,
                           row.additionalPaid || 0,
@@ -126,8 +126,8 @@ export default function Reports() {
                           row.collectedOther,
                           row.totalCollected,
                           row.paymentModes,
-                          row.lastPaymentDate ? new Date(row.lastPaymentDate).toLocaleDateString() : 'N/A',
-                          row.nextDueDate ? new Date(row.nextDueDate).toLocaleDateString() : 'N/A',
+                          row.lastPaymentDate ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(row.lastPaymentDate)) : 'N/A',
+                          row.nextDueDate ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(row.nextDueDate)) : 'N/A',
                           row.totalDue,
                           row.paymentStatus
                         ])
@@ -213,7 +213,7 @@ export default function Reports() {
                                 <div className="flex items-center gap-2 text-xs">
                                   <span className="text-gray-400 w-6">Last</span>
                                   <span className="text-gray-700 font-medium whitespace-nowrap">
-                                    {row.lastPaymentDate ? new Date(row.lastPaymentDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' }) : '-'}
+                                     {row.lastPaymentDate ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: '2-digit' }).format(new Date(row.lastPaymentDate)) : '-'}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs">
@@ -222,7 +222,7 @@ export default function Reports() {
                                     ? 'text-red-600 bg-red-50 px-1 rounded'
                                     : 'text-gray-700'
                                     }`}>
-                                    {row.nextDueDate ? new Date(row.nextDueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' }) : '-'}
+                                     {row.nextDueDate ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: '2-digit' }).format(new Date(row.nextDueDate)) : '-'}
                                   </span>
                                 </div>
                               </div>
