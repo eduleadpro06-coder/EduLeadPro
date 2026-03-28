@@ -56,10 +56,31 @@ export default function NotificationCenter() {
     // Navigate based on actionType
     if (notification.actionType && notification.actionId) {
       switch (notification.actionType) {
-        case 'view_lead':
+        case 'view_lead': {
+          let leadIdStr = notification.actionId;
+          
+          if ((notification.type === 'followup' || notification.actionId.startsWith('followup:')) && notification.metadata) {
+            try {
+              if (typeof notification.metadata === 'string') {
+                const meta = JSON.parse(notification.metadata);
+                if (meta.leadId) {
+                  leadIdStr = meta.leadId.toString();
+                }
+              } else if (typeof notification.metadata === 'object' && notification.metadata !== null) {
+                const meta = notification.metadata as any;
+                if (meta.leadId) {
+                  leadIdStr = meta.leadId.toString();
+                }
+              }
+            } catch (e) {
+              console.error("Failed to parse notification metadata", e);
+            }
+          }
+          
           const hashSuffix = notification.type === 'followup' ? '#followups' : '';
-          setLocation(`/leads?id=${notification.actionId}${hashSuffix}`);
+          setLocation(`/leads?id=${leadIdStr}${hashSuffix}`);
           break;
+        }
         case 'view_student_fees':
           setLocation(`/student-fees?id=${notification.actionId}`);
           break;
@@ -72,15 +93,27 @@ export default function NotificationCenter() {
         case 'view_admission':
           setLocation(`/students?id=${notification.actionId}`);
           break;
-        default:
+        default: {
           // Fallback based on type if actionType is generic or missing
+          let leadIdStr = notification.actionId;
+          
+          if (notification.type === 'followup' && notification.metadata) {
+            try {
+              const meta = typeof notification.metadata === 'string' ? JSON.parse(notification.metadata) : notification.metadata as any;
+              if (meta && meta.leadId) {
+                leadIdStr = meta.leadId.toString();
+              }
+            } catch (e) {}
+          }
+
           if (notification.type === 'lead') {
             setLocation(`/leads?id=${notification.actionId}`);
           } else if (notification.type === 'followup') {
-            setLocation(`/leads?id=${notification.actionId}#followups`);
+            setLocation(`/leads?id=${leadIdStr}#followups`);
           } else if (notification.type === 'payment') {
             setLocation(`/student-fees?id=${notification.actionId}`);
           }
+        }
       }
     } else {
       // General fallbacks based on type if no specific action meta

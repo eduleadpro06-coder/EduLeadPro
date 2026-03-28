@@ -14,6 +14,8 @@ import { Plus, Filter, Phone, Mail, Calendar, Edit } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import Header from "@/components/layout/header";
 import type { Lead, LeadWithCounselor } from "@shared/schema";
+import LeadDetailModal from "@/components/leads/lead-detail-modal";
+import { useLocation } from "wouter";
 
 export default function Leads() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -47,9 +49,40 @@ export default function Leads() {
     },
   });
 
+  const [location] = useLocation();
 
-
-
+  // Handle URL parameters for opening specific lead
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const rawId = params.get('id');
+    
+    if (rawId && leads.length > 0) {
+      if (rawId.startsWith('followup:')) {
+        const followUpId = parseInt(rawId.split(':')[1], 10);
+        
+        // Fetch follow ups to find which lead this follow-up belongs to
+        apiRequest("GET", "/api/follow-ups")
+          .then(res => res.json())
+          .then(allFollowUps => {
+            const followUp = allFollowUps.find((f: any) => f.id === followUpId);
+            if (followUp) {
+              const match = leads.find(l => l.id === followUp.leadId);
+              if (match && (!editingLead || editingLead.id !== match.id)) {
+                setEditingLead(match);
+              }
+            }
+          })
+          .catch(err => console.error("Error fetching follow-ups for notification:", err));
+      } else {
+        // Handle pure generic lead IDs (or if no prefix is present)
+        const parsedId = parseInt(rawId, 10);
+        const match = leads.find(l => l.id === parsedId);
+        if (match && (!editingLead || editingLead.id !== match.id)) {
+          setEditingLead(match);
+        }
+      }
+    }
+  }, [location, leads, editingLead]);
 
   // Filter leads based on search and filters
   const filteredLeads = leads.filter(lead => {
@@ -295,6 +328,24 @@ export default function Leads() {
           </CardContent>
         </Card>
       </div>
+
+      <LeadDetailModal
+        lead={editingLead as any} // Cast to any as LeadDetailModal expects LeadWithCounselorAndFollowUps which extends this
+        open={!!editingLead}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingLead(null);
+            // Clear the URL parameter if it exists
+            const url = new URL(window.location.href);
+            if (url.searchParams.has('id')) {
+              url.searchParams.delete('id');
+              window.history.replaceState({}, '', url.toString());
+            }
+          }
+        }}
+        onLeadDeleted={() => setEditingLead(null)}
+        onLeadUpdated={(updatedLead) => setEditingLead(updatedLead as any)}
+      />
     </>
   );
 }
