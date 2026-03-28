@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NotificationManager } from "@/lib/notificationManager";
 
 const outwardCategories = [
   "Salaries",
@@ -140,11 +141,19 @@ export default function Expenses() {
     mutationFn: async (data: any) => {
       return await apiRequest("POST", "/api/expenses", data);
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/expenses'] });
       invalidateNotifications(queryClient);
       const actionTxt = form.type === "inward" ? "Inward entry added" : form.type === "transfer" ? "Transfer recorded" : "Expense added successfully";
       toast({ title: "Success", description: actionTxt });
+      
+      // Activity Log
+      NotificationManager.createExpenseNotification({
+        amount: parseFloat(variables.amount || "0"),
+        category: variables.category || "General",
+        description: variables.description || ""
+      }).catch(err => console.error("Failed to create activity log:", err));
+
       resetForm();
       setIsAddExpenseOpen(false);
     },

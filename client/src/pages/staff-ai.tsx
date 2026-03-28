@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
+import { NotificationManager } from "@/lib/notificationManager";
 import Header from "@/components/layout/header";
 import {
   Bot,
@@ -1036,7 +1037,7 @@ export default function StaffAI() {
       const response = await apiRequest("POST", "/staff", payload);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
       invalidateNotifications(queryClient);
@@ -1044,6 +1045,13 @@ export default function StaffAI() {
       toast({ title: "Staff added successfully" });
       addStaffForm.reset();
       setIsAddStaffOpen(false);
+
+      // Activity Log
+      NotificationManager.createStaffNotification({
+        name: variables.name,
+        action: "Joined the Team",
+        details: variables.role
+      }).catch(err => console.error("Failed to create activity log:", err));
     },
     onError: (error: any) => {
       toast({ title: "Error adding staff", description: error.message || "Something went wrong", variant: "destructive" });

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
+import { NotificationManager } from "@/lib/notificationManager";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -102,6 +103,13 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
         title: "Success",
         description: `Staff details updated successfully.${updatedStaff?.isActive === false ? ' Employee has been deactivated.' : ''}`
       });
+
+      // Activity Log
+      NotificationManager.createStaffNotification({
+        name: updatedStaff.name,
+        action: variables.isActive === false ? "Deactivated" : "Updated Details",
+        details: updatedStaff.role
+      }).catch(err => console.error("Failed to create activity log:", err));
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to update staff.", variant: "destructive" });
@@ -142,6 +150,14 @@ export default function StaffDetailModal({ staff, open, onOpenChange, onStaffUpd
       invalidateNotifications(queryClient);
       if (fetchPayrollOverview) fetchPayrollOverview();
       toast({ title: "Success", description: "Staff member deleted." });
+
+      // Activity Log
+      NotificationManager.createStaffNotification({
+        name: staff?.name || "Staff Member",
+        action: "Removed from System",
+        details: staff?.role || "N/A"
+      }).catch(err => console.error("Failed to create activity log:", err));
+
       onOpenChange(false);
       if (onStaffUpdated) onStaffUpdated();
     },

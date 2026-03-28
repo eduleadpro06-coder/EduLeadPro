@@ -27,7 +27,7 @@ interface NotificationCategory {
 }
 
 // Only show actionable alert types in the bell — activity types go in Activity Log
-const NOTIFICATION_TYPES = ["followup", "lead", "daycare"];
+const NOTIFICATION_TYPES = ["followup", "daycare"];
 
 export default function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);

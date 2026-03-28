@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { extendedLeadSchema, type InsertLead, type Staff, type GlobalClassFee } from "@shared/schema";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { NotificationManager } from "@/lib/notificationManager";
 
 interface AddLeadModalProps {
   open: boolean;
@@ -128,7 +129,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (data: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/leads"] });
@@ -139,6 +140,13 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
       });
       form.reset();
       onOpenChange(false);
+
+      // Activity Log
+      NotificationManager.createLeadNotification({
+        name: variables.data.name,
+        class: variables.data.class,
+        source: variables.data.source
+      }).catch(err => console.error("Failed to create activity log:", err));
     },
     onError: (error: any) => {
       console.log("Error in createLeadMutation:", error);

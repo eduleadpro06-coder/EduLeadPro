@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ClipboardList, Bell } from "lucide-react";
+import { ClipboardList, Bell, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,7 @@ import { useNotificationContext } from "@/contexts/NotificationContext";
 import { useLocation } from "wouter";
 
 // Activity types — everything that's NOT a direct actionable alert
-const ACTIVITY_TYPES = ["payment", "admission", "staff", "student", "expense", "event", "attendance", "exam"];
+const ACTIVITY_TYPES = ["payment", "admission", "staff", "student", "expense", "event", "attendance", "exam", "lead", "fee", "payroll", "emi"];
 
 export default function ActivityLog() {
   const [isOpen, setIsOpen] = useState(false);
@@ -141,6 +141,10 @@ function getActivityIcon(type: string) {
     case "event": return <div className="p-1.5 rounded-full bg-pink-100 text-pink-700"><Bell size={14} /></div>;
     case "attendance": return <div className="p-1.5 rounded-full bg-amber-100 text-amber-700"><Bell size={14} /></div>;
     case "exam": return <div className="p-1.5 rounded-full bg-purple-100 text-purple-700"><Bell size={14} /></div>;
+    case "lead": return <div className="p-1.5 rounded-full bg-indigo-100 text-indigo-700"><User size={14} /></div>;
+    case "fee": return <div className="p-1.5 rounded-full bg-green-100 text-green-700"><Bell size={14} /></div>;
+    case "payroll": return <div className="p-1.5 rounded-full bg-emerald-100 text-emerald-700"><Bell size={14} /></div>;
+    case "emi": return <div className="p-1.5 rounded-full bg-cyan-100 text-cyan-700"><Bell size={14} /></div>;
     default: return <div className="p-1.5 rounded-full bg-gray-100 text-gray-700"><Bell size={14} /></div>;
   }
 }

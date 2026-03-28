@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { NotificationManager } from "@/lib/notificationManager";
 
 interface CSVImportProps {
   onSuccess?: () => void;
@@ -113,6 +114,13 @@ export default function StaffCSVImport({ onSuccess, onClose }: CSVImportProps) {
         title: "Import Completed!",
         description: description,
       });
+
+      // Activity Log
+      NotificationManager.createStaffNotification({
+        name: "Bulk Import",
+        action: `Imported ${data.staff?.length || 0} staff members`,
+        details: "CSV Upload"
+      }).catch(err => console.error("Failed to create activity log:", err));
       
       queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
       

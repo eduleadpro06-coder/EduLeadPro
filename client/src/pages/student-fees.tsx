@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import { generateFeeReceipt, type FeeReceiptData } from "@/lib/receipt-generator";
+import { NotificationManager } from "@/lib/notificationManager";
 import { generateInvoicePDF } from "@/lib/invoice-generator";
 import { format } from "date-fns";
 import { formatDateTimeIST } from "@/lib/utils";
@@ -846,6 +847,13 @@ export default function StudentFees() {
         title: "Success",
         description: "Payment recorded successfully",
       });
+
+      // Activity Log
+      NotificationManager.createPaymentNotification({
+        amount: parseFloat(data.amount || "0"),
+        studentName: selectedStudent?.name || "Student",
+        paymentMode: data.paymentMode || "Cash"
+      }).catch(err => console.error("Failed to create activity log:", err));
     },
     onError: (error) => {
       console.error("Payment recording error:", error);
@@ -1372,6 +1380,13 @@ export default function StudentFees() {
           ? `₹${actualAmount.toLocaleString()} received. ₹${shortfall.toLocaleString()} carried over to next EMI.`
           : `₹${actualAmount.toLocaleString()} recorded successfully.`
       });
+
+      // Activity Log
+      NotificationManager.createPaymentNotification({
+        amount: actualAmount,
+        studentName: selectedStudent?.name || "Student",
+        paymentMode: emiPaymentFormData.paymentMode || "EMI"
+      }).catch(err => console.error("Failed to create activity log:", err));
 
       // Always close modal after successful payment
       setEmiPaymentModalOpen(false);

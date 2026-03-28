@@ -19,6 +19,7 @@ import { invalidateNotifications } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
 import { format } from "date-fns";
+import { NotificationManager } from "@/lib/notificationManager";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -87,7 +88,7 @@ export default function Students() {
     mutationFn: async (data: any) => {
       return await apiRequest("/api/students", "POST", data);
     },
-    onSuccess: () => {
+    onSuccess: (data: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
       invalidateNotifications(queryClient);
       setAddStudentOpen(false);
@@ -95,6 +96,13 @@ export default function Students() {
         title: "Success",
         description: "Student added successfully",
       });
+
+      // Activity Log
+      NotificationManager.createStudentNotification({
+        name: variables.name || "New Student",
+        action: "Enrolled",
+        class: variables.class || "N/A"
+      }).catch(err => console.error("Failed to create activity log:", err));
     },
   });
 
@@ -106,7 +114,7 @@ export default function Students() {
         body: JSON.stringify(data),
       });
     },
-    onSuccess: () => {
+    onSuccess: (data: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fee-structures"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fee-stats"] });
@@ -117,6 +125,13 @@ export default function Students() {
         title: "Success",
         description: "Fee payment recorded successfully",
       });
+
+      // Activity Log
+      NotificationManager.createPaymentNotification({
+        amount: parseFloat(variables.amount || "0"),
+        studentName: selectedStudent?.name || "Student",
+        paymentMode: variables.paymentMethod || "Cash"
+      }).catch(err => console.error("Failed to create activity log:", err));
     },
   });
 
