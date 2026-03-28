@@ -827,8 +827,8 @@ router.get('/bus/:routeId/live-location', async (req: Request, res: Response) =>
         const orgId = req.user!.organizationId;
         const org = await storage.getOrganization(orgId);
         const orgLocation = org ? {
-            latitude: parseFloat(org.latitude || "0"),
-            longitude: parseFloat(org.longitude || "0")
+            latitude: parseFloat((org as any).latitude || "0"),
+            longitude: parseFloat((org as any).longitude || "0")
         } : null;
 
         res.json({

@@ -267,8 +267,8 @@ export default function LeadManagement() {
       lead.status,
       lead.source,
       lead.counselor?.name || "",
-      lead.parentName || "",
-      lead.parentPhone || "",
+      lead.fatherFirstName ? `${lead.fatherFirstName} ${lead.fatherLastName || ''}`.trim() : (lead.motherFirstName ? `${lead.motherFirstName} ${lead.motherLastName || ''}`.trim() : ""),
+      lead.fatherPhone || lead.motherPhone || "",
       lead.address || "",
       lead.lastContactedAt ? new Date(lead.lastContactedAt).toLocaleDateString() : "",
       lead.notes || ""
@@ -386,7 +386,7 @@ export default function LeadManagement() {
       .replace(/\{\{instituteName\}\}/g, instituteName)
       .replace(/\{\{phone\}\}/g, lead.phone || "")
       .replace(/\{\{email\}\}/g, lead.email || "")
-      .replace(/\{\{parentName\}\}/g, lead.parentName || "Parent")
+      .replace(/\{\{parentName\}\}/g, lead.fatherFirstName ? `${lead.fatherFirstName} ${lead.fatherLastName || ''}`.trim() : (lead.motherFirstName ? `${lead.motherFirstName} ${lead.motherLastName || ''}`.trim() : "Parent"))
       .replace(/\{\{date\}\}/g, today)
       .replace(/\{\{dueDate\}\}/g, financialData.dueDate || today)
       .replace(/\{\{amount\}\}/g, financialData.amount) // Shows Next EMI Amount

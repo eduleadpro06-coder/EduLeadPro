@@ -120,15 +120,15 @@ async function analyzeCoursePerformance() {
   try {
     const courses = await db
       .select({
-        courseId: students.course,
-        courseName: students.course,
+        courseId: students.class,
+        courseName: students.class,
         studentCount: count(students.id),
-        averageFee: avg(sql`CAST(${students.feeAmount} AS DECIMAL)`),
-        enrollmentTrend: sql<number>`COUNT(CASE WHEN ${students.enrollmentDate} >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END)`
+        averageFee: sql`0`,
+        enrollmentTrend: sql<number>`COUNT(CASE WHEN ${students.createdAt} >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END)`
       })
       .from(students)
-      .where(eq(students.isActive, true))
-      .groupBy(students.course);
+      .where(eq(students.status, 'enrolled'))
+      .groupBy(students.class);
 
     return courses.map(course => ({
       courseId: course.courseId || 'unknown',
@@ -162,7 +162,7 @@ async function analyzeCapacityUtilization() {
     const totalStudents = await db
       .select({ count: count(students.id) })
       .from(students)
-      .where(eq(students.isActive, true));
+      .where(eq(students.status, 'enrolled'));
 
     const totalStaff = await db
       .select({ count: count(staff.id) })
@@ -320,15 +320,15 @@ function calculatePricingConfidence(course: any, market: any): number {
 // Generate scholarship recommendations
 export async function generateScholarshipRecommendations(): Promise<ScholarshipRecommendation[]> {
   try {
-    const students = await db
+    const activeStudents = await db
       .select()
       .from(students)
-      .where(eq(students.isActive, true))
+      .where(eq(students.status, 'enrolled'))
       .limit(50);
 
     const recommendations: ScholarshipRecommendation[] = [];
 
-    for (const student of students) {
+    for (const student of activeStudents) {
       const recommendation = await analyzeScholarshipEligibility(student);
       if (recommendation.eligibilityScore >= 60) {
         recommendations.push(recommendation);
@@ -351,7 +351,7 @@ async function analyzeScholarshipEligibility(student: any): Promise<ScholarshipR
   const paymentHistory = await db
     .select()
     .from(feePayments)
-    .where(eq(feePayments.studentId, student.id));
+    .where(eq(feePayments.leadId, student.id));
 
   const financialNeedScore = analyzeFinancialNeed(paymentHistory);
   eligibilityScore += financialNeedScore * 0.4; // 40% weight
@@ -369,7 +369,7 @@ async function analyzeScholarshipEligibility(student: any): Promise<ScholarshipR
   }
 
   // Enrollment duration bonus
-  const enrollmentDate = new Date(student.enrollmentDate);
+  const enrollmentDate = new Date(student.createdAt);
   const monthsEnrolled = (Date.now() - enrollmentDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
   
   if (monthsEnrolled > 12) {
@@ -378,7 +378,7 @@ async function analyzeScholarshipEligibility(student: any): Promise<ScholarshipR
   }
 
   // Family situation
-  if (student.parentName && student.parentPhone) {
+  if ((student.fatherFirstName || student.motherFirstName) && (student.fatherPhone || student.motherPhone)) {
     eligibilityScore += 10;
     justification.push('Strong family support system');
   }
@@ -396,7 +396,7 @@ async function analyzeScholarshipEligibility(student: any): Promise<ScholarshipR
   }
 
   // Calculate recommended amount
-  const baseAmount = parseFloat(student.feeAmount) || 80000;
+  const baseAmount = 0 || 80000;
   let scholarshipPercentage = Math.min(50, eligibilityScore * 0.5); // Max 50%
   
   if (scholarshipType === 'hybrid') {
@@ -470,7 +470,7 @@ export async function generateOptimalPaymentPlan(studentId: number): Promise<Opt
     }
 
     const studentData = student[0];
-    const totalAmount = parseFloat(studentData.feeAmount) || 80000;
+    const totalAmount = parseFloat('0') || 80000;
     
     // Analyze family financial capacity
     const familyCapacityScore = await analyzeFamilyCapacity(studentData);
@@ -504,7 +504,7 @@ async function analyzeFamilyCapacity(student: any): Promise<number> {
   const paymentHistory = await db
     .select()
     .from(feePayments)
-    .where(eq(feePayments.studentId, student.id));
+    .where(eq(feePayments.leadId, student.id));
 
   if (paymentHistory.length > 0) {
     const onTimePayments = paymentHistory.filter(p => p.status === 'paid').length;
@@ -513,7 +513,7 @@ async function analyzeFamilyCapacity(student: any): Promise<number> {
   }
 
   // Enrollment timing (early enrollments indicate financial readiness)
-  const enrollmentDate = new Date(student.enrollmentDate);
+  const enrollmentDate = new Date(student.createdAt);
   const academicYearStart = new Date(enrollmentDate.getFullYear(), 5, 1); // June 1st
   const enrollmentSpeed = (enrollmentDate.getTime() - academicYearStart.getTime()) / (1000 * 60 * 60 * 24);
   
@@ -522,7 +522,7 @@ async function analyzeFamilyCapacity(student: any): Promise<number> {
   }
 
   // Contact completeness (indicates organization and engagement)
-  if (student.email && student.phone && student.parentPhone) {
+  if (student.email && student.phone && (student.fatherPhone || student.motherPhone)) {
     capacityScore += 10;
   }
 

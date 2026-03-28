@@ -42,22 +42,23 @@ router.get("/student-success-analytics", async (req, res) => {
         });
 
         // Store prediction in database
-        const [prediction] = await db.insert(schema.aiPredictions).values({
-          entityType: 'student',
-          entityId: studentData.student.id,
+                const [prediction] = await db.insert(schema.aiPredictions).values({
+          studentId: studentData.student.id,
           predictionType: 'success_probability',
-          predictionValue: aiAnalysis.successProbability.toString(),
-          confidence: aiAnalysis.confidence.toString(),
-          metadata: JSON.stringify({
-            riskFactors: aiAnalysis.riskFactors,
-            recommendations: aiAnalysis.recommendations,
-            academicData: {
-              avgMarks: studentData.academicAvg,
-              attendance: studentData.attendanceAvg,
-              engagement: studentData.engagementAvg
-            }
+          prediction: JSON.stringify({ 
+            predictionValue: aiAnalysis.successProbability,
+            metadata: {
+              riskFactors: aiAnalysis.riskFactors,
+              recommendations: aiAnalysis.recommendations,
+              academicData: {
+                avgMarks: studentData.academicAvg,
+                attendance: studentData.attendanceAvg,
+                engagement: studentData.engagementAvg
+              }
+            },
+            modelVersion: 'perplexity-v2.1'
           }),
-          modelVersion: 'perplexity-v2.1'
+          confidence: aiAnalysis.confidence.toString() || '0'
         }).returning();
 
         predictions.push({
@@ -257,7 +258,7 @@ router.post("/virtual-counselor", async (req, res) => {
     const startTime = Date.now();
     const aiResponse = await perplexityAI.processIntelligentQuery(message, {
       userType,
-      messageCount: conversation[0].messageCount,
+      messageCount: conversation[0]!.messageCount,
       currentTopic: recentMessages.length > 0 ? recentMessages[0].intent : 'general'
     });
     const responseTime = Date.now() - startTime;
@@ -285,10 +286,10 @@ router.post("/virtual-counselor", async (req, res) => {
     if (conversation[0]) {
       await db.update(schema.aiConversations)
         .set({
-          messageCount: conversation[0].messageCount + 2,
+          messageCount: (conversation[0]?.messageCount || 0) + 2,
           escalated: aiResponse.escalationNeeded
         })
-        .where(eq(schema.aiConversations.id, conversation[0].id));
+        .where(eq(schema.aiConversations.id, conversation[0]!.id));
     }
 
     res.json({
@@ -301,7 +302,7 @@ router.post("/virtual-counselor", async (req, res) => {
         suggestedActions: aiResponse.suggestedActions
       },
       conversationMetrics: {
-        messageCount: conversation[0].messageCount + 2,
+        messageCount: (conversation[0]?.messageCount || 0) + 2,
         responseTime,
         sessionId
       }
@@ -543,7 +544,7 @@ router.get("/ai-model-performance", async (req, res) => {
       recentActivity: {
         totalPredictions: recentPredictions.length,
         predictionsByType,
-        avgConfidence: Math.round(recentPredictions.reduce((sum, p) => sum + parseFloat(p.confidence), 0) / recentPredictions.length)
+        avgConfidence: Math.round(recentPredictions.reduce((sum, p) => sum + parseFloat(p.confidence || '0'), 0) / recentPredictions.length)
       },
       systemHealth: {
         status: 'operational',

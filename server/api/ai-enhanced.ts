@@ -59,7 +59,7 @@ router.get("/lead-score/:leadId", async (req: Request, res: Response) => {
       daysSinceCreation,
       followUpCount,
       lastContactDays,
-      hasParentInfo: !!(lead.parentName && lead.parentPhone),
+      hasParentInfo: !!((lead.fatherFirstName || lead.motherFirstName) && (lead.fatherPhone || lead.motherPhone)),
       interestedProgram: lead.interestedProgram || undefined,
       admissionLikelihood: lead.admissionLikelihood ? parseFloat(lead.admissionLikelihood) : undefined
     };
@@ -111,7 +111,7 @@ router.post("/communication-plan", async (req: Request, res: Response) => {
       source: lead.source,
       daysSinceCreation,
       followUpCount: 0, // Simplified
-      hasParentInfo: !!(lead.parentName && lead.parentPhone),
+      hasParentInfo: !!((lead.fatherFirstName || lead.motherFirstName) && (lead.fatherPhone || lead.motherPhone)),
       interestedProgram: lead.interestedProgram || undefined
     };
     
@@ -185,7 +185,7 @@ router.get("/bulk-lead-scores", async (req: Request, res: Response) => {
   try {
     const { limit = 50, status, source } = req.query;
     
-    let queryBuilder = db.select().from(leads);
+    let queryBuilder: any = db.select().from(leads);
     
     if (status && typeof status === 'string') {
       queryBuilder = queryBuilder.where(eq(leads.status, status));
@@ -200,7 +200,7 @@ router.get("/bulk-lead-scores", async (req: Request, res: Response) => {
       .limit(parseInt(limit as string));
     
     const leadScores = await Promise.all(
-      leadsData.map(async (lead) => {
+      leadsData.map(async (lead: any) => {
         const daysSinceCreation = Math.floor(
           (Date.now() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60 * 24)
         );
@@ -221,7 +221,7 @@ router.get("/bulk-lead-scores", async (req: Request, res: Response) => {
           daysSinceCreation,
           followUpCount: 0, // Simplified
           lastContactDays,
-          hasParentInfo: !!(lead.parentName && lead.parentPhone),
+          hasParentInfo: !!((lead.fatherFirstName || lead.motherFirstName) && (lead.fatherPhone || lead.motherPhone)),
           interestedProgram: lead.interestedProgram || undefined,
           admissionLikelihood: lead.admissionLikelihood ? parseFloat(lead.admissionLikelihood) : undefined
         };
@@ -294,7 +294,7 @@ router.get("/insights-dashboard", async (req: Request, res: Response) => {
             (Date.now() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60 * 24)
           ),
           followUpCount: 0,
-          hasParentInfo: !!(lead.parentName && lead.parentPhone),
+          hasParentInfo: !!((lead.fatherFirstName || lead.motherFirstName) && (lead.fatherPhone || lead.motherPhone)),
           interestedProgram: lead.interestedProgram || undefined
         };
         

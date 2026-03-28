@@ -74,8 +74,9 @@ export async function importCSVLeads(csvData: CSVLeadData[]): Promise<void> {
         assignedAt: null,
         lastContactedAt: new Date(), // Set to current date when importing
         notes: row["Notes"] || "",
-        parentName: row["Enquirer Name"],
-        parentPhone: row["Enquirer Mobile"],
+        fatherFirstName: row["Enquirer Name"],
+        fatherLastName: "",
+        fatherPhone: row["Enquirer Mobile"],
         address: row["Locality"] || ""
       };
 

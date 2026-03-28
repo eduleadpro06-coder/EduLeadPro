@@ -46,7 +46,7 @@ export async function initializeDatabase() {
         phone: '9876543210',
         role: 'Principal',
         department: 'Administration',
-        dateOfJoining: new Date('2020-01-15'),
+        dateOfJoining: '2020-01-15',
         salary: '100000',
         qualifications: 'PhD in Education',
         bankAccountNumber: '1234567890',
@@ -60,7 +60,7 @@ export async function initializeDatabase() {
         phone: '9876543211',
         role: 'Teacher',
         department: 'Mathematics',
-        dateOfJoining: new Date('2021-03-20'),
+        dateOfJoining: '2021-03-20',
         salary: '45000',
         qualifications: 'M.Sc Mathematics, B.Ed',
         bankAccountNumber: '1234567891',
@@ -74,7 +74,7 @@ export async function initializeDatabase() {
         phone: '9876543212',
         role: 'Teacher',
         department: 'Physics',
-        dateOfJoining: new Date('2021-06-10'),
+        dateOfJoining: '2021-06-10',
         salary: '42000',
         qualifications: 'M.Sc Physics, B.Ed',
         bankAccountNumber: '1234567892',
@@ -88,7 +88,7 @@ export async function initializeDatabase() {
         phone: '9876543213',
         role: 'Teacher',
         department: 'Chemistry',
-        dateOfJoining: new Date('2022-01-05'),
+        dateOfJoining: '2022-01-05',
         salary: '43000',
         qualifications: 'M.Sc Chemistry, B.Ed',
         bankAccountNumber: '1234567893',
@@ -102,7 +102,7 @@ export async function initializeDatabase() {
         phone: '9876543214',
         role: 'Counselor',
         department: 'Student Affairs',
-        dateOfJoining: new Date('2021-09-15'),
+        dateOfJoining: '2021-09-15',
         salary: '38000',
         qualifications: 'M.A Psychology, Counseling Certification',
         bankAccountNumber: '1234567894',
@@ -123,8 +123,8 @@ export async function initializeDatabase() {
         parentName: 'Ramesh Patel',
         parentPhone: '9123456700',
         address: '123 MG Road, Mumbai',
-        dateOfBirth: new Date('2005-03-15'),
-        admissionDate: new Date('2023-04-01'),
+        dateOfBirth: '2005-03-15',
+        admissionDate: '2023-04-01',
         status: 'active'
       },
       {
@@ -137,8 +137,8 @@ export async function initializeDatabase() {
         parentName: 'Suresh Shah',
         parentPhone: '9123456701',
         address: '456 FC Road, Pune',
-        dateOfBirth: new Date('2005-07-22'),
-        admissionDate: new Date('2023-04-01'),
+        dateOfBirth: '2005-07-22',
+        admissionDate: '2023-04-01',
         status: 'active'
       },
       {
@@ -151,8 +151,8 @@ export async function initializeDatabase() {
         parentName: 'Vikash Kumar',
         parentPhone: '9123456702',
         address: '789 Park Street, Delhi',
-        dateOfBirth: new Date('2006-01-10'),
-        admissionDate: new Date('2023-04-01'),
+        dateOfBirth: '2006-01-10',
+        admissionDate: '2023-04-01',
         status: 'active'
       },
       {
@@ -165,8 +165,8 @@ export async function initializeDatabase() {
         parentName: 'Rajesh Reddy',
         parentPhone: '9123456703',
         address: '321 Brigade Road, Bangalore',
-        dateOfBirth: new Date('2006-05-18'),
-        admissionDate: new Date('2023-04-01'),
+        dateOfBirth: '2006-05-18',
+        admissionDate: '2023-04-01',
         status: 'active'
       },
       {
@@ -179,8 +179,8 @@ export async function initializeDatabase() {
         parentName: 'Sunil Agarwal',
         parentPhone: '9123456704',
         address: '654 Commercial Street, Hyderabad',
-        dateOfBirth: new Date('2007-09-30'),
-        admissionDate: new Date('2023-04-01'),
+        dateOfBirth: '2007-09-30',
+        admissionDate: '2023-04-01',
         status: 'active'
       }
     ]).returning();
@@ -342,8 +342,9 @@ export async function initializeDatabase() {
         assignedAt: new Date(),
         lastContactedAt: new Date(),
         admissionLikelihood: '75.5',
-        parentName: 'Mukesh Mehta',
-        parentPhone: '9987654300',
+        fatherFirstName: 'Mukesh',
+        fatherLastName: 'Mehta',
+        fatherPhone: '9987654300',
         address: '123 Sector 15, Noida',
         interestedProgram: 'Engineering Entrance Preparation'
       },
@@ -358,8 +359,9 @@ export async function initializeDatabase() {
         counselorId: counselors[1].id,
         assignedAt: new Date(),
         admissionLikelihood: '85.2',
-        parentName: 'Deepak Joshi',
-        parentPhone: '9876543200',
+        fatherFirstName: 'Deepak',
+        fatherLastName: 'Joshi',
+        fatherPhone: '9876543200',
         address: '456 MG Road, Jaipur',
         interestedProgram: 'Commerce Stream'
       },
@@ -375,8 +377,9 @@ export async function initializeDatabase() {
         assignedAt: new Date(),
         lastContactedAt: new Date(),
         admissionLikelihood: '62.8',
-        parentName: 'Suresh Rao',
-        parentPhone: '9765432100',
+        fatherFirstName: 'Suresh',
+        fatherLastName: 'Rao',
+        fatherPhone: '9765432100',
         address: '789 Brigade Road, Chennai',
         interestedProgram: 'General Studies'
       }
@@ -385,40 +388,28 @@ export async function initializeDatabase() {
     // Create AI predictions for students
     await db.insert(schema.aiPredictions).values([
       {
-        entityType: 'student',
-        entityId: students[0].id,
+        studentId: students[0].id,
         predictionType: 'success_probability',
-        predictionValue: '87.5',
-        confidence: '89',
-        metadata: '{"factors": ["high_attendance", "good_grades", "active_participation"], "risk_level": "low"}',
-        modelVersion: 'v2.1'
+        prediction: JSON.stringify({ predictionValue: '87.5', modelVersion: 'v2.1', metadata: {"factors": ["high_attendance", "good_grades", "active_participation"], "risk_level": "low"} }),
+        confidence: '89'
       },
       {
-        entityType: 'student',
-        entityId: students[1].id,
+        studentId: students[1].id,
         predictionType: 'success_probability',
-        predictionValue: '92.3',
-        confidence: '91',
-        metadata: '{"factors": ["excellent_grades", "high_engagement", "consistent_performance"], "risk_level": "low"}',
-        modelVersion: 'v2.1'
+        prediction: JSON.stringify({ predictionValue: '92.3', modelVersion: 'v2.1', metadata: {"factors": ["excellent_grades", "high_engagement", "consistent_performance"], "risk_level": "low"} }),
+        confidence: '91'
       },
       {
-        entityType: 'student',
-        entityId: students[2].id,
+        studentId: students[2].id,
         predictionType: 'success_probability',
-        predictionValue: '65.7',
-        confidence: '76',
-        metadata: '{"factors": ["low_attendance", "declining_grades", "reduced_engagement"], "risk_level": "high"}',
-        modelVersion: 'v2.1'
+        prediction: JSON.stringify({ predictionValue: '65.7', modelVersion: 'v2.1', metadata: {"factors": ["low_attendance", "declining_grades", "reduced_engagement"], "risk_level": "high"} }),
+        confidence: '76'
       },
       {
-        entityType: 'student',
-        entityId: students[3].id,
+        studentId: students[3].id,
         predictionType: 'success_probability',
-        predictionValue: '78.9',
-        confidence: '82',
-        metadata: '{"factors": ["good_grades", "moderate_attendance", "steady_progress"], "risk_level": "medium"}',
-        modelVersion: 'v2.1'
+        prediction: JSON.stringify({ predictionValue: '78.9', modelVersion: 'v2.1', metadata: {"factors": ["good_grades", "moderate_attendance", "steady_progress"], "risk_level": "medium"} }),
+        confidence: '82'
       }
     ]);
 

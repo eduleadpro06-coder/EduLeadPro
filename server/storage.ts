@@ -288,7 +288,7 @@ export interface IStorage {
 
   // Message Templates
   getMessageTemplate(id: number): Promise<MessageTemplate | undefined>;
-  getAllMessageTemplates(category?: string): Promise<MessageTemplate[]>;
+  getAllMessageTemplates(organizationId?: number, filters?: { category?: string; isActive?: boolean; searchTerm?: string }): Promise<MessageTemplate[]>;
   createMessageTemplate(template: InsertMessageTemplate): Promise<MessageTemplate>;
   updateMessageTemplate(id: number, updates: Partial<MessageTemplate>): Promise<MessageTemplate | undefined>;
   deleteMessageTemplate(id: number): Promise<boolean>;
@@ -368,47 +368,17 @@ export class DatabaseStorage implements IStorage {
 
   // Basic user operations
   async getUser(id: number): Promise<User | undefined> {
-    const result = await db.select({
-      id: schema.users.id,
-      username: schema.users.username,
-      password: schema.users.password,
-      role: schema.users.role,
-      name: schema.users.name,
-      email: schema.users.email,
-      organizationId: schema.users.organizationId,
-      createdAt: schema.users.createdAt,
-      updatedAt: schema.users.updatedAt
-    }).from(schema.users).where(eq(schema.users.id, id));
+    const result = await db.select().from(schema.users).where(eq(schema.users.id, id));
     return result[0];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await db.select({
-      id: schema.users.id,
-      username: schema.users.username,
-      password: schema.users.password,
-      role: schema.users.role,
-      name: schema.users.name,
-      email: schema.users.email,
-      organizationId: schema.users.organizationId,
-      createdAt: schema.users.createdAt,
-      updatedAt: schema.users.updatedAt
-    }).from(schema.users).where(ilike(schema.users.username, username));
+    const result = await db.select().from(schema.users).where(ilike(schema.users.username, username));
     return result[0];
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await db.select({
-      id: schema.users.id,
-      username: schema.users.username,
-      password: schema.users.password,
-      role: schema.users.role,
-      name: schema.users.name,
-      email: schema.users.email,
-      organizationId: schema.users.organizationId,
-      createdAt: schema.users.createdAt,
-      updatedAt: schema.users.updatedAt
-    }).from(schema.users).where(ilike(schema.users.email, email));
+    const result = await db.select().from(schema.users).where(ilike(schema.users.email, email));
     return result[0];
   }
 
@@ -2874,6 +2844,10 @@ export class DatabaseStorage implements IStorage {
         approvedBy: schema.expenses.approvedBy,
         createdAt: schema.expenses.createdAt,
         updatedAt: schema.expenses.updatedAt,
+        inventoryItemId: schema.expenses.inventoryItemId,
+        deductFromBudget: schema.expenses.deductFromBudget,
+        type: schema.expenses.type,
+        receiptNumber: schema.expenses.receiptNumber,
         approverId: schema.users.id,
         approverName: schema.users.name,
         approverEmail: schema.users.email,
@@ -2904,6 +2878,10 @@ export class DatabaseStorage implements IStorage {
       approvedBy: row.approvedBy,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      inventoryItemId: row.inventoryItemId,
+      deductFromBudget: row.deductFromBudget,
+      type: row.type,
+      receiptNumber: row.receiptNumber,
       approver: row.approverId ? {
         id: row.approverId,
         name: row.approverName,
@@ -2938,6 +2916,10 @@ export class DatabaseStorage implements IStorage {
         organizationId: schema.expenses.organizationId,
         createdAt: schema.expenses.createdAt,
         updatedAt: schema.expenses.updatedAt,
+        inventoryItemId: schema.expenses.inventoryItemId,
+        deductFromBudget: schema.expenses.deductFromBudget,
+        type: schema.expenses.type,
+        receiptNumber: schema.expenses.receiptNumber,
         approverId: schema.users.id,
         approverName: schema.users.name,
         approverEmail: schema.users.email,
@@ -2971,6 +2953,10 @@ export class DatabaseStorage implements IStorage {
       organizationId: row.organizationId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      inventoryItemId: row.inventoryItemId,
+      deductFromBudget: row.deductFromBudget,
+      type: row.type,
+      receiptNumber: row.receiptNumber,
       approver: row.approverId ? {
         id: row.approverId,
         name: row.approverName,
@@ -3000,6 +2986,10 @@ export class DatabaseStorage implements IStorage {
         organizationId: schema.expenses.organizationId,
         createdAt: schema.expenses.createdAt,
         updatedAt: schema.expenses.updatedAt,
+        inventoryItemId: schema.expenses.inventoryItemId,
+        deductFromBudget: schema.expenses.deductFromBudget,
+        type: schema.expenses.type,
+        receiptNumber: schema.expenses.receiptNumber,
         approverId: schema.users.id,
         approverName: schema.users.name,
         approverEmail: schema.users.email,
@@ -3041,6 +3031,10 @@ export class DatabaseStorage implements IStorage {
       organizationId: row.organizationId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      inventoryItemId: row.inventoryItemId,
+      deductFromBudget: row.deductFromBudget,
+      type: row.type,
+      receiptNumber: row.receiptNumber,
       approver: row.approverId ? {
         id: row.approverId,
         name: row.approverName,
@@ -5123,8 +5117,7 @@ export class DatabaseStorage implements IStorage {
     })
       .from(schema.inventoryItems)
       .leftJoin(schema.inventoryCategories, eq(schema.inventoryItems.categoryId, schema.inventoryCategories.id))
-      .leftJoin(schema.inventorySuppliers, eq(schema.inventoryItems.supplierId, schema.inventorySuppliers.id))
-      .where(eq(schema.inventoryItems.organizationId, organizationId));
+      .leftJoin(schema.inventorySuppliers, eq(schema.inventoryItems.supplierId, schema.inventorySuppliers.id));
 
     // Apply filters
     const conditions = [eq(schema.inventoryItems.organizationId, organizationId)];
@@ -5143,14 +5136,14 @@ export class DatabaseStorage implements IStorage {
         or(
           ilike(schema.inventoryItems.name, `%${filters.searchTerm}%`),
           ilike(schema.inventoryItems.itemCode, `%${filters.searchTerm}%`)
-        )
+        ) as any
       );
     }
 
-    query = query.where(and(...conditions)) as any;
+    query = query.where(and(...conditions)!) as any;
     const results = await query.orderBy(schema.inventoryItems.name);
 
-    return results.map(({ item, category, supplier }) => ({
+    return (results as any[]).map(({ item, category, supplier }) => ({
       ...item,
       category,
       supplier
@@ -5297,8 +5290,7 @@ export class DatabaseStorage implements IStorage {
     })
       .from(schema.inventoryTransactions)
       .innerJoin(schema.inventoryItems, eq(schema.inventoryTransactions.itemId, schema.inventoryItems.id))
-      .leftJoin(schema.leads, eq(schema.inventoryTransactions.leadId, schema.leads.id))
-      .where(eq(schema.inventoryItems.organizationId, organizationId));
+      .leftJoin(schema.leads, eq(schema.inventoryTransactions.leadId, schema.leads.id));
 
     if (filters?.itemId) {
       conditions.push(eq(schema.inventoryTransactions.itemId, filters.itemId));
@@ -5319,7 +5311,7 @@ export class DatabaseStorage implements IStorage {
 
     const results = await finalQuery.orderBy(desc(schema.inventoryTransactions.transactionDate));
 
-    return results.map(({ transaction, item, lead }) => ({
+    return (results as any[]).map(({ transaction, item, lead }) => ({
       ...transaction,
       item,
       lead
@@ -5834,7 +5826,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Bus Live Location Tracking Methods
-  async saveBusLocation(locationData: InsertBusLiveLocation) {
+  async saveBusLocation(locationData: any) {
     const [result] = await db.insert(schema.busLiveLocations).values(locationData).returning();
     return result;
   }

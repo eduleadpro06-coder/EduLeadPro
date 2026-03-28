@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Calendar } from "lucide-react";
 
 export function EnrollmentChart() {
-  const { data: monthlyEnrollments = [] } = useQuery({
+  const { data: monthlyEnrollments = [] } = useQuery<any[]>({
     queryKey: ['/api/analytics/monthly-enrollments'],
   });
 

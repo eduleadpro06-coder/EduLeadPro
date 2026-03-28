@@ -67,7 +67,7 @@ export const metaStorage = {
         startTime?: Date;
         endTime?: Date;
     }) {
-        const result = await db.insert(schema.metaCampaigns).values(data).returning();
+        const result = await (db.insert(schema.metaCampaigns).values(data as any) as any).returning();
         return result[0];
     },
 
@@ -115,7 +115,7 @@ export const metaStorage = {
         billingEvent?: string;
         status?: string;
     }) {
-        const result = await db.insert(schema.metaAdSets).values(data).returning();
+        const result = await (db.insert(schema.metaAdSets).values(data as any) as any).returning();
         return result[0];
     },
 

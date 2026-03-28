@@ -3,12 +3,12 @@
  * Displayed when user tries to access a page they don't have permission for
  */
 
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { XCircle, ArrowLeft } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function UnauthorizedPage() {
-    const navigate = useNavigate();
+    const [, setLocation] = useLocation();
     const { user } = useAuth();
 
     return (
@@ -36,7 +36,7 @@ export default function UnauthorizedPage() {
 
                 <div className="space-y-3">
                     <button
-                        onClick={() => navigate(-1)}
+                        onClick={() => window.history.back()}
                         className="w-full btn-secondary flex items-center justify-center gap-2"
                     >
                         <ArrowLeft className="w-4 h-4" />
@@ -44,7 +44,7 @@ export default function UnauthorizedPage() {
                     </button>
 
                     <button
-                        onClick={() => navigate('/dashboard')}
+                        onClick={() => setLocation('/dashboard')}
                         className="w-full btn-primary"
                     >
                         Go to Dashboard

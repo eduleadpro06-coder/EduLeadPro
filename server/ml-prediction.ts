@@ -1,13 +1,13 @@
 // Future ML-based prediction system for EduLeadPro
 // This will be implemented when we have sufficient historical data (500+ conversions)
 
-export interface MLPredictionConfig {
+interface MLPredictionConfig {
   minDataPoints: number;
   retrainThreshold: number;
   fallbackToLLM: boolean;
 }
 
-export interface MLFeatures {
+interface MLFeatures {
   // Numerical features
   daysSinceCreation: number;
   followUpCount: number;
@@ -32,7 +32,7 @@ export interface MLFeatures {
   monthOfYear: number; // 1-12
 }
 
-export interface MLPredictionResult {
+interface MLPredictionResult {
   likelihood: number;
   confidence: number;
   modelUsed: 'xgboost' | 'random_forest' | 'neural_network' | 'llm_fallback';
@@ -171,4 +171,3 @@ async function runMLModel(features: MLFeatures): Promise<MLPredictionResult> {
 }
 
 // Export for future use
-export { MLFeatures, MLPredictionResult, MLPredictionConfig };

@@ -247,7 +247,7 @@ async function calculateWorkloadMetrics(staffId: number): Promise<WorkloadMetric
     const studentCount = await db
       .select({ count: count(students.id) })
       .from(students)
-      .where(eq(students.isActive, true));
+      .where(eq(students.status, 'enrolled'));
 
     // Get assigned leads (simulated)
     const leadCount = await db
@@ -472,7 +472,7 @@ export async function generateHiringPredictions(): Promise<HiringPrediction[]> {
     const currentStudents = await db
       .select({ count: count(students.id) })
       .from(students)
-      .where(eq(students.isActive, true));
+      .where(eq(students.status, 'enrolled'));
 
     const currentStaff = await db
       .select({ count: count(staff.id) })
@@ -918,7 +918,7 @@ async function analyzeWorkloadDistribution(): Promise<WorkloadDistributionAnalys
     let totalOverloaded = 0;
     let totalUnderutilized = 0;
 
-    for (const [deptName, data] of departmentStats) {
+    for (const [deptName, data] of Array.from(departmentStats.entries())) {
       const avgWorkload = data.workloads.reduce((sum, w) => sum + w.hoursPerWeek, 0) / data.workloads.length;
       const workloadVariance = calculateVariance(data.workloads.map(w => w.hoursPerWeek));
       const efficiencyScore = data.workloads.reduce((sum, w) => sum + (w.hoursPerWeek > 50 ? 60 : 80), 0) / data.workloads.length;

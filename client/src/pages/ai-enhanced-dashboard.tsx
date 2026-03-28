@@ -42,19 +42,19 @@ export default function AIEnhancedDashboard() {
   const queryClient = useQueryClient();
 
   // Fetch AI Insights Dashboard
-  const { data: dashboardData, isLoading: dashboardLoading } = useQuery({
+  const { data: dashboardData, isLoading: dashboardLoading } = useQuery<any>({
     queryKey: ["/api/ai/insights-dashboard"],
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   // Fetch Bulk Lead Scores
-  const { data: leadScores, isLoading: leadScoresLoading } = useQuery({
+  const { data: leadScores, isLoading: leadScoresLoading } = useQuery<any>({
     queryKey: ["/api/ai/bulk-lead-scores", { limit: 20 }],
     refetchInterval: 60000, // Refresh every minute
   });
 
   // Fetch Financial Analytics
-  const { data: financialAnalytics, isLoading: financialLoading } = useQuery({
+  const { data: financialAnalytics, isLoading: financialLoading } = useQuery<any>({
     queryKey: ["/api/ai/financial-analytics"],
     refetchInterval: 300000, // Refresh every 5 minutes
   });

@@ -53,6 +53,48 @@ export default function Communication() {
     return window.location.hash.slice(1) || "logs";
   });
 
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [templateCategoryFilter, setTemplateCategoryFilter] = useState("all");
+  const [templateStatusFilter, setTemplateStatusFilter] = useState("all");
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<any>(null);
+
+  const templateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (editingTemplate) {
+        return await apiRequest("PATCH", `/api/message-templates/${editingTemplate.id}`, data);
+      }
+      return await apiRequest("POST", "/api/message-templates", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/message-templates"] });
+      setTemplateDialogOpen(false);
+      toast({
+        title: "Success",
+        description: `Template ${editingTemplate ? 'updated' : 'created'} successfully`,
+      });
+    },
+  });
+
+  const handleDeleteTemplate = (id: number) => {
+    // Delete mutation could be called here
+    apiRequest("DELETE", `/api/message-templates/${id}`).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/message-templates"] });
+      toast({ title: "Success", description: "Template deleted" });
+    });
+  };
+
+  const handleTemplateSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    templateMutation.mutate({
+      displayName: formData.get("displayName"),
+      category: formData.get("category"),
+      content: formData.get("content"),
+      isActive: formData.get("isActive") === "on",
+    });
+  };
+
   // Fetch communication logs
   const { data: communicationLogs = [] } = useQuery<CommunicationLog[]>({
     queryKey: ["/api/communications"],
@@ -182,6 +224,14 @@ export default function Communication() {
     };
     createTemplateMutation.mutate(data);
   };
+
+  const filteredTemplates = templates.filter((t: any) => {
+    if (templateCategoryFilter !== "all" && t.category !== templateCategoryFilter) return false;
+    if (templateStatusFilter === "active" && !t.isActive) return false;
+    if (templateStatusFilter === "inactive" && t.isActive) return false;
+    if (templateSearch && !t.name?.toLowerCase().includes(templateSearch.toLowerCase()) && !t.content.toLowerCase().includes(templateSearch.toLowerCase())) return false;
+    return true;
+  });
 
   const handleUseTemplate = (template: CommunicationTemplate) => {
     setMessageType(template.type);

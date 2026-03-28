@@ -197,8 +197,8 @@ export default function CSVImport({ onSuccess, onClose }: CSVImportProps) {
     if (!counselorName || !counselors) return undefined;
     
     const counselor = counselors.find(c => 
-      c.name.toLowerCase().includes(counselorName.toLowerCase()) ||
-      counselorName.toLowerCase().includes(c.name.toLowerCase())
+      c?.name?.toLowerCase().includes(counselorName.toLowerCase()) ||
+      counselorName.toLowerCase().includes(c?.name?.toLowerCase() || '')
     );
     
     return counselor?.id;

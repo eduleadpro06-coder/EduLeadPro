@@ -217,7 +217,7 @@ router.get("/transactions", async (req, res) => {
 
 router.post("/transactions", async (req, res) => {
     try {
-        const userId = req.user?.id;
+        const userId = (req.user as any)?.id || (req.user as any)?.userId;
         const transaction = await storage.createInventoryTransaction({
             ...req.body,
             userId

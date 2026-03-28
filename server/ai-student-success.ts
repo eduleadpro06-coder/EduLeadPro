@@ -62,7 +62,7 @@ export async function predictStudentSuccess(studentId: number): Promise<StudentR
     const paymentHistory = await db
       .select()
       .from(feePayments)
-      .where(eq(feePayments.studentId, studentId))
+      .where(eq(feePayments.leadId, studentId))
       .orderBy(desc(feePayments.paymentDate));
 
     // Calculate risk factors
@@ -74,17 +74,14 @@ export async function predictStudentSuccess(studentId: number): Promise<StudentR
     riskFactors.push(...financialRisk.factors);
     totalRiskScore += financialRisk.score * 0.35; // 35% weight
 
-    // 2. Academic Risk Analysis (simulated - would integrate with LMS)
     const academicRisk = analyzeAcademicRisk(student);
     riskFactors.push(...academicRisk.factors);
     totalRiskScore += academicRisk.score * 0.25; // 25% weight
 
-    // 3. Engagement Risk Analysis
     const engagementRisk = analyzeEngagementRisk(student);
     riskFactors.push(...engagementRisk.factors);
     totalRiskScore += engagementRisk.score * 0.20; // 20% weight
 
-    // 4. Family/Social Risk Analysis
     const familyRisk = analyzeFamilyRisk(student);
     riskFactors.push(...familyRisk.factors);
     totalRiskScore += familyRisk.score * 0.20; // 20% weight
@@ -184,7 +181,7 @@ function analyzeAcademicRisk(student: any): { score: number; factors: RiskFactor
   let score = 0;
 
   // Simulate academic indicators based on available data
-  const enrollmentDate = new Date(student.enrollmentDate);
+  const enrollmentDate = new Date(student.createdAt);
   const monthsEnrolled = (Date.now() - enrollmentDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
 
   // Early enrollment indicator
@@ -233,7 +230,7 @@ function analyzeEngagementRisk(student: any): { score: number; factors: RiskFact
   }
 
   // Parent engagement
-  if (!student.parentName || !student.parentPhone) {
+  if (!(student.fatherFirstName || student.motherFirstName) || !(student.fatherPhone || student.motherPhone)) {
     factors.push({
       category: 'engagement',
       factor: 'no_parent_contact',
@@ -245,7 +242,7 @@ function analyzeEngagementRisk(student: any): { score: number; factors: RiskFact
   }
 
   // Enrollment recency
-  const enrollmentDate = new Date(student.enrollmentDate);
+  const enrollmentDate = new Date(student.createdAt);
   const daysEnrolled = (Date.now() - enrollmentDate.getTime()) / (1000 * 60 * 60 * 24);
   
   if (daysEnrolled < 30) {
@@ -268,7 +265,7 @@ function analyzeFamilyRisk(student: any): { score: number; factors: RiskFactor[]
   let score = 0;
 
   // Family contact availability
-  if (!student.parentName) {
+  if (!(student.fatherFirstName || student.motherFirstName)) {
     factors.push({
       category: 'family',
       factor: 'no_family_contact',
@@ -380,12 +377,12 @@ function calculateConfidenceScore(dataPoints: number, student: any): number {
   confidence += Math.min(30, dataPoints * 5);
 
   // Complete profile increases confidence
-  if (student.email && student.phone && student.parentName && student.parentPhone) {
+  if (student.email && student.phone && (student.fatherFirstName || student.motherFirstName) && (student.fatherPhone || student.motherPhone)) {
     confidence += 15;
   }
 
   // Recent enrollment affects confidence
-  const enrollmentDate = new Date(student.enrollmentDate);
+  const enrollmentDate = new Date(student.createdAt);
   const daysEnrolled = (Date.now() - enrollmentDate.getTime()) / (1000 * 60 * 60 * 24);
   
   if (daysEnrolled > 180) {
@@ -404,7 +401,7 @@ export async function generateEarlyWarningAlerts(): Promise<EarlyWarningAlert[]>
     const activeStudents = await db
       .select()
       .from(students)
-      .where(eq(students.isActive, true));
+      .where(eq(students.status, 'enrolled'));
 
     for (const student of activeStudents) {
       const riskProfile = await predictStudentSuccess(student.id);
@@ -456,13 +453,14 @@ export async function generateEarlyWarningAlerts(): Promise<EarlyWarningAlert[]>
 // Bulk prediction for dashboard
 export async function bulkStudentSuccessPrediction(limit: number = 50): Promise<StudentRiskProfile[]> {
   try {
-    const students = await db
+    const activeStudents = await db
       .select()
-      .from(db.select().from(students).where(eq(students.isActive, true)))
+      .from(students)
+      .where(eq(students.status, 'enrolled'))
       .limit(limit);
 
     const predictions = await Promise.all(
-      students.map(student => predictStudentSuccess(student.id))
+      activeStudents.map(student => predictStudentSuccess(student.id))
     );
 
     return predictions.sort((a, b) => a.successProbability - b.successProbability);

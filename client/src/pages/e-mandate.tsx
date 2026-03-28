@@ -64,32 +64,29 @@ export default function EMandate() {
   });
 
   // Fetch students data
-  const { data: students = [] } = useQuery({
+  const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students"],
   });
 
   // Fetch e-mandates
-  const { data: eMandates = [], isLoading: eMandatesLoading } = useQuery({
+  const { data: eMandates = [], isLoading: eMandatesLoading } = useQuery<EMandate[]>({
     queryKey: ["/api/e-mandates"],
   });
 
   // Fetch EMI schedules
-  const { data: emiSchedules = [] } = useQuery({
+  const { data: emiSchedules = [] } = useQuery<EmiSchedule[]>({
     queryKey: ["/api/emi-schedules"],
   });
 
   // Fetch upcoming EMIs
-  const { data: upcomingEmis = [] } = useQuery({
+  const { data: upcomingEmis = [] } = useQuery<EmiSchedule[]>({
     queryKey: ["/api/upcoming-emis"],
   });
 
   // Add e-mandate mutation
   const addEMandateMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("/api/e-mandates", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/e-mandates", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/e-mandates"] });
@@ -105,10 +102,7 @@ export default function EMandate() {
   // Update EMI status mutation
   const updateEmiStatusMutation = useMutation({
     mutationFn: async ({ emiId, status, transactionId, failureReason }: any) => {
-      return await apiRequest(`/api/emi-schedules/${emiId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status, transactionId, failureReason }),
-      });
+      return await apiRequest("PATCH", `/api/emi-schedules/${emiId}`, { status, transactionId, failureReason });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/emi-schedules"] });
@@ -273,7 +267,7 @@ export default function EMandate() {
                   value={selectedStudent?.id.toString() || ""}
                   onValueChange={(value) => {
                     const student = students.find((s: Student) => s.id === parseInt(value));
-                    setSelectedStudent(student);
+                    setSelectedStudent(student || null);
                   }}
                   required
                 >

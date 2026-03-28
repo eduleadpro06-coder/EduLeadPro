@@ -19,7 +19,7 @@ router.get('/daily-updates/feed', async (req: Request, res: Response) => {
         }
 
         // Get parent's children
-        const children = await db.query(
+        const children = await (db.query as any)(
             `SELECT id, name, class_id FROM students 
        WHERE parent_email = (SELECT email FROM users WHERE id = $1)`,
             [userId]
@@ -33,7 +33,7 @@ router.get('/daily-updates/feed', async (req: Request, res: Response) => {
         const classIds = children.rows.map((c: any) => c.class_id);
 
         // Get updates for child's class or individual child
-        const updates = await db.query(
+        const updates = await (db.query as any)(
             `SELECT 
         du.id,
         du.title,
@@ -76,7 +76,7 @@ router.get('/daily-updates/class/:classId', async (req: Request, res: Response) 
     try {
         const { classId } = req.params;
 
-        const updates = await db.query(
+        const updates = await (db.query as any)(
             `SELECT 
         du.id,
         du.title,
@@ -123,7 +123,7 @@ router.post('/daily-updates', async (req: Request, res: Response) => {
         }
 
         // Get organization_id from teacher
-        const teacher = await db.query(
+        const teacher = await (db.query as any)(
             'SELECT organization_id FROM users WHERE id = $1',
             [teacherId]
         );
@@ -134,7 +134,7 @@ router.post('/daily-updates', async (req: Request, res: Response) => {
 
         const orgId = teacher.rows[0].organization_id;
 
-        const result = await db.query(
+        const result = await (db.query as any)(
             `INSERT INTO daily_updates 
         (organization_id, class_id, student_id, teacher_id, title, content, activity_type, mood, media_urls)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -158,7 +158,7 @@ router.get('/homework/parent/:userId', async (req: Request, res: Response) => {
     try {
         const { userId } = req.params;
 
-        const homework = await db.query(
+        const homework = await (db.query as any)(
             `SELECT 
         h.id,
         h.subject,
@@ -198,7 +198,7 @@ router.get('/homework/class/:classId', async (req: Request, res: Response) => {
     try {
         const { classId } = req.params;
 
-        const homework = await db.query(
+        const homework = await (db.query as any)(
             `SELECT 
         h.id,
         h.subject,
@@ -234,7 +234,7 @@ router.post('/homework', async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        const teacher = await db.query(
+        const teacher = await (db.query as any)(
             'SELECT organization_id FROM users WHERE id = $1',
             [teacherId]
         );
@@ -245,7 +245,7 @@ router.post('/homework', async (req: Request, res: Response) => {
 
         const orgId = teacher.rows[0].organization_id;
 
-        const result = await db.query(
+        const result = await (db.query as any)(
             `INSERT INTO homework 
         (organization_id, class_id, teacher_id, subject, title, description, due_date, media_urls)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -269,7 +269,7 @@ router.get('/attendance/parent/:userId', async (req: Request, res: Response) => 
     try {
         const { userId } = req.params;
 
-        const attendance = await db.query(
+        const attendance = await (db.query as any)(
             `SELECT 
         s.id as student_id,
         s.name as student_name,
@@ -324,7 +324,7 @@ router.post('/attendance/mark', async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        const teacher = await db.query(
+        const teacher = await (db.query as any)(
             'SELECT organization_id FROM users WHERE id = $1',
             [teacherId]
         );
@@ -359,7 +359,7 @@ router.post('/attendance/mark', async (req: Request, res: Response) => {
       RETURNING *
     `;
 
-        const result = await db.query(query, [orgId, classId, date, teacherId, ...values]);
+        const result = await (db.query as any)(query, [orgId, classId, date, teacherId, ...values]);
 
         res.json({ success: true, records: result.rows });
     } catch (error) {
@@ -378,7 +378,7 @@ router.get('/announcements/parent/:userId', async (req: Request, res: Response) 
         const { userId } = req.params;
 
         // Get parent's organization
-        const user = await db.query(
+        const user = await (db.query as any)(
             'SELECT organization_id FROM users WHERE id = $1',
             [userId]
         );
@@ -389,7 +389,7 @@ router.get('/announcements/parent/:userId', async (req: Request, res: Response) 
 
         const orgId = user.rows[0].organization_id;
 
-        const announcements = await db.query(
+        const announcements = await (db.query as any)(
             `SELECT 
         a.id,
         a.title,
@@ -425,7 +425,7 @@ router.get('/teacher/dashboard/:teacherId', async (req: Request, res: Response) 
         const { teacherId } = req.params;
 
         // Get teacher's classes
-        const classes = await db.query(
+        const classes = await (db.query as any)(
             `SELECT 
         c.id,
         c.name,
@@ -444,7 +444,7 @@ router.get('/teacher/dashboard/:teacherId', async (req: Request, res: Response) 
         );
 
         // Get today's attendance stats
-        const attendanceToday = await db.query(
+        const attendanceToday = await (db.query as any)(
             `SELECT 
         c.id as class_id,
         COUNT(CASE WHEN a.status = 'present' THEN 1 END) as present,
@@ -475,7 +475,7 @@ router.get('/teacher/students/:classId', async (req: Request, res: Response) => 
     try {
         const { classId } = req.params;
 
-        const students = await db.query(
+        const students = await (db.query as any)(
             `SELECT 
         s.id,
         s.name,

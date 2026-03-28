@@ -118,8 +118,8 @@ router.post('/media/upload', express.json({ limit: '50mb' }), async (req: Reques
         if (error) {
             console.error('[Media Upload] Supabase storage error:', {
                 message: error.message,
-                statusCode: error.statusCode || error.status,
-                errorCode: error.error || error.code,
+                statusCode: (error as any).statusCode || (error as any).status,
+                errorCode: (error as any).error || (error as any).code,
                 fullError: JSON.stringify(error, null, 2)
             });
             throw error;
@@ -239,8 +239,6 @@ router.post('/auth/login', async (req: Request, res: Response) => {
                         email: staff.email,
                         role: normalizedRole,
                         organization_id: staff.organization_id,
-                        role: normalizedRole,
-                        organization_id: staff.organization_id,
                         organizationName: organizationName,
                         organizationEmail: (staff as any).organizationEmail || '',
                         organizationPhone: (staff as any).organizationPhone || '',
@@ -353,7 +351,6 @@ router.post('/auth/login', async (req: Request, res: Response) => {
                 })(),
                 phone: activeParentPhone,
                 role: 'parent',
-                organization_id: parentRecord.organization_id,
                 organization_id: parentRecord.organization_id,
                 organizationName: organizationName,
                 organizationEmail: (parentRecord as any).organizationEmail || '',
@@ -721,7 +718,7 @@ router.get('/driver/dashboard/:staffId', async (req: Request, res: Response) => 
         let assignedRoute = routes && routes.length > 0 ? routes[0] : null;
 
         // Get students assigned to this route
-        let assignedStudents = [];
+        let assignedStudents: any[] = [];
         if (assignedRoute) {
             const { data: studentAssignments } = await supabase
                 .from('student_bus_assignments')

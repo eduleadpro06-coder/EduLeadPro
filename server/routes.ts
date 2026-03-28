@@ -1021,8 +1021,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Fetch organization data
       let organizationName = null;
-      if (user.organizationId || undefined) {
-        const organization = await storage.getOrganization(user.organizationId || undefined);
+      if (user.organizationId) {
+        const organization = await storage.getOrganization(user.organizationId);
         organizationName = organization?.name || null;
       }
 
@@ -1065,20 +1065,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import JWT utilities from middleware
       const { generateAccessToken, generateRefreshToken } = await import('./middleware/auth.js');
 
-      // Generate JWT tokens
-      const accessToken = generateAccessToken({
-        id: user.id,
-        email: user.email,
-        role: user.role || 'admin',
-        organization_id: user.organizationId
-      });
+      const accessToken = generateAccessToken(
+        user.id,
+        user.username || user.email || '',
+        user.role || 'admin',
+        user.organizationId || 0
+      );
 
-      const refreshToken = generateRefreshToken({
-        id: user.id,
-        email: user.email,
-        role: user.role || 'admin',
-        organization_id: user.organizationId
-      });
+      const refreshToken = generateRefreshToken(
+        user.id,
+        user.username || user.email || '',
+        user.role || 'admin',
+        user.organizationId || 0
+      );
 
       // Get organization details
       const organization = user.organizationId
@@ -1089,9 +1088,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.session) {
         req.session = {} as any;
       }
-      req.session.userId = user.id;
-      req.session.userName = user.name;
-      req.session.organizationId = user.organizationId;
+      (req.session as any).userId = user.id;
+      (req.session as any).userName = user.name;
+      (req.session as any).organizationId = user.organizationId;
 
       console.log("Login successful:", {
         userId: user.id,
@@ -1409,7 +1408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         publishedAt: publishedAt ? new Date(publishedAt) : new Date(),
         targetRoles: req.body.targetRoles || ["parent", "teacher"], // Default to parent & teacher visibility
         mediaUrl: mediaUrl || null,
-        createdBy: req.user?.id ? String(req.user.id) : "system" // Best effort to track creator
+        createdBy: req.user?.userId ? String(req.user.userId) : "system" // Best effort to track creator
       };
 
       const announcement = await storage.createAnnouncement(data);
@@ -1602,7 +1601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Phone:", sanitizedData.phone);
       console.log("Email:", sanitizedData.email);
       console.log("Force create:", forceCreate);
-      console.log("Organization ID:", user.organizationId || undefined);
+      console.log("Organization ID:", user?.organizationId || undefined);
 
       // First check only active leads for duplicates (within same organization if context is present)
       const activeLeads = await storage.getAllLeads(false, user?.organizationId || undefined);
@@ -1806,7 +1805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastContactDays,
         class: lead.class,
         stream: lead.stream || undefined,
-        hasParentInfo: !!(lead.parentName && lead.parentPhone),
+        hasParentInfo: !!((lead.fatherFirstName || lead.motherFirstName) && (lead.fatherPhone || lead.motherPhone)),
         name: lead.name,
         phone: lead.phone || undefined,
         email: lead.email || undefined,
@@ -1959,7 +1958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Safest is to pass it if updated, else filter. 
       // But getOverdueFollowUps usually returns CRM followups.
       // I'll assume we pass it.
-      const overdueFollowUps = await storage.getOverdueFollowUps(orgId);
+      const overdueFollowUps = await storage.getOverdueFollowUps();
       res.json(overdueFollowUps);
     } catch (error) {
       console.error("Overdue follow-ups error:", error);
@@ -2609,7 +2608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/fee-stats", async (req, res) => {
     try {
       const orgId = await getOrganizationId(req);
-      const feeStats = await storage.getFeeStats(orgId); // Assuming updated
+      const feeStats = await storage.getFeeStats(); // Assuming updated
       res.json(feeStats);
     } catch (error) {
       console.error("Fee stats fetch error:", error);
@@ -3276,9 +3275,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (lead.motherFirstName) {
               return `${lead.motherFirstName} ${lead.motherLastName || ''}`.trim();
             }
-            return lead.parentName || '';
+            return '';
           })(),
-          parentPhone: lead.fatherPhone || lead.motherPhone || lead.parentPhone || '',
+          parentPhone: lead.fatherPhone || lead.motherPhone || '',
           program: `${lead.class || ''} ${lead.stream || ''}`.trim(),
           class: lead.class || '',
           stream: lead.stream || '',
@@ -5106,7 +5105,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/message-templates", async (req, res) => {
     try {
       const { category } = req.query;
-      const templates = await storage.getAllMessageTemplates(category as string | undefined);
+      const orgId = await getOrganizationId(req);
+      const templates = await storage.getAllMessageTemplates(orgId, { category: category as string });
       res.json(templates);
     } catch (error) {
       console.error("Get message templates error:", error);
@@ -5991,11 +5991,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const crmLead = await storage.createLead({
               name: leadData.full_name || leadData.name || "Unknown",
               email: leadData.email,
-              phone: leadData.phone,
+              phone: leadData.phone || "Unknown",
               class: leadData.class || "Not Specified",
               source: "Meta Ads",
               status: "new",
               organizationId,
+              fatherFirstName: "Unknown",
+              fatherLastName: "",
+              fatherPhone: leadData.phone || "Unknown",
+              address: ""
             });
 
             // Create sync record
