@@ -4,6 +4,7 @@ import { Bell, User, LogOut, Settings, ChevronDown, Sun, Moon, Menu } from "luci
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import NotificationCenter from "@/components/notifications/notification-center";
+import ActivityLog from "@/components/notifications/activity-log";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -52,6 +53,7 @@ export default function Header({ title, subtitle, className, onMenuClick }: Head
         </div>
         <div className="flex items-center space-x-4">
           <NotificationCenter />
+          <ActivityLog />
           {/* Profile Dropdown */}
           <div className="relative">
             <Button

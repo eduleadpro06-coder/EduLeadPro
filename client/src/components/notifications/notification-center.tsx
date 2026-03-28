@@ -26,13 +26,16 @@ interface NotificationCategory {
   count: number;
 }
 
+// Only show actionable alert types in the bell — activity types go in Activity Log
+const NOTIFICATION_TYPES = ["followup", "lead", "daycare"];
+
 export default function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   const {
-    notifications,
+    notifications: allNotifications,
     stats,
     loading,
     markAsRead,
@@ -40,6 +43,9 @@ export default function NotificationCenter() {
     clearAll,
     refresh
   } = useNotificationContext();
+
+  // Filter to only show actionable notifications
+  const notifications = allNotifications.filter(n => NOTIFICATION_TYPES.includes(n.type));
 
   const handleNotificationClick = (notification: Notification) => {
     markAsRead(notification.id);
