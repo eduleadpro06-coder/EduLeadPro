@@ -11,6 +11,7 @@ import { Notification } from "@shared/schema";
 import { useAuth } from "@/contexts/AuthContext";
 import OrganizationOnboarding from "@/components/onboarding/organization-onboarding";
 import { apiRequest } from "@/lib/queryClient";
+import DashboardPinGuard from "@/components/dashboard/dashboard-pin-guard";
 
 interface DashboardAnalytics {
   kpis: {
@@ -148,6 +149,7 @@ export default function Dashboard() {
       )}
 
       <Header title="Dashboard" subtitle="Overview of your school's performance" />
+      <DashboardPinGuard>
       <div className="min-h-screen w-full bg-gray-50 text-gray-900 px-4 pb-8">
 
         {/* KPI Cards - 8 Total */}
@@ -424,6 +426,7 @@ export default function Dashboard() {
         </div>
 
       </div>
+      </DashboardPinGuard>
     </>
   );
 }

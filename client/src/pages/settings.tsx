@@ -597,6 +597,33 @@ export default function Settings() {
                       disabled={isUpdatingSettings}
                     />
                   </div>
+
+                  {/* Dashboard PIN Reset */}
+                  <div className="border-t pt-6 mt-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label className="text-base font-semibold">Dashboard PIN</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Reset the 4-digit PIN used to protect dashboard data
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                        onClick={() => {
+                          if (confirm("Reset your dashboard PIN? You'll need to create a new one when you visit the dashboard.")) {
+                            localStorage.removeItem("dashboard_pin");
+                            toast({
+                              title: "PIN Reset",
+                              description: "Dashboard PIN has been reset. You'll be asked to create a new one on your next dashboard visit.",
+                            });
+                          }
+                        }}
+                      >
+                        Reset PIN
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
