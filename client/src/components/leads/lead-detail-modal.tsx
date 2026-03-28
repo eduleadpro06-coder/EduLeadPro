@@ -806,7 +806,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                                   </FormControl>
                                   <SelectContent>
                                     <SelectItem value="Walk-in">Walk-in</SelectItem>
-                                    <SelectItem value="Walk-in (Google Form)">Walk-in (Google Form)</SelectItem>
+                                    {/* Walk-in (Google Form) merged into Walk-in */}
                                     <SelectItem value="Phone Call">Phone Call</SelectItem>
                                     <SelectItem value="Email">Email</SelectItem>
                                     <SelectItem value="Website">Website</SelectItem>

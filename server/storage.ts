@@ -660,8 +660,21 @@ export class DatabaseStorage implements IStorage {
 
   async createLead(insertLead: InsertLead): Promise<Lead> {
     try {
+      // Normalize name fields to Title Case
+      const toTitleCase = (str: string | null | undefined): string | null | undefined => {
+        if (!str) return str;
+        return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+      };
+
       // Auto-assign counselor if only one counselor exists in staff table
       let leadData = { ...insertLead };
+
+      // Apply Title Case to all name fields
+      if (leadData.name) leadData.name = toTitleCase(leadData.name) as string;
+      if (leadData.fatherFirstName) leadData.fatherFirstName = toTitleCase(leadData.fatherFirstName) as string;
+      if (leadData.fatherLastName) leadData.fatherLastName = toTitleCase(leadData.fatherLastName) as string;
+      if (leadData.motherFirstName) leadData.motherFirstName = toTitleCase(leadData.motherFirstName) as string;
+      if (leadData.motherLastName) leadData.motherLastName = toTitleCase(leadData.motherLastName) as string;
 
       if (!leadData.counselorId && leadData.organizationId) {
         try {

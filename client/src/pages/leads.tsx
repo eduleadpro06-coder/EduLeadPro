@@ -82,6 +82,7 @@ export default function Leads() {
       case "interested": return "bg-yellow-100 text-yellow-800";
       case "ready_for_admission": return "bg-teal-100 text-teal-800";
       case "future_intake": return "bg-sky-100 text-sky-800";
+      case "visited": return "bg-orange-100 text-orange-800";
       case "enrolled": return "bg-green-100 text-green-800";
       case "dropped": return "bg-red-100 text-red-800";
       default: return "bg-gray-100 text-gray-800";
@@ -142,7 +143,7 @@ export default function Leads() {
                   <SelectItem value="new">New</SelectItem>
                   <SelectItem value="contacted">Contacted</SelectItem>
                   <SelectItem value="interested">Interested</SelectItem>
-                  <SelectItem value="interested">Interested</SelectItem>
+                  <SelectItem value="visited">Visited</SelectItem>
                   <SelectItem value="ready_for_admission">Ready for Admission</SelectItem>
                   <SelectItem value="future_intake">Future Intake</SelectItem>
                   <SelectItem value="enrolled">Enrolled</SelectItem>
@@ -259,6 +260,7 @@ export default function Leads() {
                               <SelectItem value="new">New</SelectItem>
                               <SelectItem value="contacted">Contacted</SelectItem>
                               <SelectItem value="interested">Interested</SelectItem>
+                              <SelectItem value="visited">Visited</SelectItem>
                               <SelectItem value="ready_for_admission">Ready for Admission</SelectItem>
                               <SelectItem value="future_intake">Future Intake</SelectItem>
                               <SelectItem value="enrolled">Enrolled</SelectItem>

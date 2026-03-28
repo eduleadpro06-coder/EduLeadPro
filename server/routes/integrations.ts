@@ -61,11 +61,16 @@ export function registerIntegrationRoutes(app: Express) {
             // 3. IF NO DIGITS (e.g. Meta Test Data text), use the original string so user can see it.
             const finalPhone = cleanedPhone.length > 0 ? cleanedPhone.slice(-10) : phone;
 
-            // Insert into DB
+            // Insert into DB - apply Title Case to names
+            const toTitleCase = (s: string | null): string | null => {
+                if (!s) return s;
+                return s.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+            };
+
             const newLead = await db.insert(leads).values({
-                name: studentName,
-                fatherFirstName: fatherFirstName,
-                fatherLastName: fatherLastName,
+                name: toTitleCase(studentName) || studentName,
+                fatherFirstName: toTitleCase(fatherFirstName),
+                fatherLastName: toTitleCase(fatherLastName),
                 fatherPhone: finalPhone, // Map phone to father's phone
                 email: email || null,
                 phone: finalPhone, // Primary phone field
@@ -139,8 +144,26 @@ export function registerIntegrationRoutes(app: Express) {
                 return { first: parts[0], last: parts.slice(1).join(" ") };
             };
 
+            // Normalize to Title Case
+            const toTitleCase = (str: string | null): string | null => {
+                if (!str) return str;
+                return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+            };
+
             const father = parseName(fatherName);
+            father.first = toTitleCase(father.first);
+            father.last = toTitleCase(father.last);
             const mother = parseName(motherName);
+            mother.first = toTitleCase(mother.first);
+            mother.last = toTitleCase(mother.last);
+            const normalizedStudentName = toTitleCase(name) || name;
+
+            // Trim class name: remove parenthetical suffixes like "(3 yrs to 4 yrs)"
+            const trimClassName = (cls: string | undefined): string => {
+                if (!cls) return "Unknown";
+                return cls.replace(/\s*\(.*\)\s*$/, '').trim() || "Unknown";
+            };
+            const trimmedClass = trimClassName(childClass);
 
             // 1. Check for duplicate lead
             const existingLeads = await db.select().from(leads).where(sql`right(${leads.phone}, 10) = ${searchPhone}`);
@@ -172,7 +195,7 @@ export function registerIntegrationRoutes(app: Express) {
 
                         // Address & Academics
                         address: existingLead.address || address || null,
-                        class: existingLead.class === "Unknown" ? (childClass || "Unknown") : existingLead.class,
+                        class: existingLead.class === "Unknown" ? trimmedClass : existingLead.class,
 
                         // Status Update: Mark as visited/contacted since they physically walked in
                         status: "visited",
@@ -189,7 +212,7 @@ export function registerIntegrationRoutes(app: Express) {
                 console.log(`[Google Form] New walk-in lead creating for phone ${searchPhone}`);
 
                 const newLead = await db.insert(leads).values({
-                    name: name, // Student Name
+                    name: normalizedStudentName, // Student Name (Title Case)
 
                     // Father
                     fatherFirstName: father.first,
@@ -206,9 +229,9 @@ export function registerIntegrationRoutes(app: Express) {
 
                     email: email || null,
                     address: address || null,
-                    class: childClass || "Unknown",
+                    class: trimmedClass,
 
-                    source: "Walk-in (Google Form)",
+                    source: "Walk-in",
                     status: "visited",
                     notes: "Walk-in inquiry via Google Form",
                     organizationId: orgId
