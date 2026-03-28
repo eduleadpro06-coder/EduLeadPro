@@ -37,7 +37,7 @@ const playBeep = () => {
 };
 
 export default function FollowUpMonitor() {
-    const { notifications, createNotification } = useNotificationContext();
+    const { notifications, createNotification, loading } = useNotificationContext();
     const { toast } = useToast();
 
     // Use a ref to track IDs we've already processed in this session 
@@ -56,6 +56,7 @@ export default function FollowUpMonitor() {
     });
 
     useEffect(() => {
+        if (loading) return; // Wait for existing notifications to load from backend first
         if (!overdueFollowUps.length) return;
 
         overdueFollowUps.forEach(async (followUp) => {
@@ -65,7 +66,7 @@ export default function FollowUpMonitor() {
             // Check if a persistent notification already exists for this follow-up
             // We look for type 'followup' and actionId matching the followUp.id
             const alreadyNotified = notifications.some(
-                (n) => n.type === "followup" && n.actionId === String(followUp.id)
+                (n) => n.type === "followup" && n.actionId === `followup:${followUp.id}`
             );
 
             if (alreadyNotified) {
@@ -84,8 +85,8 @@ export default function FollowUpMonitor() {
                     priority: "high",
                     read: false,
                     actionType: "view_lead",
-                    actionId: String(followUp.leadId), // Store lead ID for navigation
-                    metadata: JSON.stringify({ leadId: followUp.leadId, scheduledAt: followUp.scheduledAt })
+                    actionId: `followup:${followUp.id}`, // Unique per follow-up for dedup
+                    metadata: JSON.stringify({ followUpId: followUp.id, leadId: followUp.leadId, scheduledAt: followUp.scheduledAt })
                 });
 
                 // Mark as processed
@@ -105,7 +106,7 @@ export default function FollowUpMonitor() {
             }
         });
 
-    }, [overdueFollowUps, notifications, createNotification, toast]);
+    }, [overdueFollowUps, notifications, createNotification, toast, loading]);
 
     return null;
 }
