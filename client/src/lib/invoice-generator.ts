@@ -204,6 +204,15 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
             `Rs. ${formatCurrency(totalFee)}`
         ]);
 
+        // Add Registration Fee if it exists (installmentNumber === 0)
+        const regPayment = invoiceData.payments?.find(p => p.installmentNumber === 0);
+        if (regPayment) {
+            tableBody.push([
+                `Registration Amount (Paid)`,
+                `Rs. ${formatCurrency(parseFloat(regPayment.amount))}`
+            ]);
+        }
+
         // Add all installments as separate line items for reference (showing how it is split)
         // Sort by installment number to be safe
         const allInstallments = [...invoiceData.emiSchedule].sort((a, b) => a.installmentNumber - b.installmentNumber);
