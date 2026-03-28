@@ -4819,6 +4819,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/notifications", async (req, res) => {
     try {
       const notificationData = req.body;
+
+      // Server-side dedup: if type and actionId are provided, check for existing notification
+      if (notificationData.type && notificationData.actionId) {
+        const existing = await db.select()
+          .from(schema.notifications)
+          .where(
+            and(
+              eq(schema.notifications.type, notificationData.type),
+              eq(schema.notifications.actionId, notificationData.actionId)
+            )
+          )
+          .limit(1);
+
+        if (existing.length > 0) {
+          // Already exists — return existing notification instead of creating duplicate
+          console.log(`[Notifications] Dedup: notification already exists for type="${notificationData.type}" actionId="${notificationData.actionId}"`);
+          return res.json(existing[0]);
+        }
+      }
+
       const notification = await storage.createNotification(notificationData);
       res.json(notification);
     } catch (error) {
