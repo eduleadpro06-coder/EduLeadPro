@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,7 +26,9 @@ import {
   Plus,
   Clock,
   CheckCircle2,
-  Trash2
+  Trash2,
+  Mic,
+  MicOff
 } from "lucide-react";
 import { type LeadWithCounselor as BaseLeadWithCounselor, type Staff, type FollowUp, type GlobalClassFee, extendedLeadSchema, type InsertLead } from "@shared/schema";
 import { apiRequest, invalidateNotifications } from "@/lib/utils";
@@ -34,6 +36,33 @@ import { useToast } from "@/components/ui/use-toast";
 import { useHashState } from "@/hooks/use-hash-state";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { z } from "zod";
+import { useSpeechToText } from "@/hooks/use-speech-to-text";
+
+// Small mic button component for speech-to-text in textareas
+function SpeechMicButton({ onResult }: { onResult: (text: string) => void }) {
+  const { isListening, isSupported, toggleListening } = useSpeechToText({
+    lang: "en-IN",
+    continuous: true,
+    onResult,
+  });
+
+  if (!isSupported) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={toggleListening}
+      className={`absolute top-2 right-2 p-1.5 rounded-lg transition-all ${
+        isListening
+          ? "bg-red-100 text-red-600 animate-pulse shadow-sm"
+          : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+      }`}
+      title={isListening ? "Stop recording" : "Start voice input"}
+    >
+      {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+    </button>
+  );
+}
 
 // Extend LeadWithCounselor to include followUps for local use
 type LeadWithCounselorAndFollowUps = BaseLeadWithCounselor & { followUps?: FollowUp[] };
@@ -849,16 +878,24 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                           />
                         </div>
 
-                        {/* Notes */}
+                        {/* Notes with Speech-to-Text */}
                         <FormField
                           control={form.control}
                           name="notes"
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Notes</FormLabel>
-                              <FormControl>
-                                <Textarea {...field} value={field.value ?? ""} rows={3} />
-                              </FormControl>
+                              <div className="relative">
+                                <FormControl>
+                                  <Textarea {...field} value={field.value ?? ""} rows={3} className="pr-12" />
+                                </FormControl>
+                                <SpeechMicButton
+                                  onResult={(text) => {
+                                    const current = field.value ?? "";
+                                    field.onChange(current ? `${current} ${text}` : text);
+                                  }}
+                                />
+                              </div>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -986,11 +1023,22 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                       </div>
                       <div>
                         <label className="text-sm font-medium mb-1 block">Remarks</label>
-                        <Textarea
-                          placeholder="Enter remarks..."
-                          value={followUpForm.remarks}
-                          onChange={(e) => setFollowUpForm(prev => ({ ...prev, remarks: e.target.value }))}
-                        />
+                        <div className="relative">
+                          <Textarea
+                            placeholder="Enter remarks..."
+                            value={followUpForm.remarks}
+                            onChange={(e) => setFollowUpForm(prev => ({ ...prev, remarks: e.target.value }))}
+                            className="pr-12"
+                          />
+                          <SpeechMicButton
+                            onResult={(text) => {
+                              setFollowUpForm(prev => ({
+                                ...prev,
+                                remarks: prev.remarks ? `${prev.remarks} ${text}` : text
+                              }));
+                            }}
+                          />
+                        </div>
                       </div>
                       <Button
                         className="w-full bg-[#643ae5] hover:bg-[#643ae5]/90"
