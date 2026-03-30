@@ -18,13 +18,13 @@ export const authAPI = {
         console.log('[AuthAPI] Provided Password:', credentials.password, 'Provided Phone:', credentials.phone);
 
         // Client-side Failsafe Enforcement:
-        // Even if the Vercel backend deployment hasn't finished syncing yet, 
-        // we manually force the `requiresPasswordChange` flag if they used a default password.
-        if (response.success) {
+        // Only force password change for PARENTS if they use default passwords. 
+        // Staff/Security passwords are strictly managed via the web portal.
+        if (response.success && response.user?.role === 'parent') {
             const trimmedPass = credentials.password?.trim() || '';
             const trimmedPhone = credentials.phone?.trim() || '';
             if (trimmedPass === '1234' || trimmedPass === trimmedPhone) {
-                console.log('[AuthAPI] Triggering Client-Side requiresPasswordChange = true');
+                console.log('[AuthAPI] Triggering Client-Side requiresPasswordChange = true for Parent');
                 response.requiresPasswordChange = true;
             }
         }

@@ -196,7 +196,6 @@ export default function LoginScreen() {
                             />
                         </View>
                         <Text style={styles.title}>Bloomdale Connect</Text>
-                        <Text style={styles.subtitle}>Powered by Bloomdale Preschool</Text>
                     </Animated.View>
 
                     {/* Login Form Card */}

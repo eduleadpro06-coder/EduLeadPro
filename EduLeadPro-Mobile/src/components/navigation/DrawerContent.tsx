@@ -107,7 +107,7 @@ export default function DrawerContent(props: DrawerContentComponentProps) {
                     </View>
                     <View style={styles.userInfo}>
                         <Text style={styles.userName} numberOfLines={1}>
-                            {user?.name || 'Parent Portal'}
+                            {user?.name || 'Bloomdale Connect'}
                         </Text>
                         <Text style={styles.userRole}>
                             {user?.role === 'teacher' ? 'Faculty Member' : user?.role === 'driver' ? 'Transport Staff' : 'Guardian'}
@@ -180,7 +180,6 @@ export default function DrawerContent(props: DrawerContentComponentProps) {
                     </View>
                     <Text style={styles.logoutText}>Sign Out</Text>
                 </TouchableOpacity>
-                <Text style={styles.versionText}>EduLead Pro v2.0.0</Text>
             </View>
         </View>
     );

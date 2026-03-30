@@ -147,9 +147,9 @@ export default function PremiumSideMenu({ isOpen, onClose }: PremiumSideMenuProp
                             </View>
                             <View style={styles.userInfo}>
                                 <Text style={styles.userName} numberOfLines={1}>
-                                    {user?.name || 'Parent Portal'}
+                                    {user?.name || 'Bloomdale Connect'}
                                 </Text>
-                                <Text style={styles.userRole}>Welcome to {(user as any)?.organizationName || 'EduConnect'}</Text>
+                                <Text style={styles.userRole}>Welcome to {(user as any)?.organizationName || 'Bloomdale Connect'}</Text>
                             </View>
                             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
                                 <Ionicons name="close" size={24} color="white" />
