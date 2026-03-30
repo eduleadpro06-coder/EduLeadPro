@@ -195,8 +195,8 @@ export default function LoginScreen() {
                                 resizeMode="cover"
                             />
                         </View>
-                        <Text style={styles.title}>Parent Portal</Text>
-                        <Text style={styles.subtitle}>Powered by Bloomdale Preschool | Dedicated to Excellence</Text>
+                        <Text style={styles.title}>Bloomdale Connect</Text>
+                        <Text style={styles.subtitle}>Powered by Bloomdale Preschool</Text>
                     </Animated.View>
 
                     {/* Login Form Card */}
