@@ -22,7 +22,7 @@ router.use(roleGuard(['security', 'support_staff', 'admin']));
 router.get('/students', async (req: Request, res: Response) => {
     try {
         const organizationId = req.user!.organizationId;
-        const search = (req.query.search as string || '').toLowerCase();
+        const search = (req.query.search as string || req.query.query as string || '').toLowerCase();
 
         const { supabase } = await import('../../supabase.js');
 
@@ -37,7 +37,7 @@ router.get('/students', async (req: Request, res: Response) => {
             query = query.or(`name.ilike.%${search}%,roll_number.ilike.%${search}%`);
         }
 
-        const { data: students, error } = await query.limit(50);
+        const { data: students, error } = await query.limit(1000);
 
         if (error) throw error;
 
