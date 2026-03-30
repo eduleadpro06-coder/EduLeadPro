@@ -21,7 +21,9 @@ export const authAPI = {
         // Even if the Vercel backend deployment hasn't finished syncing yet, 
         // we manually force the `requiresPasswordChange` flag if they used a default password.
         if (response.success) {
-            if (credentials.password === '1234' || credentials.password === credentials.phone) {
+            const trimmedPass = credentials.password?.trim() || '';
+            const trimmedPhone = credentials.phone?.trim() || '';
+            if (trimmedPass === '1234' || trimmedPass === trimmedPhone) {
                 console.log('[AuthAPI] Triggering Client-Side requiresPasswordChange = true');
                 response.requiresPasswordChange = true;
             }

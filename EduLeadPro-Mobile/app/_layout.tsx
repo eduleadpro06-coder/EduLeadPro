@@ -31,6 +31,30 @@ function RootLayoutNav() {
         loadUser();
     }, []);
 
+    // Autorouting logic: this was completely missing before!
+    // It watches for authentication state changes and pushes the user to the correct dashboard
+    useEffect(() => {
+        if (isLoading) return;
+
+        const inAuthGroup = segments[0] === '(auth)';
+
+        if (isAuthenticated && inAuthGroup) {
+            // User is authenticated but still on the login screen -> route them to their dashboard!
+            if (user?.role === 'parent') {
+                router.replace('/(parent)');
+            } else if (user?.role === 'teacher') {
+                router.replace('/(teacher)');
+            } else if (user?.role === 'driver') {
+                router.replace('/(driver)');
+            } else {
+                router.replace('/'); 
+            }
+        } else if (!isAuthenticated && !inAuthGroup) {
+            // User is NOT authenticated but is trying to access a secure screen -> route to login!
+            router.replace('/(auth)/login');
+        }
+    }, [isAuthenticated, segments, isLoading, user]);
+
     // Show loading screen while checking auth
     if (isLoading) {
         return (
