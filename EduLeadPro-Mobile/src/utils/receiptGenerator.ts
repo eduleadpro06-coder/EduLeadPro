@@ -33,9 +33,11 @@ function buildReceiptCopyHtml(data: FeeReceiptData, copyLabel: string): string {
            </tr>`
         : '';
 
-    const footerAddress = data.organizationAddress
-        ? `${data.organizationName || 'Organization'}, ${data.organizationAddress}${data.organizationPhone ? ' | Ph: ' + data.organizationPhone : ''}`
-        : '';
+    // Use specific defaults to ensure the footer address is always populated even if backend is out of date
+    const orgName = data.organizationName || 'Bloomdale Preschool & Daycare';
+    const orgAddress = data.organizationAddress || '78, KhanKhoje Nagar, Manewada Rd, Nagpur, Maharashtra 440024';
+    const orgPhone = data.organizationPhone || '8591627145';
+    const footerAddress = `${orgName}, ${orgAddress} | Ph: ${orgPhone}`;
 
     return `
     <div style="border: 2px solid #006400; border-radius: 10px; background: #f0fff0; padding: 24px 20px 18px 20px; position: relative; margin-bottom: 10px; page-break-inside: avoid;">
@@ -44,7 +46,7 @@ function buildReceiptCopyHtml(data: FeeReceiptData, copyLabel: string): string {
         
         <!-- Header -->
         <div style="text-align: center; margin-bottom: 4px;">
-            <div style="font-size: 18px; font-weight: bold; color: #111;">${data.organizationName || 'Organization Name'}</div>
+            <div style="font-size: 18px; font-weight: bold; color: #111;">${orgName}</div>
         </div>
         
         <!-- Title -->
@@ -85,7 +87,9 @@ function buildReceiptCopyHtml(data: FeeReceiptData, copyLabel: string): string {
         <div style="font-size: 10px; color: #333; margin-bottom: 4px;">
             Academic Year: ${data.academicYear || '2026-27'}
         </div>
-        ${footerAddress ? `<div style="text-align: center; font-size: 9px; color: #555; margin-bottom: 4px;">${footerAddress}</div>` : ''}
+        <div style="text-align: center; font-size: 9px; color: #555; margin-bottom: 4px;">
+            ${footerAddress}
+        </div>
         <div style="text-align: center; font-size: 10px; color: #c80000; margin-bottom: 6px;">
             This is a computer-generated receipt and does not require a signature.
         </div>
@@ -111,7 +115,8 @@ export async function generateMobileFeeReceipt(data: FeeReceiptData): Promise<vo
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { font-family: Helvetica, Arial, sans-serif; padding: 20px; background: #fff; }
-            @page { margin: 20px; }
+            /* Force the printed page to be shorter to eliminate blank space */
+            @page { margin: 20px; size: 595pt 460pt; }
         </style>
     </head>
     <body>
@@ -124,6 +129,8 @@ export async function generateMobileFeeReceipt(data: FeeReceiptData): Promise<vo
     const { uri } = await Print.printToFileAsync({
         html,
         base64: false,
+        width: 595,
+        height: 460, // Reduces height to eliminate bottom blank space
     });
 
     // Build a meaningful filename instead of the random one from expo-print

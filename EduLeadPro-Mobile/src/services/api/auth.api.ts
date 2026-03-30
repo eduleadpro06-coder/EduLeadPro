@@ -13,14 +13,34 @@ export const authAPI = {
      */
     async login(credentials: LoginRequest): Promise<LoginResponse> {
         const response: LoginResponse = await apiClient.post('/auth/login', credentials);
+        
+        console.log('[AuthAPI] Received login response success:', response.success);
+        console.log('[AuthAPI] Provided Password:', credentials.password, 'Provided Phone:', credentials.phone);
 
-        // Store tokens and user data securely
-        if (response.success && response.accessToken) {
+        // Client-side Failsafe Enforcement:
+        // Even if the Vercel backend deployment hasn't finished syncing yet, 
+        // we manually force the `requiresPasswordChange` flag if they used a default password.
+        if (response.success) {
+            if (credentials.password === '1234' || credentials.password === credentials.phone) {
+                console.log('[AuthAPI] Triggering Client-Side requiresPasswordChange = true');
+                response.requiresPasswordChange = true;
+            }
+        }
+        
+        console.log('[AuthAPI] Final requiresPasswordChange status:', response.requiresPasswordChange);
+
+        // Store tokens securely ONLY if a password change is NOT required. 
+        // This is a bulletproof security measure: if they dismiss the modal or restart the app, 
+        // `loadUser` will find no token and boot them back to the login screen!
+        if (response.success && response.accessToken && !response.requiresPasswordChange) {
+            console.log('[AuthAPI] Saving tokens to SecureStore...');
             await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, response.accessToken);
             if (response.refreshToken) {
                 await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, response.refreshToken);
             }
             await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(response.user));
+        } else {
+            console.log('[AuthAPI] NOT saving tokens. Reason -> requiresPasswordChange:', response.requiresPasswordChange);
         }
 
         return response;
