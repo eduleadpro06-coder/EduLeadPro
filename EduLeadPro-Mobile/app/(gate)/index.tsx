@@ -21,7 +21,7 @@ import PremiumCard from '../../src/components/ui/PremiumCard';
 import PremiumDrawer from '../../src/components/ui/PremiumDrawer';
 import { api } from '../../src/services/api';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 export default function GateDashboard() {
     const router = useRouter();
@@ -52,7 +52,6 @@ export default function GateDashboard() {
                         visitors: response.stats.activeVisitors || 0
                     });
                 } else {
-                    // Fallback to manual calculation if stats missing
                     const inside = response.data.filter((s: any) => s.gateStatus?.status === 'present').length;
                     setStats({
                         total: response.data.length,
@@ -60,15 +59,6 @@ export default function GateDashboard() {
                         visitors: 0
                     });
                 }
-            } else if (Array.isArray(response)) {
-                // Legacy support if API returns array directly
-                setStudents(response);
-                const inside = response.filter((s: any) => s.gateStatus?.status === 'present').length;
-                setStats({
-                    total: response.length,
-                    inside,
-                    visitors: 0
-                });
             }
         } catch (error) {
             console.error('Gate data error:', error);
@@ -77,7 +67,6 @@ export default function GateDashboard() {
         }
     };
 
-    // Auto-refresh when screen comes into focus
     useFocusEffect(
         useCallback(() => {
             loadData();
@@ -92,159 +81,132 @@ export default function GateDashboard() {
 
     const filteredStudents = students.filter(s =>
         searchQuery ? (s.name.toLowerCase().includes(searchQuery.toLowerCase()) || (s.id && s.id.toString().includes(searchQuery))) : true
-    ).slice(0, 50); // Limit display for performance
-
-    const getGreeting = () => {
-        const hour = new Date().getHours();
-        if (hour < 12) return 'Good Morning,';
-        if (hour < 18) return 'Good Afternoon,';
-        return 'Good Evening,';
-    };
+    ).slice(0, 50);
 
     return (
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
             
-            {/* Premium Header */}
+            {/* Header with Search (TOP PRIORITY) */}
             <View style={styles.headerContainer}>
-                <View style={styles.headerContent}>
-                    <View style={{ flex: 1 }}>
-                        <TouchableOpacity style={styles.menuBtn} onPress={() => setDrawerVisible(true)}>
-                            <Ionicons name="grid-outline" size={26} color={colors.textPrimary} />
-                        </TouchableOpacity>
-                        <View style={{ marginTop: 12 }}>
-                            <Text style={styles.dateText}>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
-                            <Text style={styles.greetingText}>{getGreeting()}</Text>
-                            <Text style={styles.userNameText}>{user?.role === 'security' ? 'Security Staff' : 'Support Staff'}</Text>
-                        </View>
-                    </View>
+                <View style={styles.topBar}>
+                    <TouchableOpacity style={styles.menuBtn} onPress={() => setDrawerVisible(true)}>
+                        <Ionicons name="grid-outline" size={26} color={colors.textPrimary} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Gate Dashboard</Text>
+                    <View style={{ width: 32 }} /> 
                 </View>
-            </View>
 
-            <ScrollView 
-                style={styles.content}
-                contentContainerStyle={styles.scrollContent}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-            >
-                {/* Stats Grid - Premium 3-column Layout */}
+                {/* Priority 1: Quick Search */}
+                <View style={styles.searchContainer}>
+                    <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search Student by Name or ID..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholderTextColor={colors.textSecondary + '80'}
+                    />
+                    {searchQuery !== '' && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')}>
+                            <Feather name="x-circle" size={18} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Shift Stats (Below Search) */}
                 <View style={styles.statsGrid}>
                     {[
-                        { label: 'Total', value: stats.total, icon: 'users', color: colors.primary, bg: '#EEF2FF' },
-                        { label: 'Inside', value: stats.inside, icon: 'user-check', color: colors.success, bg: '#ECFDF5' },
+                        { label: 'Total', value: stats.total, icon: 'users', color: colors.primary, bg: '#F5F7FF' },
+                        { label: 'Inside', value: stats.inside, icon: 'user-check', color: colors.success, bg: '#F0FDF4' },
                         { label: 'Visitors', value: stats.visitors, icon: 'user-plus', color: colors.warning, bg: '#FFFBEB' },
                     ].map((stat, i) => (
                         <View key={i} style={[styles.statCard, { backgroundColor: stat.bg }]}>
-                            <View style={styles.statIconBox}>
-                                <Feather name={stat.icon as any} size={16} color={stat.color} />
-                            </View>
-                            <Text style={styles.statValue}>{stat.value}</Text>
+                            <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
                             <Text style={styles.statLabel}>{stat.label}</Text>
                         </View>
                     ))}
                 </View>
+            </View>
 
-                {/* Quick Actions Grid */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Gate Operations</Text>
-                    <View style={styles.quickActionsGrid}>
-                        <TouchableOpacity 
-                            style={[styles.actionCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}
-                            onPress={() => router.push('/(gate)/scanner')}
-                        >
-                            <View style={[styles.actionIconBox, { backgroundColor: '#DCFCE7' }]}>
-                                <Ionicons name="scan" size={24} color={colors.success} />
-                            </View>
-                            <Text style={styles.actionLabel}>Scan Pass</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={[styles.actionCard, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
-                            onPress={() => router.push('/(gate)/visitor-form')}
-                        >
-                            <View style={[styles.actionIconBox, { backgroundColor: '#DBEAFE' }]}>
-                                <Feather name="user-plus" size={24} color={colors.primary} />
-                            </View>
-                            <Text style={styles.actionLabel}>Visitor Entry</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={[styles.actionCard, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}
-                            onPress={() => router.push('/(gate)/history')}
-                        >
-                            <View style={[styles.actionIconBox, { backgroundColor: '#FEF3C7' }]}>
-                                <Feather name="clock" size={24} color={colors.warning} />
-                            </View>
-                            <Text style={styles.actionLabel}>Log History</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={[styles.actionCard, { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' }]}
-                            onPress={logout}
-                        >
-                            <View style={[styles.actionIconBox, { backgroundColor: '#E5E7EB' }]}>
-                                <Feather name="log-out" size={24} color={colors.textSecondary} />
-                            </View>
-                            <Text style={styles.actionLabel}>Sign Out</Text>
-                        </TouchableOpacity>
-                    </View>
+            {/* Main Content: Student List */}
+            <ScrollView 
+                style={styles.content}
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Students List</Text>
+                    <Text style={styles.countText}>{filteredStudents.length} of {students.length}</Text>
                 </View>
 
-                {/* Student Enrollment List */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Quick Search</Text>
-                        <Text style={styles.countText}>{students.length} Students</Text>
+                {loading && !refreshing ? (
+                    <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+                ) : filteredStudents.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                        <Feather name="search" size={48} color={colors.border} />
+                        <Text style={styles.emptyText}>No students found</Text>
                     </View>
-                    
-                    <View style={styles.searchContainer}>
-                        <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search by Name or ID..."
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                        />
-                    </View>
-
-                    {loading && !refreshing ? (
-                        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
-                    ) : (
-                        filteredStudents.map((student) => (
-                            <TouchableOpacity 
-                                key={student.id}
-                                style={styles.studentCardWrapper}
-                                onPress={() => router.push(`/(gate)/student/${student.id}`)}
-                            >
-                                <PremiumCard style={styles.studentCard}>
-                                    <View style={styles.studentRow}>
-                                        <View style={styles.studentAvatar}>
-                                            <Feather name="user" size={24} color={colors.primary} />
-                                        </View>
-                                        <View style={styles.studentInfo}>
-                                            <Text style={styles.studentName}>{student.name}</Text>
-                                            <Text style={styles.studentDetail}>{student.class} • ID: {student.id}</Text>
-                                        </View>
-                                        <View style={[
-                                            styles.statusBadge,
-                                            { backgroundColor: student.gateStatus?.status === 'present' ? '#F0FDF4' : '#FEF2F2' }
-                                        ]}>
-                                            <Text style={[
-                                                styles.statusText,
-                                                { color: student.gateStatus?.status === 'present' ? colors.success : colors.danger }
-                                            ]}>
-                                                {student.gateStatus?.status === 'present' ? 'In' : 'Out'}
-                                            </Text>
-                                        </View>
-                                        <Feather name="chevron-right" size={20} color={colors.border} />
+                ) : (
+                    filteredStudents.map((student) => (
+                        <TouchableOpacity 
+                            key={student.id}
+                            style={styles.studentCardWrapper}
+                            onPress={() => router.push(`/(gate)/student/${student.id}`)}
+                        >
+                            <PremiumCard style={styles.studentCard}>
+                                <View style={styles.studentRow}>
+                                    <View style={styles.studentAvatar}>
+                                        <Feather name="user" size={24} color={colors.primary} />
                                     </View>
-                                </PremiumCard>
-                            </TouchableOpacity>
-                        ))
-                    )}
-                </View>
+                                    <View style={styles.studentInfo}>
+                                        <Text style={styles.studentName}>{student.name}</Text>
+                                        <Text style={styles.studentDetail}>{student.class} • ID: {student.id}</Text>
+                                    </View>
+                                    <View style={[
+                                        styles.statusBadge,
+                                        { backgroundColor: student.gateStatus?.status === 'present' ? '#F0FDF4' : '#FEF2F2' }
+                                    ]}>
+                                        <Text style={[
+                                            styles.statusText,
+                                            { color: student.gateStatus?.status === 'present' ? colors.success : colors.danger }
+                                        ]}>
+                                            {student.gateStatus?.status === 'present' ? 'In' : 'Out'}
+                                        </Text>
+                                    </View>
+                                    <Feather name="chevron-right" size={20} color={colors.border} />
+                                </View>
+                            </PremiumCard>
+                        </TouchableOpacity>
+                    ))
+                )}
                 
-                <View style={{ height: 40 }} />
+                <View style={{ height: 100 }} />
             </ScrollView>
+
+            {/* Bottom Navigation: Quick Actions */}
+            <View style={styles.bottomNav}>
+                <TouchableOpacity 
+                    style={styles.navItem}
+                    onPress={() => router.push('/(gate)/scanner')}
+                >
+                    <View style={[styles.navIconBox, { backgroundColor: '#F0FDF4' }]}>
+                        <Ionicons name="qr-code-outline" size={24} color={colors.success} />
+                    </View>
+                    <Text style={styles.navLabel}>QR Scan</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                    style={styles.navItem}
+                    onPress={() => router.push('/(gate)/visitor-form')}
+                >
+                    <View style={[styles.navIconBox, { backgroundColor: '#EFF6FF' }]}>
+                        <Feather name="user-plus" size={24} color={colors.primary} />
+                    </View>
+                    <Text style={styles.navLabel}>Visitors</Text>
+                </TouchableOpacity>
+            </View>
 
             <PremiumDrawer 
                 isVisible={drawerVisible}
@@ -253,13 +215,11 @@ export default function GateDashboard() {
                 onSelectTab={(id) => {
                     if (id === 'scanner') router.push('/(gate)/scanner');
                     if (id === 'visitor') router.push('/(gate)/visitor-form');
-                    if (id === 'history') router.push('/(gate)/history');
                 }}
                 menuItems={[
                     { id: 'dashboard', label: 'Dashboard', icon: 'home' },
                     { id: 'scanner', label: 'Scan QR Pass', icon: 'maximize' },
                     { id: 'visitor', label: 'Visitor Logs', icon: 'user-plus' },
-                    { id: 'history', label: 'Operation History', icon: 'clock' },
                 ]}
                 user={{ name: user?.name || 'Security', role: user?.role || 'security' }}
                 onLogout={logout}
@@ -275,139 +235,34 @@ const styles = StyleSheet.create({
     },
     headerContainer: {
         backgroundColor: colors.background,
-        paddingTop: Platform.OS === 'ios' ? 60 : 40,
-        paddingBottom: 20,
+        paddingTop: Platform.OS === 'ios' ? 50 : 30,
         paddingHorizontal: spacing.lg,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border + '40',
+        paddingBottom: 15,
     },
-    headerContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
-    menuBtn: {
-        padding: 4,
-        marginLeft: -4,
-        marginBottom: 8,
-    },
-    dateText: {
-        fontSize: 12,
-        color: colors.textSecondary,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        fontWeight: '600',
-        marginBottom: 2,
-    },
-    greetingText: {
-        fontSize: 24,
-        fontWeight: '300',
-        color: colors.textPrimary,
-        letterSpacing: -0.5,
-    },
-    userNameText: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: colors.textPrimary,
-        marginTop: -4,
-        letterSpacing: -0.5,
-    },
-    content: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingHorizontal: spacing.lg,
-        paddingBottom: 40,
-    },
-    statsGrid: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: spacing.xl,
-        marginTop: spacing.md,
-    },
-    statCard: {
-        width: '31%',
-        borderRadius: 20,
-        padding: 12,
-        justifyContent: 'space-between',
-        aspectRatio: 0.9,
-    },
-    statIconBox: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        backgroundColor: 'white',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    statValue: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: colors.textPrimary,
-        marginTop: 8,
-    },
-    statLabel: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: colors.textSecondary,
-    },
-    section: {
-        marginBottom: spacing.xl,
-    },
-    sectionHeader: {
+    topBar: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.md,
+        marginBottom: 15,
     },
-    sectionTitle: {
+    headerTitle: {
         fontSize: 18,
         fontWeight: '700',
         color: colors.textPrimary,
-        marginBottom: spacing.md,
     },
-    countText: {
-        fontSize: 13,
-        color: colors.textSecondary,
-        fontWeight: '600',
-    },
-    quickActionsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-    },
-    actionCard: {
-        width: '48%',
-        marginBottom: 16,
-        padding: 16,
-        borderRadius: 20,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    actionIconBox: {
-        width: 48,
-        height: 48,
-        borderRadius: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 12,
-    },
-    actionLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: colors.textPrimary,
-        textAlign: 'center',
+    menuBtn: {
+        padding: 4,
     },
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'white',
+        backgroundColor: '#F3F4F6',
         borderRadius: 15,
         paddingHorizontal: 15,
-        borderWidth: 1,
-        borderColor: colors.border,
-        marginBottom: 16,
         height: 50,
-        ...shadows.sm,
+        marginBottom: 15,
     },
     searchIcon: {
         marginRight: 10,
@@ -416,6 +271,53 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 16,
         color: colors.textPrimary,
+        fontWeight: '500',
+    },
+    statsGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    statCard: {
+        width: '31%',
+        borderRadius: 15,
+        padding: 10,
+        alignItems: 'center',
+        height: 65,
+        justifyContent: 'center',
+        ...shadows.sm,
+    },
+    statValue: {
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    statLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: colors.textSecondary,
+        marginTop: 2,
+    },
+    content: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingHorizontal: spacing.lg,
+        paddingTop: 20,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    countText: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        fontWeight: '600',
     },
     studentCardWrapper: {
         marginBottom: 12,
@@ -428,9 +330,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     studentAvatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: '#F3F4F6',
         alignItems: 'center',
         justifyContent: 'center',
@@ -459,15 +361,46 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '700',
     },
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 60,
+    },
     emptyText: {
         fontSize: 16,
         color: colors.textSecondary,
         marginTop: 10,
+        fontWeight: '500',
     },
-    rollNo: {
+    bottomNav: {
+        position: 'absolute',
+        bottom: 0,
+        width: '100%',
+        height: Platform.OS === 'ios' ? 90 : 75,
+        backgroundColor: 'white',
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+        paddingBottom: Platform.OS === 'ios' ? 20 : 0,
+        borderTopWidth: 1,
+        borderTopColor: colors.border + '40',
+        ...shadows.lg,
+    },
+    navItem: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    navIconBox: {
+        width: 48,
+        height: 40,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 4,
+    },
+    navLabel: {
         fontSize: 12,
-        color: colors.textSecondary,
-        fontStyle: 'italic',
-        marginTop: 2,
+        fontWeight: '700',
+        color: colors.textPrimary,
     },
 });
