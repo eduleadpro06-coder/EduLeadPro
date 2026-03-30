@@ -49,7 +49,7 @@ export const gateAPI = {
     async getGateStudents(query: string = ''): Promise<any[]> {
         const params = new URLSearchParams();
         if (query) params.append('query', query);
-        const response = await apiClient.get(`/mobile/gate/students?${params.toString()}`);
+        const response = await apiClient.get(`/gate/students?${params.toString()}`);
         return response.data;
     },
 
@@ -57,7 +57,7 @@ export const gateAPI = {
      * Get specific student details for gate
      */
     async getGateStudentDetails(studentId: string | number): Promise<any> {
-        const response = await apiClient.get(`/mobile/gate/students/${studentId}`);
+        const response = await apiClient.get(`/gate/students/${studentId}`);
         return response.data;
     },
 
@@ -65,7 +65,7 @@ export const gateAPI = {
      * Sync offline logs (idempotent)
      */
     async syncLogs(logs: any[]): Promise<any> {
-        const response = await apiClient.post('/mobile/gate/sync', { logs });
+        const response = await apiClient.post('/gate/sync', { logs });
         return response.data;
     },
 
@@ -79,7 +79,7 @@ export const gateAPI = {
             if (publicUrl) log.photo_url = publicUrl;
         }
 
-        const response = await apiClient.post('/mobile/gate/sync', { logs: [log] });
+        const response = await apiClient.post('/gate/sync', { logs: [log] });
         return response.data;
     },
 
@@ -91,7 +91,7 @@ export const gateAPI = {
             const publicUrl = await uploadToSupabase(visitorData.photo_url, 'visitors');
             if (publicUrl) visitorData.photo_url = publicUrl;
         }
-        const response = await apiClient.post('/mobile/gate/visitors', visitorData);
+        const response = await apiClient.post('/gate/visitors', visitorData);
         return response.data;
     },
 
@@ -99,7 +99,7 @@ export const gateAPI = {
      * Visitor Check-out
      */
     async visitorCheckOut(visitorId: number): Promise<any> {
-        const response = await apiClient.patch(`/mobile/gate/visitors/${visitorId}/checkout`);
+        const response = await apiClient.patch(`/gate/visitors/${visitorId}/checkout`);
         return response.data;
     },
 
@@ -107,7 +107,7 @@ export const gateAPI = {
      * Get today's visitor history
      */
     async getVisitorHistory(): Promise<any[]> {
-        const response = await apiClient.get('/mobile/gate/visitors/active');
+        const response = await apiClient.get('/gate/visitors/active');
         return response.data;
     }
 };

@@ -44,8 +44,8 @@ export default function GateDashboard() {
             setStudents(data);
             
             // Calculate stats from data
-            const inside = data.filter((s: any) => !s.gateStatus || s.gateStatus.status === 'present').length;
-            const exited = data.filter((s: any) => s.gateStatus?.status === 'checked_out').length;
+            const inside = data.filter((s: any) => s.gateStatus?.status === 'present').length;
+            const exited = data.filter((s: any) => !s.gateStatus || s.gateStatus.status === 'checked_out').length;
             
             setStats({
                 total: data.length,
@@ -185,7 +185,7 @@ export default function GateDashboard() {
                             <Text style={styles.emptyText}>No students found</Text>
                         </View>
                     ) : (
-                        filteredStudents.slice(0, searchQuery ? 50 : 10).map((student) => (
+                        filteredStudents.map((student) => (
                             <TouchableOpacity 
                                 key={student.id}
                                 onPress={() => router.push(`/(gate)/student/${student.id}`)}
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 11,
-        fontWeight: 'BOLD',
+        fontWeight: 'bold',
     },
     emptyState: {
         alignItems: 'center',
