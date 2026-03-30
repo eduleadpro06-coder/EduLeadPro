@@ -52,84 +52,87 @@ function drawReceipt(
     const lightBg: [number, number, number] = [240, 255, 240]; // Light mint green
 
 
-    // Card background - slightly narrower (185mm) and taller (132mm)
+    // Card background
     doc.setFillColor(...lightBg);
-    doc.roundedRect(12, y + 8, 186, 132, 5, 5, "F");
+    doc.roundedRect(10, y + 10, 190, 135, 5, 5, "F");
 
     doc.setDrawColor(...brandColor);
-    doc.roundedRect(12, y + 8, 186, 132, 5, 5);
+    doc.roundedRect(10, y + 10, 190, 135, 5, 5);
 
-    // Copy label - moved left to avoid clipping
+    // Copy label
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    doc.text(copyLabel, 193, y + 15, { align: "right" });
+    doc.text(copyLabel, 195, y + 18, { align: "right" });
 
     // Header
-    doc.setFontSize(14);
-    doc.text(data.organizationName || "Organization Name", 105, y + 25, { align: "center" });
+    doc.setFontSize(15);
+    doc.text(data.organizationName || "Organization Name", 105, y + 30, { align: "center" });
+
+    // Optional Tagline or spacer
+    // doc.setFontSize(9);
+    // doc.setFont("helvetica", "normal");
+    // doc.text("Education Management", 105, y + 36, { align: "center" }); 
 
     // Title
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("STUDENT FEE RECEIPT", 105, y + 42, { align: "center" });
+    doc.setFontSize(12);
+    doc.text("STUDENT FEE RECEIPT", 105, y + 50, { align: "center" });
 
     // Info row
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text(`Receipt No: ${receiptNo}`, 18, y + 55);
-    doc.text(`Date: ${data.date}`, 192, y + 55, { align: "right" });
+    doc.text(`Receipt No: ${receiptNo}`, 15, y + 62);
+    doc.text(`Date: ${data.date}`, 190, y + 62, { align: "right" });
 
     // Student details
-    doc.text("Student Name :", 18, y + 68);
-    doc.text(data.studentName, 55, y + 68);
+    doc.text("Student Name :", 15, y + 75);
+    doc.text(data.studentName, 55, y + 75);
 
-    doc.text("Class / Section :", 18, y + 78);
-    doc.text(data.className, 55, y + 78);
+    doc.text("Class / Section :", 15, y + 85);
+    doc.text(data.className, 55, y + 85);
 
-    doc.text("Payment Mode :", 18, y + 88);
-    doc.text(data.paymentMode, 55, y + 88);
+    doc.text("Payment Mode :", 15, y + 95);
+    doc.text(data.paymentMode, 55, y + 95);
 
     // Transaction ID
-    let currentY = y + 88;
     if (data.transactionId) {
-        currentY += 10;
-        doc.text("Transaction ID :", 18, currentY);
-        doc.text(data.transactionId, 55, currentY);
+        doc.text("Transaction ID :", 15, y + 105);
+        doc.text(data.transactionId, 55, y + 105);
     }
 
-    // Amount highlight - more padding
-    const amountY = currentY + 10;
+    // Amount highlight
+    const amountY = data.transactionId ? y + 113 : y + 103;
     doc.setFillColor(255, 255, 255);
-    doc.roundedRect(18, amountY, 174, 16, 4, 4, "F");
+    doc.roundedRect(15, amountY, 180, 18, 4, 4, "F");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text("Amount Paid", 24, amountY + 11);
-    doc.text(`Rs. ${data.amount || "0.00"}`, 186, amountY + 11, { align: "right" });
+    doc.text("Amount Paid", 20, amountY + 12);
+    doc.text(`Rs. ${data.amount}`, 185, amountY + 12, { align: "right" });
 
     // Footer
-    const footerY = amountY + 24;
+    const footerY = data.transactionId ? y + 136 : y + 126;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.text(`Academic Year: ${data.academicYear || "2026-27"}`, 18, footerY);
+    doc.text(`Academic Year: ${data.academicYear || "2026-27"}`, 15, footerY);
 
-    // Dynamic Footer Address
+    // Dynamic Footer Address — wrap long text to fit within receipt
     const footerAddress = data.organizationAddress
-        ? `${data.organizationName || "Organization"} | ${data.organizationAddress}`
+        ? `${data.organizationName || "Organization"}, ${data.organizationAddress} | Ph: ${data.organizationPhone || "N/A"}`
         : "Authorized Signatory";
 
     doc.setFontSize(7);
-    const maxWidth = 160; 
+    const maxWidth = 180; // receipt inner width (10 to 190)
     const addressLines = doc.splitTextToSize(footerAddress, maxWidth);
-    const addressStartY = footerY + 4;
+    const addressStartY = y + 132;
     addressLines.forEach((line: string, i: number) => {
         doc.text(line, 105, addressStartY + (i * 3.5), { align: "center" });
     });
 
     const afterAddressY = addressStartY + (addressLines.length * 3.5);
 
-    doc.setFontSize(7.5);
-    doc.setTextColor(180, 0, 0);
+    doc.setFontSize(8);
+    doc.setTextColor(200, 0, 0);
     doc.text(
         "This is a computer-generated receipt and does not require a signature.",
         105,
@@ -138,8 +141,7 @@ function drawReceipt(
     );
     doc.setTextColor(0, 0, 0);
 
-    doc.setFontSize(8);
-    doc.text("Authorized Signatory", 192, afterAddressY + 4, { align: "right" });
+    doc.text("Authorized Signatory", 185, afterAddressY + 8, { align: "right" });
 }
 
 
