@@ -48,7 +48,10 @@ export const useAuthStore = create<AuthStore>((set) => ({
      */
     login: async (phone: string, password: string) => {
         try {
-            set({ isLoading: true });
+            // DO NOT SET GLOBAL isLoading: true HERE! 
+            // Setting global isLoading unmounts the `<Slot />` in `_layout.tsx`, 
+            // which irreversibly kills the local state of `login.tsx`!
+            // The LoginScreen already maintains its own `loading` spinner for the login button.
 
             const response = await authAPI.login({ phone, password });
 
@@ -60,14 +63,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
                         user: response.user,
                         token: response.accessToken || (response as any).token,
                         isAuthenticated: false, // Keep false until password is changed
-                        isLoading: false,
                     });
                 } else {
                     set({
                         user: response.user,
                         token: response.accessToken || (response as any).token,
                         isAuthenticated: true,
-                        isLoading: false,
                     });
                 }
                 return response;
@@ -75,7 +76,6 @@ export const useAuthStore = create<AuthStore>((set) => ({
                 throw new Error('Login failed');
             }
         } catch (error) {
-            set({ isLoading: false });
             throw error;
         }
     },

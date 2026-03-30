@@ -70,14 +70,19 @@ export default function LoginScreen() {
 
         setLoading(true);
         try {
+            console.log('[LoginScreen] Calling authStore.login...');
             const response = await login(phone, password);
+            console.log('[LoginScreen] Got response from authStore:', JSON.stringify(response));
 
             if (response.requiresPasswordChange) {
+                console.log('[LoginScreen] setting showChangePassword = true!');
                 setShowChangePassword(true);
+            } else {
+                console.log('[LoginScreen] requiresPasswordChange was falsy!');
             }
             // Navigation happens automatically via _layout.tsx auth state if not showing modal
         } catch (error: any) {
-            console.error(error);
+            console.error('[LoginScreen] Error caught:', error);
             const errorMessage = error?.response?.data?.error || error?.message || 'Invalid credentials';
 
             // Check for network/connection related errors
@@ -133,128 +138,125 @@ export default function LoginScreen() {
 
     const logout = useAuthStore(state => state.logout);
 
+    console.log('[LoginScreen] RENDERING. showChangePassword state is:', showChangePassword);
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor={colors.primaryDark} />
 
-            {/* Background */}
-            <LinearGradient
-                colors={[colors.primaryDark, colors.primary, colors.background]}
-                locations={[0, 0.4, 1]}
-                style={styles.background}
-            />
+            {/* If Change Password is required, violently swap the screen to ONLY show this form! */}
+            {showChangePassword ? (
+                <View style={styles.changePasswordScreen}>
+                    <Text style={styles.modalTitle}>Security Update Required</Text>
+                    <Text style={styles.modalSub}>Please change your default password to continue.</Text>
 
-            {/* Header Content */}
-            <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-                <View style={styles.logoContainer}>
-                    <Image
-                        source={require('../../assets/logo.png')}
-                        style={styles.logoImage}
-                        resizeMode="cover"
+                    <PremiumInput
+                        label="New Password"
+                        placeholder="Min 4 characters"
+                        icon="lock"
+                        secureTextEntry
+                        value={newPassword}
+                        onChangeText={setNewPassword}
+                    />
+
+                    <PremiumInput
+                        label="Confirm Password"
+                        placeholder="Re-enter password"
+                        icon="check-circle"
+                        secureTextEntry
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                    />
+
+                    <View style={{ height: spacing.lg }} />
+
+                    <PremiumButton
+                        title="Update Password"
+                        onPress={handlePasswordChange}
+                        loading={changeLoading}
+                        icon="save"
                     />
                 </View>
-                <Text style={styles.title}>Parent Portal</Text>
-                <Text style={styles.subtitle}>Powered by Bloomdale Preschool | Dedicated to Excellence</Text>
-            </Animated.View>
+            ) : (
+                <>
+                    {/* Background */}
+                    <LinearGradient
+                        colors={[colors.primaryDark, colors.primary, colors.background]}
+                        locations={[0, 0.4, 1]}
+                        style={styles.background}
+                    />
 
-            {/* Login Form Card */}
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                style={styles.keyboardView}
-            >
-                <Animated.View style={{
-                    transform: [{ translateY: slideAnim }],
-                    opacity: fadeAnim,
-                    width: '100%',
-                    paddingHorizontal: spacing.lg
-                }}>
-                    <PremiumCard style={styles.card}>
-
-                        <Text style={styles.cardTitle}>Welcome Back</Text>
-                        <Text style={styles.cardSub}>Stay connected with your child's progress</Text>
-
-                        <View style={{ height: spacing.lg }} />
-
-                        <PremiumInput
-                            label="Mobile Number"
-                            placeholder="9876543210"
-                            icon="smartphone"
-                            value={phone}
-                            onChangeText={setPhone}
-                            keyboardType="phone-pad"
-                        />
-
-                        <PremiumInput
-                            label="Password"
-                            placeholder="Enter your password"
-                            icon="lock"
-                            secureTextEntry
-                            value={password}
-                            onChangeText={setPassword}
-                        />
-
-                        <View style={{ height: spacing.md }} />
-
-                        <PremiumButton
-                            title="Sign In"
-                            onPress={handleLogin}
-                            loading={loading}
-                            icon="log-in"
-                        />
-
-                        <View style={styles.divider}>
-                            <View style={styles.line} />
-                            <Text style={styles.orText}>Internal Access</Text>
-                            <View style={styles.line} />
+                    {/* Header Content */}
+                    <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
+                        <View style={styles.logoContainer}>
+                            <Image
+                                source={require('../../assets/logo.png')}
+                                style={styles.logoImage}
+                                resizeMode="cover"
+                            />
                         </View>
+                        <Text style={styles.title}>Parent Portal</Text>
+                        <Text style={styles.subtitle}>Powered by Bloomdale Preschool | Dedicated to Excellence</Text>
+                    </Animated.View>
 
-                        <Text style={styles.footerText}>
-                            Teachers & Staff members use your registered credentials.
-                        </Text>
-                    </PremiumCard>
-                </Animated.View>
-            </KeyboardAvoidingView>
+                    {/* Login Form Card */}
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                        style={styles.keyboardView}
+                    >
+                        <Animated.View style={{
+                            transform: [{ translateY: slideAnim }],
+                            opacity: fadeAnim,
+                            width: '100%',
+                            paddingHorizontal: spacing.lg
+                        }}>
+                            <PremiumCard style={styles.card}>
+                                <Text style={styles.cardTitle}>Welcome Back</Text>
+                                <Text style={styles.cardSub}>Stay connected with your child's progress</Text>
 
-            {/* Change Password Modal */}
-            <Modal
-                visible={showChangePassword}
-                animationType="slide"
-                transparent={true}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Reset Password</Text>
-                        <Text style={styles.modalSub}>For security, please change your default password.</Text>
+                                <View style={{ height: spacing.lg }} />
 
-                        <PremiumInput
-                            label="New Password"
-                            placeholder="Min 4 characters"
-                            icon="lock"
-                            secureTextEntry
-                            value={newPassword}
-                            onChangeText={setNewPassword}
-                        />
+                                <PremiumInput
+                                    label="Mobile Number"
+                                    placeholder="9876543210"
+                                    icon="smartphone"
+                                    value={phone}
+                                    onChangeText={setPhone}
+                                    keyboardType="phone-pad"
+                                />
 
-                        <PremiumInput
-                            label="Confirm Password"
-                            placeholder="Re-enter password"
-                            icon="check-circle"
-                            secureTextEntry
-                            value={confirmPassword}
-                            onChangeText={setConfirmPassword}
-                        />
+                                <PremiumInput
+                                    label="Password"
+                                    placeholder="Enter your password"
+                                    icon="lock"
+                                    secureTextEntry
+                                    value={password}
+                                    onChangeText={setPassword}
+                                />
 
-                        <View style={{ height: spacing.lg }} />
+                                <View style={{ height: spacing.md }} />
 
-                        <PremiumButton
-                            title="Update Password"
-                            onPress={handlePasswordChange}
-                            loading={changeLoading}
-                            icon="save"
-                        />
-                    </View>
-                </View>
-            </Modal>
+                                <PremiumButton
+                                    title="Sign In"
+                                    onPress={handleLogin}
+                                    loading={loading}
+                                    icon="log-in"
+                                />
+
+                                <View style={styles.divider}>
+                                    <View style={styles.line} />
+                                    <Text style={styles.orText}>Internal Access</Text>
+                                    <View style={styles.line} />
+                                </View>
+
+                                <Text style={styles.footerText}>
+                                    Teachers & Staff members use your registered credentials.
+                                </Text>
+                            </PremiumCard>
+                        </Animated.View>
+                    </KeyboardAvoidingView>
+                </>
+            )}
         </View>
     );
 }
@@ -263,6 +265,12 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
+    },
+    changePasswordScreen: {
+        flex: 1,
+        justifyContent: 'center',
+        padding: spacing.xl,
+        backgroundColor: colors.surface,
     },
     background: {
         position: 'absolute',
