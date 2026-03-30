@@ -47,92 +47,97 @@ function drawReceipt(
     data: FeeReceiptData,
     copyLabel: "PARENT COPY" | "OFFICE COPY"
 ) {
-    // Brand colors (Generic Green or pass as prop)
-    const brandColor: [number, number, number] = [0, 100, 0]; // Dark Green generic
-    const lightBg: [number, number, number] = [240, 255, 240]; // Light mint green
+    // Brand colors (Green theme as seen in screenshot)
+    const brandColor: [number, number, number] = [0, 100, 0];
+    const lightBg: [number, number, number] = [240, 255, 240];
 
-
-    // Card background
+    // Card background - standardized margins
     doc.setFillColor(...lightBg);
-    doc.roundedRect(10, y + 10, 190, 135, 5, 5, "F");
+    doc.roundedRect(12, y + 8, 186, 138, 5, 5, "F");
 
     doc.setDrawColor(...brandColor);
-    doc.roundedRect(10, y + 10, 190, 135, 5, 5);
+    doc.roundedRect(12, y + 8, 186, 138, 5, 5);
 
     // Copy label
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    doc.text(copyLabel, 195, y + 18, { align: "right" });
+    doc.text(copyLabel, 192, y + 15, { align: "right" });
 
     // Header
-    doc.setFontSize(15);
-    doc.text(data.organizationName || "Organization Name", 105, y + 30, { align: "center" });
-
-    // Optional Tagline or spacer
-    // doc.setFontSize(9);
-    // doc.setFont("helvetica", "normal");
-    // doc.text("Education Management", 105, y + 36, { align: "center" }); 
+    doc.setFontSize(14);
+    doc.text(data.organizationName || "Bloomdale Preschool & Daycare", 105, y + 26, { align: "center" });
 
     // Title
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("STUDENT FEE RECEIPT", 105, y + 50, { align: "center" });
+    doc.setFontSize(11);
+    doc.text("STUDENT FEE RECEIPT", 105, y + 42, { align: "center" });
 
     // Info row
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text(`Receipt No: ${receiptNo}`, 15, y + 62);
-    doc.text(`Date: ${data.date}`, 190, y + 62, { align: "right" });
+    doc.text(`Receipt No: ${receiptNo}`, 18, y + 55);
+    doc.text(`Date: ${data.date}`, 192, y + 55, { align: "right" });
 
     // Student details
-    doc.text("Student Name :", 15, y + 75);
-    doc.text(data.studentName, 55, y + 75);
+    doc.text("Student Name :", 18, y + 68);
+    doc.text(data.studentName, 55, y + 68);
 
-    doc.text("Class / Section :", 15, y + 85);
-    doc.text(data.className, 55, y + 85);
+    doc.text("Class / Section :", 18, y + 78);
+    doc.text(data.className, 55, y + 78);
 
-    doc.text("Payment Mode :", 15, y + 95);
-    doc.text(data.paymentMode, 55, y + 95);
+    doc.text("Payment Mode :", 18, y + 88);
+    doc.text(data.paymentMode, 55, y + 88);
 
     // Transaction ID
+    let currentY = y + 88;
     if (data.transactionId) {
-        doc.text("Transaction ID :", 15, y + 105);
-        doc.text(data.transactionId, 55, y + 105);
+        currentY += 10;
+        doc.text("Transaction ID :", 18, currentY);
+        doc.text(data.transactionId, 55, currentY);
     }
 
-    // Amount highlight
-    const amountY = data.transactionId ? y + 113 : y + 103;
+    // Amount highlight - centered white box
+    const amountY = currentY + 12;
     doc.setFillColor(255, 255, 255);
-    doc.roundedRect(15, amountY, 180, 18, 4, 4, "F");
+    doc.roundedRect(18, amountY, 174, 16, 4, 4, "F");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text("Amount Paid", 20, amountY + 12);
-    doc.text(`Rs. ${data.amount}`, 185, amountY + 12, { align: "right" });
+    doc.text("Amount Paid", 24, amountY + 10.5);
+
+    // Format amount with commas and 2 decimals
+    const formattedAmount = Number(data.amount || 0).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+    doc.text(`Rs. ${formattedAmount}`, 190, amountY + 10.5, { align: "right" });
 
     // Footer
-    const footerY = data.transactionId ? y + 136 : y + 126;
+    const footerY = amountY + 22;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.text(`Academic Year: ${data.academicYear || "2026-27"}`, 15, footerY);
+    doc.text(`Academic Year: ${data.academicYear || "2026-27"}`, 18, footerY);
 
-    // Dynamic Footer Address — wrap long text to fit within receipt
-    const footerAddress = data.organizationAddress
-        ? `${data.organizationName || "Organization"}, ${data.organizationAddress} | Ph: ${data.organizationPhone || "N/A"}`
-        : "Authorized Signatory";
+    // Dynamic Footer Address
+    const orgName = data.organizationName || "Bloomdale Preschool & Daycare";
+    const address = data.organizationAddress || "";
+    const phone = data.organizationPhone || "";
+
+    const footerAddress = `${orgName}${address ? `, ${address}` : ""}${phone ? ` | Ph: ${phone}` : ""}`;
 
     doc.setFontSize(7);
-    const maxWidth = 180; // receipt inner width (10 to 190)
+    const maxWidth = 165;
     const addressLines = doc.splitTextToSize(footerAddress, maxWidth);
-    const addressStartY = y + 132;
+    const addressStartY = footerY + 2; // Closer to academic year
+
     addressLines.forEach((line: string, i: number) => {
         doc.text(line, 105, addressStartY + (i * 3.5), { align: "center" });
     });
 
     const afterAddressY = addressStartY + (addressLines.length * 3.5);
 
-    doc.setFontSize(8);
-    doc.setTextColor(200, 0, 0);
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 100, 100);
     doc.text(
         "This is a computer-generated receipt and does not require a signature.",
         105,
@@ -141,7 +146,8 @@ function drawReceipt(
     );
     doc.setTextColor(0, 0, 0);
 
-    doc.text("Authorized Signatory", 185, afterAddressY + 8, { align: "right" });
+    doc.setFontSize(8);
+    doc.text("Authorized Signatory", 192, afterAddressY + 7, { align: "right" });
 }
 
 
@@ -174,10 +180,7 @@ export function generateFeeReceipt(
     const mode = options?.mode ?? 'download';
     const copyType = options?.copyType ?? (mode === 'print' ? 'both' : 'parent');
 
-    // A4 width is 210mm, height is 297mm. A half-page receipt takes ~148.5mm.
-    // Dynamically crop the bottom of the PDF if only the parent copy is generated!
-    const pageHeight = copyType === 'both' ? 297 : 148.5;
-    const doc = new jsPDF("p", "mm", [210, pageHeight]);
+    const doc = new jsPDF("p", "mm", "a4");;
 
     const receiptNo = existingReceiptNo || generateReceiptNo(data.academicYear);
 
