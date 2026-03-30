@@ -2511,9 +2511,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Fallback to 2026-27 to match client-side default if not configured
           const academicYear = configuredAcademicYear || "2026-27";
 
-          const orgPrefix = organization?.name
-            ? organization.name.substring(0, 3).toUpperCase()
-            : "ORG";
+          const orgPrefix = orgSettings.receiptPrefix
+            || (organization?.name ? organization.name.substring(0, 3).toUpperCase() : "ORG");
           const receiptNumber = `${orgPrefix} / ${academicYear}/${String(feePayment.id).padStart(6, '0')}`;
           console.log(`Generating persistent receipt number for payment ${feePayment.id}: ${receiptNumber}`);
 
@@ -2570,11 +2569,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const organization = payment.organizationId
             ? await storage.getOrganization(payment.organizationId)
             : null;
-          const orgPrefix = organization?.name
-            ? organization.name.substring(0, 3).toUpperCase()
-            : "ORG";
+          const bOrgSettings = (organization?.settings as any) || {};
+          const orgPrefix = bOrgSettings.receiptPrefix
+            || (organization?.name ? organization.name.substring(0, 3).toUpperCase() : "ORG");
           // Use payment ID to ensure uniqueness and persistence
-          const receiptNumber = `${orgPrefix}/${academicYear}/${String(payment.id).padStart(6, '0')}`;
+          const receiptNumber = `${orgPrefix} / ${academicYear}/${String(payment.id).padStart(6, '0')}`;
           await storage.updateFeePayment(payment.id, { receiptNumber });
           updatedCount++;
         }
@@ -2780,10 +2779,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Fallback to 2026-27 to match client-side default
           const academicYear = configuredAcademicYear || "2026-27";
 
-          const orgPrefix = organization?.name
-            ? organization.name.substring(0, 3).toUpperCase()
-            : "ORG";
-          const generatedReceiptNumber = `${orgPrefix}/${academicYear}/${String(payment.id).padStart(6, '0')}`;
+          const orgPrefix = orgSettings.receiptPrefix
+            || (organization?.name ? organization.name.substring(0, 3).toUpperCase() : "ORG");
+          const generatedReceiptNumber = `${orgPrefix} / ${academicYear}/${String(payment.id).padStart(6, '0')}`;
           const updatedPayment = await storage.updateFeePayment(payment.id, { receiptNumber: generatedReceiptNumber });
           if (updatedPayment) {
             registrationFeeData = updatedPayment;
@@ -2921,7 +2919,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const organization = organizationId ? await storage.getOrganization(organizationId) : null;
           const orgSettings = (organization?.settings as any) || {};
           const academicYear = orgSettings.academicYear || "2026-27";
-          const orgPrefix = organization?.name ? organization.name.substring(0, 3).toUpperCase() : "ORG";
+          const orgPrefix = orgSettings.receiptPrefix
+            || (organization?.name ? organization.name.substring(0, 3).toUpperCase() : "ORG");
           const receiptNumber = `${orgPrefix} / ${academicYear}/${String(result.payment.id).padStart(6, '0')}`;
           const updatedPayment = await storage.updateFeePayment(result.payment.id, { receiptNumber });
           if (updatedPayment) result.payment = updatedPayment as any;

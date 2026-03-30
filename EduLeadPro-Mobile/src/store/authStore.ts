@@ -53,12 +53,23 @@ export const useAuthStore = create<AuthStore>((set) => ({
             const response = await authAPI.login({ phone, password });
 
             if (response.success) {
-                set({
-                    user: response.user,
-                    token: response.accessToken || (response as any).token,
-                    isAuthenticated: true,
-                    isLoading: false,
-                });
+                // If password change is required, DON'T set isAuthenticated yet
+                // This keeps the user on the login screen to show the change password modal
+                if (response.requiresPasswordChange) {
+                    set({
+                        user: response.user,
+                        token: response.accessToken || (response as any).token,
+                        isAuthenticated: false, // Keep false until password is changed
+                        isLoading: false,
+                    });
+                } else {
+                    set({
+                        user: response.user,
+                        token: response.accessToken || (response as any).token,
+                        isAuthenticated: true,
+                        isLoading: false,
+                    });
+                }
                 return response;
             } else {
                 throw new Error('Login failed');

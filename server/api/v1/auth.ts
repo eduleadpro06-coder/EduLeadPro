@@ -6,7 +6,7 @@
 import express, { Request, Response } from 'express';
 import { supabase } from '../../supabase.js';
 import { generateAccessToken, generateRefreshToken, verifyToken } from '../../middleware/auth.js';
-import { comparePassword } from '../../utils/password.js'; // Security: bcrypt password comparison
+import { comparePassword, hashPassword } from '../../utils/password.js'; // Security: bcrypt password comparison
 
 const router = express.Router();
 
@@ -50,13 +50,26 @@ router.post('/login', async (req: Request, res: Response) => {
             if (isValidPassword) {
                 // Fetch organization name
                 let organizationName = 'School';
+                let organizationAddress = '';
+                let organizationPhone = '';
+                let organizationEmail = '';
+                let academicYear = '2026-27';
                 if (staff.organization_id) {
                     const { data: org } = await supabase
                         .from('organizations')
-                        .select('name')
+                        .select('name, address, phone, email, city, state, pincode, settings')
                         .eq('id', staff.organization_id)
                         .single();
-                    if (org) organizationName = org.name;
+                    if (org) {
+                        organizationName = org.name;
+                        organizationPhone = org.phone || '';
+                        organizationEmail = org.email || '';
+                        const orgSettings = (org.settings as any) || {};
+                        academicYear = orgSettings.academicYear || '2026-27';
+                        // Build full address
+                        const addrParts = [org.address, org.city, org.state, org.pincode].filter(Boolean);
+                        organizationAddress = addrParts.join(', ');
+                    }
                 }
 
                 const userRole = staff.role.toLowerCase();
@@ -90,7 +103,11 @@ router.post('/login', async (req: Request, res: Response) => {
                         email: staff.email,
                         role: normalizedRole,
                         organization_id: staff.organization_id,
-                        organizationName: organizationName
+                        organizationName: organizationName,
+                        organizationAddress: organizationAddress,
+                        organizationPhone: organizationPhone,
+                        organizationEmail: organizationEmail,
+                        academicYear: academicYear
                     },
                     requiresPasswordChange: false,
                     students: []
@@ -129,11 +146,15 @@ router.post('/login', async (req: Request, res: Response) => {
         let authenticated = false;
         let requiresChange = false;
 
-        // Use bcrypt for stored passwords, allow default '1234' for accounts without password
+        // Use bcrypt for stored passwords, allow default '1234' or their phone number for accounts without password
         if (storedPassword) {
             authenticated = await comparePassword(password, storedPassword);
-        } else if (password === '1234') {
+        } else if (password === '1234' || password === phone) {
             authenticated = true;
+        }
+
+        // Force password change if using default password (1234 or phone number)
+        if (authenticated && (password === '1234' || password === phone)) {
             requiresChange = true;
         }
 
@@ -145,14 +166,25 @@ router.post('/login', async (req: Request, res: Response) => {
 
         // Fetch Organization Name
         let organizationName = 'School';
+        let organizationAddress = '';
+        let organizationPhone = '';
+        let organizationEmail = '';
+        let academicYear = '2026-27';
         if (parentRecord.organization_id) {
             const { data: org } = await supabase
                 .from('organizations')
-                .select('name')
+                .select('name, address, phone, email, city, state, pincode, settings')
                 .eq('id', parentRecord.organization_id)
                 .single();
             if (org) {
                 organizationName = org.name;
+                organizationPhone = org.phone || '';
+                organizationEmail = org.email || '';
+                const orgSettings = (org.settings as any) || {};
+                academicYear = orgSettings.academicYear || '2026-27';
+                // Build full address
+                const addrParts = [org.address, org.city, org.state, org.pincode].filter(Boolean);
+                organizationAddress = addrParts.join(', ');
             }
         }
 
@@ -209,6 +241,10 @@ router.post('/login', async (req: Request, res: Response) => {
                 role: 'parent',
                 organization_id: parentRecord.organization_id,
                 organizationName: organizationName,
+                organizationAddress: organizationAddress,
+                organizationPhone: organizationPhone,
+                organizationEmail: organizationEmail,
+                academicYear: academicYear,
                 children: children
             },
             requiresPasswordChange: requiresChange,
@@ -248,9 +284,11 @@ router.post('/change-password', async (req: Request, res: Response) => {
 
         const ids = leads.map(l => l.id);
 
+        const hashedPassword = await hashPassword(newPassword);
+
         const { error: updateError } = await supabase
             .from('leads')
-            .update({ app_password: newPassword })
+            .update({ app_password: hashedPassword })
             .in('id', ids);
 
         if (updateError) throw updateError;

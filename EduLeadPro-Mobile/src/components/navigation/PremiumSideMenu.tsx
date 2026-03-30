@@ -92,7 +92,7 @@ export default function PremiumSideMenu({ isOpen, onClose }: PremiumSideMenuProp
             title: 'MAIN MENU',
             items: [
                 { icon: 'grid-outline', label: 'Dashboard', route: '/(parent)', description: 'Daily overview' },
-                { icon: 'bus-outline', label: 'School Bus', route: '/(parent)/bus-tracking', description: 'Real-time status' },
+                // { icon: 'bus-outline', label: 'School Bus', route: '/(parent)/bus-tracking', description: 'Real-time status' },
                 { icon: 'card-outline', label: 'Fees & Payments', route: '/(parent)/fees', description: 'Due status' },
             ]
         },

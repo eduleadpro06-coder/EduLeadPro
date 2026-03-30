@@ -27,7 +27,7 @@ export interface FeeReceiptData {
    (Use DB in production)
 ============================ */
 
-export function generateReceiptNo(academicYear: string = "2025-26"): string {
+export function generateReceiptNo(academicYear: string = "2026-27"): string {
     let counter = Number(localStorage.getItem("fee_receipt_no")) || 0;
     counter++;
 
@@ -114,7 +114,7 @@ function drawReceipt(
     const footerY = data.transactionId ? y + 136 : y + 126;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.text(`Academic Year: ${data.academicYear || "2025-26"}`, 15, footerY);
+    doc.text(`Academic Year: ${data.academicYear || "2026-27"}`, 15, footerY);
 
     // Dynamic Footer Address — wrap long text to fit within receipt
     const footerAddress = data.organizationAddress

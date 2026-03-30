@@ -176,7 +176,6 @@ export default function ParentHomeScreen() {
                     <Ionicons name="grid-outline" size={26} color="#1F2937" />
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerSubtitle}>{(user as any)?.organizationName || 'EduConnect'}</Text>
                     <Text style={styles.headerTitle}>Overview</Text>
                 </View>
                 <TouchableOpacity style={styles.headerButton} onPress={() => router.push('/(parent)/notifications')}>
@@ -246,12 +245,12 @@ export default function ParentHomeScreen() {
                         <Text style={styles.actionLabel}>Activities</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.actionItem} onPress={handleTrackBus}>
+                    {/* <TouchableOpacity style={styles.actionItem} onPress={handleTrackBus}>
                         <View style={[styles.actionIcon, { backgroundColor: '#F3F4F6' }]}>
                             <MaterialCommunityIcons name="bus-school" size={28} color="#4B5563" />
                         </View>
                         <Text style={styles.actionLabel}>School Bus</Text>
-                    </TouchableOpacity>
+                    </TouchableOpacity> */}
 
                     <TouchableOpacity style={styles.actionItem} onPress={handleFees}>
                         <View style={[styles.actionIcon, { backgroundColor: '#FEE2E2' }]}>
@@ -377,14 +376,16 @@ const styles = StyleSheet.create({
     },
     headerTitleContainer: {
         alignItems: 'center',
+        flex: 1, // allow it to take available space
+        paddingHorizontal: 10, // prevent it from touching icons
     },
     headerSubtitle: {
         fontSize: 11,
         fontWeight: '800',
         color: '#64748B', // Slate 500
         textTransform: 'uppercase',
-        letterSpacing: 2.5, // Increased spacing for premium feel
-        marginBottom: -2,
+        letterSpacing: 1.5, // Reduced slightly to save space
+        marginBottom: 2, // Removed negative margin to add breathing room
     },
     headerTitle: {
         fontSize: 20,
@@ -514,8 +515,8 @@ const styles = StyleSheet.create({
     },
     actionsContainerFixed: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg + 10,
+        justifyContent: 'space-evenly', // Changed to space-evenly to better space the 2 remaining items
+        paddingHorizontal: spacing.lg,
         marginBottom: spacing.xl,
         paddingBottom: 10,
     },

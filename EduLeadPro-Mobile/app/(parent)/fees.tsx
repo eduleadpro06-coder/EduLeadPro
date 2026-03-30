@@ -7,7 +7,8 @@ import {
     ActivityIndicator,
     TouchableOpacity,
     Dimensions,
-    RefreshControl
+    RefreshControl,
+    Alert
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ import { useAuthStore } from '../../src/store/authStore';
 import { api } from '../../services/api';
 import PremiumCard from '../../src/components/ui/PremiumCard';
 import { colors, spacing, typography, shadows } from '../../src/theme';
+import { generateMobileFeeReceipt, type FeeReceiptData } from '../../src/utils/receiptGenerator';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +29,7 @@ export default function ParentFeesScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [fees, setFees] = useState<any>(null);
+    const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
     const currentChild = user?.children?.[0];
 
@@ -55,6 +58,33 @@ export default function ParentFeesScreen() {
 
     const formatCurrency = (amount: number) => {
         return '₹' + Math.round(amount).toLocaleString('en-IN');
+    };
+
+    const handleDownloadReceipt = async (payment: any) => {
+        try {
+            setDownloadingId(payment.id);
+            // Use the organization's configured academic year or match web default
+            const academicYear = (user as any)?.academicYear || '2026-27';
+            const receiptData: FeeReceiptData = {
+                studentName: currentChild?.student_name || (currentChild as any)?.name || 'Student',
+                className: currentChild?.class || 'N/A',
+                paymentMode: payment.mode || 'N/A',
+                amount: Math.round(payment.amount).toLocaleString('en-IN'),
+                date: formatDate(payment.date),
+                transactionId: payment.transactionId || undefined,
+                receiptNumber: payment.receiptNumber || 'N/A',
+                organizationName: (user as any)?.organizationName || 'EduConnect',
+                organizationPhone: (user as any)?.organizationPhone,
+                organizationAddress: (user as any)?.organizationAddress,
+                academicYear,
+            };
+            await generateMobileFeeReceipt(receiptData);
+        } catch (error) {
+            console.error('Receipt download error:', error);
+            Alert.alert('Error', 'Failed to generate receipt. Please try again.');
+        } finally {
+            setDownloadingId(null);
+        }
     };
 
     const formatDate = (dateString: string) => {
@@ -105,7 +135,6 @@ export default function ParentFeesScreen() {
                     <Feather name="arrow-left" size={24} color="#1F2937" />
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerSubtitle}>{(user as any)?.organizationName || 'EduConnect'}</Text>
                     <Text style={styles.headerTitle}>Fees & Payments</Text>
                 </View>
                 <View style={{ width: 44 }} />
@@ -225,9 +254,22 @@ export default function ParentFeesScreen() {
                                         </View>
                                         <View style={{ alignItems: 'flex-end' }}>
                                             <Text style={styles.paymentAmount}>{formatCurrency(p.amount)}</Text>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                                                <Ionicons name="checkmark-circle" size={12} color={colors.success} />
-                                                <Text style={{ fontSize: 10, color: colors.success, marginLeft: 2, fontWeight: '700' }}>PAID</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                    <Ionicons name="checkmark-circle" size={12} color={colors.success} />
+                                                    <Text style={{ fontSize: 10, color: colors.success, marginLeft: 2, fontWeight: '700' }}>PAID</Text>
+                                                </View>
+                                                <TouchableOpacity
+                                                    onPress={() => handleDownloadReceipt(p)}
+                                                    style={styles.downloadBtn}
+                                                    disabled={downloadingId === p.id}
+                                                >
+                                                    {downloadingId === p.id ? (
+                                                        <ActivityIndicator size="small" color={colors.primary} />
+                                                    ) : (
+                                                        <Feather name="download" size={14} color={colors.primary} />
+                                                    )}
+                                                </TouchableOpacity>
                                             </View>
                                         </View>
                                     </TouchableOpacity>
@@ -499,4 +541,12 @@ const styles = StyleSheet.create({
     },
     emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 100 },
     emptyText: { color: colors.textTertiary, marginTop: 16, fontSize: 16, fontWeight: '600' },
+    downloadBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: colors.primary + '15',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
 });

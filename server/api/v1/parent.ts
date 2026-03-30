@@ -465,7 +465,7 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
         // 2. Get Payment History & Calculate Paid Amount
         const { data: payments, error: paymentsError } = await supabase
             .from('fee_payments')
-            .select('id, amount, payment_date, payment_mode, receipt_number, status, installment_number, payment_category')
+            .select('id, amount, payment_date, payment_mode, receipt_number, transaction_id, status, installment_number, payment_category')
             .eq('lead_id', childId)
             .eq('status', 'completed')
             .order('payment_date', { ascending: false });
@@ -514,6 +514,7 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
             date: p.payment_date,
             mode: p.payment_mode,
             receiptNumber: p.receipt_number,
+            transactionId: p.transaction_id,
             status: p.status,
             installmentNumber: p.installment_number,
             paymentCategory: p.payment_category

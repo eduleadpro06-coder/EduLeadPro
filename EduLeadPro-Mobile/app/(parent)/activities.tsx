@@ -201,7 +201,6 @@ export default function ActivitiesScreen() {
                     <Feather name="arrow-left" size={24} color="#1F2937" />
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerSubtitle}>{(user as any)?.organizationName || 'EduConnect'}</Text>
                     <Text style={styles.headerTitle}>Activities & Calendar</Text>
                 </View>
                 <View style={{ width: 44 }} />
