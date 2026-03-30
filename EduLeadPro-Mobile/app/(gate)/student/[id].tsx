@@ -113,7 +113,7 @@ export default function StudentGateDetail() {
                 </View>
                 <Text style={styles.studentName}>{student.name}</Text>
                 <Text style={styles.studentDetails}>{student.class} - {student.section}</Text>
-                {student.roll_number && <Text style={styles.rollNo}>Roll No: {student.roll_number}</Text>}
+                <Text style={styles.rollNo}>ID: {student.id}</Text>
             </View>
 
             {/* Quick Toggle Status */}

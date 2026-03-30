@@ -20,8 +20,8 @@ export default function CustomDrawerContent(props: any) {
     };
 
     const isTeacher = user?.role === 'teacher';
-    const activeRoute = isTeacher ? '/(teacher)' : '/(parent)';
-
+    const isSecurity = user?.role === 'security' || user?.role === 'support_staff';
+    
     const teacherItems = [
         { label: 'Dashboard', icon: 'home', route: '/(teacher)' },
         { label: 'My Tasks', icon: 'clipboard', route: '/(teacher)/tasks' },
@@ -39,7 +39,14 @@ export default function CustomDrawerContent(props: any) {
         { label: 'Chat', icon: 'message-circle', route: '/(parent)/chat' },
     ];
 
-    const menuItems = isTeacher ? teacherItems : parentItems;
+    const securityItems = [
+        { label: 'Gate Dashboard', icon: 'shield', route: '/(gate)' },
+        { label: 'QR Scanner', icon: 'maximize', route: '/(gate)/scanner' },
+        { label: 'Visitor Log', icon: 'user-plus', route: '/(gate)/visitor-form' },
+        { label: 'Entry Logs', icon: 'list', route: '/(gate)/history' },
+    ];
+
+    const menuItems = isSecurity ? securityItems : (isTeacher ? teacherItems : parentItems);
 
     return (
         <View style={{ flex: 1 }}>
@@ -53,7 +60,7 @@ export default function CustomDrawerContent(props: any) {
                         <Feather name="user" size={32} color="#111827" />
                     </View>
                     <View style={{ marginLeft: 16 }}>
-                        <Text style={styles.userName}>{user?.name || (isTeacher ? 'Teacher' : 'Parent')}</Text>
+                        <Text style={styles.userName}>{user?.name || (isSecurity ? 'Gate Security' : isTeacher ? 'Teacher' : 'Parent')}</Text>
                         <Text style={styles.userRole}>{user?.role?.toUpperCase() || 'USER'}</Text>
                     </View>
                 </View>
@@ -63,7 +70,7 @@ export default function CustomDrawerContent(props: any) {
             <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
                 <View style={styles.menuContainer}>
                     {menuItems.map((item, index) => {
-                        const isActive = pathname === item.route && item.label !== 'My Students'; // Simple active check
+                        const isActive = pathname === item.route;
                         return (
                             <TouchableOpacity
                                 key={index}
@@ -96,7 +103,6 @@ export default function CustomDrawerContent(props: any) {
                     <Feather name="log-out" size={20} color="#EF4444" />
                     <Text style={styles.logoutText}>Sign Out</Text>
                 </TouchableOpacity>
-                <Text style={styles.versionText}>v2.0.0 Premium</Text>
             </View>
         </View>
     );

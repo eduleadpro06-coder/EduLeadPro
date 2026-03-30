@@ -29,25 +29,33 @@ router.get('/students', async (req: Request, res: Response) => {
         // Fetch enrolled students
         let query = supabase
             .from('leads')
-            .select('id, name, class, section, roll_number, father_name, mother_name, phone')
+            .select('id, name, class, section, father_first_name, father_last_name, mother_first_name, mother_last_name, phone')
             .eq('organization_id', organizationId)
             .eq('status', 'enrolled');
 
         if (search) {
-            query = query.or(`name.ilike.%${search}%,roll_number.ilike.%${search}%`);
+            query = query.ilike('name', `%${search}%`);
         }
 
         const { data: students, error } = await query.limit(1000);
 
         if (error) throw error;
 
-        // Fetch today's gate logs to show current status
-        const today = new Date().toISOString().split('T')[0];
+        // Fetch today's gate logs to show current status - Use IST
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        
         const { data: todayLogs } = await supabase
             .from('student_gate_logs')
             .select('*')
             .eq('organization_id', organizationId)
             .eq('date', today);
+
+        // Fetch active visitors count
+        const { count: activeVisitors } = await supabase
+            .from('visitor_logs')
+            .select('*', { count: 'exact', head: true })
+            .eq('organization_id', organizationId)
+            .eq('status', 'inside');
 
         // Map status to students
         const logsMap = new Map((todayLogs || []).map(log => [log.student_id, log]));
@@ -59,11 +67,61 @@ router.get('/students', async (req: Request, res: Response) => {
 
         res.json({
             success: true,
-            data: results
+            data: results,
+            stats: {
+                totalStudents: results.length,
+                insideStudents: (todayLogs || []).filter(l => l.status === 'present').length,
+                activeVisitors: activeVisitors || 0
+            }
         });
     } catch (error) {
         console.error('[Gate API] Search students error:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch students' });
+    }
+});
+
+/**
+ * GET /api/v1/mobile/gate/students/:id
+ * Get specific student details for gate
+ */
+router.get('/students/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const organizationId = req.user!.organizationId;
+        const { supabase } = await import('../../supabase.js');
+
+        // 1. Fetch student details
+        const { data: student, error: studentError } = await supabase
+            .from('leads')
+            .select('id, name, class, section, father_first_name, father_last_name, mother_first_name, mother_last_name, phone')
+            .eq('id', id)
+            .eq('organization_id', organizationId)
+            .single();
+
+        if (studentError) throw studentError;
+        if (!student) {
+            return res.status(404).json({ success: false, message: 'Student not found' });
+        }
+
+        // 2. Fetch today's gate log
+        const today = new Date().toISOString().split('T')[0];
+        const { data: gateStatus } = await supabase
+            .from('student_gate_logs')
+            .select('*')
+            .eq('student_id', id)
+            .eq('date', today)
+            .maybeSingle();
+
+        res.json({
+            success: true,
+            data: {
+                ...student,
+                gateStatus: gateStatus || null
+            }
+        });
+    } catch (error) {
+        console.error('[Gate API] Get student details error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch student details' });
     }
 });
 
@@ -85,8 +143,21 @@ router.post('/sync', async (req: Request, res: Response) => {
         const results = [];
 
         for (const log of logs) {
-            const { studentId, type, timestamp, pickupDetails, offlineId } = log;
-            const logDate = new Date(timestamp).toISOString().split('T')[0];
+            const studentId = log.student_id || log.studentId;
+            const type = log.type || log.logType;
+            const timestamp = log.timestamp;
+            const offlineId = log.offline_id || log.offlineId;
+            const pickupDetails = log.pickup_details || log.pickupDetails;
+            const photoUrl = log.photo_url || log.photoUrl;
+
+            // Prepare data for Supabase (snake_case columns)
+            const date = timestamp 
+                ? new Date(timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) 
+                : new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+            const logType = type; // 'check_in' or 'check_out'
+            const checkInTime = log.check_in_time || log.checkInTime || (logType === 'check_in' ? timestamp || new Date().toISOString() : null);
+            const checkOutTime = log.check_out_time || log.checkOutTime || (logType === 'check_out' ? timestamp || new Date().toISOString() : null);
 
             // 1. Check if log already exists (idempotency via offlineId)
             if (offlineId) {
@@ -94,7 +165,7 @@ router.post('/sync', async (req: Request, res: Response) => {
                     .from('student_gate_logs')
                     .select('id')
                     .eq('offline_id', offlineId)
-                    .single();
+                    .maybeSingle(); // Use maybeSingle to avoid 406 on no match
                 
                 if (existing) {
                     results.push({ offlineId, status: 'synced', id: existing.id });
@@ -107,27 +178,31 @@ router.post('/sync', async (req: Request, res: Response) => {
                 .from('student_gate_logs')
                 .select('*')
                 .eq('student_id', studentId)
-                .eq('date', logDate)
-                .single();
+                .eq('date', date)
+                .maybeSingle();
 
-            let updateData: any = {
+            const entryData: any = {
                 organization_id: organizationId,
                 student_id: studentId,
-                date: logDate,
+                date: date,
                 recorded_by: staffId,
-                offline_id: offlineId
+                offline_id: offlineId,
+                status: logType === 'check_in' ? 'present' : 'checked_out',
             };
 
-            if (type === 'check-in') {
-                updateData.check_in_time = timestamp;
-                updateData.status = 'present';
-            } else if (type === 'check-out') {
-                updateData.check_out_time = timestamp;
-                updateData.status = 'checked_out';
+            if (logType === 'check_in') {
+                entryData.check_in_time = checkInTime;
+            } else if (logType === 'check_out') {
+                entryData.check_out_time = checkOutTime;
+                
+                // Pickup logic (flat structure or nested)
                 if (pickupDetails) {
-                    updateData.pickup_person_type = pickupDetails.type;
-                    updateData.pickup_person_name = pickupDetails.name;
-                    updateData.pickup_photo_url = pickupDetails.photoUrl;
+                    entryData.pickup_person_type = pickupDetails.type || pickupDetails.person_type;
+                    entryData.pickup_person_name = pickupDetails.name || pickupDetails.person_name;
+                    entryData.pickup_photo_url = pickupDetails.photoUrl || pickupDetails.photo_url;
+                } else if (log.pickup_verification) {
+                    entryData.pickup_person_type = log.pickup_verification;
+                    entryData.pickup_photo_url = photoUrl;
                 }
             }
 
@@ -135,7 +210,7 @@ router.post('/sync', async (req: Request, res: Response) => {
             if (currentEntry) {
                 const { data } = await supabase
                     .from('student_gate_logs')
-                    .update(updateData)
+                    .update(entryData)
                     .eq('id', currentEntry.id)
                     .select()
                     .single();
@@ -143,13 +218,13 @@ router.post('/sync', async (req: Request, res: Response) => {
             } else {
                 const { data } = await supabase
                     .from('student_gate_logs')
-                    .insert(updateData)
+                    .insert(entryData)
                     .select()
                     .single();
                 finalLog = data;
             }
 
-            results.push({ offlineId, status: 'created', id: finalLog?.id });
+            results.push({ offlineId, status: currentEntry ? 'updated' : 'created', id: finalLog?.id });
 
             // 3. Trigger push notification to parents
             try {
@@ -160,9 +235,10 @@ router.post('/sync', async (req: Request, res: Response) => {
                     .single();
 
                 if (studentInfo?.user_id) {
-                    const actionVerb = type === 'check-in' ? 'arrived at' : 'left';
-                    const pickupText = type === 'check-out' && pickupDetails 
-                        ? ` Picked up by ${pickupDetails.type}.` 
+                    const isCheckIn = logType === 'check_in' || logType === 'check-in';
+                    const actionVerb = isCheckIn ? 'arrived at' : 'left';
+                    const pickupText = !isCheckIn && pickupDetails 
+                        ? ` Picked up by ${pickupDetails.type || pickupDetails.person_type}.` 
                         : '';
                     
                     await supabase.from('notifications').insert({
@@ -200,7 +276,8 @@ router.post('/sync', async (req: Request, res: Response) => {
  */
 router.post('/visitors', async (req: Request, res: Response) => {
     try {
-        const { name, phone, purpose, photoUrl } = req.body;
+        const { name, phone, purpose, photoUrl, photo_url } = req.body;
+        const finalPhotoUrl = photoUrl || photo_url;
         const organizationId = req.user!.organizationId;
         const staffId = req.user!.userId;
 
@@ -213,7 +290,7 @@ router.post('/visitors', async (req: Request, res: Response) => {
                 visitor_name: name,
                 visitor_phone: phone,
                 visitor_purpose: purpose,
-                visitor_photo_url: photoUrl,
+                visitor_photo_url: finalPhotoUrl,
                 status: 'inside',
                 recorded_by: staffId,
                 check_in_time: new Date().toISOString()
@@ -283,6 +360,86 @@ router.get('/visitors/active', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('[Gate API] Fetch active visitors error:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch visitors' });
+    }
+});
+
+/**
+ * GET /api/v1/gate/history/students
+ * Get historical check-in/out logs for students
+ */
+router.get('/history/students', async (req: Request, res: Response) => {
+    try {
+        const organizationId = req.user!.organizationId;
+        const { startDate, endDate, search } = req.query;
+        const { supabase } = await import('../../supabase.js');
+
+        let query = supabase
+            .from('student_gate_logs')
+            .select(`
+                *,
+                student:leads(name, class, section, phone),
+                recorder:staff(name)
+            `)
+            .eq('organization_id', organizationId)
+            .order('date', { ascending: false })
+            .order('check_in_time', { ascending: false });
+
+        if (startDate) query = query.gte('date', startDate);
+        if (endDate) query = query.lte('date', endDate);
+        
+        const { data, error } = await query.limit(1000);
+        if (error) throw error;
+
+        // Apply search filter manually if needed or via supabase ilike on joined field
+        // Supabase join filtering is tricky, so we'll do it in memory for now given the limit
+        let filtered = data || [];
+        if (search) {
+            const s = (search as string).toLowerCase();
+            filtered = filtered.filter((log: any) => 
+                log.student?.name?.toLowerCase().includes(s) || 
+                log.student?.phone?.includes(s)
+            );
+        }
+
+        res.json({ success: true, data: filtered });
+    } catch (error) {
+        console.error('[Gate API] Student history error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch student history' });
+    }
+});
+
+/**
+ * GET /api/v1/gate/history/visitors
+ * Get historical visitor logs
+ */
+router.get('/history/visitors', async (req: Request, res: Response) => {
+    try {
+        const organizationId = req.user!.organizationId;
+        const { startDate, endDate, search } = req.query;
+        const { supabase } = await import('../../supabase.js');
+
+        let query = supabase
+            .from('visitor_logs')
+            .select(`
+                *,
+                recorder:staff(name)
+            `)
+            .eq('organization_id', organizationId)
+            .order('check_in_time', { ascending: false });
+
+        if (startDate) query = query.gte('check_in_time', startDate);
+        if (endDate) query = query.lte('check_in_time', endDate);
+        if (search) {
+            query = query.or(`visitor_name.ilike.%${search}%,visitor_phone.ilike.%${search}%`);
+        }
+
+        const { data, error } = await query.limit(1000);
+        if (error) throw error;
+
+        res.json({ success: true, data: data || [] });
+    } catch (error) {
+        console.error('[Gate API] Visitor history error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch visitor history' });
     }
 });
 

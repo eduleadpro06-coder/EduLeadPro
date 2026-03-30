@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -11,54 +11,78 @@ import {
     TextInput,
     StatusBar,
     Image,
+    Dimensions,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
-import { colors, spacing, shadows } from '../../src/theme';
+import { colors, spacing, shadows, typography } from '../../src/theme';
 import PremiumCard from '../../src/components/ui/PremiumCard';
+import PremiumDrawer from '../../src/components/ui/PremiumDrawer';
 import { api } from '../../src/services/api';
+
+const { width } = Dimensions.get('window');
 
 export default function GateDashboard() {
     const router = useRouter();
     const { user, logout } = useAuthStore();
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [drawerVisible, setDrawerVisible] = useState(false);
     const [stats, setStats] = useState({
         total: 0,
         inside: 0,
-        exited: 0,
         visitors: 0
     });
     const [searchQuery, setSearchQuery] = useState('');
     const [students, setStudents] = useState<any[]>([]);
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
     const loadData = async () => {
         setLoading(true);
         try {
-            const data = await api.getGateStudents('');
-            setStudents(data);
+            const response = await api.getGateStudents('');
             
-            // Calculate stats from data
-            const inside = data.filter((s: any) => s.gateStatus?.status === 'present').length;
-            const exited = data.filter((s: any) => !s.gateStatus || s.gateStatus.status === 'checked_out').length;
-            
-            setStats({
-                total: data.length,
-                inside,
-                exited,
-                visitors: 0 // Fetch visitors separately later
-            });
+            if (response && response.data) {
+                setStudents(response.data);
+                
+                if (response.stats) {
+                    setStats({
+                        total: response.stats.totalStudents || response.data.length,
+                        inside: response.stats.insideStudents || 0,
+                        visitors: response.stats.activeVisitors || 0
+                    });
+                } else {
+                    // Fallback to manual calculation if stats missing
+                    const inside = response.data.filter((s: any) => s.gateStatus?.status === 'present').length;
+                    setStats({
+                        total: response.data.length,
+                        inside,
+                        visitors: 0
+                    });
+                }
+            } else if (Array.isArray(response)) {
+                // Legacy support if API returns array directly
+                setStudents(response);
+                const inside = response.filter((s: any) => s.gateStatus?.status === 'present').length;
+                setStats({
+                    total: response.length,
+                    inside,
+                    visitors: 0
+                });
+            }
         } catch (error) {
             console.error('Gate data error:', error);
         } finally {
             setLoading(false);
         }
     };
+
+    // Auto-refresh when screen comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            loadData();
+        }, [])
+    );
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -67,8 +91,8 @@ export default function GateDashboard() {
     };
 
     const filteredStudents = students.filter(s =>
-        searchQuery ? (s.name.toLowerCase().includes(searchQuery.toLowerCase()) || (s.roll_number && s.roll_number.includes(searchQuery))) : true
-    );
+        searchQuery ? (s.name.toLowerCase().includes(searchQuery.toLowerCase()) || (s.id && s.id.toString().includes(searchQuery))) : true
+    ).slice(0, 50); // Limit display for performance
 
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -79,135 +103,136 @@ export default function GateDashboard() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
             
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerTop}>
-                    <View>
-                        <Text style={styles.greetingText}>{getGreeting()}</Text>
-                        <Text style={styles.userNameText}>{user?.name || 'Security'}</Text>
-                        <View style={styles.roleBadge}>
-                            <Text style={styles.roleText}>{user?.role === 'security' ? 'Security' : 'Support Staff'}</Text>
+            {/* Premium Header */}
+            <View style={styles.headerContainer}>
+                <View style={styles.headerContent}>
+                    <View style={{ flex: 1 }}>
+                        <TouchableOpacity style={styles.menuBtn} onPress={() => setDrawerVisible(true)}>
+                            <Ionicons name="grid-outline" size={26} color={colors.textPrimary} />
+                        </TouchableOpacity>
+                        <View style={{ marginTop: 12 }}>
+                            <Text style={styles.dateText}>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+                            <Text style={styles.greetingText}>{getGreeting()}</Text>
+                            <Text style={styles.userNameText}>{user?.role === 'security' ? 'Security Staff' : 'Support Staff'}</Text>
                         </View>
                     </View>
-                    <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-                        <Feather name="log-out" size={20} color="#fff" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Search Bar */}
-                <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color={colors.textSecondary} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search student by name or roll no..."
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        placeholderTextColor={colors.textSecondary}
-                    />
-                    {searchQuery !== '' && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
-                        </TouchableOpacity>
-                    )}
                 </View>
             </View>
 
-            <ScrollView
+            <ScrollView 
                 style={styles.content}
                 contentContainerStyle={styles.scrollContent}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             >
-                {/* Stats Summary */}
-                <View style={styles.statsRow}>
-                    <View style={[styles.statBox, { backgroundColor: '#EEF2FF' }]}>
-                        <Text style={[styles.statValue, { color: colors.primary }]}>{stats.inside}</Text>
-                        <Text style={styles.statLabel}>Inside</Text>
-                    </View>
-                    <View style={[styles.statBox, { backgroundColor: '#ECFDF5' }]}>
-                        <Text style={[styles.statValue, { color: colors.success }]}>{stats.exited}</Text>
-                        <Text style={styles.statLabel}>Exited</Text>
-                    </View>
-                    <View style={[styles.statBox, { backgroundColor: '#FFFBEB' }]}>
-                        <Text style={[styles.statValue, { color: colors.warning }]}>{stats.visitors}</Text>
-                        <Text style={styles.statLabel}>Visitors</Text>
-                    </View>
+                {/* Stats Grid - Premium 3-column Layout */}
+                <View style={styles.statsGrid}>
+                    {[
+                        { label: 'Total', value: stats.total, icon: 'users', color: colors.primary, bg: '#EEF2FF' },
+                        { label: 'Inside', value: stats.inside, icon: 'user-check', color: colors.success, bg: '#ECFDF5' },
+                        { label: 'Visitors', value: stats.visitors, icon: 'user-plus', color: colors.warning, bg: '#FFFBEB' },
+                    ].map((stat, i) => (
+                        <View key={i} style={[styles.statCard, { backgroundColor: stat.bg }]}>
+                            <View style={styles.statIconBox}>
+                                <Feather name={stat.icon as any} size={16} color={stat.color} />
+                            </View>
+                            <Text style={styles.statValue}>{stat.value}</Text>
+                            <Text style={styles.statLabel}>{stat.label}</Text>
+                        </View>
+                    ))}
                 </View>
 
-                {/* Quick Actions */}
+                {/* Quick Actions Grid */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Gate Actions</Text>
-                    <View style={styles.actionsGrid}>
+                    <Text style={styles.sectionTitle}>Gate Operations</Text>
+                    <View style={styles.quickActionsGrid}>
                         <TouchableOpacity 
-                            style={styles.actionItem}
+                            style={[styles.actionCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}
                             onPress={() => router.push('/(gate)/scanner')}
                         >
-                            <View style={[styles.actionIcon, { backgroundColor: colors.primary }]}>
-                                <MaterialCommunityIcons name="qrcode-scan" size={28} color="#fff" />
+                            <View style={[styles.actionIconBox, { backgroundColor: '#DCFCE7' }]}>
+                                <Ionicons name="scan" size={24} color={colors.success} />
                             </View>
-                            <Text style={styles.actionLabel}>Scan QR</Text>
+                            <Text style={styles.actionLabel}>Scan Pass</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
-                            style={styles.actionItem}
+                            style={[styles.actionCard, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
                             onPress={() => router.push('/(gate)/visitor-form')}
                         >
-                            <View style={[styles.actionIcon, { backgroundColor: colors.warning }]}>
-                                <Feather name="user-plus" size={28} color="#fff" />
+                            <View style={[styles.actionIconBox, { backgroundColor: '#DBEAFE' }]}>
+                                <Feather name="user-plus" size={24} color={colors.primary} />
                             </View>
-                            <Text style={styles.actionLabel}>Visitor Log</Text>
+                            <Text style={styles.actionLabel}>Visitor Entry</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
-                            style={styles.actionItem}
+                            style={[styles.actionCard, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}
                             onPress={() => router.push('/(gate)/history')}
                         >
-                            <View style={[styles.actionIcon, { backgroundColor: colors.success }]}>
-                                <Feather name="clock" size={28} color="#fff" />
+                            <View style={[styles.actionIconBox, { backgroundColor: '#FEF3C7' }]}>
+                                <Feather name="clock" size={24} color={colors.warning} />
                             </View>
-                            <Text style={styles.actionLabel}>Entry Logs</Text>
+                            <Text style={styles.actionLabel}>Log History</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[styles.actionCard, { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' }]}
+                            onPress={logout}
+                        >
+                            <View style={[styles.actionIconBox, { backgroundColor: '#E5E7EB' }]}>
+                                <Feather name="log-out" size={24} color={colors.textSecondary} />
+                            </View>
+                            <Text style={styles.actionLabel}>Sign Out</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* Student List */}
+                {/* Student Enrollment List */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>
-                        {searchQuery ? 'Search Results' : 'Recent Students'}
-                    </Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Quick Search</Text>
+                        <Text style={styles.countText}>{students.length} Students</Text>
+                    </View>
                     
+                    <View style={styles.searchContainer}>
+                        <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search by Name or ID..."
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                        />
+                    </View>
+
                     {loading && !refreshing ? (
-                        <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
-                    ) : filteredStudents.length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <Feather name="search" size={48} color={colors.border} />
-                            <Text style={styles.emptyText}>No students found</Text>
-                        </View>
+                        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
                     ) : (
                         filteredStudents.map((student) => (
                             <TouchableOpacity 
                                 key={student.id}
+                                style={styles.studentCardWrapper}
                                 onPress={() => router.push(`/(gate)/student/${student.id}`)}
                             >
                                 <PremiumCard style={styles.studentCard}>
-                                    <View style={styles.studentInfo}>
-                                        <View style={styles.avatar}>
-                                            <Text style={styles.avatarText}>{student.name.charAt(0)}</Text>
+                                    <View style={styles.studentRow}>
+                                        <View style={styles.studentAvatar}>
+                                            <Feather name="user" size={24} color={colors.primary} />
                                         </View>
-                                        <View style={{ flex: 1 }}>
+                                        <View style={styles.studentInfo}>
                                             <Text style={styles.studentName}>{student.name}</Text>
-                                            <Text style={styles.studentDetails}>{student.class} {student.section}</Text>
+                                            <Text style={styles.studentDetail}>{student.class} • ID: {student.id}</Text>
                                         </View>
                                         <View style={[
                                             styles.statusBadge,
-                                            { backgroundColor: student.gateStatus?.status === 'checked_out' ? '#FEF2F2' : '#F0FDF4' }
+                                            { backgroundColor: student.gateStatus?.status === 'present' ? '#F0FDF4' : '#FEF2F2' }
                                         ]}>
                                             <Text style={[
                                                 styles.statusText,
-                                                { color: student.gateStatus?.status === 'checked_out' ? colors.danger : colors.success }
+                                                { color: student.gateStatus?.status === 'present' ? colors.success : colors.danger }
                                             ]}>
-                                                {student.gateStatus?.status === 'checked_out' ? 'Out' : 'In'}
+                                                {student.gateStatus?.status === 'present' ? 'In' : 'Out'}
                                             </Text>
                                         </View>
                                         <Feather name="chevron-right" size={20} color={colors.border} />
@@ -217,7 +242,28 @@ export default function GateDashboard() {
                         ))
                     )}
                 </View>
+                
+                <View style={{ height: 40 }} />
             </ScrollView>
+
+            <PremiumDrawer 
+                isVisible={drawerVisible}
+                onClose={() => setDrawerVisible(false)}
+                activeTab="dashboard"
+                onSelectTab={(id) => {
+                    if (id === 'scanner') router.push('/(gate)/scanner');
+                    if (id === 'visitor') router.push('/(gate)/visitor-form');
+                    if (id === 'history') router.push('/(gate)/history');
+                }}
+                menuItems={[
+                    { id: 'dashboard', label: 'Dashboard', icon: 'home' },
+                    { id: 'scanner', label: 'Scan QR Pass', icon: 'maximize' },
+                    { id: 'visitor', label: 'Visitor Logs', icon: 'user-plus' },
+                    { id: 'history', label: 'Operation History', icon: 'clock' },
+                ]}
+                user={{ name: user?.name || 'Security', role: user?.role || 'security' }}
+                onLogout={logout}
+            />
         </View>
     );
 }
@@ -227,174 +273,201 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.background,
     },
-    header: {
-        backgroundColor: colors.primary,
+    headerContainer: {
+        backgroundColor: colors.background,
         paddingTop: Platform.OS === 'ios' ? 60 : 40,
-        paddingBottom: 25,
+        paddingBottom: 20,
         paddingHorizontal: spacing.lg,
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-        ...shadows.md,
     },
-    headerTop: {
+    headerContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
+        alignItems: 'flex-start',
+    },
+    menuBtn: {
+        padding: 4,
+        marginLeft: -4,
+        marginBottom: 8,
+    },
+    dateText: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        fontWeight: '600',
+        marginBottom: 2,
     },
     greetingText: {
-        fontSize: 14,
-        color: 'rgba(255,255,255,0.8)',
+        fontSize: 24,
+        fontWeight: '300',
+        color: colors.textPrimary,
+        letterSpacing: -0.5,
     },
     userNameText: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
-    roleBadge: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 12,
-        marginTop: 4,
-        alignSelf: 'flex-start',
-    },
-    roleText: {
-        color: '#fff',
-        fontSize: 10,
-        fontWeight: 'bold',
-    },
-    logoutBtn: {
-        width: 40,
-        height: 40,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        height: 45,
-    },
-    searchInput: {
-        flex: 1,
-        height: '100%',
-        marginLeft: 8,
-        fontSize: 14,
+        fontSize: 24,
+        fontWeight: '700',
         color: colors.textPrimary,
+        marginTop: -4,
+        letterSpacing: -0.5,
     },
     content: {
         flex: 1,
     },
     scrollContent: {
-        padding: spacing.lg,
+        paddingHorizontal: spacing.lg,
         paddingBottom: 40,
     },
-    statsRow: {
+    statsGrid: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 25,
+        marginBottom: spacing.xl,
+        marginTop: spacing.md,
     },
-    statBox: {
+    statCard: {
         width: '31%',
-        padding: 15,
-        borderRadius: 16,
+        borderRadius: 20,
+        padding: 12,
+        justifyContent: 'space-between',
+        aspectRatio: 0.9,
+    },
+    statIconBox: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: 'white',
         alignItems: 'center',
         justifyContent: 'center',
     },
     statValue: {
-        fontSize: 20,
-        fontWeight: 'bold',
+        fontSize: 22,
+        fontWeight: '800',
+        color: colors.textPrimary,
+        marginTop: 8,
     },
     statLabel: {
         fontSize: 11,
+        fontWeight: '600',
         color: colors.textSecondary,
-        marginTop: 2,
     },
     section: {
-        marginBottom: 25,
+        marginBottom: spacing.xl,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.md,
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
         color: colors.textPrimary,
-        marginBottom: 15,
+        marginBottom: spacing.md,
     },
-    actionsGrid: {
+    countText: {
+        fontSize: 13,
+        color: colors.textSecondary,
+        fontWeight: '600',
+    },
+    quickActionsGrid: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         justifyContent: 'space-between',
     },
-    actionItem: {
-        width: '31%',
-        alignItems: 'center',
-    },
-    actionIcon: {
-        width: 60,
-        height: 60,
+    actionCard: {
+        width: '48%',
+        marginBottom: 16,
+        padding: 16,
         borderRadius: 20,
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 8,
-        ...shadows.sm,
+    },
+    actionIconBox: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
     },
     actionLabel: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '600',
         color: colors.textPrimary,
+        textAlign: 'center',
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'white',
+        borderRadius: 15,
+        paddingHorizontal: 15,
+        borderWidth: 1,
+        borderColor: colors.border,
+        marginBottom: 16,
+        height: 50,
+        ...shadows.sm,
+    },
+    searchIcon: {
+        marginRight: 10,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 16,
+        color: colors.textPrimary,
+    },
+    studentCardWrapper: {
+        marginBottom: 12,
     },
     studentCard: {
-        marginBottom: 12,
         padding: 12,
     },
-    studentInfo: {
+    studentRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    avatar: {
-        width: 45,
-        height: 45,
-        borderRadius: 22.5,
-        backgroundColor: colors.surfaceHighlight,
+    studentAvatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#F3F4F6',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 12,
     },
-    avatarText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: colors.primary,
+    studentInfo: {
+        flex: 1,
     },
     studentName: {
         fontSize: 16,
         fontWeight: '700',
         color: colors.textPrimary,
     },
-    studentDetails: {
-        fontSize: 12,
+    studentDetail: {
+        fontSize: 13,
         color: colors.textSecondary,
+        marginTop: 2,
     },
     statusBadge: {
         paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-        marginRight: 10,
+        paddingVertical: 5,
+        borderRadius: 10,
+        marginRight: 8,
     },
     statusText: {
-        fontSize: 11,
-        fontWeight: 'bold',
-    },
-    emptyState: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 30,
+        fontSize: 12,
+        fontWeight: '700',
     },
     emptyText: {
         fontSize: 16,
         color: colors.textSecondary,
         marginTop: 10,
-    }
+    },
+    rollNo: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        fontStyle: 'italic',
+        marginTop: 2,
+    },
 });

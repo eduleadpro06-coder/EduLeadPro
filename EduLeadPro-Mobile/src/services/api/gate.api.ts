@@ -46,11 +46,11 @@ export const gateAPI = {
     /**
      * Search students for gate check-in/out
      */
-    async getGateStudents(query: string = ''): Promise<any[]> {
+    async getGateStudents(query: string = ''): Promise<any> {
         const params = new URLSearchParams();
         if (query) params.append('query', query);
         const response = await apiClient.get(`/gate/students?${params.toString()}`);
-        return response.data;
+        return response.data; // Returns { success, data, stats }
     },
 
     /**

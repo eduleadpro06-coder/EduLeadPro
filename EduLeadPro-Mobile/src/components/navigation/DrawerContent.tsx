@@ -85,7 +85,21 @@ export default function DrawerContent(props: DrawerContentComponentProps) {
         }
     ];
 
-    const menuItems = user?.role === 'teacher' || user?.role === 'driver' ? staffMenu : parentMenu;
+    const securityMenu: MenuGroup[] = [
+        {
+            title: 'GATE OPERATIONS',
+            items: [
+                { icon: 'shield-outline', label: 'Dashboard', route: '/(gate)' },
+                { icon: 'scan-outline', label: 'QR Scanner', route: '/(gate)/scanner' },
+                { icon: 'person-add-outline', label: 'Visitor Log', route: '/(gate)/visitor-form' },
+                { icon: 'list-outline', label: 'Entry Logs', route: '/(gate)/history' },
+            ]
+        }
+    ];
+
+    const menuItems = user?.role === 'security' || user?.role === 'support_staff' 
+        ? securityMenu 
+        : (user?.role === 'teacher' || user?.role === 'driver' ? staffMenu : parentMenu);
 
     return (
         <View style={styles.container}>
@@ -101,7 +115,7 @@ export default function DrawerContent(props: DrawerContentComponentProps) {
                             style={styles.avatarGradient}
                         >
                             <Text style={styles.avatarText}>
-                                {user?.name?.charAt(0).toUpperCase() || 'P'}
+                                {user?.name?.charAt(0).toUpperCase() || (user?.role === 'security' ? 'S' : 'P')}
                             </Text>
                         </LinearGradient>
                     </View>
@@ -110,7 +124,7 @@ export default function DrawerContent(props: DrawerContentComponentProps) {
                             {user?.name || 'Bloomdale Connect'}
                         </Text>
                         <Text style={styles.userRole}>
-                            {user?.role === 'teacher' ? 'Faculty Member' : user?.role === 'driver' ? 'Transport Staff' : 'Guardian'}
+                            {user?.role === 'security' ? 'Security Staff' : user?.role === 'teacher' ? 'Faculty Member' : user?.role === 'driver' ? 'Transport Staff' : 'Guardian'}
                         </Text>
                     </View>
                 </View>

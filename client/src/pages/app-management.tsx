@@ -25,6 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TaskManagement from "@/components/mobile/task-management";
 import ActivityApproval from "@/components/mobile/activity-approval";
+import GateLogsHistory from "@/components/mobile/gate-logs-history";
 import StopSelectionMap from "@/components/StopSelectionMap";
 // import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 // import hooks consolidated above
@@ -724,6 +725,14 @@ export default function AppManagement() {
                             <Bus className="mr-2 h-4 w-4" />
                             Drivers
                         </Button>
+                        <Button
+                            variant={activeTab === "gate-logs" ? "default" : "ghost"}
+                            onClick={() => setActiveTab("gate-logs")}
+                            className="rounded-b-none"
+                        >
+                            <ClipboardList className="mr-2 h-4 w-4" />
+                            Gate Logs
+                        </Button>
                     </div>
 
                     {/* Parents Sub-Tab */}
@@ -1311,6 +1320,11 @@ export default function AppManagement() {
                                 </DialogContent>
                             </Dialog>
                         </>
+                    )}
+
+                    {/* Gate Logs Tab */}
+                    {activeTab === "gate-logs" && (
+                        <GateLogsHistory />
                     )}
                 </div>
             )}
