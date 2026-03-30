@@ -10,6 +10,7 @@ import teacherRouter from './teacher.js';
 import driverRouter from './driver.js';
 import commonRouter from './common.js';
 import teacherAssignments from './teacher-assignments.js';
+import gateRouter from './gate.js';
 
 import authRouter from './auth.js';
 
@@ -27,6 +28,7 @@ router.use('/teacher', teacherRouter);
 router.use('/driver', driverRouter);
 router.use('/common', commonRouter);
 router.use('/teacher-assignments', teacherAssignments);
+router.use('/gate', gateRouter);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

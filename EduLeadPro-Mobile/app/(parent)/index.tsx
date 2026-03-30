@@ -14,6 +14,7 @@ import {
     Image,
     Dimensions,
     RefreshControl,
+    Modal,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter, useNavigation } from 'expo-router';
@@ -38,6 +39,7 @@ export default function ParentHomeScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [currentChildIndex, setCurrentChildIndex] = useState(0);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [showPass, setShowPass] = useState(false);
 
     // Restore currentChild definition
     const currentChild = user?.children?.[currentChildIndex];
@@ -258,7 +260,37 @@ export default function ParentHomeScreen() {
                         </View>
                         <Text style={styles.actionLabel}>Fees</Text>
                     </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.actionItem} onPress={() => setShowPass(true)}>
+                        <View style={[styles.actionIcon, { backgroundColor: '#E0E7FF' }]}>
+                            <Ionicons name="qr-code-outline" size={24} color={colors.primary} />
+                        </View>
+                        <Text style={styles.actionLabel}>Gate Pass</Text>
+                    </TouchableOpacity>
                 </View>
+
+                {/* Gate Pass Modal */}
+                <Modal visible={showPass} transparent animationType="fade">
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContent}>
+                            <TouchableOpacity style={styles.closeModal} onPress={() => setShowPass(false)}>
+                                <Ionicons name="close" size={24} color="#6B7280" />
+                            </TouchableOpacity>
+                            <Text style={styles.modalTitle}>Student Gate Pass</Text>
+                            <Text style={styles.modalSubtitle}>Present this at the gate for Check-in/Out</Text>
+                            
+                            <View style={styles.qrContainer}>
+                                <Image 
+                                    source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=STUDENT_ID:${currentChild?.id}` }}
+                                    style={styles.qrImage}
+                                />
+                            </View>
+                            
+                            <Text style={styles.qrStudentName}>{currentChild?.student_name}</Text>
+                            <Text style={styles.qrClass}>{currentChild?.class}</Text>
+                        </View>
+                    </View>
+                </Modal>
 
                 {/* Notice Board */}
                 <Text style={styles.sectionTitle}>Notice Board</Text>
@@ -629,5 +661,63 @@ const styles = StyleSheet.create({
     highlightDate: {
         fontSize: 13,
         color: '#9CA3AF',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderRadius: 32,
+        padding: 30,
+        width: '100%',
+        maxWidth: 400,
+        alignItems: 'center',
+        ...shadows.lg,
+    },
+    closeModal: {
+        position: 'absolute',
+        top: 20,
+        right: 20,
+        padding: 10,
+    },
+    modalTitle: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: '#1E293B',
+        marginTop: 10,
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: '#64748B',
+        marginTop: 6,
+        marginBottom: 25,
+        textAlign: 'center',
+    },
+    qrContainer: {
+        padding: 20,
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        ...shadows.sm,
+    },
+    qrImage: {
+        width: 200,
+        height: 200,
+    },
+    qrStudentName: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#111827',
+        marginTop: 20,
+    },
+    qrClass: {
+        fontSize: 14,
+        color: '#6B7280',
+        marginTop: 4,
     },
 });

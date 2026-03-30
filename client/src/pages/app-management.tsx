@@ -242,9 +242,21 @@ export default function AppManagement() {
         queryKey: ['/api/staff']
     });
 
-    const teachers = allStaff.filter(staff =>
-        staff.role?.toLowerCase().includes('teacher') && staff.isActive
-    );
+    // Fetch Academic/Support Staff (excluding Drivers who have their own tab)
+    const staffAndSecurity = allStaff.filter(staff => {
+        const role = staff.role?.toLowerCase() || '';
+        const isAcademicOrSupport = 
+            role.includes('teacher') || 
+            role.includes('care giver') || 
+            role.includes('security') || 
+            role.includes('counselor') || 
+            role.includes('accountant') || 
+            role.includes('principal') || 
+            role.includes('office assistant') ||
+            role.includes('peon');
+        
+        return isAcademicOrSupport && staff.isActive;
+    });
 
     const drivers = allStaff.filter(staff =>
         staff.role?.toLowerCase().includes('driver')
@@ -702,7 +714,7 @@ export default function AppManagement() {
                             className="rounded-b-none"
                         >
                             <Users className="mr-2 h-4 w-4" />
-                            Teachers
+                            Staff & Security
                         </Button>
                         <Button
                             variant={activeTab === "drivers" ? "default" : "ghost"}
@@ -749,9 +761,11 @@ export default function AppManagement() {
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="all">All Teachers</SelectItem>
-                                                    {teachers.map(t => (
-                                                        <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
-                                                    ))}
+                                                    {staffAndSecurity
+                                                        .filter(s => s.role?.toLowerCase().includes('teacher'))
+                                                        .map(t => (
+                                                            <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
+                                                        ))}
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -873,16 +887,16 @@ export default function AppManagement() {
                                 <CardHeader>
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <CardTitle>Teachers (Mobile Access)</CardTitle>
+                                            <CardTitle>Staff & Security (Mobile Access)</CardTitle>
                                             <CardDescription>
-                                                View all teachers who can access the mobile app
+                                                View and manage mobile app access for all staff members
                                             </CardDescription>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <div className="relative">
                                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                                                 <Input
-                                                    placeholder="Search teachers..."
+                                                    placeholder="Search staff & security..."
                                                     value={searchTerm}
                                                     onChange={(e) => setSearchTerm(e.target.value)}
                                                     className="pl-10 w-64"
@@ -905,51 +919,44 @@ export default function AppManagement() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {teachers.length === 0 ? (
+                                                {staffAndSecurity.length === 0 ? (
                                                     <TableRow>
                                                         <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                                                            No teachers found. Create staff members with "Teacher" role in Staff Management.
+                                                            No staff members found matching your search. Create staff in Staff Management.
                                                         </TableCell>
                                                     </TableRow>
                                                 ) : (
-                                                    teachers
-                                                        .filter(teacher =>
+                                                    staffAndSecurity
+                                                        .filter(staff =>
                                                             !searchTerm ||
-                                                            teacher.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                            teacher.phone?.includes(searchTerm)
+                                                            staff.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                            staff.phone?.includes(searchTerm)
                                                         )
-                                                        .map((teacher: any) => {
+                                                        .map((staff: any) => {
                                                             const assignedStudents = leads.filter(l =>
-                                                                // Filter by whether specific assignment exists for this teacher and student
                                                                 assignments.some(a => {
-                                                                    const match = Number(a.teacher_staff_id) === Number(teacher.id) && Number(a.student_lead_id) === Number(l.id);
-                                                                    // Debugging only for first few to avoid spam
-                                                                    // if (match) console.log('Match found:', teacher.name, l.name);
+                                                                    const match = Number(a.teacher_staff_id) === Number(staff.id) && Number(a.student_lead_id) === Number(l.id);
                                                                     return match;
                                                                 })
                                                             );
 
-                                                            // Console log debugging
-                                                            // console.log(`Teacher: ${teacher.name} (${teacher.id}), Assignments:`, assignments.filter(a => Number(a.teacher_staff_id) === Number(teacher.id)));
-
                                                             const studentCount = assignedStudents.length;
 
                                                             return (
-                                                                <TableRow key={teacher.id}>
-                                                                    <TableCell className="font-medium">{teacher.name}</TableCell>
-                                                                    <TableCell>{teacher.phone}</TableCell>
+                                                                <TableRow key={staff.id}>
+                                                                    <TableCell className="font-medium">{staff.name}</TableCell>
+                                                                    <TableCell>{staff.phone}</TableCell>
                                                                     <TableCell>
                                                                         <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                                                            {teacher.role}
+                                                                            {staff.role}
                                                                         </Badge>
                                                                     </TableCell>
                                                                     <TableCell className="text-center font-semibold">
-                                                                        {/* Placeholder for actual assignment count if needed, currently shows total enrolled */}
                                                                         <span title="Total Active Students">{studentCount}</span>
                                                                     </TableCell>
                                                                     <TableCell>
-                                                                        <Badge variant={teacher.appPassword ? "default" : "secondary"}>
-                                                                            {teacher.appPassword ? 'Active' : 'Default'}
+                                                                        <Badge variant={staff.appPassword ? "default" : "secondary"}>
+                                                                            {staff.appPassword ? 'Active' : 'Default'}
                                                                         </Badge>
                                                                     </TableCell>
                                                                     <TableCell className="text-right">
@@ -958,7 +965,7 @@ export default function AppManagement() {
                                                                                 variant="outline"
                                                                                 size="sm"
                                                                                 onClick={() => {
-                                                                                    setSelectedStaffId(teacher.id);
+                                                                                    setSelectedStaffId(staff.id);
                                                                                     setNewPassword("");
                                                                                     setPasswordDialogOpen(true);
                                                                                 }}
@@ -971,9 +978,9 @@ export default function AppManagement() {
                                                                                 size="sm"
                                                                                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                                                                 onClick={() => {
-                                                                                    if (confirm(`Reset password for ${teacher.name} to default?`)) {
+                                                                                    if (confirm(`Reset password for ${staff.name} to default?`)) {
                                                                                         updateStaffPasswordMutation.mutate({
-                                                                                            id: teacher.id,
+                                                                                            id: staff.id,
                                                                                             appPassword: null
                                                                                         });
                                                                                     }
@@ -997,9 +1004,9 @@ export default function AppManagement() {
                             <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
                                 <DialogContent>
                                     <DialogHeader>
-                                        <DialogTitle>Set Teacher Password</DialogTitle>
+                                        <DialogTitle>Set Staff Password</DialogTitle>
                                         <DialogDescription>
-                                            Create a new password for this teacher to access the mobile application.
+                                            Create a new password for this staff member to access the mobile application.
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="grid gap-4 py-4">
@@ -1088,6 +1095,7 @@ export default function AppManagement() {
                                                     <TableHead>Role</TableHead>
                                                     <TableHead className="text-center">Assigned Route</TableHead>
                                                     <TableHead>Status</TableHead>
+                                                    <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -1137,9 +1145,45 @@ export default function AppManagement() {
                                                                                 isActive: checked
                                                                             })}
                                                                         />
-                                                                        <span className="text-sm text-gray-500">
-                                                                            {driver.isActive ? 'Active' : 'Inactive'}
-                                                                        </span>
+                                                                    </div>
+                                                                </TableCell>
+                                                                <TableCell className="text-right">
+                                                                    <div className="flex justify-end items-center gap-2">
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => {
+                                                                                setSelectedStaffId(driver.id);
+                                                                                setNewPassword("");
+                                                                                setPasswordDialogOpen(true);
+                                                                            }}
+                                                                        >
+                                                                            <Key className="mr-2 h-4 w-4" />
+                                                                            Set Password
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                            onClick={() => {
+                                                                                if (confirm(`Reset password for ${driver.name} to default?`)) {
+                                                                                    updateStaffPasswordMutation.mutate({
+                                                                                        id: driver.id,
+                                                                                        appPassword: null
+                                                                                    });
+                                                                                }
+                                                                            }}
+                                                                            disabled={updateStaffPasswordMutation.isPending}
+                                                                        >
+                                                                            Reset
+                                                                        </Button>
+                                                                        <Switch
+                                                                            checked={driver.isActive}
+                                                                            onCheckedChange={(checked) => updateStaffStatusMutation.mutate({
+                                                                                id: driver.id,
+                                                                                isActive: checked
+                                                                            })}
+                                                                        />
                                                                     </div>
                                                                 </TableCell>
                                                             </TableRow>

@@ -1498,6 +1498,52 @@ export const preschoolEvents = pgTable("preschool_events", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// =====================================================
+// GATE MANAGEMENT SYSTEM (Security & Support Staff)
+// =====================================================
+
+// 1. Student Gate Logs - For check-in/out tracking with security features
+export const studentGateLogs = pgTable("student_gate_logs", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  studentId: integer("student_id").notNull().references(() => leads.id),
+  date: date("date").notNull(),
+  checkInTime: timestamp("check_in_time"),
+  checkOutTime: timestamp("check_out_time"),
+  status: varchar("status", { length: 20 }).default("present"), // present, checked_out
+  
+  // Pickup Verification
+  pickupPersonType: varchar("pickup_person_type", { length: 20 }), // parent, authorized, other
+  pickupPersonName: varchar("pickup_person_name", { length: 100 }),
+  pickupPhotoUrl: text("pickup_photo_url"), // URL for "Other Person" photo
+  
+  // Metadata
+  recordedBy: integer("recorded_by").references(() => staff.id),
+  offlineId: uuid("offline_id"), // For syncing offline logs
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 2. Visitor Logs - For general school guests
+export const visitorLogs = pgTable("visitor_logs", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  visitorName: varchar("visitor_name", { length: 100 }).notNull(),
+  visitorPhone: varchar("visitor_phone", { length: 20 }).notNull(),
+  visitorPurpose: text("visitor_purpose"),
+  visitorPhotoUrl: text("visitor_photo_url"),
+  
+  checkInTime: timestamp("check_in_time").defaultNow().notNull(),
+  checkOutTime: timestamp("check_out_time"),
+  
+  recordedBy: integer("recorded_by").references(() => staff.id),
+  status: varchar("status", { length: 20 }).default("inside"), // inside, exited
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const parentTeacherMessages = pgTable("parent_teacher_messages", {
   id: serial("id").primaryKey(),
   organizationId: integer("organization_id").notNull().references(() => organizations.id),
@@ -1740,4 +1786,14 @@ export const teacherStudentAssignments = pgTable("teacher_student_assignments", 
 export const insertTeacherStudentAssignmentSchema = createInsertSchema(teacherStudentAssignments).omit({ id: true, assignedAt: true, createdAt: true, updatedAt: true });
 export type TeacherStudentAssignment = typeof teacherStudentAssignments.$inferSelect;
 export type InsertTeacherStudentAssignment = z.infer<typeof insertTeacherStudentAssignmentSchema>;
+
+// Gate App Schemas and Types
+export const insertStudentGateLogSchema = createInsertSchema(studentGateLogs).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertVisitorLogSchema = createInsertSchema(visitorLogs).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type StudentGateLog = typeof studentGateLogs.$inferSelect;
+export type VisitorLog = typeof visitorLogs.$inferSelect;
+
+export type InsertStudentGateLog = z.infer<typeof insertStudentGateLogSchema>;
+export type InsertVisitorLog = z.infer<typeof insertVisitorLogSchema>;
 

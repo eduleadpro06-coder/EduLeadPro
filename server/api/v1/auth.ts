@@ -75,7 +75,14 @@ router.post('/login', async (req: Request, res: Response) => {
                 const userRole = staff.role.toLowerCase();
                 const isTeacher = userRole.includes('teacher');
                 const isDriver = userRole.includes('driver');
-                const normalizedRole = isDriver ? 'driver' : (isTeacher ? 'teacher' : 'staff');
+                const isSecurity = userRole.includes('security');
+                const isSupport = userRole.includes('support');
+                
+                let normalizedRole = 'staff';
+                if (isDriver) normalizedRole = 'driver';
+                else if (isTeacher) normalizedRole = 'teacher';
+                else if (isSecurity) normalizedRole = 'security';
+                else if (isSupport) normalizedRole = 'support_staff';
 
                 // Generate JWT tokens
                 const accessToken = generateAccessToken(

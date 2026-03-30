@@ -18,9 +18,10 @@ export function TeacherAssignmentDropdown({ leadId }: TeacherAssignmentDropdownP
         queryKey: ['/api/staff']
     });
 
-    const teachers = allStaff.filter(staff =>
-        staff.role?.toLowerCase().includes('teacher') && (staff.isActive !== false)
-    );
+    const teachers = allStaff.filter(staff => {
+        const role = staff.role?.toLowerCase() || '';
+        return (role.includes('teacher') || role.includes('care giver')) && (staff.isActive !== false);
+    });
 
     // Fetch current assignment for this student
     const { data: assignments, isLoading } = useQuery<any[]>({

@@ -46,6 +46,8 @@ function RootLayoutNav() {
                 router.replace('/(teacher)');
             } else if (user?.role === 'driver') {
                 router.replace('/(driver)');
+            } else if (user?.role === 'security' || user?.role === 'support_staff') {
+                router.replace('/(gate)');
             } else {
                 router.replace('/'); 
             }
