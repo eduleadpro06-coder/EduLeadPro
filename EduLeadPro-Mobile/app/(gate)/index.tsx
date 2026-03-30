@@ -79,9 +79,12 @@ export default function GateDashboard() {
         setRefreshing(false);
     };
 
-    const filteredStudents = students.filter(s =>
-        searchQuery ? (s.name.toLowerCase().includes(searchQuery.toLowerCase()) || (s.id && s.id.toString().includes(searchQuery))) : true
-    ).slice(0, 50);
+    const filteredStudents = students
+        .filter(s =>
+            searchQuery ? (s.name.toLowerCase().includes(searchQuery.toLowerCase()) || (s.id && s.id.toString().includes(searchQuery))) : true
+        )
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }))
+        .slice(0, 50);
 
     return (
         <View style={styles.container}>
@@ -162,7 +165,7 @@ export default function GateDashboard() {
                                     </View>
                                     <View style={styles.studentInfo}>
                                         <Text style={styles.studentName}>{student.name}</Text>
-                                        <Text style={styles.studentDetail}>{student.class} • ID: {student.id}</Text>
+                                        <Text style={styles.studentDetail}>{student.class}{student.section ? ` - ${student.section}` : ''} • ID: {student.id}</Text>
                                     </View>
                                     <View style={[
                                         styles.statusBadge,

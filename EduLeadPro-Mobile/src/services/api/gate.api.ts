@@ -49,8 +49,9 @@ export const gateAPI = {
     async getGateStudents(query: string = ''): Promise<any> {
         const params = new URLSearchParams();
         if (query) params.append('query', query);
-        const response = await apiClient.get(`/gate/students?${params.toString()}`);
-        return response.data; // Returns { success, data, stats }
+        // apiClient.get() already unwraps Axios response.data, giving us { success, data, stats }
+        // Return the full wrapper so callers can access both .data (student array) and .stats
+        return await apiClient.get(`/gate/students?${params.toString()}`);
     },
 
     /**

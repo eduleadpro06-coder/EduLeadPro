@@ -103,8 +103,8 @@ router.get('/students/:id', async (req: Request, res: Response) => {
             return res.status(404).json({ success: false, message: 'Student not found' });
         }
 
-        // 2. Fetch today's gate log
-        const today = new Date().toISOString().split('T')[0];
+        // 2. Fetch today's gate log (using IST to match other gate endpoints)
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
         const { data: gateStatus } = await supabase
             .from('student_gate_logs')
             .select('*')
@@ -208,19 +208,21 @@ router.post('/sync', async (req: Request, res: Response) => {
 
             let finalLog;
             if (currentEntry) {
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from('student_gate_logs')
                     .update(entryData)
                     .eq('id', currentEntry.id)
                     .select()
                     .single();
+                if (error) throw error;
                 finalLog = data;
             } else {
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from('student_gate_logs')
                     .insert(entryData)
                     .select()
                     .single();
+                if (error) throw error;
                 finalLog = data;
             }
 
@@ -257,7 +259,6 @@ router.post('/sync', async (req: Request, res: Response) => {
                 console.error('[Gate API] Notification error:', notifError);
             }
 
-            results.push({ offlineId, status: 'created', id: finalLog?.id });
         }
 
         res.json({

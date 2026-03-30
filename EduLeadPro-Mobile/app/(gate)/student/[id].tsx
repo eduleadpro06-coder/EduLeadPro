@@ -11,7 +11,8 @@ import {
     Platform,
 } from 'react-native';
 import { Feather, Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+
 import * as ImagePicker from 'expo-image-picker';
 import { colors, spacing, shadows } from '../../../src/theme';
 import PremiumCard from '../../../src/components/ui/PremiumCard';
@@ -37,7 +38,9 @@ export default function StudentGateDetail() {
         try {
             const data = await gateAPI.getGateStudentDetails(id as string);
             setStudent(data);
-            setStatus(data.gateStatus?.status === 'checked_out' ? 'checked_out' : 'checked_in');
+            // If student is currently PRESENT (inside), default action = check_out
+            // If student has no log or is checked_out, default action = check_in
+            setStatus(data.gateStatus?.status === 'present' ? 'checked_out' : 'checked_in');
         } catch (error) {
             console.error('Error loading student:', error);
             Alert.alert('Error', 'Failed to load student details');
@@ -106,13 +109,32 @@ export default function StudentGateDetail() {
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+            <Stack.Screen 
+                options={{ 
+                    title: student?.name ? `Gate: ${student.name}` : 'Gate Entry'
+                }} 
+            />
             {/* Student Profile Header */}
             <View style={styles.profileHeader}>
                 <View style={styles.largeAvatar}>
-                    <Text style={styles.avatarText}>{student.name.charAt(0)}</Text>
+                    <Text style={styles.avatarText}>{student.name?.charAt(0) ?? '?'}</Text>
                 </View>
                 <Text style={styles.studentName}>{student.name}</Text>
-                <Text style={styles.studentDetails}>{student.class} - {student.section}</Text>
+                <Text style={styles.studentDetails}>
+                    {student.class}{student.section ? ` - ${student.section}` : ''}
+                </Text>
+                {/* Current status badge */}
+                <View style={[
+                    styles.currentStatusBadge,
+                    { backgroundColor: student.gateStatus?.status === 'present' ? '#F0FDF4' : '#FEF2F2' }
+                ]}>
+                    <Text style={[
+                        styles.currentStatusText,
+                        { color: student.gateStatus?.status === 'present' ? '#16a34a' : '#dc2626' }
+                    ]}>
+                        {student.gateStatus?.status === 'present' ? '🟢 Currently Inside' : '🔴 Currently Outside'}
+                    </Text>
+                </View>
                 <Text style={styles.rollNo}>ID: {student.id}</Text>
             </View>
 
@@ -121,15 +143,25 @@ export default function StudentGateDetail() {
                 <Text style={styles.sectionTitle}>Gate Status</Text>
                 <View style={styles.toggleRow}>
                     <TouchableOpacity 
-                        style={[styles.toggleBtn, status === 'checked_in' && styles.toggleBtnActiveIn]}
+                        style={[
+                            styles.toggleBtn, 
+                            status === 'checked_in' && styles.toggleBtnActiveIn,
+                            student.gateStatus?.status === 'present' && { opacity: 0.5 }
+                        ]}
                         onPress={() => setStatus('checked_in')}
+                        disabled={student.gateStatus?.status === 'present'}
                     >
                         <MaterialIcons name="login" size={24} color={status === 'checked_in' ? '#fff' : colors.textSecondary} />
                         <Text style={[styles.toggleText, status === 'checked_in' && styles.toggleTextActive]}>Checked In</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                        style={[styles.toggleBtn, status === 'checked_out' && styles.toggleBtnActiveOut]}
+                        style={[
+                            styles.toggleBtn, 
+                            status === 'checked_out' && styles.toggleBtnActiveOut,
+                            (student.gateStatus?.status !== 'present') && { opacity: 0.5 }
+                        ]}
                         onPress={() => setStatus('checked_out')}
+                        disabled={student.gateStatus?.status !== 'present'}
                     >
                         <MaterialIcons name="logout" size={24} color={status === 'checked_out' ? '#fff' : colors.textSecondary} />
                         <Text style={[styles.toggleText, status === 'checked_out' && styles.toggleTextActive]}>Checked Out</Text>
@@ -387,5 +419,15 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
         fontSize: 15,
         fontWeight: '600',
+    },
+    currentStatusBadge: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginTop: 10,
+    },
+    currentStatusText: {
+        fontSize: 14,
+        fontWeight: '700',
     }
 });

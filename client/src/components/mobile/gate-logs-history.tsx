@@ -11,9 +11,14 @@ import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 
 export default function GateLogsHistory() {
+    // Helper to get IST date string (YYYY-MM-DD)
+    const getISTDateString = () => {
+        return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    };
+
     const [searchTerm, setSearchTerm] = useState("");
-    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [startDate, setStartDate] = useState(getISTDateString());
+    const [endDate, setEndDate] = useState(getISTDateString());
     const [activeTab, setActiveTab] = useState("students");
 
     // Fetch Student Logs

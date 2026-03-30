@@ -1519,7 +1519,7 @@ export const studentGateLogs = pgTable("student_gate_logs", {
   
   // Metadata
   recordedBy: integer("recorded_by").references(() => staff.id),
-  offlineId: uuid("offline_id"), // For syncing offline logs
+  offlineId: text("offline_id"), // For syncing offline logs
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
