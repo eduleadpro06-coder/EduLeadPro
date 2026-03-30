@@ -174,7 +174,11 @@ export function generateFeeReceipt(
     const mode = options?.mode ?? 'download';
     const copyType = options?.copyType ?? (mode === 'print' ? 'both' : 'parent');
 
-    const doc = new jsPDF("p", "mm", "a4");
+    // A4 width is 210mm, height is 297mm. A half-page receipt takes ~148.5mm.
+    // Dynamically crop the bottom of the PDF if only the parent copy is generated!
+    const pageHeight = copyType === 'both' ? 297 : 148.5;
+    const doc = new jsPDF("p", "mm", [210, pageHeight]);
+
     const receiptNo = existingReceiptNo || generateReceiptNo(data.academicYear);
 
     // Parent copy (Top)

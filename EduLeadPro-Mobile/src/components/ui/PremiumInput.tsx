@@ -26,9 +26,11 @@ export default function PremiumInput({
     style,
     onFocus,
     onBlur,
+    secureTextEntry, // Intercept to manage visibility toggle natively
     ...props
 }: PremiumInputProps) {
     const [isFocused, setIsFocused] = useState(false);
+    const [isPasswordVisible, setIsPasswordVisible] = useState(false); // Toggle state
     const focusAnim = React.useRef(new Animated.Value(0)).current;
 
     const handleFocus = (e: any) => {
@@ -96,8 +98,22 @@ export default function PremiumInput({
                     onFocus={handleFocus}
                     onBlur={handleBlur}
                     selectionColor={colors.accent}
+                    secureTextEntry={secureTextEntry && !isPasswordVisible}
                     {...props}
                 />
+                
+                {/* Password Visibility Toggle */}
+                {secureTextEntry && (
+                    <Feather
+                        name={isPasswordVisible ? "eye" : "eye-off"}
+                        size={20}
+                        color={colors.textTertiary}
+                        style={{ padding: 4, marginLeft: 8 }}
+                        onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                        suppressHighlighting={true}
+                    />
+                )}
+
                 {error && (
                     <Feather name="alert-circle" size={16} color={colors.danger} style={{ marginLeft: 8 }} />
                 )}

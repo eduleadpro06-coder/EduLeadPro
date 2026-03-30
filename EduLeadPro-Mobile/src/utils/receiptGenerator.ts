@@ -136,7 +136,7 @@ export async function generateMobileFeeReceipt(data: FeeReceiptData): Promise<vo
     // Build a meaningful filename instead of the random one from expo-print
     const sanitizedName = data.studentName.replace(/[^a-zA-Z0-9]/g, '_');
     const sanitizedReceipt = (data.receiptNumber || 'Receipt').replace(/[^a-zA-Z0-9]/g, '-');
-    const fileName = `Fee_Receipt_${sanitizedName}_${sanitizedReceipt}.pdf`;
+    const fileName = `Fee_Receipt_${sanitizedName}_${sanitizedReceipt}_${Date.now()}.pdf`;
 
     // Rename/move the file to the new path with meaningful name using new File API
     let shareUri = uri;
