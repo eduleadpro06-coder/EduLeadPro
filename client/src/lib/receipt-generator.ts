@@ -128,7 +128,7 @@ function drawReceipt(
     doc.setFontSize(7);
     const maxWidth = 165;
     const addressLines = doc.splitTextToSize(footerAddress, maxWidth);
-    const addressStartY = footerY + 2; // Closer to academic year
+    const addressStartY = footerY + 6; // Proper spacing below academic year
 
     addressLines.forEach((line: string, i: number) => {
         doc.text(line, 105, addressStartY + (i * 3.5), { align: "center" });
@@ -137,7 +137,7 @@ function drawReceipt(
     const afterAddressY = addressStartY + (addressLines.length * 3.5);
 
     doc.setFontSize(7.5);
-    doc.setTextColor(100, 100, 100);
+    doc.setTextColor(220, 20, 20);
     doc.text(
         "This is a computer-generated receipt and does not require a signature.",
         105,
