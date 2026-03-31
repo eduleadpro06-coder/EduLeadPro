@@ -24,7 +24,6 @@
             }
         },
         "production": {
-            "autoIncrement": true,
             "env": {
                 "EXPO_PUBLIC_API_URL": "https://yonerra.vercel.app/api/v1/mobile",
                 "EXPO_PUBLIC_WS_URL": "wss://yonerra.vercel.app",

@@ -1,6 +1,6 @@
 export default {
   expo: {
-    name: 'Bloomdale Preschool',
+    name: 'Bloomdale Connect',
     slug: 'yonerra',
     version: '2.0.0',
     orientation: 'portrait',
@@ -40,7 +40,7 @@ export default {
       [
         'expo-camera',
         {
-          cameraPermission: 'Allow Bloomdale Preschool to access camera for attendance',
+          cameraPermission: 'Allow Bloomdale Connect to access camera for attendance',
         },
       ],
     ],
