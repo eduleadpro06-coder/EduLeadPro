@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '../../src/store/authStore';
 import { colors, spacing, typography, shadows } from '../../src/theme';
 import PremiumCard from '../../src/components/ui/PremiumCard';
+import { StatusBar } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -83,14 +84,24 @@ export default function SupportScreen() {
         <View style={styles.container}>
             <Stack.Screen options={{ headerShown: false }} />
 
+            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
             {/* Header */}
-            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Help & Support</Text>
-                <View style={{ width: 40 }} />
-            </View>
+            <LinearGradient
+                colors={[colors.primary, colors.primaryDark]}
+                style={[styles.headerGradient, { paddingTop: insets.top }]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+            >
+                <View style={styles.headerContent}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={24} color="#fff" />
+                    </TouchableOpacity>
+                    <View style={styles.headerTitleContainer}>
+                        <Text style={styles.headerTitle}>Help & Support</Text>
+                    </View>
+                </View>
+            </LinearGradient>
 
             <View style={styles.content}>
                 {/* Hero Section */}
@@ -159,26 +170,35 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#F8FAFC',
     },
-    header: {
+    headerGradient: {
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+        overflow: 'hidden',
+    },
+    headerContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingBottom: 15,
-        backgroundColor: '#fff',
-        ...shadows.sm,
+        paddingHorizontal: 16,
+        height: 56,
     },
     backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        zIndex: 1,
+    },
+    headerTitleContainer: {
+        ...StyleSheet.absoluteFillObject,
         justifyContent: 'center',
         alignItems: 'center',
     },
     headerTitle: {
         fontSize: 18,
-        fontWeight: '700',
-        color: '#111827',
+        fontFamily: 'Outfit_Bold',
+        color: '#fff',
     },
     content: {
         padding: 20,
@@ -203,17 +223,19 @@ const styles = StyleSheet.create({
     },
     orgName: {
         color: '#fff',
-        fontSize: 24,
-        fontWeight: '800',
-        marginBottom: 4,
+        fontSize: 22,
+        fontFamily: 'Outfit_Bold',
+        marginBottom: 8,
+        textAlign: 'center',
     },
     heroSubtitle: {
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: 14,
-        fontWeight: '600',
+        color: colors.accent, // Use accent color for portal status
+        fontSize: 12,
+        fontFamily: 'Lexend_SemiBold',
         textTransform: 'uppercase',
         letterSpacing: 2,
         marginBottom: 20,
+        textAlign: 'center',
     },
     heroDescription: {
         color: 'rgba(255,255,255,0.8)',
@@ -269,7 +291,7 @@ const styles = StyleSheet.create({
     },
     locationRow: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
     },
     locationPin: {
         width: 48,

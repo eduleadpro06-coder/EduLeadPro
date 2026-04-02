@@ -1,9 +1,9 @@
 /**
  * Post Update Screen - Teacher
- * Allows teachers to post daily activity updates for multiple students with images
+ * Clean modal-based selection flow
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -17,18 +17,18 @@ import {
     ActivityIndicator,
     Image,
     StatusBar,
-    KeyboardAvoidingView
+    KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { colors } from '../../src/theme/colors';
-import { spacing } from '../../src/theme/spacing';
-import { typography } from '../../src/theme/typography';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, spacing, shadows, typography } from '../../src/theme';
 import PremiumButton from '../../src/components/ui/PremiumButton';
 import PremiumCard from '../../src/components/ui/PremiumCard';
-import { api } from '../../src/services/api';
+import { teacherAPI } from '../../src/services/api/teacher.api';
+import { StudentInfo } from '../../src/types/teacher.types';
 
 export default function PostUpdateScreen() {
     const router = useRouter();
@@ -36,17 +36,25 @@ export default function PostUpdateScreen() {
     // State
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const [students, setStudents] = useState<any[]>([]);
+    const [allStudents, setAllStudents] = useState<StudentInfo[]>([]);
 
-    // Form State
-    const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
+    // Modal State
+    const [modalVisible, setModalVisible] = useState(false);
+
+    // Filter & Search State (inside modal)
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Selection State
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+    // Composition State
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [activityType, setActivityType] = useState('activity');
-    const [images, setImages] = useState<string[]>([]); // Changed to array
-
-    // Dropdown State
-    const [showStudentPicker, setShowStudentPicker] = useState(false);
+    const [images, setImages] = useState<string[]>([]);
+    const [templates, setTemplates] = useState<any[]>([]);
+    const [isTemplateModalVisible, setIsTemplateModalVisible] = useState(false);
+    const [templateSearchQuery, setTemplateSearchQuery] = useState('');
 
     const activityTypes = [
         { label: 'Activity', value: 'activity', icon: 'book-open' },
@@ -56,69 +64,82 @@ export default function PostUpdateScreen() {
 
     useEffect(() => {
         loadStudents();
+        loadTemplates();
     }, []);
 
     const loadStudents = async () => {
         setLoading(true);
         try {
-            const data = await api.getTeacherStudents('');
-            setStudents(data);
+            const data = await teacherAPI.getTeacherStudents();
+            setAllStudents(data);
+            // Optionally, select all by default, but let's start empty for clarity.
         } catch (error) {
             console.error('Failed to load students', error);
-            Alert.alert('Error', 'Failed to load student list');
+            // Non-blocking error for UI smooth flow
         } finally {
             setLoading(false);
         }
     };
 
-    const pickImage = async () => {
+    // Derived Data for Modal
+    const filteredStudents = useMemo(() => {
+        return allStudents.filter(student => {
+            return student.name.toLowerCase().includes(searchQuery.toLowerCase());
+        });
+    }, [allStudents, searchQuery]);
+
+    const loadTemplates = async () => {
         try {
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: false,
-                quality: 0.7,
-                allowsMultipleSelection: true,
-                selectionLimit: 5,
-                base64: true,
-            });
-
-            if (!result.canceled) {
-                const newImages = result.assets
-                    .filter(asset => asset.base64)
-                    .map(asset => `data:image/jpeg;base64,${asset.base64}`);
-
-                setImages(prev => [...prev, ...newImages]);
-            }
+            const data = await teacherAPI.getTemplates();
+            setTemplates(data || []);
         } catch (error) {
-            Alert.alert('Error', 'Failed to pick image');
+            console.error('Failed to load templates:', error);
         }
     };
 
-    const takePhoto = async () => {
-        try {
-            const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-            if (permissionResult.granted === false) {
-                Alert.alert("Permission Refused", "You need to allow camera access to take photos.");
-                return;
-            }
+    const handleSelectTemplate = (templateContent: string) => {
+        setContent(templateContent);
+        setIsTemplateModalVisible(false);
+        setTemplateSearchQuery('');
+    };
 
-            const result = await ImagePicker.launchCameraAsync({
-                allowsEditing: false,
-                quality: 0.7,
-                base64: true,
-            });
+    const filteredTemplates = useMemo(() => {
+        return templates.filter(t => {
+            // First filter by search query
+            const matchesSearch = t.displayName.toLowerCase().includes(templateSearchQuery.toLowerCase()) ||
+                t.content.toLowerCase().includes(templateSearchQuery.toLowerCase());
+            
+            if (!matchesSearch) return false;
 
-            if (!result.canceled && result.assets[0].base64) {
-                const base64Img = `data:image/jpeg;base64,${result.assets[0].base64}`;
-                setImages(prev => [...prev, base64Img]);
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Failed to open camera');
+            // Then filter by category if no search query is active
+            // If there's a search query, show all matching results
+            if (templateSearchQuery.length > 0) return true;
+
+            // Otherwise, filter by the selected activityType
+            // (Note: behavior is 'behaviour' in activityTypes but often 'behavior' in DB, handle both)
+            const type = activityType === 'behaviour' ? 'behaviour' : activityType;
+            return t.category === type || t.category === 'general';
+        });
+    }, [templates, templateSearchQuery, activityType]);
+
+    // Selection Handlers
+    const toggleStudent = (id: number) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredStudents.length && filteredStudents.length > 0) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredStudents.map(s => s.id));
         }
     };
 
+    // Submission Handlers
     const handleSubmit = async () => {
-        if (selectedStudents.length === 0) {
+        if (selectedIds.length === 0) {
             Alert.alert('Selection Required', 'Please select at least one student');
             return;
         }
@@ -129,367 +150,336 @@ export default function PostUpdateScreen() {
 
         setSubmitting(true);
         try {
-            const leadIds = selectedStudents.map(s => s.id);
-            await api.postActivity(leadIds, content, {
-                title: title.trim() || getDefaultTitle(),
-                activityType: activityType,
-                images: images, // Pass array of base64 images
-                image: images.length > 0 ? images[0] : null // Legacy support
+            await teacherAPI.postActivity(selectedIds, content, {
+                title: title.trim() || activityTypes.find(t => t.value === activityType)?.label,
+                activityType,
+                images,
             });
 
             Alert.alert('Success', 'Update posted successfully', [
                 { text: 'OK', onPress: () => router.back() }
             ]);
         } catch (error: any) {
-            console.error('Post update error:', error);
             Alert.alert('Error', error.message || 'Failed to post update');
         } finally {
             setSubmitting(false);
         }
     };
 
-    const toggleStudentSelection = (student: any) => {
-        if (selectedStudents.find(s => s.id === student.id)) {
-            setSelectedStudents(prev => prev.filter(s => s.id !== student.id));
-        } else {
-            setSelectedStudents(prev => [...prev, student]);
+    // Image Picker Handlers
+    const pickImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.7,
+            allowsMultipleSelection: true,
+            selectionLimit: 5 - images.length,
+            base64: true,
+        });
+
+        if (!result.canceled) {
+            const newImages = result.assets
+                .filter(asset => asset.base64)
+                .map(asset => `data:image/jpeg;base64,${asset.base64}`);
+            setImages(prev => [...prev, ...newImages]);
         }
     };
 
-    // Template State
-    const [showTemplates, setShowTemplates] = useState(false);
-    const templatesByType: Record<string, string[]> = {
-        activity: [
-            "We enjoyed learning about nature today through a fun sensory activity.",
-            "The children loved our storytelling session with puppets.",
-            "We had a wonderful time painting with bright, child-safe colors.",
-            "Practiced sorting shapes and colors today.",
-            "The little ones learned a new rhyming song and danced along.",
-            "Today's playtime was filled with building blocks and teamwork."
-        ],
-        achievement: [
-            "Awarded 'Little Star' for great participation today!",
-            "Did a fantastic job putting toys away during clean-up time.",
-            "Shared nicely with friends today - great display of kindness.",
-            "Successfully drew their first circle today!",
-            "Ate all their lunch without any help today.",
-            "Demonstrated great listening skills during circle time."
-        ],
-        behaviour: [
-            "Had a very calm and happy day in class today.",
-            "Was very attentive and engaged during storytime.",
-            "Needs a little practice with sharing toys with friends.",
-            "Displayed positive energy during our outdoor play.",
-            "Please ensure they get plenty of rest tonight.",
-            "Was very polite and used 'please' and 'thank you' nicely."
-        ]
-    };
+    const takePhoto = async () => {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) return;
 
-    const currentTemplates = templatesByType[activityType] || templatesByType['activity'];
+        const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: false,
+            quality: 0.7,
+            base64: true,
+        });
 
-    const selectAllStudents = () => {
-        if (selectedStudents.length === students.length) {
-            setSelectedStudents([]);
-        } else {
-            setSelectedStudents([...students]);
+        if (!result.canceled && result.assets[0].base64) {
+            setImages(prev => [...prev, `data:image/jpeg;base64,${result.assets[0].base64}`]);
         }
     };
 
-    const handleTemplateSelect = (template: string) => {
-        setContent(template);
-        setShowTemplates(false);
-    };
-
-    const renderTemplateModal = () => (
-        <Modal
-            visible={showTemplates}
-            transparent={true}
-            animationType="slide"
-            onRequestClose={() => setShowTemplates(false)}
-        >
-            <View style={styles.modalOverlay}>
-                <View style={[styles.modalContent, { maxHeight: '60%' }]}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Templates: {activityTypes.find(t => t.value === activityType)?.label}</Text>
-                        <TouchableOpacity onPress={() => setShowTemplates(false)}>
-                            <Feather name="x" size={24} color={colors.text.secondary} />
-                        </TouchableOpacity>
-                    </View>
-                    <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
-                        {currentTemplates.map((template, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={styles.templateItem}
-                                onPress={() => handleTemplateSelect(template)}
-                            >
-                                <Text style={styles.templateText}>{template}</Text>
-                                <Feather name="chevron-right" size={16} color={colors.text.light} />
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
-            </View>
-        </Modal>
-    );
-
-    const getDefaultTitle = () => {
-        const typeObj = activityTypes.find(t => t.value === activityType);
-        return typeObj ? typeObj.label : 'Activity Update';
-    };
-
-    // Search State
-    const [searchQuery, setSearchQuery] = useState('');
-    const [showSearch, setShowSearch] = useState(false);
-
-    const filteredStudents = students.filter(student =>
-        student.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const renderStudentList = () => (
-        <View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 4 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={styles.sectionLabel}>Who is this for?</Text>
-                    <TouchableOpacity
-                        onPress={() => {
-                            setShowSearch(!showSearch);
-                            if (showSearch) setSearchQuery('');
-                        }}
-                        style={{ marginLeft: 12, padding: 4 }}
-                    >
-                        <Feather name={showSearch ? "x-circle" : "search"} size={16} color={colors.primary} />
+    const renderSelectionModal = () => (
+        <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
+            <SafeAreaView style={styles.modalSafeArea}>
+                <View style={styles.modalHeader}>
+                    <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalHeaderBtn}>
+                        <Text style={styles.modalCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.modalTitle}>Assign to</Text>
+                    <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalHeaderBtn}>
+                        <Text style={styles.modalDoneText}>Done</Text>
                     </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={selectAllStudents}>
-                    <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 13 }}>
-                        {selectedStudents.length === students.length ? 'Deselect All' : 'Select All'}
-                    </Text>
-                </TouchableOpacity>
-            </View>
 
-            {showSearch && (
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search student..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholderTextColor={colors.text.light}
-                    autoFocus
-                />
-            )}
-
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 2, gap: 12 }}
-            >
-                {filteredStudents.length === 0 ? (
-                    <Text style={{ color: colors.text.secondary, fontStyle: 'italic', padding: 8 }}>No students found</Text>
-                ) : (
-                    filteredStudents.map(student => {
-                        const isSelected = !!selectedStudents.find(s => s.id === student.id);
-                        return (
-                            <TouchableOpacity
-                                key={student.id}
-                                style={{ alignItems: 'center', width: 64 }}
-                                onPress={() => toggleStudentSelection(student)}
-                            >
-                                <View style={[
-                                    styles.avatarRing,
-                                    isSelected && styles.avatarRingActive
-                                ]}>
-                                    <View style={[
-                                        styles.inlineAvatar,
-                                        isSelected && styles.inlineAvatarActive
-                                    ]}>
-                                        <Feather name="user" size={20} color={isSelected ? colors.white : colors.text.secondary} />
-                                    </View>
-                                    {isSelected && (
-                                        <View style={styles.checkmarkBadge}>
-                                            <Feather name="check" size={10} color={colors.white} />
-                                        </View>
-                                    )}
-                                </View>
-                                <Text numberOfLines={1} style={[
-                                    styles.studentNameCompact,
-                                    isSelected && styles.studentNameActive
-                                ]}>
-                                    {student.name ? student.name.split(' ')[0] : 'Student'}
-                                </Text>
+                <View style={styles.modalSearchBlock}>
+                    <View style={styles.modalSearchBar}>
+                        <Feather name="search" size={20} color={colors.textTertiary} />
+                        <TextInput
+                            style={styles.modalSearchInput}
+                            placeholder="Search assigned students..."
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            placeholderTextColor={colors.textTertiary}
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                <Feather name="x-circle" size={18} color={colors.textTertiary} />
                             </TouchableOpacity>
-                        );
-                    })
-                )}
-            </ScrollView>
+                        )}
+                    </View>
+                </View>
 
-            {/* Summary Text */}
-            <Text style={styles.selectionSummary}>
-                {selectedStudents.length === 0
-                    ? 'Select students above'
-                    : `${selectedStudents.length} student${selectedStudents.length !== 1 ? 's' : ''} selected`}
-            </Text>
-        </View>
-    );
-
-    const handleImageAction = () => {
-        Alert.alert('Upload Photo', 'Choose a source', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Gallery', onPress: pickImage },
-            { text: 'Camera', onPress: takePhoto },
-        ]);
-    };
-
-    const renderTypePicker = () => (
-        <View style={styles.typeListContent}>
-            {activityTypes.map(type => (
-                <TouchableOpacity
-                    key={type.value}
-                    style={[
-                        styles.typeChip,
-                        { flex: 1, justifyContent: 'center' },
-                        activityType === type.value && styles.typeChipActive
-                    ]}
-                    onPress={() => setActivityType(type.value)}
-                >
-                    <Feather
-                        name={type.icon as any}
-                        size={16}
-                        color={activityType === type.value ? colors.white : colors.text.secondary}
-                    />
-                    <Text style={[
-                        styles.typeLabel,
-                        activityType === type.value && styles.typeLabelActive
-                    ]} numberOfLines={1}>
-                        {type.label}
-                    </Text>
+                {/* Select All Toggle */}
+                <TouchableOpacity style={styles.selectAllModalRow} onPress={toggleSelectAll}>
+                    <View style={[styles.checkbox, selectedIds.length === filteredStudents.length && filteredStudents.length > 0 && styles.checkboxActive]}>
+                        {selectedIds.length === filteredStudents.length && filteredStudents.length > 0 && <Feather name="check" size={14} color="#FFF" />}
+                    </View>
+                    <Text style={styles.selectAllTextModal}>Select All shown</Text>
                 </TouchableOpacity>
-            ))}
-        </View>
+
+                {loading ? (
+                    <ActivityIndicator style={{ marginTop: 50 }} color={colors.primary} />
+                ) : (
+                    <ScrollView style={styles.modalList}>
+                        {filteredStudents.length === 0 ? (
+                            <Text style={styles.emptyModalText}>No students found</Text>
+                        ) : (
+                            filteredStudents.map(student => {
+                                const isSelected = selectedIds.includes(student.id);
+                                return (
+                                    <TouchableOpacity 
+                                        key={student.id} 
+                                        style={styles.modalListItem}
+                                        onPress={() => toggleStudent(student.id)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
+                                            {isSelected && <Feather name="check" size={14} color="#FFF" />}
+                                        </View>
+                                        <View style={styles.modalAvatar}>
+                                            <Text style={styles.modalAvatarText}>{student.name.charAt(0)}</Text>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.modalStudentName}>{student.name}</Text>
+                                            <Text style={styles.modalStudentClass}>{student.class}</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })
+                        )}
+                    </ScrollView>
+                )}
+            </SafeAreaView>
+        </Modal>
     );
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
-            <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
-                <KeyboardAvoidingView
-                    style={{ flex: 1 }}
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+            <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
+            <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+                <KeyboardAvoidingView 
+                    style={{ flex: 1 }} 
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
                 >
                     {/* Header */}
-                    <View style={styles.header}>
-                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                            <Feather name="arrow-left" size={24} color={colors.text.primary} />
-                        </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Post Daily Update</Text>
-                        <View style={{ width: 24 }} />
-                    </View>
+                    <LinearGradient
+                        colors={[colors.primary, colors.primaryDark]}
+                        style={styles.header}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    >
+                        <View style={styles.headerContentInternal}>
+                            <TouchableOpacity onPress={() => router.back()}>
+                                <Feather name="arrow-left" size={24} color="#FFF" />
+                            </TouchableOpacity>
+                            <Text style={styles.headerTitle}>Post Daily Update</Text>
+                            <View style={{ width: 24 }} />
+                        </View>
+                    </LinearGradient>
 
-                    <ScrollView
-                        contentContainerStyle={styles.content}
-                        keyboardDismissMode="on-drag"
+                    <ScrollView 
+                        style={styles.content} 
+                        contentContainerStyle={{ paddingBottom: 40 }}
                         keyboardShouldPersistTaps="handled"
                     >
+                        {/* New Clean Selection UI */}
+                        <Text style={styles.sectionTitle}>Assign To</Text>
+                        <TouchableOpacity style={styles.addStudentsBtn} onPress={() => setModalVisible(true)}>
+                            <View style={styles.addStudentsLeft}>
+                                <View style={styles.addStudentsIconBox}>
+                                    <Feather name="users" size={20} color={colors.primary} />
+                                </View>
+                                <View>
+                                    <Text style={styles.addStudentsTitle}>
+                                        {selectedIds.length > 0 ? `${selectedIds.length} Students Selected` : 'Select Students'}
+                                    </Text>
+                                    <Text style={styles.addStudentsSub}>
+                                        {selectedIds.length === 0 ? 'Tap to choose assigned students' : 'Tap to modify selection'}
+                                    </Text>
+                                </View>
+                            </View>
+                            <Feather name="chevron-right" size={20} color={colors.textTertiary} />
+                        </TouchableOpacity>
 
-                        {/* Student Selection (Inline) */}
-                        <PremiumCard style={styles.sectionCard}>
-                            {students.length > 0 ? renderStudentList() : (
-                                <ActivityIndicator color={colors.primary} />
-                            )}
-                        </PremiumCard>
+                        {/* Selected Chips directly on the form */}
+                        {selectedIds.length > 0 && (
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedChipsScroll}>
+                                {allStudents.filter(s => selectedIds.includes(s.id)).map(student => (
+                                    <View key={student.id} style={styles.selectedChipMain}>
+                                        <Text style={styles.selectedChipTextMain}>{student.name.split(' ')[0]}</Text>
+                                        <TouchableOpacity onPress={() => toggleStudent(student.id)} hitSlop={{top: 5, bottom: 5, left: 5, right: 5}}>
+                                            <Feather name="x" size={12} color="#FFF" style={{marginLeft: 4}} />
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                            </ScrollView>
+                        )}
+                        <View style={styles.divider} />
 
-                        {/* Activity Type Card (Horizontal Scroll) */}
-                        <View style={{ marginTop: spacing.md }}>
-                            <Text style={[styles.sectionLabel, { marginLeft: 4 }]}>Type of Update</Text>
-                            {renderTypePicker()}
+
+                        {/* Update Settings */}
+                        <Text style={styles.sectionTitle}>Type of Update</Text>
+                        <View style={styles.typeRow}>
+                            {activityTypes.map(type => (
+                                <TouchableOpacity
+                                    key={type.value}
+                                    style={[styles.typeChip, activityType === type.value && styles.typeChipActive]}
+                                    onPress={() => setActivityType(type.value)}
+                                >
+                                    <Feather name={type.icon as any} size={16} color={activityType === type.value ? "#FFF" : colors.textSecondary} />
+                                    <Text style={[styles.typeChipText, activityType === type.value && styles.typeChipTextActive]}>{type.label}</Text>
+                                </TouchableOpacity>
+                            ))}
                         </View>
 
-                        {/* Content Card */}
-                        <PremiumCard style={[styles.sectionCard, { marginTop: spacing.md }]}>
-                            <Text style={styles.sectionLabel}>Title (Optional)</Text>
+                        {/* Composition */}
+                        <PremiumCard style={styles.formCard}>
+                            <Text style={styles.inputLabel}>Title (Optional)</Text>
                             <TextInput
-                                style={styles.input}
-                                placeholder={getDefaultTitle()}
+                                style={styles.textInput}
+                                placeholder="Enter short title..."
                                 value={title}
                                 onChangeText={setTitle}
-                                placeholderTextColor={colors.text.light}
+                                placeholderTextColor={colors.textTertiary}
                             />
 
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md, marginBottom: 8 }}>
-                                <Text style={styles.sectionLabel}>Details</Text>
-                                <TouchableOpacity
-                                    style={{ flexDirection: 'row', alignItems: 'center' }}
-                                    onPress={() => setShowTemplates(true)}
+                            <View style={styles.labelRow}>
+                                <Text style={styles.inputLabel}>Details</Text>
+                                <TouchableOpacity 
+                                    style={styles.templateBtn}
+                                    onPress={() => setIsTemplateModalVisible(true)}
                                 >
                                     <Feather name="message-square" size={14} color={colors.primary} />
-                                    <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600', marginLeft: 4 }}>Templates</Text>
+                                    <Text style={styles.templateBtnText}>Templates</Text>
                                 </TouchableOpacity>
                             </View>
-
                             <TextInput
-                                style={[styles.input, styles.textArea]}
-                                placeholder="Enter details about the activity or event..."
+                                style={[styles.textInput, styles.textArea]}
+                                placeholder="Tell parents what the kids did today..."
                                 value={content}
                                 onChangeText={setContent}
                                 multiline
                                 numberOfLines={6}
-                                textAlignVertical="top"
-                                placeholderTextColor={colors.text.light}
+                                placeholderTextColor={colors.textTertiary}
                             />
 
-                            {/* Image Upload Area */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md }}>
-                                <Text style={styles.sectionLabel}>Photos ({images.length}/5)</Text>
-                                {images.length > 0 && (
-                                    <TouchableOpacity onPress={() => setImages([])}>
-                                        <Text style={{ fontSize: 12, color: colors.danger, fontWeight: '600' }}>Clear All</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 8 }}>
-                                {images.map((img, index) => (
-                                    <View key={index} style={styles.imagePreviewContainer}>
-                                        <Image source={{ uri: img }} style={styles.imagePreview} />
-                                        <TouchableOpacity
-                                            style={styles.removeImageBtn}
-                                            onPress={() => setImages(prev => prev.filter((_, i) => i !== index))}
+                            <Text style={styles.inputLabel}>Photos ({images.length}/5)</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
+                                {images.map((img, idx) => (
+                                    <View key={idx} style={styles.imageWrapper}>
+                                        <Image source={{ uri: img }} style={styles.previewImage} />
+                                        <TouchableOpacity 
+                                            style={styles.removeImgBtn}
+                                            onPress={() => setImages(prev => prev.filter((_, i) => i !== idx))}
                                         >
-                                            <Feather name="x" size={14} color="white" />
+                                            <Feather name="x" size={12} color="#FFF" />
                                         </TouchableOpacity>
                                     </View>
                                 ))}
-
                                 {images.length < 5 && (
-                                    <TouchableOpacity style={styles.uploadBox} onPress={handleImageAction}>
+                                    <TouchableOpacity style={styles.addImgBtn} onPress={() => Alert.alert('Add Photo', '', [
+                                        { text: 'Gallery', onPress: pickImage },
+                                        { text: 'Camera', onPress: takePhoto },
+                                        { text: 'Cancel', style: 'cancel' }
+                                    ])}>
                                         <Feather name="plus" size={24} color={colors.primary} />
-                                        <Text style={styles.uploadBoxText}>Add</Text>
+                                        <Text style={styles.addImgText}>Add</Text>
                                     </TouchableOpacity>
                                 )}
                             </ScrollView>
                         </PremiumCard>
 
-                        {/* Submit Button */}
-                        <View style={{ marginTop: spacing.xl }}>
-                            <PremiumButton
-                                title={`Post Update to ${selectedStudents.length || 0} Student${selectedStudents.length !== 1 ? 's' : ''}`}
-                                onPress={handleSubmit}
-                                loading={submitting}
-                                icon="send"
-                                disabled={selectedStudents.length === 0 || !content.trim()}
-                            />
-                            {selectedStudents.length === 0 && (
-                                <Text style={styles.hintText}>
-                                    Select at least one student to post
-                                </Text>
-                            )}
-                        </View>
-
+                        <PremiumButton
+                            title="Post Daily Update"
+                            onPress={handleSubmit}
+                            loading={submitting}
+                            style={styles.submitBtn}
+                            icon="send"
+                            disabled={selectedIds.length === 0 || !content.trim()}
+                        />
                     </ScrollView>
                 </KeyboardAvoidingView>
-
-                {renderTemplateModal()}
             </SafeAreaView>
+            {renderSelectionModal()}
+            
+            {/* Template Selection Modal */}
+            <Modal
+                visible={isTemplateModalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setIsTemplateModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContentSmall}>
+                        <View style={styles.modalHeaderSmall}>
+                            <Text style={styles.modalTitleSmall}>Select Template</Text>
+                            <TouchableOpacity 
+                                onPress={() => setIsTemplateModalVisible(false)}
+                                style={styles.modalCloseBtn}
+                            >
+                                <Feather name="x" size={24} color={colors.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.templateSearchBox}>
+                            <Feather name="search" size={20} color={colors.textTertiary} />
+                            <TextInput
+                                style={styles.templateSearchInput}
+                                placeholder="Search templates..."
+                                value={templateSearchQuery}
+                                onChangeText={setTemplateSearchQuery}
+                                placeholderTextColor={colors.textTertiary}
+                            />
+                        </View>
+
+                        <ScrollView style={styles.templateListScroll}>
+                            {filteredTemplates.length > 0 ? (
+                                filteredTemplates.map((template) => (
+                                    <TouchableOpacity 
+                                        key={template.id} 
+                                        style={styles.templateItemCard}
+                                        onPress={() => handleSelectTemplate(template.content)}
+                                    >
+                                        <Text style={styles.templateItemName}>{template.displayName}</Text>
+                                        <Text style={styles.templateItemPreview} numberOfLines={2}>
+                                            {template.content}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))
+                            ) : (
+                                <View style={styles.emptyTemplatesBox}>
+                                    <Text style={styles.emptyTemplatesText}>
+                                        {templateSearchQuery ? 'No matching templates' : 'No templates found'}
+                                    </Text>
+                                </View>
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -497,312 +487,406 @@ export default function PostUpdateScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#FAFAFA',
     },
     header: {
+        paddingBottom: 20,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+    },
+    headerContentInternal: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: spacing.md,
-        paddingVertical: 12,
-        backgroundColor: colors.white,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.cardBorder,
-    },
-    backButton: {
-        padding: 8,
-        marginLeft: -8
+        paddingHorizontal: 20,
+        paddingTop: 15,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: colors.text.primary,
+        fontSize: 20,
+        fontFamily: 'Outfit_Bold',
+        color: '#FFF',
     },
     content: {
-        padding: spacing.md,
-        paddingBottom: 40
+        flex: 1,
+        padding: 20,
     },
-    sectionCard: {
-        marginBottom: 8,
-        padding: 10
-    },
-    sectionLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: colors.text.secondary,
-        marginBottom: 4,
-    },
-
-    // Inline Student List
-    avatarRing: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        borderWidth: 2,
-        borderColor: colors.cardBorder,
-        padding: 2,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 4
-    },
-    avatarRingActive: {
-        borderColor: colors.primary,
-        backgroundColor: colors.primary
-    },
-    inlineAvatar: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 28,
-        backgroundColor: colors.background,
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    inlineAvatarActive: {
-        backgroundColor: colors.primary
-    },
-    checkmarkBadge: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        backgroundColor: colors.primary,
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: colors.white
-    },
-    studentNameCompact: {
-        fontSize: 13,
-        color: colors.text.secondary,
-        textAlign: 'center',
-        marginTop: 4
-    },
-    studentNameActive: {
-        color: colors.primary,
-        fontWeight: '600'
-    },
-    selectionSummary: {
-        fontSize: 12,
-        color: colors.text.light,
-        marginTop: 12,
-        marginLeft: 4,
-        fontStyle: 'italic'
-    },
-
-    // Input
-    input: {
-        backgroundColor: colors.background,
-        borderRadius: 10,
-        padding: 10,
-        fontSize: 15,
-        color: colors.text.primary,
-        borderWidth: 1,
-        borderColor: colors.cardBorder,
-        minHeight: 40,
-    },
-    textArea: {
-        minHeight: 80,
-        paddingTop: 10,
-    },
-
-    // Horizontal Type List
-    typeListContent: {
+    
+    // Clean Header Assignment
+    addStudentsBtn: {
         flexDirection: 'row',
-        gap: 8,
-        paddingHorizontal: 2,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFF',
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#EFEFEF',
+        ...shadows.sm,
+        marginBottom: 10,
+    },
+    addStudentsLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    addStudentsIconBox: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.primary + '15',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 15,
+    },
+    addStudentsTitle: {
+        fontSize: 16,
+        fontFamily: 'Lexend_SemiBold',
+        color: colors.textPrimary,
+    },
+    addStudentsSub: {
+        fontSize: 12,
+        fontFamily: 'Lexend_Regular',
+        color: colors.textTertiary,
+        marginTop: 2,
+    },
+    selectedChipsScroll: {
+        flexDirection: 'row',
+        marginBottom: 20,
+    },
+    selectedChipMain: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.primary,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        marginRight: 8,
+    },
+    selectedChipTextMain: {
+        color: '#FFF',
+        fontSize: 12,
+        fontFamily: 'Lexend_Medium',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#EAEAEA',
+        marginVertical: 20,
+    },
+
+    // Sections
+    sectionTitle: {
+        fontSize: 14,
+        fontFamily: 'Outfit_Bold',
+        color: colors.textTertiary,
+        marginBottom: 12,
+        textTransform: 'uppercase',
+    },
+    typeRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 20,
     },
     typeChip: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         paddingVertical: 12,
-        paddingHorizontal: 8,
-        backgroundColor: colors.white,
-        borderRadius: 20,
+        backgroundColor: '#FFF',
+        borderRadius: 15,
         borderWidth: 1,
-        borderColor: colors.cardBorder,
-        marginRight: 4,
+        borderColor: '#EEE',
+        gap: 6,
     },
     typeChipActive: {
         backgroundColor: colors.primary,
         borderColor: colors.primary,
     },
-    typeLabel: {
-        marginLeft: 8,
+    typeChipText: {
         fontSize: 13,
-        fontWeight: '600',
-        color: colors.text.secondary,
+        fontFamily: 'Lexend_Medium',
+        color: colors.textSecondary,
     },
-    typeLabelActive: {
-        color: colors.white,
+    typeChipTextActive: {
+        color: '#FFF',
     },
-
-    // Simplified Image Upload
-    imageUploadContainer: {
-        marginTop: 4,
+    formCard: {
+        padding: 15,
+        marginBottom: 20,
     },
-    uploadBtnRefined: {
+    inputLabel: {
+        fontSize: 13,
+        fontFamily: 'Lexend_SemiBold',
+        color: colors.textTertiary,
+        marginBottom: 8,
+    },
+    textInput: {
+        backgroundColor: '#F9F9F9',
+        borderRadius: 12,
+        padding: 12,
+        fontSize: 15,
+        fontFamily: 'Lexend_Regular',
+        color: colors.textPrimary,
+        borderWidth: 1,
+        borderColor: '#F0F0F0',
+        marginBottom: 20,
+    },
+    textArea: {
+        height: 120,
+        textAlignVertical: 'top',
+    },
+    labelRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    templateBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
-        backgroundColor: colors.background,
-        borderWidth: 1,
-        borderColor: colors.cardBorder,
-        borderRadius: 10,
-        borderStyle: 'dashed',
-        marginBottom: 8,
-        justifyContent: 'center'
+        gap: 4,
     },
-    uploadBtnTextRefined: {
-        marginLeft: 8,
+    templateBtnText: {
         color: colors.primary,
-        fontSize: 14,
-        fontWeight: '600'
+        fontSize: 13,
+        fontFamily: 'Lexend_SemiBold',
     },
-    // Multi Image Styles
-    imagePreviewContainer: {
-        width: 100,
-        height: 100,
-        borderRadius: 8,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: colors.cardBorder,
+    imageScroll: {
+        marginTop: 5,
     },
-    imagePreview: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
+    imageWrapper: {
+        marginRight: 12,
     },
-    removeImageBtn: {
+    previewImage: {
+        width: 80,
+        height: 80,
+        borderRadius: 12,
+    },
+    removeImgBtn: {
         position: 'absolute',
-        top: 4,
-        right: 4,
+        top: -5,
+        right: -5,
         backgroundColor: 'rgba(0,0,0,0.6)',
-        borderRadius: 10,
         width: 20,
         height: 20,
+        borderRadius: 10,
+        justifyContent: 'center',
         alignItems: 'center',
-        justifyContent: 'center'
     },
-    uploadBox: {
-        width: 100,
-        height: 100,
-        borderRadius: 8,
+    addImgBtn: {
+        width: 80,
+        height: 80,
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: colors.cardBorder,
+        borderColor: colors.primary,
         borderStyle: 'dashed',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: colors.background
+        backgroundColor: colors.primary + '05',
     },
-    uploadBoxText: {
-        fontSize: 12,
+    addImgText: {
+        fontSize: 11,
         color: colors.primary,
-        marginTop: 4,
-        fontWeight: '600'
+        fontFamily: 'Lexend_Medium',
+        marginTop: 2,
+    },
+    submitBtn: {
+        marginTop: 10,
     },
 
-    // Hint
-    hintText: {
+    // Modal Styles
+    modalSafeArea: {
+        flex: 1,
+        backgroundColor: '#FFF',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+    },
+    modalHeaderBtn: {
+        padding: 5,
+    },
+    modalCancelText: {
+        fontSize: 16,
+        color: colors.textSecondary,
+        fontFamily: 'Lexend_Regular',
+    },
+    modalDoneText: {
+        fontSize: 16,
+        color: colors.primary,
+        fontFamily: 'Lexend_SemiBold',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontFamily: 'Outfit_Bold',
+        color: colors.textPrimary,
+    },
+    modalSearchBlock: {
+        padding: 15,
+        backgroundColor: '#FFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F5F5F5',
+    },
+    modalSearchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5F5F5',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 44,
+    },
+    modalSearchInput: {
+        flex: 1,
+        marginLeft: 8,
+        fontSize: 15,
+        fontFamily: 'Lexend_Regular',
+        color: colors.textPrimary,
+    },
+    selectAllModalRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F5F5F5',
+    },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 5,
+        borderWidth: 1.5,
+        borderColor: '#CCC',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    checkboxActive: {
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
+    },
+    selectAllTextModal: {
+        fontSize: 15,
+        fontFamily: 'Lexend_Medium',
+        color: colors.textPrimary,
+    },
+    modalList: {
+        flex: 1,
+    },
+    modalListItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F9F9F9',
+    },
+    modalAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.primary + '15',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    modalAvatarText: {
+        color: colors.primary,
+        fontSize: 16,
+        fontFamily: 'Outfit_Bold',
+    },
+    modalStudentName: {
+        fontSize: 15,
+        fontFamily: 'Lexend_Medium',
+        color: colors.textPrimary,
+    },
+    modalStudentClass: {
+        fontSize: 13,
+        fontFamily: 'Lexend_Regular',
+        color: colors.textTertiary,
+    },
+    emptyModalText: {
         textAlign: 'center',
-        marginTop: 8,
-        color: colors.text.light,
-        fontSize: 12
+        marginTop: 40,
+        fontFamily: 'Lexend_Medium',
+        color: '#BBB',
+        fontSize: 15,
     },
 
-    // Modal - No longer used but key kept if needed for other things
+    // Template Modal Styles
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'flex-end',
     },
-    modalContent: {
-        backgroundColor: colors.white,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: spacing.md,
-        maxHeight: '80%',
+    modalContentSmall: {
+        backgroundColor: '#FFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        height: '70%',
+        padding: 20,
     },
-    modalHeader: {
+    modalHeaderSmall: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.sm,
-        paddingBottom: spacing.sm,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.cardBorder,
+        marginBottom: 20,
     },
-    modalTitle: {
+    modalTitleSmall: {
         fontSize: 18,
-        fontWeight: 'bold',
-        color: colors.text.primary,
+        fontFamily: 'Outfit_Bold',
+        color: colors.textPrimary,
     },
-    templateItem: {
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.cardBorder,
+    modalCloseBtn: {
+        padding: 5,
+    },
+    templateSearchBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between'
-    },
-    templateText: {
-        fontSize: 14,
-        color: colors.text.primary,
-        flex: 1,
-        marginRight: 10,
-        lineHeight: 20
-    },
-    searchInput: {
-        backgroundColor: colors.background,
-        borderRadius: 8,
+        backgroundColor: '#F5F5F5',
+        borderRadius: 12,
         paddingHorizontal: 12,
-        paddingVertical: 8,
-        fontSize: 14,
-        color: colors.text.primary,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: colors.cardBorder
+        height: 48,
+        marginBottom: 15,
     },
-    modalSubtitle: {
-        fontSize: 12,
-        color: colors.text.secondary,
-        marginTop: 1,
-    },
-    pickerItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.cardBorder,
-    },
-    pickerItemText: {
+    templateSearchInput: {
+        flex: 1,
+        marginLeft: 10,
         fontSize: 15,
-        fontWeight: '600',
-        color: colors.text.primary,
+        fontFamily: 'Lexend_Regular',
+        color: colors.textPrimary,
     },
-    pickerItemSubText: {
-        fontSize: 12,
-        color: colors.text.secondary,
-        marginTop: 1,
+    templateListScroll: {
+        flex: 1,
     },
-    avatarPlaceholder: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: colors.background,
+    templateItemCard: {
+        padding: 16,
+        backgroundColor: '#FCFCFC',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#F0F0F0',
+        marginBottom: 10,
+    },
+    templateItemName: {
+        fontSize: 15,
+        fontFamily: 'Lexend_SemiBold',
+        color: colors.textPrimary,
+        marginBottom: 4,
+    },
+    templateItemPreview: {
+        fontSize: 13,
+        fontFamily: 'Lexend_Regular',
+        color: colors.textSecondary,
+        lineHeight: 18,
+    },
+    emptyTemplatesBox: {
+        padding: 40,
         alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12
     },
-    checkbox: {
-        width: 20,
-        height: 20,
-        borderRadius: 6,
-        borderWidth: 2,
-        borderColor: colors.text.light,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginLeft: 12
+    emptyTemplatesText: {
+        fontSize: 14,
+        color: colors.textTertiary,
+        fontFamily: 'Lexend_Medium',
     }
 });

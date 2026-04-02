@@ -13,14 +13,14 @@ import {
     Alert,
     Modal,
     ActivityIndicator,
-    FlatList
+    FlatList,
+    StatusBar
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { colors } from '../../src/theme/colors';
-import { spacing } from '../../src/theme/spacing';
-import { typography } from '../../src/theme/typography'; // Using standard typography if available, else inline
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, spacing, typography } from '../../src/theme';
 import PremiumCard from '../../src/components/ui/PremiumCard';
 import { api } from '../../src/services/api';
 
@@ -41,7 +41,7 @@ const getStatusColor = (status: string) => {
         case 'present': return colors.success;
         case 'late': return colors.warning;
         case 'absent': return colors.danger;
-        default: return colors.neutral;
+        default: return colors.textTertiary;
     }
 };
 
@@ -56,6 +56,22 @@ export default function AttendanceHistoryScreen() {
 
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
     const [showStudentPicker, setShowStudentPicker] = useState(false);
+
+    const getInitials = (name: string) => {
+        if (!name) return 'S';
+        return name
+            .split(' ')
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .substring(0, 2);
+    };
+
+    const getAvatarColor = (id: number) => {
+        const colors_list = ['#643ae5', '#2196F3', '#4CAF50', '#FF9800', '#E91E63', '#9C27B0'];
+        const index = typeof id === 'number' ? id : 0;
+        return colors_list[index % colors_list.length];
+    };
 
     useEffect(() => {
         loadStudents();
@@ -113,7 +129,7 @@ export default function AttendanceHistoryScreen() {
                     <View style={styles.modalHeader}>
                         <Text style={styles.modalTitle}>Select Student</Text>
                         <TouchableOpacity onPress={() => setShowStudentPicker(false)}>
-                            <Feather name="x" size={24} color={colors.text.secondary} />
+                            <Feather name="x" size={24} color={colors.textSecondary} />
                         </TouchableOpacity>
                     </View>
                     <ScrollView style={{ maxHeight: 400 }}>
@@ -129,8 +145,10 @@ export default function AttendanceHistoryScreen() {
                                         setShowStudentPicker(false);
                                     }}
                                 >
-                                    <View style={styles.avatarPlaceholder}>
-                                        <Feather name="user" size={16} color={colors.primary} />
+                                    <View style={[styles.avatarPlaceholder, { backgroundColor: getAvatarColor(student.id) + '20' }]}>
+                                        <Text style={{ fontSize: 13, color: getAvatarColor(student.id), fontFamily: 'Outfit_Bold' }}>
+                                            {getInitials(student.name)}
+                                        </Text>
                                     </View>
                                     <View>
                                         <Text style={styles.pickerItemText}>{student.name}</Text>
@@ -167,15 +185,25 @@ export default function AttendanceHistoryScreen() {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
             {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Feather name="arrow-left" size={24} color={colors.text.primary} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Attendance History</Text>
-                <View style={{ width: 24 }} />
-            </View>
+            <LinearGradient
+                colors={[colors.primary, colors.primaryDark]}
+                style={styles.header}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+            >
+                <SafeAreaView edges={['top']}>
+                    <View style={styles.headerContentInternal}>
+                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                            <Feather name="arrow-left" size={24} color="#FFF" />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>Attendance History</Text>
+                        <View style={{ width: 24 }} />
+                    </View>
+                </SafeAreaView>
+            </LinearGradient>
 
             <View style={styles.content}>
                 {/* Student Selector - Horizontal List */}
@@ -189,15 +217,25 @@ export default function AttendanceHistoryScreen() {
                         keyExtractor={item => item.id.toString()}
                         renderItem={({ item }) => {
                             const isSelected = selectedStudent?.id === item.id;
+                            const avatarColor = getAvatarColor(item.id);
                             return (
                                 <TouchableOpacity
                                     style={[styles.avatarItem, isSelected && styles.avatarItemSelected]}
                                     onPress={() => setSelectedStudent(item)}
                                 >
-                                    <View style={[styles.avatarCircle, isSelected && { backgroundColor: colors.primary }]}>
-                                        <Feather name="user" size={20} color={isSelected ? 'white' : colors.primary} />
+                                    <View style={[
+                                        styles.avatarCircle, 
+                                        isSelected ? { backgroundColor: avatarColor, borderColor: avatarColor } : { borderColor: '#F3F4F6' }
+                                    ]}>
+                                        <Text style={{ 
+                                            fontSize: 16, 
+                                            color: isSelected ? '#FFF' : avatarColor, 
+                                            fontFamily: 'Outfit_Bold' 
+                                        }}>
+                                            {getInitials(item.name)}
+                                        </Text>
                                     </View>
-                                    <Text style={[styles.avatarName, isSelected && { color: colors.primary, fontWeight: '700' }]} numberOfLines={1}>
+                                    <Text style={[styles.avatarName, isSelected && { color: avatarColor, fontWeight: '700' }]} numberOfLines={1}>
                                         {item.name.split(' ')[0]}
                                     </Text>
                                 </TouchableOpacity>
@@ -216,12 +254,12 @@ export default function AttendanceHistoryScreen() {
                         </View>
                     ) : !selectedStudent ? (
                         <View style={styles.centered}>
-                            <Feather name="arrow-up" size={48} color={colors.neutral + '40'} />
+                            <Feather name="arrow-up" size={48} color={colors.textTertiary + '40'} />
                             <Text style={styles.emptyText}>Select a student from the list above</Text>
                         </View>
                     ) : history.length === 0 ? (
                         <View style={styles.centered}>
-                            <Feather name="calendar" size={48} color={colors.neutral + '40'} />
+                            <Feather name="calendar" size={48} color={colors.textTertiary + '40'} />
                             <Text style={styles.emptyText}>No attendance records found</Text>
                         </View>
                     ) : (
@@ -237,7 +275,7 @@ export default function AttendanceHistoryScreen() {
             </View>
 
             {renderStudentPicker()}
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -247,56 +285,58 @@ const styles = StyleSheet.create({
         backgroundColor: colors.background,
     },
     header: {
+        paddingBottom: 20,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+    },
+    headerContentInternal: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.md,
-        backgroundColor: colors.white,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.cardBorder,
+        paddingTop: 12,
     },
     backButton: {
         padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: colors.text.primary,
+        fontSize: 20,
+        fontFamily: 'Outfit_Bold',
+        color: '#FFF',
     },
     content: {
         flex: 1,
-        padding: spacing.lg,
+        padding: 20,
     },
     sectionLabel: {
         fontSize: 14,
-        fontWeight: '600',
-        color: colors.text.secondary,
-        marginBottom: spacing.xs,
-        marginTop: spacing.sm,
+        fontFamily: 'Lexend_SemiBold',
+        color: colors.textSecondary,
+        marginBottom: 12,
+        marginTop: 4,
     },
     selector: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: colors.white,
+        backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderColor: colors.cardBorder,
+        borderColor: colors.border,
         borderRadius: 12,
         padding: spacing.md,
     },
     selectorValue: {
         fontSize: 16,
         fontWeight: '600',
-        color: colors.text.primary,
+        color: colors.textPrimary,
     },
     selectorSubValue: {
         fontSize: 12,
-        color: colors.text.secondary,
+        color: colors.textSecondary,
     },
     selectorPlaceholder: {
         fontSize: 16,
-        color: colors.text.light,
+        color: colors.textTertiary,
     },
 
     // Avatar Horizontal List
@@ -321,7 +361,7 @@ const styles = StyleSheet.create({
     },
     avatarName: {
         fontSize: 12,
-        color: colors.text.secondary,
+        color: colors.textSecondary,
         textAlign: 'center',
         fontWeight: '500',
     },
@@ -331,12 +371,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: colors.white,
+        backgroundColor: '#FFFFFF',
         padding: spacing.md,
         borderRadius: 12,
         marginBottom: spacing.sm,
         borderWidth: 1,
-        borderColor: colors.cardBorder,
+        borderColor: colors.border,
     },
     dateContainer: {
         justifyContent: 'center',
@@ -344,11 +384,11 @@ const styles = StyleSheet.create({
     dateText: {
         fontSize: 16,
         fontWeight: '500',
-        color: colors.text.primary,
+        color: colors.textPrimary,
     },
     timeText: {
         fontSize: 12,
-        color: colors.text.secondary,
+        color: colors.textSecondary,
         marginTop: 2,
     },
     statusBadge: {
@@ -371,7 +411,7 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         marginTop: spacing.md,
-        color: colors.text.secondary,
+        color: colors.textSecondary,
         fontSize: 16,
     },
 
@@ -382,7 +422,7 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: colors.white,
+        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         padding: spacing.lg,
@@ -395,28 +435,28 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
         paddingBottom: spacing.md,
         borderBottomWidth: 1,
-        borderBottomColor: colors.cardBorder,
+        borderBottomColor: colors.border,
     },
     modalTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: colors.text.primary,
+        color: colors.textPrimary,
     },
     pickerItem: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: colors.cardBorder,
+        borderBottomColor: colors.border,
     },
     pickerItemText: {
         fontSize: 16,
         fontWeight: '600',
-        color: colors.text.primary,
+        color: colors.textPrimary,
     },
     pickerItemSubText: {
         fontSize: 12,
-        color: colors.text.secondary,
+        color: colors.textSecondary,
         marginTop: 2,
     },
     avatarPlaceholder: {

@@ -80,10 +80,8 @@ export default function PremiumDrawer({
         }
     }, [isVisible]);
 
-    if (!isVisible && slideAnim._value === -DRAWER_WIDTH) return null;
-
     return (
-        <View style={StyleSheet.absoluteFillObject} pointerEvents={isVisible ? 'auto' : 'none'}>
+        <View style={styles.fullscreenContainer} pointerEvents={isVisible ? 'auto' : 'none'}>
             {/* Backdrop */}
             <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
                 <Pressable style={{ flex: 1 }} onPress={onClose} />
@@ -146,6 +144,10 @@ export default function PremiumDrawer({
 }
 
 const styles = StyleSheet.create({
+    fullscreenContainer: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 9999,
+    },
     backdrop: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.5)',

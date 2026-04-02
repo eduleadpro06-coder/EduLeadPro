@@ -72,3 +72,12 @@ export interface TeacherTask {
     due_date?: string;
     created_at: string;
 }
+
+export interface MessageTemplate {
+    id: number;
+    name: string;
+    displayName: string;
+    content: string;
+    category: string;
+    isDefault: boolean;
+}

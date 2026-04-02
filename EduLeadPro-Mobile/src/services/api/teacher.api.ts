@@ -8,6 +8,7 @@ import {
     MarkAttendanceRequest,
     PostUpdateRequest,
     StudentInfo,
+    MessageTemplate,
 } from '../../types/teacher.types';
 import { supabase } from '../../lib/supabase';
 import { decode } from 'base64-arraybuffer';
@@ -245,6 +246,14 @@ export const teacherAPI = {
      */
     async getUpdateHistory(): Promise<any[]> {
         const response = await apiClient.get('/teacher/daily-updates');
+        return response.data || [];
+    },
+
+    /**
+     * Get message templates for daily updates
+     */
+    async getTemplates(): Promise<MessageTemplate[]> {
+        const response = await apiClient.get('/teacher/templates');
         return response.data || [];
     },
 };

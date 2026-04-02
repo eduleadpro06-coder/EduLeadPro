@@ -10,7 +10,7 @@ const router = express.Router();
 
 // Apply JWT middleware and role guard to all teacher routes
 router.use(jwtMiddleware);
-router.use(roleGuard(['teacher']));
+router.use(roleGuard(['teacher', 'counselor']));
 
 /**
  * GET /api/v1/mobile/teacher/holidays
@@ -896,6 +896,97 @@ router.delete('/tasks/:id', async (req: Request, res: Response) => {
             error: {
                 code: 'DELETE_TASK_ERROR',
                 message: 'Failed to delete task'
+            }
+        });
+    }
+});
+
+
+/**
+ * GET /api/v1/mobile/teacher/templates
+ * Get message templates for daily updates
+ */
+router.get('/templates', async (req: Request, res: Response) => {
+    try {
+        const organizationId = req.user!.organizationId;
+        const { supabase } = await import('../../supabase.js');
+
+        // Fetch active templates for this organization or system defaults
+        const { data: templates, error } = await supabase
+            .from('message_templates')
+            .select('id, name, display_name, content, category, is_default')
+            .eq('is_active', true)
+            .or(`organization_id.eq.${organizationId},is_default.eq.true`)
+            .order('display_name', { ascending: true });
+
+        if (error) throw error;
+
+        // Map to camelCase for mobile app
+        const mappedTemplates = (templates || []).map(t => ({
+            id: t.id,
+            name: t.name,
+            displayName: t.display_name,
+            content: t.content,
+            category: t.category,
+            isDefault: t.is_default
+        }));
+
+        // Add preschool-specific Post templates if not already present
+        const preschoolPostTemplates = [
+            // Activity (10)
+            { id: 'p1', name: 'art_activity', displayName: 'Creative Art Time', category: 'activity', content: 'The children showed great creativity during our art session today! They enjoyed working with various materials to create beautiful masterpieces.' },
+            { id: 'p2', name: 'reading_time', displayName: 'Reading & Phonics', category: 'activity', content: 'The class was very focused during book reading today. Everyone enjoyed the story session and participated with great enthusiasm.' },
+            { id: 'p3', name: 'outdoor_play', displayName: 'Outdoor Play', category: 'activity', content: 'We had a wonderful time in the playground today! The students practiced their gross motor skills and enjoyed playing together with their friends.' },
+            { id: 'p8', name: 'science_exploration', displayName: 'Science Discovery', category: 'activity', content: 'Today was all about exploration and discovery! We conducted a hands-on experiment and discussed how things work in the world around us.' },
+            { id: 'p9', name: 'music_movement', displayName: 'Music & Movement', category: 'activity', content: 'There was a lot of energy in our music session today! The children danced enthusiastically and followed all the rhythms perfectly.' },
+            { id: 'p10', name: 'sensory_play', displayName: 'Sensory Exploration', category: 'activity', content: 'We had a fun sensory play day! The children loved exploring different textures and spent a long time investigating and learning through touch.' },
+            { id: 'p11', name: 'puzzles', displayName: 'Puzzle Solving', category: 'activity', content: 'The children did a fantastic job with puzzles today. It was great to see their focus and patience as they worked through various challenges.' },
+            { id: 'p12', name: 'storytelling', displayName: 'Creative Storytelling', category: 'activity', content: 'We had a wonderful storytelling session today! The children shared many imaginative ideas and enjoyed listening to one another\'s stories.' },
+            { id: 'p13', name: 'math_fun', displayName: 'Math & Counting', category: 'activity', content: 'We practiced our numbers and counting today. The children successfully identified different shapes and worked on their foundational math skills.' },
+            { id: 'p14', name: 'garden_day', displayName: 'Nature & Gardening', category: 'activity', content: 'We spent time in our garden today! The children helped take care of the plants and were fascinated by the natural world around them.' },
+            
+            // Achievement (10)
+            { id: 'p4', name: 'milestone', displayName: 'Milestone Reached', category: 'achievement', content: 'Wonderful news! We reached several learning milestones today! It is so rewarding to see such consistent progress and dedication from the group.' },
+            { id: 'p5', name: 'star_performer', displayName: 'Star Performers', category: 'achievement', content: 'The students were superstars today! They completed their tasks perfectly and showed great enthusiasm in helping one another.' },
+            { id: 'p15', name: 'independent_learner', displayName: 'Independent Group Work', category: 'achievement', content: 'The children showed great independence today. It is wonderful to see them taking the lead in their learning and working confidently on their own.' },
+            { id: 'p16', name: 'math_whiz', displayName: 'Math Achievement', category: 'achievement', content: 'The group excelled in our math activities today! Everyone worked hard on their problem-solving and foundational skills. Keep up the brilliant work.' },
+            { id: 'p17', name: 'little_artist', displayName: 'Artistic Excellence', category: 'achievement', content: 'The class produced exceptional pieces of art today. Their attention to detail and creative expressions were truly impressive to behold.' },
+            { id: 'p18', name: 'healthy_eater', displayName: 'Healthy Eating Habits', category: 'achievement', content: 'Great achievement! The children focused on their healthy eating habits today and enjoyed a nutritious meal together.' },
+            { id: 'p19', name: 'public_speaking', displayName: 'Confidence Building', category: 'achievement', content: 'We are so proud of the children for speaking confidently in front of the class today! It is great to see their communication skills blooming.' },
+            { id: 'p20', name: 'goal_achiever', displayName: 'Goal Accomplishment', category: 'achievement', content: 'The students set several learning goals and successfully achieved them today! Their persistence and hard work are truly inspiring.' },
+            { id: 'p21', name: 'team_player', displayName: 'Teamwork & Cooperation', category: 'achievement', content: 'The children worked wonderfully as a team today. They cooperated beautifully on their shared projects and showed great collaborative spirit.' },
+            { id: 'p22', name: 'problem_solver', displayName: 'Critical Thinking', category: 'achievement', content: 'The group found very creative solutions to several challenges today. It is wonderful to see their critical thinking and logic developing.' },
+            
+            // Behavior (10)
+            { id: 'p6', name: 'kindness', displayName: 'Kindness & Friendship', category: 'behaviour', content: 'The students were fantastic friends today! They shared their toys beautifully and helped one another in very thoughtful and kind ways.' },
+            { id: 'p7', name: 'listening', displayName: 'Excellent Listening', category: 'behaviour', content: 'Everyone followed instructions beautifully today and acted as great role models for one another during transition times.' },
+            { id: 'p23', name: 'empathy_hero', displayName: 'Empathy & Care', category: 'behaviour', content: 'The children showed great empathy today. It was heartwarming to see them comforting and caring for their peers with such kind hearts.' },
+            { id: 'p24', name: 'sharing_caring', displayName: 'Sharing Values', category: 'behaviour', content: 'We were so happy to see the children sharing their items with their friends today. They are learning the value of sharing so well!' },
+            { id: 'p25', name: 'polite_manners', displayName: 'Polite Manners', category: 'behaviour', content: 'The students used their "Please" and "Thank You" perfectly all day! Their polite manners are becoming a wonderful habit for the whole class.' },
+            { id: 'p26', name: 'helpful_hands', displayName: 'Classroom Helpers', category: 'behaviour', content: 'The children volunteered to help tidy up the classroom and were very helpful throughout the day. We appreciate their participation!' },
+            { id: 'p27', name: 'patience_pro', displayName: 'Patience & Waiting', category: 'behaviour', content: 'The students showed great patience today while waiting for their turns. This is such an important skill that they are mastering beautifully.' },
+            { id: 'p28', name: 'conflict_resolver', displayName: 'Conflict Resolution', category: 'behaviour', content: 'The children used their words to resolve disagreements today. They stayed calm and found fair solutions, showing great emotional maturity.' },
+            { id: 'p29', name: 'respectful_choice', displayName: 'Respectful Choices', category: 'behaviour', content: 'The group made many respectful choices today. We appreciate their consistently positive attitude toward classroom rules and one another.' },
+            { id: 'p30', name: 'gentle_leader', displayName: 'Positive Leadership', category: 'behaviour', content: 'The children led their peers in a gentle and encouraging way, making sure everyone felt included and valued in our activities.' }
+        ];
+
+        // Filter out original "whatsapp" categories to reduce clutter for the post update flow 
+        // as requested by the user.
+        const filteredTemplates = mappedTemplates.filter(t => 
+            t.category !== 'whatsapp' && t.category !== 'sms'
+        );
+
+        res.json({
+            success: true,
+            data: [...preschoolPostTemplates, ...filteredTemplates]
+        });
+    } catch (error) {
+        console.error('[Mobile API] Get templates error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'FETCH_TEMPLATES_ERROR',
+                message: 'Failed to fetch message templates'
             }
         });
     }

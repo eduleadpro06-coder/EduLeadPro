@@ -8,7 +8,8 @@ import {
     ActivityIndicator,
     RefreshControl,
     TextInput,
-    SafeAreaView
+    SafeAreaView,
+    Alert
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -44,6 +45,22 @@ export default function MyStudentsScreen() {
     const filteredStudents = students.filter(s =>
         searchQuery ? s.name.toLowerCase().includes(searchQuery.toLowerCase()) : true
     );
+
+    const getInitials = (name: string) => {
+        if (!name) return 'S';
+        return name
+            .split(' ')
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .substring(0, 2);
+    };
+
+    const getAvatarColor = (id: number) => {
+        const colors_list = ['#643ae5', '#2196F3', '#4CAF50', '#FF9800', '#E91E63', '#9C27B0'];
+        const index = typeof id === 'number' ? id : 0;
+        return colors_list[index % colors_list.length];
+    };
 
     return (
         <View style={styles.container}>
@@ -86,20 +103,28 @@ export default function MyStudentsScreen() {
                     <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
                 ) : (
                     <>
-                        <Text style={styles.sectionTitle}>{filteredStudents.length} Students Assigned</Text>
+                        <Text style={styles.sectionTitle}>{filteredStudents.length} Students</Text>
                         {filteredStudents.map(student => (
-                            <PremiumCard key={student.id} style={styles.studentCard}>
-                                <View style={styles.avatarBox}>
-                                    <Text style={styles.avatarText}>{student.name?.charAt(0)}</Text>
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.studentName}>{student.name}</Text>
-                                    <Text style={styles.studentClass}>{student.class}</Text>
-                                </View>
-                                <TouchableOpacity style={styles.detailsBtn}>
-                                    <Feather name="chevron-right" size={20} color={colors.textSecondary} />
-                                </TouchableOpacity>
-                            </PremiumCard>
+                            <TouchableOpacity 
+                                key={student.id} 
+                                activeOpacity={0.7}
+                                onPress={() => Alert.alert('Student Details', `Coming Soon: Detailed profile for ${student.name}`)}
+                            >
+                                <PremiumCard style={styles.studentCard}>
+                                    <View style={[styles.avatarBox, { backgroundColor: getAvatarColor(student.id) + '20' }]}>
+                                        <Text style={[styles.avatarText, { color: getAvatarColor(student.id) }]}>
+                                            {getInitials(student.name)}
+                                        </Text>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.studentName}>{student.name}</Text>
+                                        <Text style={styles.studentClass}>{student.class}</Text>
+                                    </View>
+                                    <View style={styles.detailsBtn}>
+                                        <Feather name="chevron-right" size={20} color={colors.textSecondary} />
+                                    </View>
+                                </PremiumCard>
+                            </TouchableOpacity>
                         ))}
                     </>
                 )}

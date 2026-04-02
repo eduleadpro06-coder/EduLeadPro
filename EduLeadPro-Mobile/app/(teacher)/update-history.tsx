@@ -164,6 +164,23 @@ const UpdateHistoryScreen = () => {
                     )
                 }
             />
+
+            {/* Floating Action Button */}
+            {!loading && (
+                <TouchableOpacity 
+                    style={styles.fab}
+                    onPress={() => router.push('/(teacher)/post-update')}
+                >
+                    <LinearGradient
+                        colors={[colors.primary, colors.primaryDark]}
+                        style={styles.fabGradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    >
+                        <Feather name="plus" size={28} color="#FFF" />
+                    </LinearGradient>
+                </TouchableOpacity>
+            )}
         </SafeAreaView>
     );
 };
@@ -192,7 +209,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         color: '#FFF',
         fontSize: 20,
-        fontWeight: 'bold',
+        fontFamily: 'Outfit_Bold',
     },
     listContent: {
         padding: 16,
@@ -341,7 +358,24 @@ const styles = StyleSheet.create({
     postBtnText: {
         color: '#FFF',
         fontWeight: 'bold',
-    }
+    },
+    fab: {
+        position: 'absolute',
+        bottom: 30,
+        right: 25,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        ...shadows.lg,
+        elevation: 8,
+    },
+    fabGradient: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
 });
 
 export default UpdateHistoryScreen;

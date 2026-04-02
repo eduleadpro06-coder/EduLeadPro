@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { colors, typography } from '../../theme';
 import teacherAPI from '../../services/api/teacher.api';
 import { LeaveApplication } from '../../types/teacher.types';
 import { format, addDays } from 'date-fns';
@@ -184,8 +185,10 @@ const LeaveApplicationScreen = () => {
     return (
         <SafeAreaView style={styles.container}>
             <LinearGradient
-                colors={['#4c669f', '#3b5998', '#192f6a']}
+                colors={[colors.primary, colors.primaryDark]}
                 style={styles.header}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
             >
                 <View style={styles.headerContent}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -328,11 +331,11 @@ const styles = StyleSheet.create({
         backgroundColor: '#F7F7F7',
     },
     header: {
-        paddingTop: Platform.OS === 'ios' ? 0 : 40,
-        paddingBottom: 20,
+        paddingTop: Platform.OS === 'ios' ? 50 : 40,
+        paddingBottom: 25,
         paddingHorizontal: 20,
-        borderBottomLeftRadius: 20,
-        borderBottomRightRadius: 20,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
     },
     headerContent: {
         flexDirection: 'row',
@@ -345,8 +348,8 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         color: '#FFF',
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 20,
+        fontFamily: 'Outfit_Bold',
     },
     listContent: {
         padding: 20,
@@ -440,7 +443,7 @@ const styles = StyleSheet.create({
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: '#3b5998',
+        backgroundColor: colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 6,
@@ -514,8 +517,8 @@ const styles = StyleSheet.create({
         textAlignVertical: 'top',
     },
     applyButton: {
-        backgroundColor: '#3b5998',
-        borderRadius: 10,
+        backgroundColor: colors.primary,
+        borderRadius: 12,
         padding: 16,
         alignItems: 'center',
         marginTop: 10,
@@ -524,7 +527,7 @@ const styles = StyleSheet.create({
     applyButtonText: {
         color: '#FFF',
         fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: 'Lexend_Bold',
     },
     leaveTypeContainer: {
         flexDirection: 'row',

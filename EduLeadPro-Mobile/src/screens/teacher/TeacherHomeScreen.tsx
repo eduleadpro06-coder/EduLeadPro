@@ -12,6 +12,7 @@ import {
     ActivityIndicator,
     TextInput,
     RefreshControl,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -39,13 +40,27 @@ export default function TeacherHomeScreen() {
 
         try {
             setLoading(true);
-            const data = await teacherAPI.getDashboard(user.userId);
+            const data = await teacherAPI.getDashboard();
             setDashboard(data);
         } catch (error) {
             console.error('Failed to load dashboard:', error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const getInitials = (name: string) => {
+        return name
+            .split(' ')
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .substring(0, 2);
+    };
+
+    const getAvatarColor = (id: number) => {
+        const colors_list = ['#643ae5', '#2196F3', '#4CAF50', '#FF9800', '#E91E63', '#9C27B0'];
+        return colors_list[id % colors_list.length];
     };
 
     const onRefresh = async () => {
@@ -178,12 +193,20 @@ export default function TeacherHomeScreen() {
 
                     {filteredStudents.length > 0 ? (
                         filteredStudents.map((student) => (
-                            <View key={student.id} style={styles.studentCard}>
+                            <TouchableOpacity 
+                                key={student.id} 
+                                style={styles.studentCard}
+                                onPress={() => navigation.navigate('StudentDetail', { studentId: student.id })}
+                            >
+                                <View style={[styles.avatar, { backgroundColor: getAvatarColor(student.id) }]}>
+                                    <Text style={styles.avatarText}>{getInitials(student.name)}</Text>
+                                </View>
                                 <View style={styles.studentInfo}>
                                     <Text style={styles.studentName}>{student.name}</Text>
                                     <Text style={styles.studentClass}>Class {student.class}</Text>
                                 </View>
-                            </View>
+                                <Text style={styles.actionArrow}>›</Text>
+                            </TouchableOpacity>
                         ))
                     ) : (
                         <View style={styles.emptyCard}>
@@ -320,12 +343,26 @@ const styles = StyleSheet.create({
     studentCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         backgroundColor: colors.white,
         borderRadius: borderRadius.md,
         padding: spacing.md,
         marginBottom: spacing.sm,
+        borderWidth: 1,
+        borderColor: colors.cardBorder,
         ...shadows.sm,
+    },
+    avatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: spacing.md,
+    },
+    avatarText: {
+        color: colors.white,
+        fontSize: typography.fontSize.md,
+        fontWeight: typography.fontWeight.bold,
     },
     studentInfo: {
         flex: 1,

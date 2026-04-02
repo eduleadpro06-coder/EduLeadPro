@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { colors, typography } from '../../theme';
 import teacherAPI from '../../services/api/teacher.api';
 import { TeacherTask } from '../../types/teacher.types';
 import { format } from 'date-fns';
@@ -149,8 +150,10 @@ const TeacherTasksScreen = () => {
     return (
         <SafeAreaView style={styles.container}>
             <LinearGradient
-                colors={['#4c669f', '#3b5998', '#192f6a']}
+                colors={[colors.primary, colors.primaryDark]}
                 style={styles.header}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
             >
                 <View style={styles.headerContent}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -235,11 +238,11 @@ const styles = StyleSheet.create({
         backgroundColor: '#F7F7F7',
     },
     header: {
-        paddingTop: Platform.OS === 'ios' ? 0 : 40,
-        paddingBottom: 20,
+        paddingTop: Platform.OS === 'ios' ? 50 : 40,
+        paddingBottom: 25,
         paddingHorizontal: 20,
-        borderBottomLeftRadius: 20,
-        borderBottomRightRadius: 20,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
     },
     headerContent: {
         flexDirection: 'row',
@@ -252,8 +255,8 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         color: '#FFF',
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 20,
+        fontFamily: 'Outfit_Bold',
     },
     listContent: {
         padding: 20,
@@ -280,12 +283,12 @@ const styles = StyleSheet.create({
         height: 24,
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: '#3b5998',
+        borderColor: colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
     },
     checkedCheckbox: {
-        backgroundColor: '#3b5998',
+        backgroundColor: colors.primary,
     },
     taskContent: {
         flex: 1,
@@ -374,8 +377,8 @@ const styles = StyleSheet.create({
         textAlignVertical: 'top',
     },
     addButton: {
-        backgroundColor: '#3b5998',
-        borderRadius: 10,
+        backgroundColor: colors.primary,
+        borderRadius: 12,
         padding: 16,
         alignItems: 'center',
         marginTop: 10,
@@ -383,7 +386,7 @@ const styles = StyleSheet.create({
     addButtonText: {
         color: '#FFF',
         fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: 'Lexend_Bold',
     },
 });
 

@@ -63,11 +63,9 @@ export default function TeacherHomeScreen() {
     };
 
     const quickActions = [
-        { id: 'attendance', label: 'Attendance', icon: 'check-circle', color: '#3B82F6', bg: '#EFF6FF', route: '/(teacher)/mark-attendance' },
-        { id: 'post', label: 'Post Update', icon: 'edit-3', color: '#EF4444', bg: '#FEF2F2', route: '/(teacher)/post-update' },
-        { id: 'students', label: 'My Students', icon: 'users', color: '#8B5CF6', bg: '#F5F3FF', route: '/(teacher)/my-students' },
-        { id: 'u_history', label: 'Upd. History', icon: 'calendar', color: '#D33394', bg: '#FDF2F9', route: '/(teacher)/update-history' },
+        { id: 'attendance', label: 'Attendance', icon: 'user-check', color: '#4CAF50', bg: '#E8F5E9', route: '/(teacher)/mark-attendance' },
         { id: 'a_history', label: 'Att. History', icon: 'clock', color: '#F97316', bg: '#FFF7ED', route: '/(teacher)/attendance-history' },
+        { id: 'history', label: 'Post Updates', icon: 'clipboard', color: '#2196F3', bg: '#E3F2FD', route: '/(teacher)/update-history' },
         { id: 'leaves', label: 'Leaves', icon: 'briefcase', color: '#6366F1', bg: '#EEF2FF', route: '/(teacher)/leaves' },
         { id: 'tasks', label: 'Tasks', icon: 'check-square', color: '#06B6D4', bg: '#ECFEFF', route: '/(teacher)/tasks' },
     ];
@@ -76,73 +74,62 @@ export default function TeacherHomeScreen() {
         <View style={styles.container}>
             <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-            {/* Premium Header */}
-            <View style={styles.headerContainerFixed}>
-                <LinearGradient
-                    colors={[colors.primary, colors.primaryDark]}
-                    style={styles.headerGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                />
-                <View style={styles.headerContentFixed}>
-                    <View style={{ flex: 1 }}>
-                        <View style={styles.headerTopRow}>
-                            <TouchableOpacity style={styles.menuBtnFixed} onPress={() => setDrawerVisible(true)}>
-                                <Ionicons name="grid-outline" size={24} color="#fff" />
-                            </TouchableOpacity>
-                            <Text style={styles.dateTextFixed}>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
-                        </View>
-                        <View style={{ marginTop: 20 }}>
-                            <Text style={styles.greetingTextFixed}>{getGreeting()}</Text>
-                            <Text style={styles.teacherNameTextFixed}>{(user as any)?.name || 'Teacher'}</Text>
-                        </View>
-                    </View>
-                    <View style={styles.avatarContainerFixed}>
-                        <Text style={styles.avatarTextFixed}>{(user as any)?.name?.charAt(0) || 'T'}</Text>
-                    </View>
-                </View>
-            </View>
-
             {/* Content */}
-            <ScrollView
-                style={styles.content}
-                contentContainerStyle={{ paddingBottom: 50, paddingHorizontal: spacing.lg }}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            <ScrollView 
+                style={styles.content} 
+                contentContainerStyle={[styles.scrollContent, { paddingTop: 260 }]}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl 
+                        refreshing={refreshing} 
+                        onRefresh={loadDashboard}
+                        tintColor={colors.primary} 
+                        progressViewOffset={260}
+                    />
+                }
             >
                 {loading && !refreshing ? (
-                    <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
-                ) : (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                    </View>
+                ) : dashboardData && (
                     <>
-                        {/* Consolidated Class Snapshot */}
-                        {dashboardData && (
-                            <PremiumCard style={styles.snapshotCard}>
-                                <View style={styles.snapshotHeader}>
-                                    <View style={styles.snapshotTitleRow}>
-                                        <MaterialCommunityIcons name="finance" size={18} color={colors.primary} />
-                                        <Text style={styles.snapshotTitle}>Class Snapshot</Text>
+                        {/* Class Snapshot Card */}
+                        <PremiumCard style={styles.snapshotCard}>
+                            <View style={styles.snapshotHeader}>
+                                <View style={styles.snapshotTitleRow}>
+                                    <View style={[styles.snapshotIconBox, { backgroundColor: colors.primary + '10' }]}>
+                                        <Feather name="activity" size={16} color={colors.primary} />
                                     </View>
-                                    <Text style={styles.snapshotDate}>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                    <Text style={styles.snapshotTitle}>Class Snapshot</Text>
                                 </View>
-                                
-                                <View style={styles.snapshotGrid}>
-                                    {[
-                                        { label: 'Assigned', value: dashboardData.studentsCount || 0, icon: 'users', color: colors.primary, bg: '#EEF2FF' },
-                                        { label: 'Present', value: dashboardData.attendance?.present || 0, icon: 'user-check', color: colors.success, bg: '#ECFDF5' },
-                                        { label: 'Absent', value: dashboardData.attendance?.absent || 0, icon: 'user-x', color: colors.danger, bg: '#FEF2F2' },
-                                    ].map((stat, i) => (
-                                        <View key={stat.label} style={[styles.snapshotItem, i < 2 && styles.snapshotDivider]}>
-                                            <View style={[styles.snapshotIconBox, { backgroundColor: stat.bg }]}>
-                                                <Feather name={stat.icon as any} size={16} color={stat.color} />
-                                            </View>
-                                            <View>
-                                                <Text style={styles.snapshotValue}>{stat.value}</Text>
-                                                <Text style={styles.snapshotLabel}>{stat.label}</Text>
-                                            </View>
+                                <Text style={styles.snapshotDate}>{new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</Text>
+                            </View>
+                            
+                            <View style={styles.snapshotGrid}>
+                                {[
+                                    { label: 'My Students', value: dashboardData.studentsCount || 0, icon: 'users', color: colors.primary, bg: '#EEF2FF', route: '/(teacher)/my-students' },
+                                    { label: 'Present', value: dashboardData.attendance?.present || 0, icon: 'user-check', color: colors.success, bg: '#ECFDF5' },
+                                    { label: 'Absent', value: dashboardData.attendance?.absent || 0, icon: 'user-x', color: colors.danger, bg: '#FEF2F2' },
+                                ].map((stat, i) => (
+                                    <TouchableOpacity 
+                                        key={stat.label} 
+                                        style={[styles.snapshotItem, i < 2 && styles.snapshotDivider]}
+                                        onPress={() => stat.route && router.push(stat.route as any)}
+                                        disabled={!stat.route}
+                                        activeOpacity={stat.route ? 0.7 : 1}
+                                    >
+                                        <View style={[styles.snapshotIconBox, { backgroundColor: stat.bg }]}>
+                                            <Feather name={stat.icon as any} size={16} color={stat.color} />
                                         </View>
-                                    ))}
-                                </View>
-                            </PremiumCard>
-                        )}
+                                        <View>
+                                            <Text style={styles.snapshotValue}>{stat.value}</Text>
+                                            <Text style={styles.snapshotLabel}>{stat.label}</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </PremiumCard>
 
                         {/* Quick Actions Grid */}
                         <View style={styles.section}>
@@ -183,6 +170,33 @@ export default function TeacherHomeScreen() {
                     </>
                 )}
             </ScrollView>
+            
+            {/* Premium Header - Rendered after ScrollView to ensure touch capture */}
+            <View style={styles.headerContainerFixed}>
+                <LinearGradient
+                    colors={[colors.primary, colors.primaryDark]}
+                    style={styles.headerGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                />
+                <View style={styles.headerContentFixed}>
+                    <View style={{ flex: 1 }}>
+                        <View style={styles.headerTopRow}>
+                            <TouchableOpacity style={styles.menuBtnFixed} onPress={() => setDrawerVisible(true)} activeOpacity={0.7}>
+                                <Ionicons name="grid-outline" size={24} color="#fff" />
+                            </TouchableOpacity>
+                            <Text style={styles.dateTextFixed}>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+                        </View>
+                        <View style={{ marginTop: 20 }}>
+                            <Text style={styles.greetingTextFixed}>{getGreeting()}</Text>
+                            <Text style={styles.teacherNameTextFixed}>{(user as any)?.name || 'Teacher'}</Text>
+                        </View>
+                    </View>
+                    <View style={styles.avatarContainerFixed}>
+                        <Text style={styles.avatarTextFixed}>{(user as any)?.name?.charAt(0) || 'T'}</Text>
+                    </View>
+                </View>
+            </View>
 
             <PremiumDrawer
                 isVisible={drawerVisible}
@@ -211,12 +225,26 @@ export default function TeacherHomeScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
     content: { flex: 1 },
+    scrollContent: {
+        paddingHorizontal: spacing.lg,
+        paddingBottom: 50,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 100,
+    },
     headerContainerFixed: {
-        height: 240,
-        justifyContent: 'flex-start',
+        height: 260,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
         overflow: 'hidden',
+        zIndex: 10,
     },
     headerGradient: { ...StyleSheet.absoluteFillObject },
     headerContentFixed: {
@@ -264,10 +292,12 @@ const styles = StyleSheet.create({
     },
     avatarTextFixed: { color: '#fff', fontSize: 20, fontFamily: 'Outfit_Bold' },
     snapshotCard: {
-        marginTop: -40,
+        marginTop: 10,
+        marginHorizontal: 0,
         marginBottom: 24,
         padding: 20,
         borderRadius: 24,
+        minHeight: 120,
         ...shadows.lg,
     },
     snapshotHeader: {
@@ -332,14 +362,14 @@ const styles = StyleSheet.create({
     quickActionsGridThree: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 10,
-        justifyContent: 'flex-start',
+        justifyContent: 'space-between',
+        rowGap: 12,
     },
     actionCardCompact: {
         width: '31%',
-        aspectRatio: 1.05,
+        aspectRatio: 1,
         backgroundColor: '#fff',
-        borderRadius: 24,
+        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
         padding: 8,
