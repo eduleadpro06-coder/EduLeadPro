@@ -6,7 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileDown, User, Users, Clock, Calendar, CheckCircle2, XCircle } from "lucide-react";
+import { Search, FileDown, User, Users, Clock, Calendar, CheckCircle2, XCircle, Camera } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 
@@ -145,15 +146,16 @@ export default function GateLogsHistory() {
                                         <TableHead>Class</TableHead>
                                         <TableHead className="text-center">Check-In</TableHead>
                                         <TableHead className="text-center">Check-Out</TableHead>
+                                        <TableHead>Picked Up By</TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead>Recorded By</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {isLoadingStudents ? (
-                                        <TableRow><TableCell colSpan={7} className="text-center py-12 text-gray-500">Loading history...</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={8} className="text-center py-12 text-gray-500">Loading history...</TableCell></TableRow>
                                     ) : studentLogs.length === 0 ? (
-                                        <TableRow><TableCell colSpan={7} className="text-center py-12 text-gray-400">No student logs found for this period</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={8} className="text-center py-12 text-gray-400">No student logs found for this period</TableCell></TableRow>
                                     ) : (
                                         studentLogs.map((log) => (
                                             <TableRow key={log.id} className="hover:bg-gray-50/50 transition-colors">
@@ -186,6 +188,50 @@ export default function GateLogsHistory() {
                                                             <span className="text-sm font-semibold">{format(new Date(log.check_out_time), 'hh:mm a')}</span>
                                                         </div>
                                                     ) : '-'}
+                                                </TableCell>
+
+                                                {/* Picked Up By */}
+                                                <TableCell>
+                                                    {log.pickup_person_type ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <div>
+                                                                <Badge variant="outline" className={
+                                                                    log.pickup_person_type === 'parent' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                                    log.pickup_person_type === 'authorized' || log.pickup_person_type === 'verified' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                                    'bg-amber-50 text-amber-700 border-amber-200'
+                                                                }>
+                                                                    {log.pickup_person_type === 'parent' ? 'Parent' :
+                                                                     log.pickup_person_type === 'authorized' || log.pickup_person_type === 'verified' ? 'Authorized' :
+                                                                     'Other'}
+                                                                </Badge>
+                                                                {log.pickup_person_name && (
+                                                                    <p className="text-xs text-gray-500 mt-1">{log.pickup_person_name}</p>
+                                                                )}
+                                                            </div>
+                                                            {log.pickup_photo_url && (
+                                                                <Dialog>
+                                                                    <DialogTrigger asChild>
+                                                                        <button className="relative w-9 h-9 rounded-md overflow-hidden border border-gray-200 hover:border-purple-400 transition-colors cursor-pointer flex-shrink-0">
+                                                                            <img src={log.pickup_photo_url} alt="Pickup" className="w-full h-full object-cover" />
+                                                                            <div className="absolute inset-0 bg-black/10 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                                                                <Camera className="h-3 w-3 text-white" />
+                                                                            </div>
+                                                                        </button>
+                                                                    </DialogTrigger>
+                                                                    <DialogContent className="max-w-md">
+                                                                        <DialogTitle>Pickup Photo — {log.student?.name}</DialogTitle>
+                                                                        <img src={log.pickup_photo_url} alt="Pickup person" className="w-full rounded-lg" />
+                                                                        <p className="text-sm text-gray-500 mt-2">
+                                                                            Picked up by: <span className="font-medium text-gray-700">{log.pickup_person_name || log.pickup_person_type || 'Unknown'}</span>
+                                                                            {' • '}{log.check_out_time ? format(new Date(log.check_out_time), 'dd MMM yyyy, hh:mm a') : ''}
+                                                                        </p>
+                                                                    </DialogContent>
+                                                                </Dialog>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-gray-300 text-sm">—</span>
+                                                    )}
                                                 </TableCell>
 
                                                 <TableCell>
