@@ -40,6 +40,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
 import FollowUpMonitor from "@/components/notifications/follow-up-monitor";
 import LeadMonitor from "@/components/notifications/lead-monitor";
+import PrivacyPolicy from "@/pages/privacy-policy";
 
 function Router() {
   return (
@@ -237,6 +238,7 @@ function Router() {
         )}
       </Route>
       <Route path="/" component={Landing} />
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route component={NotFound} />
     </Switch>
   );

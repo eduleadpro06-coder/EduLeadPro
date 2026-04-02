@@ -1204,7 +1204,7 @@ export default function Landing() {
             <div className="border-t border-white/10 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center text-slate-500">
               <p className="mb-4 md:mb-0">&copy; {new Date().getFullYear()} EduConnect. All rights reserved.</p>
               <div className="flex space-x-6">
-                <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
+                <a href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</a>
                 <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
               </div>
             </div>

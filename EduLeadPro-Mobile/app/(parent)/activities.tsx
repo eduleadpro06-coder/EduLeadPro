@@ -196,7 +196,7 @@ export default function ActivitiesScreen() {
                             <View style={{ flex: 1, marginLeft: 16 }}>
                                 <Text style={styles.holidayTitle}>{item.title}</Text>
                                 {description ? (
-                                    <Text style={styles.holidayDescription} numberOfLines={2}>{description}</Text>
+                                    <Text style={styles.holidayDescription}>{description}</Text>
                                 ) : null}
                                 <View style={[styles.typeBadge, { backgroundColor: typeBg }]}>
                                     <Text style={[styles.typeBadgeText, { color: typeColor }]}>{typeLabel}</Text>
