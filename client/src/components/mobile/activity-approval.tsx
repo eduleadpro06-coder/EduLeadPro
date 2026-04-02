@@ -85,20 +85,6 @@ export default function ActivityApproval() {
         );
     }
 
-    return (
-        <div className="space-y-4 w-full">
-            <div className="flex justify-between items-center bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                <div className="flex items-center gap-3">
-                    <div className="bg-yellow-100 p-1.5 rounded-full">
-                        <MessageSquare className="h-4 w-4 text-yellow-700" />
-                    </div>
-                    <div>
-                        <h3 className="font-medium text-yellow-900 text-sm">Pending Approvals</h3>
-                        <p className="text-xs text-yellow-700">Reviewing {pendingUpdates.length} teacher posts</p>
-                    </div>
-                </div>
-            </div>
-
     // Grouping updates by teacher, content, and date
     const groupedUpdates = pendingUpdates.reduce((acc: any[], update: any) => {
         const key = `${update.teacher_name}-${update.content}-${(update.media_urls || []).join(',')}-${update.posted_at ? format(new Date(update.posted_at), 'yyyy-MM-dd HH:mm') : 'now'}`;
@@ -281,7 +267,6 @@ export default function ActivityApproval() {
                     </Card>
                 ))}
             </div>
-        </div>
         </div>
     );
 }

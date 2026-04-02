@@ -26,7 +26,7 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 const LeaveApplicationScreen = () => {
     const navigation = useNavigation();
     const [leaves, setLeaves] = useState<LeaveApplication[]>([]);
-    const [balance, setBalance] = useState<{ cl: any; el: any } | null>(null);
+    const [balance, setBalance] = useState<{ cl: any } | null>(null);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
@@ -35,7 +35,7 @@ const LeaveApplicationScreen = () => {
     const [startDate, setStartDate] = useState(new Date());
     const [endDate, setEndDate] = useState(new Date());
     const [reason, setReason] = useState('');
-    const [leaveType, setLeaveType] = useState<'CL' | 'EL'>('CL');
+    const [leaveType, setLeaveType] = useState<'CL'>('CL');
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
 
@@ -214,13 +214,6 @@ const LeaveApplicationScreen = () => {
                                 </Text>
                                 <Text style={styles.balanceSubtext}>Left</Text>
                             </View>
-                            <View style={[styles.balanceCard, { backgroundColor: '#F3E5F5', borderColor: '#9C27B0' }]}>
-                                <Text style={[styles.balanceLabel, { color: '#7B1FA2' }]}>Emergency Leave</Text>
-                                <Text style={styles.balanceValue}>
-                                    {Math.max(0, balance.el?.balance ?? 0)}
-                                </Text>
-                                <Text style={styles.balanceSubtext}>Left</Text>
-                            </View>
                         </View>
                     ) : null
                 }
@@ -260,19 +253,12 @@ const LeaveApplicationScreen = () => {
                         </View>
 
                         <ScrollView>
-                            <Text style={styles.label}>Leave Type</Text>
                             <View style={styles.leaveTypeContainer}>
                                 <TouchableOpacity
-                                    style={[styles.leaveTypeButton, leaveType === 'CL' && styles.leaveTypeActive]}
-                                    onPress={() => setLeaveType('CL')}
+                                    style={[styles.leaveTypeButton, styles.leaveTypeActive]}
+                                    onPress={() => {}}
                                 >
-                                    <Text style={[styles.leaveTypeText, leaveType === 'CL' && styles.leaveTypeTextActive]}>Casual Leave (CL)</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.leaveTypeButton, leaveType === 'EL' && styles.leaveTypeActive]}
-                                    onPress={() => setLeaveType('EL')}
-                                >
-                                    <Text style={[styles.leaveTypeText, leaveType === 'EL' && styles.leaveTypeTextActive]}>Emergency Leave (EL)</Text>
+                                    <Text style={[styles.leaveTypeText, styles.leaveTypeTextActive]}>Casual Leave (CL)</Text>
                                 </TouchableOpacity>
                             </View>
 

@@ -42,7 +42,6 @@ interface Staff {
     name: string;
     totalLeaves?: number;
     clLimit?: number;
-    elLimit?: number;
 }
 
 interface StaffLeavesTabProps {
@@ -62,9 +61,7 @@ export function StaffLeavesTab({ staffId }: StaffLeavesTabProps) {
     });
     const [rejectionReason, setRejectionReason] = useState("");
     const [isEditingCL, setIsEditingCL] = useState(false);
-    const [isEditingEL, setIsEditingEL] = useState(false);
     const [quotaInputCL, setQuotaInputCL] = useState("");
-    const [quotaInputEL, setQuotaInputEL] = useState("");
 
     // Fetch staff details to get totalLeaves
     const { data: staff } = useQuery<Staff>({
@@ -92,7 +89,6 @@ export function StaffLeavesTab({ staffId }: StaffLeavesTabProps) {
             queryClient.invalidateQueries({ queryKey: ["staff", staffId] });
             toast({ title: "Success", description: "Leave quota updated successfully" });
             setIsEditingCL(false);
-            setIsEditingEL(false);
         },
         onError: () => {
             toast({ title: "Error", description: "Failed to update leave quota", variant: "destructive" });
@@ -136,13 +132,6 @@ export function StaffLeavesTab({ staffId }: StaffLeavesTabProps) {
         }
     };
 
-    const handleSaveEL = () => {
-        const val = parseInt(quotaInputEL);
-        if (!isNaN(val) && val >= 0) {
-            updateQuotaMutation.mutate({ elLimit: val });
-        }
-    };
-
     const statusBadge = (status: string) => {
         switch (status) {
             case "approved": return <Badge className="bg-green-100 text-green-800 hover:bg-green-200"><CheckCircle className="w-3 h-3 mr-1" /> Approved</Badge>;
@@ -156,21 +145,10 @@ export function StaffLeavesTab({ staffId }: StaffLeavesTabProps) {
     }
 
     const clLimit = staff?.clLimit ?? 10;
-    const elLimit = staff?.elLimit ?? 5;
 
     // Calculate used leaves (count of approved requests)
-    const calculateUsedCount = (type: 'CL' | 'EL') => {
-        if (!leaves) return 0;
-        return leaves.filter(l => l.status === 'approved' && ((l as any).leaveType === type || (l as any).leave_type === type)).length;
-    };
-
-    const clUsed = calculateUsedCount('CL');
-    const elUsed = calculateUsedCount('EL');
-
-    // If legacy data or unspecified, maybe just count towards CL? For now strict.
-
+    const clUsed = leaves?.filter(l => l.status === 'approved' && ((l as any).leaveType === 'CL' || (l as any).leave_type === 'CL')).length || 0;
     const clBalance = clLimit - clUsed;
-    const elBalance = elLimit - elUsed;
 
     return (
         <div className="space-y-6">
@@ -212,46 +190,6 @@ export function StaffLeavesTab({ staffId }: StaffLeavesTabProps) {
                         </div>
                         <Progress value={(clUsed / clLimit) * 100} className="h-1.5 bg-blue-100" indicatorClassName="bg-blue-500" />
                         <div className="mt-2 text-xs text-slate-400 text-right">{clUsed} Used</div>
-                    </div>
-                </Card>
-
-                {/* EL Card */}
-                <Card className="overflow-hidden border-0 shadow-md bg-gradient-to-br from-purple-50 to-white">
-                    <div className="p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
-                                    <Target className="h-5 w-5" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium text-slate-500">Emergency Leave (EL)</p>
-                                    <h3 className="text-2xl font-bold text-slate-800">{elBalance} <span className="text-sm font-normal text-slate-400">left</span></h3>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-xs text-slate-400 font-medium mb-1">Quota</div>
-                                {isEditingEL ? (
-                                    <div className="flex items-center gap-1">
-                                        <input
-                                            type="number"
-                                            className="w-12 px-1 py-0.5 text-center border rounded border-purple-200 focus:outline-none focus:ring-1 focus:ring-purple-400"
-                                            autoFocus
-                                            value={quotaInputEL}
-                                            onChange={(e) => setQuotaInputEL(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && handleSaveEL()}
-                                        />
-                                        <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600" onClick={handleSaveEL}><CheckCircle2 className="h-4 w-4" /></Button>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-1 group cursor-pointer" onClick={() => { setQuotaInputEL(elLimit.toString()); setIsEditingEL(true); }}>
-                                        <span className="text-lg font-semibold text-slate-700">{elLimit}</span>
-                                        <Edit2 className="h-3 w-3 text-slate-300 group-hover:text-purple-500" />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <Progress value={(elUsed / elLimit) * 100} className="h-1.5 bg-purple-100" indicatorClassName="bg-purple-500" />
-                        <div className="mt-2 text-xs text-slate-400 text-right">{elUsed} Used</div>
                     </div>
                 </Card>
             </div>

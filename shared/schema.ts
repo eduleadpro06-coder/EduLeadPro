@@ -121,8 +121,7 @@ export const staff = pgTable("staff", {
   organizationId: integer("organization_id").references(() => organizations.id),
   appPassword: varchar("app_password", { length: 255 }),
   clLimit: integer("cl_limit").default(10), // Casual Leave Limit
-  elLimit: integer("el_limit").default(5),  // Emergency Leave Limit
-  totalLeaves: integer("total_leaves").default(15),
+  totalLeaves: integer("total_leaves").default(10),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

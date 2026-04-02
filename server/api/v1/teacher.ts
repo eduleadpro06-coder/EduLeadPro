@@ -561,29 +561,19 @@ router.get('/leaves/balance', async (req: Request, res: Response) => {
         if (leavesError) throw leavesError;
 
         let clUsed = 0;
-        let elUsed = 0;
 
         console.log(`[Mobile Balance] Fetching leaves for Staff ${staffId}, Year ${year}, Org ${organizationId}`);
-        console.log(`[Mobile Balance] Raw Leaves Data: ${JSON.stringify(usedLeaves)}`);
-
+        
         usedLeaves?.forEach(leave => {
             // Count instances instead of days as per user requirement
-            const days = 1;
-
-            // Handle both camelCase and snake_case properties just in case
             const type = leave.leave_type || (leave as any).leaveType;
-
-            if (type === 'CL') clUsed += days;
-            else if (type === 'EL') elUsed += days;
+            if (type === 'CL') clUsed += 1;
         });
-
-        console.log(`[Mobile Balance] Calculated Used: CL=${clUsed}, EL=${elUsed}`);
 
         res.json({
             success: true,
             data: {
-                cl: { limit: staff.cl_limit || 10, used: clUsed, balance: (staff.cl_limit || 10) - clUsed },
-                el: { limit: staff.el_limit || 5, used: elUsed, balance: (staff.el_limit || 5) - elUsed }
+                cl: { limit: staff.cl_limit || 10, used: clUsed, balance: (staff.cl_limit || 10) - clUsed }
             }
         });
     } catch (error) {

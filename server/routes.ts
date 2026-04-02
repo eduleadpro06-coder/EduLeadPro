@@ -290,30 +290,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/staff/:id/leave-quota", async (req, res) => {
     try {
       const staffId = parseInt(req.params.id);
-      const { totalLeaves, clLimit, elLimit } = req.body;
+      const { clLimit } = req.body;
       const organizationId = await getOrganizationId(req);
 
       if (!organizationId) {
         return res.status(403).json({ message: "No organization assigned" });
       }
 
-      console.log(`[DEBUG] Updating quota for staff ${staffId}: Total=${totalLeaves}, CL=${clLimit}, EL=${elLimit}`);
+      console.log(`[DEBUG] Updating quota for staff ${staffId}: CL=${clLimit}`);
 
       const updateData: any = {};
 
-      if (totalLeaves !== undefined) {
-        const parsed = parseInt(totalLeaves);
-        if (!isNaN(parsed)) updateData.totalLeaves = parsed;
-      }
-
       if (clLimit !== undefined) {
         const parsed = parseInt(clLimit);
-        if (!isNaN(parsed)) updateData.clLimit = parsed;
-      }
-
-      if (elLimit !== undefined) {
-        const parsed = parseInt(elLimit);
-        if (!isNaN(parsed)) updateData.elLimit = parsed;
+        if (!isNaN(parsed)) {
+          updateData.clLimit = parsed;
+          updateData.totalLeaves = parsed; // Sync total leaves with CL limit
+        }
       }
 
       if (Object.keys(updateData).length === 0) {
