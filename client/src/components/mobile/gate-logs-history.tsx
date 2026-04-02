@@ -24,10 +24,10 @@ export default function GateLogsHistory() {
 
     // Fetch Student Logs
     const { data: studentLogs = [], isLoading: isLoadingStudents } = useQuery<any[]>({
-        queryKey: ['/api/v1/gate/history/students', startDate, endDate, searchTerm],
+        queryKey: ['/api/v1/mobile/gate/history/students', startDate, endDate, searchTerm],
         queryFn: async () => {
             const params = new URLSearchParams({ startDate, endDate, search: searchTerm });
-            const res = await apiRequest("GET", `/api/v1/gate/history/students?${params.toString()}`);
+            const res = await apiRequest("GET", `/api/v1/mobile/gate/history/students?${params.toString()}`);
             const json = await res.json();
             return json.data || [];
         },
@@ -36,10 +36,10 @@ export default function GateLogsHistory() {
 
     // Fetch Visitor Logs
     const { data: visitorLogs = [], isLoading: isLoadingVisitors } = useQuery<any[]>({
-        queryKey: ['/api/v1/gate/history/visitors', startDate, endDate, searchTerm],
+        queryKey: ['/api/v1/mobile/gate/history/visitors', startDate, endDate, searchTerm],
         queryFn: async () => {
             const params = new URLSearchParams({ startDate, endDate, search: searchTerm });
-            const res = await apiRequest("GET", `/api/v1/gate/history/visitors?${params.toString()}`);
+            const res = await apiRequest("GET", `/api/v1/mobile/gate/history/visitors?${params.toString()}`);
             const json = await res.json();
             return json.data || [];
         },
