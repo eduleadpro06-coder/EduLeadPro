@@ -179,12 +179,7 @@ const TeacherTasksScreen = () => {
                 }
             />
 
-            <TouchableOpacity
-                style={styles.fab}
-                onPress={() => setModalVisible(true)}
-            >
-                <Feather name="plus" size={24} color="#FFF" />
-            </TouchableOpacity>
+            {/* Add button removed upon request */}
 
             <Modal
                 animationType="slide"

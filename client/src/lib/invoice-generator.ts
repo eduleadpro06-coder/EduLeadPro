@@ -362,11 +362,10 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
     doc.setFillColor(orangeR, orangeG, orangeB);
     doc.rect(margin, yPosition, pageWidth - (2 * margin), 4, 'F');
 
-    yPosition += 4; // Move past the orange bar
+    yPosition += 10; // Move past the orange bar with generous spacing
 
-    // Calculate position for Notes and Signature - use remaining space
-    const remainingSpace = pageHeight - yPosition - 10; // 10 for bottom margin
-    const notesSignatureY = yPosition + (remainingSpace * 0.7); // Position at 70% of remaining space to move it closer to bottom
+    // Position Notes and Signature near the bottom consistently
+    const notesSignatureY = Math.max(yPosition + 5, pageHeight - margin - 25);
 
     // ========== NOTES SECTION (Left Side) ==========
     doc.setFont("helvetica", "bold");

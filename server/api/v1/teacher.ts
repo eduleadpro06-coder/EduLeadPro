@@ -111,12 +111,13 @@ router.get('/dashboard', async (req: Request, res: Response) => {
             total: todayAttendance?.length || 0
         };
 
-        // Get enrolled students count
-        const { count: studentsCount } = await supabase
-            .from('leads')
-            .select('*', { count: 'exact', head: true })
-            .eq('organization_id', organizationId)
-            .eq('status', 'enrolled');
+        // Get enrolled students count (filtered by teacher assignment)
+        const { data: assignedStudents } = await supabase
+            .from('teacher_student_assignments')
+            .select('lead_id')
+            .eq('staff_id', staffId);
+        
+        const studentsCount = assignedStudents?.length || 0;
 
         // Get recent activities posted by this teacher
         const { data: recentActivities } = await supabase

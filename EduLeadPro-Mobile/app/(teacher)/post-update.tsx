@@ -160,28 +160,28 @@ export default function PostUpdateScreen() {
     const [showTemplates, setShowTemplates] = useState(false);
     const templatesByType: Record<string, string[]> = {
         activity: [
-            "We learned about Photosynthesis today through a fun experiment.",
-            "The class enjoyed a storytelling session about history.",
-            "Students participated in a group art project using recycled materials.",
-            "We practiced multiplication tables with a fun interactive game.",
-            "Today's science class focused on local ecosystems.",
-            "Introduced new vocabulary words related to nature."
+            "We enjoyed learning about nature today through a fun sensory activity.",
+            "The children loved our storytelling session with puppets.",
+            "We had a wonderful time painting with bright, child-safe colors.",
+            "Practiced sorting shapes and colors today.",
+            "The little ones learned a new rhyming song and danced along.",
+            "Today's playtime was filled with building blocks and teamwork."
         ],
         achievement: [
-            "Awarded 'Star Student' for excellent participation today!",
-            "Completed the reading challenge ahead of schedule!",
-            "Shown remarkable improvement in handwriting.",
-            "Helped a classmate today - great display of kindness.",
-            "Scored full marks in the surprise quiz.",
-            "Demonstrated great leadership skills in group activities."
+            "Awarded 'Little Star' for great participation today!",
+            "Did a fantastic job putting toys away during clean-up time.",
+            "Shared nicely with friends today - great display of kindness.",
+            "Successfully drew their first circle today!",
+            "Ate all their lunch without any help today.",
+            "Demonstrated great listening skills during circle time."
         ],
         behaviour: [
-            "Showed great discipline during the morning assembly.",
-            "Was very attentive and focused in class today.",
-            "Needs to work on active listening skills during lessons.",
-            "Displayed positive leadership qualities in group tasks.",
-            "Please ensure homework is completed on time.",
-            "Was very polite and respectful to teachers and peers."
+            "Had a very calm and happy day in class today.",
+            "Was very attentive and engaged during storytime.",
+            "Needs a little practice with sharing toys with friends.",
+            "Displayed positive energy during our outdoor play.",
+            "Please ensure they get plenty of rest tonight.",
+            "Was very polite and used 'please' and 'thank you' nicely."
         ]
     };
 

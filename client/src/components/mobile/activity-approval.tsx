@@ -99,9 +99,54 @@ export default function ActivityApproval() {
                 </div>
             </div>
 
+    // Grouping updates by teacher, content, and date
+    const groupedUpdates = pendingUpdates.reduce((acc: any[], update: any) => {
+        const key = `${update.teacher_name}-${update.content}-${(update.media_urls || []).join(',')}-${update.posted_at ? format(new Date(update.posted_at), 'yyyy-MM-dd HH:mm') : 'now'}`;
+        
+        const existingGroup = acc.find(g => g.key === key);
+        if (existingGroup) {
+            existingGroup.studentNames.push(update.leads?.name || `Student #${update.leadId}`);
+            existingGroup.ids.push(update.id);
+        } else {
+            acc.push({
+                ...update,
+                key,
+                studentNames: [update.leads?.name || `Student #${update.leadId}`],
+                ids: [update.id]
+            });
+        }
+        return acc;
+    }, []);
+
+    const handleApproveAll = async (ids: number[]) => {
+        for (const id of ids) {
+            await updateStatusMutation.mutateAsync({ id, status: 'approved' });
+        }
+    };
+
+    const handleRejectAll = async (ids: number[], reason: string) => {
+        for (const id of ids) {
+            await updateStatusMutation.mutateAsync({ id, status: 'rejected', reason });
+        }
+    };
+
+    return (
+        <div className="space-y-4 w-full">
+            <div className="flex justify-between items-center bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <div className="flex items-center gap-3">
+                    <div className="bg-yellow-100 p-1.5 rounded-full">
+                        <MessageSquare className="h-4 w-4 text-yellow-700" />
+                    </div>
+                    <div>
+                        <h3 className="font-medium text-yellow-900 text-sm">Pending Approvals</h3>
+                        <p className="text-xs text-yellow-700">Reviewing {pendingUpdates.length} teacher posts ({groupedUpdates.length} groups)</p>
+                    </div>
+                </div>
+            </div>
+
             <div className="space-y-4">
-                {pendingUpdates.map((update) => (
-                    <Card key={update.id} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
+                {groupedUpdates.map((group) => (
+                    <Card key={group.key} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
                         <CardHeader className="bg-muted/5 border-b py-3 px-4">
                             <div className="flex justify-between items-start">
                                 <div className="flex gap-3">
@@ -109,24 +154,26 @@ export default function ActivityApproval() {
                                         <User className="h-4 w-4 text-primary" />
                                     </div>
                                     <div>
-                                        <div className="font-medium text-sm flex items-center gap-2">
-                                            {update.teacher_name || 'Teacher'}
+                                        <div className="font-medium text-sm flex flex-wrap items-center gap-2">
+                                            {group.teacher_name || 'Teacher'}
                                             <span className="text-muted-foreground font-normal text-xs">posted for</span>
-                                            <span className="font-semibold text-primary">
-                                                {update.leads?.name || `Student #${update.leadId}`}
-                                            </span>
+                                            {group.studentNames.map((name: string, i: number) => (
+                                                <span key={i} className="font-semibold text-primary">
+                                                    {name}{i < group.studentNames.length - 1 ? ',' : ''}
+                                                </span>
+                                            ))}
                                         </div>
                                         <div className="text-xs text-muted-foreground flex items-center mt-0.5">
                                             <Calendar className="h-3 w-3 mr-1" />
-                                            {update.posted_at ? format(new Date(update.posted_at), 'PPp') : 'Recently'}
+                                            {group.posted_at ? format(new Date(group.posted_at), 'PPp') : 'Recently'}
                                             <span className="mx-2">•</span>
-                                            <span className="capitalize">{update.leads?.class || 'Pre-School'}</span>
+                                            <span className="capitalize">{group.leads?.class || 'Pre-School'}</span>
                                         </div>
                                     </div>
                                 </div>
                                 <Badge variant="outline" className="capitalize px-2 py-0.5 text-xs bg-background">
                                     {(() => {
-                                        const type = (update.activity_type || '').toLowerCase();
+                                        const type = (group.activity_type || '').toLowerCase();
                                         if (type === 'food') return '🍱 Meal Update';
                                         if (type === 'sleep') return '😴 Sleep Update';
                                         if (type === 'bathroom') return '🚽 Bathroom';
@@ -143,21 +190,21 @@ export default function ActivityApproval() {
                         </CardHeader>
 
                         <CardContent className="pt-4 px-4 pb-2">
-                            {update.title && (
-                                <h4 className="font-semibold text-base mb-1">{update.title}</h4>
+                            {group.title && (
+                                <h4 className="font-semibold text-base mb-1">{group.title}</h4>
                             )}
                             <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">
-                                {update.content}
+                                {group.content}
                             </p>
 
-                            {update.media_urls && update.media_urls.length > 0 && (
+                            {group.media_urls && group.media_urls.length > 0 && (
                                 <div className="mt-4">
-                                    <div className={`grid gap-2 ${update.media_urls.length === 1 ? 'grid-cols-1' :
-                                        update.media_urls.length === 2 ? 'grid-cols-2' :
+                                    <div className={`grid gap-2 ${group.media_urls.length === 1 ? 'grid-cols-1' :
+                                        group.media_urls.length === 2 ? 'grid-cols-2' :
                                             'grid-cols-3 md:grid-cols-4'
                                         }`}>
-                                        {update.media_urls.map((url: string, idx: number) => (
-                                            <div key={idx} className={`relative rounded-lg overflow-hidden bg-muted border ${update.media_urls.length === 1 ? 'aspect-video max-h-[300px]' : 'aspect-square'}`}>
+                                        {group.media_urls.map((url: string, idx: number) => (
+                                            <div key={idx} className={`relative rounded-lg overflow-hidden bg-muted border ${group.media_urls.length === 1 ? 'aspect-video max-h-[300px]' : 'aspect-square'}`}>
                                                 <img
                                                     src={url}
                                                     alt={`Attachment ${idx + 1}`}
@@ -174,11 +221,11 @@ export default function ActivityApproval() {
                         <CardFooter className="py-3 px-4 border-t bg-muted/5 flex gap-3">
                             <Button
                                 className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium h-9 text-sm"
-                                onClick={() => handleApprove(update.id)}
+                                onClick={() => handleApproveAll(group.ids)}
                                 disabled={updateStatusMutation.isPending}
                             >
                                 <Check className="h-4 w-4 mr-2" />
-                                Approve
+                                Approve All {group.ids.length > 1 ? `(${group.ids.length})` : ''}
                             </Button>
 
                             <Dialog>
@@ -186,18 +233,18 @@ export default function ActivityApproval() {
                                     <Button
                                         variant="destructive"
                                         className="flex-1 h-9 text-sm bg-red-50 hover:bg-red-100 text-red-600 border border-red-200"
-                                        onClick={() => setSelectedUpdateId(update.id)}
+                                        onClick={() => setSelectedUpdateId(group.id)}
                                         disabled={updateStatusMutation.isPending}
                                     >
                                         <X className="h-4 w-4 mr-2" />
-                                        Reject
+                                        Reject All
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader>
                                         <DialogTitle>Reject Activity Update</DialogTitle>
                                         <DialogDescription>
-                                            Please provide a reason for rejecting this update.
+                                            Please provide a reason for rejecting this update for all selected students.
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-4 py-4">
@@ -222,7 +269,7 @@ export default function ActivityApproval() {
                                         <Button
                                             variant="destructive"
                                             size="sm"
-                                            onClick={handleReject}
+                                            onClick={() => handleRejectAll(group.ids, rejectionReason)}
                                             disabled={!rejectionReason.trim() || updateStatusMutation.isPending}
                                         >
                                             Confirm Rejection
@@ -234,6 +281,7 @@ export default function ActivityApproval() {
                     </Card>
                 ))}
             </div>
+        </div>
         </div>
     );
 }
