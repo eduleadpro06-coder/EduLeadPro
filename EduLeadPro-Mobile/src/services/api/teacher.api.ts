@@ -239,6 +239,15 @@ export const teacherAPI = {
         const response = await apiClient.delete(`/teacher/tasks/${taskId}`);
         return response;
     },
+
+    /**
+     * Get history of daily updates posted by this teacher
+     */
+    async getUpdateHistory(): Promise<any[]> {
+        const response = await apiClient.get('/teacher/daily-updates');
+        return response.data || [];
+    },
 };
+
 
 export default teacherAPI;

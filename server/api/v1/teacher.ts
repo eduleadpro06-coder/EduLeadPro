@@ -438,6 +438,58 @@ router.post('/activity', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/v1/mobile/teacher/daily-updates
+ * Get complete history of daily updates posted by this teacher
+ */
+router.get('/daily-updates', async (req: Request, res: Response) => {
+    try {
+        const organizationId = req.user!.organizationId;
+        const staffId = req.user!.userId;
+        const { supabase } = await import('../../supabase.js');
+
+        // Fetch teacher name
+        const { data: teacher } = await supabase
+            .from('staff')
+            .select('name')
+            .eq('id', staffId)
+            .single();
+
+        const { data: activities, error } = await supabase
+            .from('daily_updates')
+            .select(`
+                *,
+                student:leads!daily_updates_lead_id_fkey (
+                    id, 
+                    name, 
+                    class, 
+                    section
+                )
+            `)
+            .eq('organization_id', organizationId)
+            .eq('teacher_name', teacher?.name || '')
+            .order('posted_at', { ascending: false })
+            .limit(100);
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            data: activities || []
+        });
+    } catch (error) {
+        console.error('[Mobile API] Get teacher history error:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                code: 'GET_HISTORY_ERROR',
+                message: 'Failed to fetch update history'
+            }
+        });
+    }
+});
+
+
+/**
  * GET /api/v1/mobile/teacher/attendance/today
  * Get today's attendance status for all students
  */

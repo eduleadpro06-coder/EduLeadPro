@@ -41,15 +41,20 @@ export default function ActivitiesScreen() {
                 const orgId = (user as any).organization_id || (user as any).organizationId;
 
                 // Parallel fetch
-                const [updatesData, announcementsData, eventsData] = await Promise.all([
+                const [updatesRes, announcementsRes, eventsRes] = await Promise.all([
                     api.getDailyUpdates(childId),
                     api.getAnnouncements(orgId),
-                    api.getEvents(orgId) // Assuming getEvents fetches holidays/calendar
+                    api.getEvents(orgId)
                 ]);
 
-                setUpdates(updatesData);
-                setAnnouncements(announcementsData);
-                setHolidays(eventsData || []); // eventsData might be null/undefined
+                // Extract nested data from API responses: { success, data: { activities/announcements/events } }
+                const extractedUpdates = (updatesRes as any)?.data?.activities || (updatesRes as any)?.activities || (Array.isArray(updatesRes) ? updatesRes : []);
+                const extractedAnnouncements = (announcementsRes as any)?.data?.announcements || (announcementsRes as any)?.announcements || (Array.isArray(announcementsRes) ? announcementsRes : []);
+                const extractedEvents = (eventsRes as any)?.data?.events || (eventsRes as any)?.events || (Array.isArray(eventsRes) ? eventsRes : []);
+
+                setUpdates(extractedUpdates);
+                setAnnouncements(extractedAnnouncements);
+                setHolidays(extractedEvents);
 
             } catch (e) {
                 console.error('Activities load error:', e);
@@ -165,18 +170,37 @@ export default function ActivitiesScreen() {
             const validHolidays = holidays.filter(item => item && item.id && item.title?.trim());
             if (validHolidays.length === 0) return renderEmpty('No upcoming events');
             return validHolidays.map((item) => {
-                const date = item.event_date ? new Date(item.event_date) : new Date();
+                // Parse date safely - append T00:00:00 to avoid UTC midnight timezone shift
+                const rawDate = item.event_date || item.eventDate;
+                const date = rawDate ? new Date(rawDate + 'T00:00:00') : new Date();
+
+                // Determine type and styling
+                const rawType = (item.event_type || item.eventType || item.type || 'event').toLowerCase();
+                const isHoliday = rawType === 'holiday';
+                const typeLabel = isHoliday ? 'Holiday' : rawType.charAt(0).toUpperCase() + rawType.slice(1);
+                const typeColor = isHoliday ? '#EF4444' : '#3B82F6';
+                const typeBg = isHoliday ? '#FEE2E2' : '#DBEAFE';
+                const dateBg = isHoliday ? '#FEE2E2' : '#FEF3C7';
+                const dateColor = isHoliday ? '#DC2626' : '#D97706';
+
+                // Description
+                const description = item.description || '';
 
                 return (
                     <PremiumCard key={item.id} style={styles.card}>
                         <View style={styles.holidayRow}>
-                            <View style={styles.dateBox}>
-                                <Text style={styles.dateDay}>{date.getDate()}</Text>
-                                <Text style={styles.dateMonth}>{date.toLocaleDateString('en-US', { month: 'short' })}</Text>
+                            <View style={[styles.dateBox, { backgroundColor: dateBg }]}>
+                                <Text style={[styles.dateDay, { color: dateColor }]}>{date.getDate()}</Text>
+                                <Text style={[styles.dateMonth, { color: dateColor }]}>{date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</Text>
                             </View>
                             <View style={{ flex: 1, marginLeft: 16 }}>
                                 <Text style={styles.holidayTitle}>{item.title}</Text>
-                                <Text style={styles.holidayType}>{item.event_type || item.type || 'Event'}</Text>
+                                {description ? (
+                                    <Text style={styles.holidayDescription} numberOfLines={2}>{description}</Text>
+                                ) : null}
+                                <View style={[styles.typeBadge, { backgroundColor: typeBg }]}>
+                                    <Text style={[styles.typeBadgeText, { color: typeColor }]}>{typeLabel}</Text>
+                                </View>
                             </View>
                         </View>
                     </PremiumCard>
@@ -311,6 +335,9 @@ const styles = StyleSheet.create({
     dateDay: { fontSize: 18, fontWeight: '700', color: '#D97706' },
     dateMonth: { fontSize: 10, color: '#D97706', textTransform: 'uppercase' },
     holidayTitle: { fontSize: 16, fontWeight: '600', color: '#1F2937' },
+    holidayDescription: { fontSize: 13, color: '#6B7280', marginTop: 2, lineHeight: 18 },
+    typeBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 6 },
+    typeBadgeText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
     holidayType: { fontSize: 12, color: '#6B7280' },
 
     emptyContainer: { alignItems: 'center', padding: 40 },

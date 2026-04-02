@@ -263,6 +263,17 @@ export default function TeacherHomeScreen() {
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
+                                            style={[styles.actionCard, { backgroundColor: '#FDF2F9', borderColor: '#FBCFE8' }]}
+                                            onPress={() => router.push('/(teacher)/update-history' as any)}
+                                        >
+                                            <View style={[styles.actionIconBox, { backgroundColor: '#FCE7F3' }]}>
+                                                <Feather name="calendar" size={24} color="#D33394" />
+                                            </View>
+                                            <Text style={styles.actionLabel}>Update History</Text>
+                                        </TouchableOpacity>
+
+
+                                        <TouchableOpacity
                                             style={[styles.actionCard, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
                                             onPress={() => setActiveTab('students')}
                                         >
@@ -423,9 +434,13 @@ export default function TeacherHomeScreen() {
                     } else if (t === 'history') {
                         router.push('/(teacher)/attendance-history');
                         setDrawerVisible(false);
+                    } else if (t === 'update_history') {
+                        router.push('/(teacher)/update-history' as any);
+                        setDrawerVisible(false);
                     } else {
                         setActiveTab(t as TabType);
                     }
+
                 }}
                 user={{ name: user?.name || 'Teacher', role: user?.role || 'teacher' }}
                 onLogout={logout}
@@ -433,10 +448,12 @@ export default function TeacherHomeScreen() {
                     { id: 'dashboard', label: 'Dashboard', icon: 'home' },
                     { id: 'attendance', label: 'Mark Attendance', icon: 'check-square' },
                     { id: 'post_update', label: 'Post Update', icon: 'edit-3' },
+                    { id: 'update_history', label: 'Update History', icon: 'calendar' },
                     { id: 'students', label: 'My Students', icon: 'users' },
                     { id: 'history', label: 'Attendance History', icon: 'clock' },
                 ]}
             />
+
         </View>
     );
 }

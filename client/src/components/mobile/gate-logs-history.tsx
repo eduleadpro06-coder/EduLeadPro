@@ -54,15 +54,15 @@ export default function GateLogsHistory() {
         if (activeTab === "students") {
             csvContent += "Date,Student Name,Class,Check-In,Check-Out,Status,Recorded By\n";
             data.forEach(log => {
-                const checkIn = log.checkInTime ? format(new Date(log.checkInTime), 'hh:mm a') : '-';
-                const checkOut = log.checkOutTime ? format(new Date(log.checkOutTime), 'hh:mm a') : '-';
+                const checkIn = log.check_in_time ? format(new Date(log.check_in_time), 'hh:mm a') : '-';
+                const checkOut = log.check_out_time ? format(new Date(log.check_out_time), 'hh:mm a') : '-';
                 csvContent += `${log.date},${log.student?.name},${log.student?.class},${checkIn},${checkOut},${log.status},${log.recorder?.name || 'N/A'}\n`;
             });
         } else {
             csvContent += "Time,Visitor Name,Phone,Purpose,Check-Out,Status,Recorded By\n";
             data.forEach(log => {
-                const checkIn = format(new Date(log.checkInTime), 'dd/MM/yyyy hh:mm a');
-                const checkOut = log.checkOutTime ? format(new Date(log.checkOutTime), 'hh:mm a') : '-';
+                const checkIn = format(new Date(log.check_in_time), 'dd/MM/yyyy hh:mm a');
+                const checkOut = log.check_out_time ? format(new Date(log.check_out_time), 'hh:mm a') : '-';
                 csvContent += `${checkIn},${log.visitorName},${log.visitorPhone},${log.visitorPurpose},${checkOut},${log.status},${log.recorder?.name || 'N/A'}\n`;
             });
         }
@@ -172,21 +172,22 @@ export default function GateLogsHistory() {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-center">
-                                                    {log.checkInTime ? (
+                                                    {log.check_in_time ? (
                                                         <div className="flex flex-col items-center">
                                                             <Clock className="h-3 w-3 text-green-500 mb-1" />
-                                                            <span className="text-sm font-semibold">{format(new Date(log.checkInTime), 'hh:mm a')}</span>
+                                                            <span className="text-sm font-semibold">{format(new Date(log.check_in_time), 'hh:mm a')}</span>
                                                         </div>
                                                     ) : '-'}
                                                 </TableCell>
                                                 <TableCell className="text-center">
-                                                    {log.checkOutTime ? (
+                                                    {log.check_out_time ? (
                                                         <div className="flex flex-col items-center">
                                                             <Clock className="h-3 w-3 text-orange-500 mb-1" />
-                                                            <span className="text-sm font-semibold">{format(new Date(log.checkOutTime), 'hh:mm a')}</span>
+                                                            <span className="text-sm font-semibold">{format(new Date(log.check_out_time), 'hh:mm a')}</span>
                                                         </div>
                                                     ) : '-'}
                                                 </TableCell>
+
                                                 <TableCell>
                                                     {log.status === 'present' ? (
                                                         <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">
@@ -232,10 +233,11 @@ export default function GateLogsHistory() {
                                             <TableRow key={log.id} className="hover:bg-gray-50/50 transition-colors">
                                                 <TableCell>
                                                     <div className="flex flex-col">
-                                                        <span className="font-medium text-gray-600">{format(new Date(log.checkInTime), 'dd MMM yyyy')}</span>
-                                                        <span className="text-xs font-bold text-gray-900">{format(new Date(log.checkInTime), 'hh:mm a')}</span>
+                                                        <span className="font-medium text-gray-600">{format(new Date(log.check_in_time), 'dd MMM yyyy')}</span>
+                                                        <span className="text-xs font-bold text-gray-900">{format(new Date(log.check_in_time), 'hh:mm a')}</span>
                                                     </div>
                                                 </TableCell>
+
                                                 <TableCell>
                                                     <div className="flex flex-col">
                                                         <span className="font-bold text-gray-900">{log.visitorName}</span>
@@ -246,15 +248,16 @@ export default function GateLogsHistory() {
                                                     {log.visitorPurpose}
                                                 </TableCell>
                                                 <TableCell className="text-center">
-                                                    {log.checkOutTime ? (
+                                                    {log.check_out_time ? (
                                                         <div className="flex flex-col items-center">
                                                             <Clock className="h-3 w-3 text-orange-500 mb-1" />
-                                                            <span className="text-sm font-semibold">{format(new Date(log.checkOutTime), 'hh:mm a')}</span>
+                                                            <span className="text-sm font-semibold">{format(new Date(log.check_out_time), 'hh:mm a')}</span>
                                                         </div>
                                                     ) : (
                                                         <span className="text-gray-400 italic">Still inside</span>
                                                     )}
                                                 </TableCell>
+
                                                 <TableCell>
                                                     {log.status === 'inside' ? (
                                                         <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200 animate-pulse">
