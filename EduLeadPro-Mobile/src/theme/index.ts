@@ -96,15 +96,58 @@ export const spacing = {
     }
 };
 
-// 4. Typography (Clean, readable, well-spaced)
+// 4. Typography (Outfit for headings, Inter for body)
+const fontFamilies = {
+    bold: 'Outfit_Bold',
+    extraBold: 'Outfit_ExtraBold',
+    semiBold: 'Outfit_SemiBold',
+    bodyRegular: 'Inter_Regular',
+    bodyMedium: 'Inter_Medium',
+    bodySemiBold: 'Inter_SemiBold',
+};
+
 export const typography = {
-    h1: { fontSize: 32, fontWeight: '800' as const, color: colors.textPrimary, letterSpacing: -0.5 },
-    h2: { fontSize: 24, fontWeight: '700' as const, color: colors.textPrimary, letterSpacing: -0.5 },
-    h3: { fontSize: 20, fontWeight: '700' as const, color: colors.textPrimary },
-    subtitle: { fontSize: 16, fontWeight: '500' as const, color: colors.textSecondary, lineHeight: 24 },
-    body: { fontSize: 15, color: colors.textPrimary, lineHeight: 22 },
-    caption: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-    button: { fontSize: 16, fontWeight: '700' as const, letterSpacing: 0.5 },
+    h1: { 
+        fontSize: 32, 
+        fontFamily: fontFamilies.extraBold, 
+        color: colors.textPrimary, 
+        letterSpacing: -0.8 
+    },
+    h2: { 
+        fontSize: 24, 
+        fontFamily: fontFamilies.bold, 
+        color: colors.textPrimary, 
+        letterSpacing: -0.5 
+    },
+    h3: { 
+        fontSize: 20, 
+        fontFamily: fontFamilies.semiBold, 
+        color: colors.textPrimary,
+        letterSpacing: -0.3
+    },
+    subtitle: { 
+        fontSize: 16, 
+        fontFamily: fontFamilies.bodyMedium, 
+        color: colors.textSecondary, 
+        lineHeight: 24 
+    },
+    body: { 
+        fontSize: 15, 
+        fontFamily: fontFamilies.bodyRegular, 
+        color: colors.textPrimary, 
+        lineHeight: 22 
+    },
+    caption: { 
+        fontSize: 13, 
+        fontFamily: fontFamilies.bodyRegular, 
+        color: colors.textSecondary, 
+        lineHeight: 18 
+    },
+    button: { 
+        fontSize: 16, 
+        fontFamily: fontFamilies.bold, 
+        letterSpacing: 0.5 
+    },
 };
 
 // 5. Animation Constants

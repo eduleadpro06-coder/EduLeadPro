@@ -9,8 +9,24 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
+import { 
+    useFonts, 
+    Outfit_700Bold, 
+    Outfit_800ExtraBold, 
+    Outfit_600SemiBold 
+} from '@expo-google-fonts/outfit';
+import { 
+    Inter_400Regular, 
+    Inter_500Medium, 
+    Inter_600SemiBold 
+} from '@expo-google-fonts/inter';
+
 import { useAuthStore } from '../src/store/authStore';
 import { colors } from '../src/theme/colors';
+
+// Prevent splash screen from hiding automatically
+SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -26,15 +42,26 @@ function RootLayoutNav() {
     const router = useRouter();
     const { isAuthenticated, isLoading, user, loadUser } = useAuthStore();
 
+    const [fontsLoaded] = useFonts({
+        'Outfit_Bold': Outfit_700Bold,
+        'Outfit_ExtraBold': Outfit_800ExtraBold,
+        'Outfit_SemiBold': Outfit_600SemiBold,
+        'Inter_Regular': Inter_400Regular,
+        'Inter_Medium': Inter_500Medium,
+        'Inter_SemiBold': Inter_600SemiBold,
+    });
+
     // Load user on app start
     useEffect(() => {
         loadUser();
     }, []);
 
-    // Autorouting logic: this was completely missing before!
-    // It watches for authentication state changes and pushes the user to the correct dashboard
+    // Handle SplashScreen and Navigation
     useEffect(() => {
-        if (isLoading) return;
+        if (isLoading || !fontsLoaded) return;
+
+        // Hide splash screen when ready
+        SplashScreen.hideAsync();
 
         const inAuthGroup = segments[0] === '(auth)';
 
@@ -57,13 +84,9 @@ function RootLayoutNav() {
         }
     }, [isAuthenticated, segments, isLoading, user]);
 
-    // Show loading screen while checking auth
-    if (isLoading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-        );
+    // Show nothing (Splash Screen stays visible) while checking auth or loading fonts
+    if (isLoading || !fontsLoaded) {
+        return null;
     }
 
     return <Slot />;
