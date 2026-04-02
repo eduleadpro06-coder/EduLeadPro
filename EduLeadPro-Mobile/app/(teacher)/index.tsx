@@ -1,6 +1,6 @@
 /**
- * Teacher Home Screen - Premium Design with Expo Router
- * Based on premium TeacherHomeScreen.tsx with tabs and attendance management
+ * Teacher Home Screen - Refined Premium Design
+ * Addresses vertical clutter, removes tabs, and organizes action sequence.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -13,58 +13,24 @@ import {
     ActivityIndicator,
     RefreshControl,
     Platform,
-    Alert,
-    TextInput,
     StatusBar,
-    BackHandler,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../src/store/authStore';
-import { colors, spacing, typography, shadows } from '../../src/theme';
-import PremiumCard from '../../src/components/ui/PremiumCard';
-import PremiumButton from '../../src/components/ui/PremiumButton';
+import { colors, spacing, shadows } from '../../src/theme';
 import PremiumDrawer from '../../src/components/ui/PremiumDrawer';
-
-type TabType = 'dashboard' | 'attendance' | 'students' | 'reports';
+import PremiumCard from '../../src/components/ui/PremiumCard';
 
 export default function TeacherHomeScreen() {
     const router = useRouter();
     const { user, logout } = useAuthStore();
-    const [activeTab, setActiveTab] = useState<TabType>('dashboard');
     const [drawerVisible, setDrawerVisible] = useState(false);
-
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [dashboardData, setDashboardData] = useState<any>(null);
-    const [students, setStudents] = useState<any[]>([]);
-    const [searchQuery, setSearchQuery] = useState('');
-
-    // Attendance state
-    const [attendanceRecords, setAttendanceRecords] = useState<Map<number, 'present' | 'absent' | 'late'>>(new Map());
-    const [savingAttendance, setSavingAttendance] = useState(false);
-
-    useEffect(() => {
-        if (activeTab === 'dashboard') loadDashboard();
-        else if (activeTab === 'students' || activeTab === 'attendance') loadStudents();
-    }, [activeTab]);
-
-    // Handle Android Back Button
-    useFocusEffect(
-        React.useCallback(() => {
-            const onBackPress = () => {
-                if (activeTab !== 'dashboard') {
-                    setActiveTab('dashboard');
-                    return true;
-                }
-                return false;
-            };
-
-            const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-            return () => backHandler.remove();
-        }, [activeTab])
-    );
 
     const loadDashboard = async () => {
         setLoading(true);
@@ -78,83 +44,15 @@ export default function TeacherHomeScreen() {
         }
     };
 
-    const loadStudents = async () => {
-        setLoading(true);
-        try {
-            const data = await api.getTeacherStudents('');
-            setStudents(data);
-
-            const todayData = await api.getTodayAttendanceAll();
-            const attMap = new Map();
-
-            // Strictly check if server date matches client today
-            const clientToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-            const serverDate = todayData?.date;
-
-            // Only populate if dates match (handle timezone rollover issues)
-            if (serverDate === clientToday) {
-                todayData?.students?.forEach((s: any) => {
-                    if (s.attendance?.status) {
-                        attMap.set(s.id, s.attendance.status);
-                    }
-                });
-            }
-            setAttendanceRecords(attMap);
-        } catch (error) {
-            console.error('Students error:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    useEffect(() => {
+        loadDashboard();
+    }, []);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        if (activeTab === 'dashboard') await loadDashboard();
-        else await loadStudents();
+        await loadDashboard();
         setRefreshing(false);
     };
-
-    const markAllPresent = () => {
-        const newMap = new Map(attendanceRecords);
-        students.forEach(s => newMap.set(s.id, 'present'));
-        setAttendanceRecords(newMap);
-    };
-
-    const toggleAttendance = (studentId: number, status: 'present' | 'absent' | 'late') => {
-        const newMap = new Map(attendanceRecords);
-        newMap.set(studentId, status);
-        setAttendanceRecords(newMap);
-    };
-
-    const saveAttendance = async () => {
-        if (attendanceRecords.size === 0) {
-            Alert.alert('No Changes', 'Please mark attendance for at least one student');
-            return;
-        }
-
-        setSavingAttendance(true);
-        try {
-            const records = Array.from(attendanceRecords.entries()).map(([leadId, status]) => ({
-                leadId,
-                status,
-                markedBy: user?.name,
-                organizationId: (user as any)?.organization_id || (user as any)?.organizationId
-            }));
-
-            await api.markAttendanceBulk(records);
-            Alert.alert('Success', 'Attendance saved successfully');
-            setActiveTab('dashboard');
-        } catch (error: any) {
-            console.error('Save attendance error:', error);
-            Alert.alert('Error', error.message || 'Failed to save attendance');
-        } finally {
-            setSavingAttendance(false);
-        }
-    };
-
-    const filteredStudents = students.filter(s =>
-        searchQuery ? s.name.toLowerCase().includes(searchQuery.toLowerCase()) : true
-    );
 
     const getGreeting = () => {
         const hour = new Date().toLocaleTimeString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' });
@@ -164,41 +62,46 @@ export default function TeacherHomeScreen() {
         return 'Good Evening,';
     };
 
+    const quickActions = [
+        { id: 'attendance', label: 'Attendance', icon: 'check-circle', color: '#3B82F6', bg: '#EFF6FF', route: '/(teacher)/mark-attendance' },
+        { id: 'post', label: 'Post Update', icon: 'edit-3', color: '#EF4444', bg: '#FEF2F2', route: '/(teacher)/post-update' },
+        { id: 'students', label: 'My Students', icon: 'users', color: '#8B5CF6', bg: '#F5F3FF', route: '/(teacher)/my-students' },
+        { id: 'u_history', label: 'Upd. History', icon: 'calendar', color: '#D33394', bg: '#FDF2F9', route: '/(teacher)/update-history' },
+        { id: 'a_history', label: 'Att. History', icon: 'clock', color: '#F97316', bg: '#FFF7ED', route: '/(teacher)/attendance-history' },
+        { id: 'leaves', label: 'Leaves', icon: 'briefcase', color: '#6366F1', bg: '#EEF2FF', route: '/(teacher)/leaves' },
+        { id: 'tasks', label: 'Tasks', icon: 'check-square', color: '#06B6D4', bg: '#ECFEFF', route: '/(teacher)/tasks' },
+    ];
+
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-            {/* Header Logic */}
-            {activeTab === 'dashboard' ? (
-                /* Premium Header - Dashboard Only */
-                <View style={styles.headerContainer}>
-                    <View style={styles.headerContent}>
-                        <View style={{ flex: 1 }}>
-                            <TouchableOpacity style={styles.menuBtn} onPress={() => setDrawerVisible(true)}>
-                                <Ionicons name="grid-outline" size={26} color={colors.textPrimary} />
+            {/* Premium Header */}
+            <View style={styles.headerContainerFixed}>
+                <LinearGradient
+                    colors={[colors.primary, colors.primaryDark]}
+                    style={styles.headerGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                />
+                <View style={styles.headerContentFixed}>
+                    <View style={{ flex: 1 }}>
+                        <View style={styles.headerTopRow}>
+                            <TouchableOpacity style={styles.menuBtnFixed} onPress={() => setDrawerVisible(true)}>
+                                <Ionicons name="grid-outline" size={24} color="#fff" />
                             </TouchableOpacity>
-                            <View style={{ marginTop: 12 }}>
-                                <Text style={styles.dateText}>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
-                                <Text style={styles.greetingText}>{getGreeting()}</Text>
-                                <Text style={styles.teacherNameText}>{(user as any)?.name || 'Teacher'}</Text>
-                            </View>
+                            <Text style={styles.dateTextFixed}>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+                        </View>
+                        <View style={{ marginTop: 20 }}>
+                            <Text style={styles.greetingTextFixed}>{getGreeting()}</Text>
+                            <Text style={styles.teacherNameTextFixed}>{(user as any)?.name || 'Teacher'}</Text>
                         </View>
                     </View>
-                </View>
-            ) : (
-                /* Back Header - Other Tabs */
-                <View style={[styles.headerContainer, { paddingBottom: 10 }]}>
-                    <View style={[styles.headerContent, { alignItems: 'center' }]}>
-                        <TouchableOpacity style={{ padding: 8, marginLeft: -8 }} onPress={() => setActiveTab('dashboard')}>
-                            <Feather name="arrow-left" size={24} color={colors.textPrimary} />
-                        </TouchableOpacity>
-                        <Text style={[styles.teacherNameText, { fontSize: 18, marginTop: 0 }]}>
-                            {activeTab === 'attendance' ? 'Mark Attendance' : `My Students (${filteredStudents.length})`}
-                        </Text>
-                        <View style={{ width: 24 }} />
+                    <View style={styles.avatarContainerFixed}>
+                        <Text style={styles.avatarTextFixed}>{(user as any)?.name?.charAt(0) || 'T'}</Text>
                     </View>
                 </View>
-            )}
+            </View>
 
             {/* Content */}
             <ScrollView
@@ -207,212 +110,71 @@ export default function TeacherHomeScreen() {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             >
                 {loading && !refreshing ? (
-                    <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 50 }} />
+                    <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
                 ) : (
                     <>
-                        {activeTab === 'dashboard' && dashboardData && (
-                            <>
-                                {/* Stats Grid - Fixed Layout */}
-                                <View style={styles.statsGridPremium}>
+                        {/* Consolidated Class Snapshot */}
+                        {dashboardData && (
+                            <PremiumCard style={styles.snapshotCard}>
+                                <View style={styles.snapshotHeader}>
+                                    <View style={styles.snapshotTitleRow}>
+                                        <MaterialCommunityIcons name="finance" size={18} color={colors.primary} />
+                                        <Text style={styles.snapshotTitle}>Class Snapshot</Text>
+                                    </View>
+                                    <Text style={styles.snapshotDate}>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                </View>
+                                
+                                <View style={styles.snapshotGrid}>
                                     {[
-                                        { label: 'Total', value: dashboardData.studentsCount || 0, icon: 'users', color: colors.primary, bg: '#EEF2FF' },
+                                        { label: 'Assigned', value: dashboardData.studentsCount || 0, icon: 'users', color: colors.primary, bg: '#EEF2FF' },
                                         { label: 'Present', value: dashboardData.attendance?.present || 0, icon: 'user-check', color: colors.success, bg: '#ECFDF5' },
                                         { label: 'Absent', value: dashboardData.attendance?.absent || 0, icon: 'user-x', color: colors.danger, bg: '#FEF2F2' },
                                     ].map((stat, i) => (
-                                        <View key={i} style={[styles.statCardPremium, { backgroundColor: stat.bg }]}>
-                                            <View style={styles.statIconHeader}>
-                                                <View style={[styles.statIconBox, { backgroundColor: 'white' }]}>
-                                                    <Feather name={stat.icon as any} size={16} color={stat.color} />
-                                                </View>
-                                                {stat.label.includes('Present') && (
-                                                    <View style={styles.percentBadge}>
-                                                        <Text style={styles.percentText}>
-                                                            {dashboardData.studentsCount ? Math.round((stat.value / dashboardData.studentsCount) * 100) : 0}%
-                                                        </Text>
-                                                    </View>
-                                                )}
+                                        <View key={stat.label} style={[styles.snapshotItem, i < 2 && styles.snapshotDivider]}>
+                                            <View style={[styles.snapshotIconBox, { backgroundColor: stat.bg }]}>
+                                                <Feather name={stat.icon as any} size={16} color={stat.color} />
                                             </View>
-                                            <Text style={styles.statValuePremium}>{stat.value}</Text>
-                                            <Text style={styles.statLabelPremium}>{stat.label}</Text>
+                                            <View>
+                                                <Text style={styles.snapshotValue}>{stat.value}</Text>
+                                                <Text style={styles.snapshotLabel}>{stat.label}</Text>
+                                            </View>
                                         </View>
                                     ))}
                                 </View>
-
-                                {/* Quick Actions Grid */}
-                                <View style={styles.section}>
-                                    <Text style={styles.sectionTitle}>Quick Actions</Text>
-                                    <View style={styles.quickActionsGrid}>
-                                        <TouchableOpacity
-                                            style={[styles.actionCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}
-                                            onPress={() => setActiveTab('attendance')}
-                                        >
-                                            <View style={[styles.actionIconBox, { backgroundColor: '#DCFCE7' }]}>
-                                                <Feather name="check-circle" size={24} color={colors.success} />
-                                            </View>
-                                            <Text style={styles.actionLabel}>Mark Attendance</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            style={[styles.actionCard, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
-                                            onPress={() => router.push('/(teacher)/post-update')}
-                                        >
-                                            <View style={[styles.actionIconBox, { backgroundColor: '#FEE2E2' }]}>
-                                                <Feather name="edit-3" size={24} color={colors.danger} />
-                                            </View>
-                                            <Text style={styles.actionLabel}>Post Update</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            style={[styles.actionCard, { backgroundColor: '#FDF2F9', borderColor: '#FBCFE8' }]}
-                                            onPress={() => router.push('/(teacher)/update-history' as any)}
-                                        >
-                                            <View style={[styles.actionIconBox, { backgroundColor: '#FCE7F3' }]}>
-                                                <Feather name="calendar" size={24} color="#D33394" />
-                                            </View>
-                                            <Text style={styles.actionLabel}>Update History</Text>
-                                        </TouchableOpacity>
-
-
-                                        <TouchableOpacity
-                                            style={[styles.actionCard, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
-                                            onPress={() => setActiveTab('students')}
-                                        >
-                                            <View style={[styles.actionIconBox, { backgroundColor: '#DBEAFE' }]}>
-                                                <Feather name="users" size={24} color={colors.primary} />
-                                            </View>
-                                            <Text style={styles.actionLabel}>View Students</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            style={[styles.actionCard, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}
-                                            onPress={() => router.push('/(teacher)/attendance-history')}
-                                        >
-                                            <View style={[styles.actionIconBox, { backgroundColor: '#FEF3C7' }]}>
-                                                <Feather name="clock" size={24} color={colors.warning} />
-                                            </View>
-                                            <Text style={styles.actionLabel}>Attendance History</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            style={[styles.actionCard, { backgroundColor: '#F3E8FF', borderColor: '#E9D5FF' }]}
-                                            onPress={() => router.push('/(teacher)/leaves')}
-                                        >
-                                            <View style={[styles.actionIconBox, { backgroundColor: '#F3E8FF' }]}>
-                                                <Feather name="calendar" size={24} color="#9333EA" />
-                                            </View>
-                                            <Text style={styles.actionLabel}>Apply Leave</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            style={[styles.actionCard, { backgroundColor: '#E0F2FE', borderColor: '#BAE6FD' }]}
-                                            onPress={() => router.push('/(teacher)/tasks')}
-                                        >
-                                            <View style={[styles.actionIconBox, { backgroundColor: '#E0F2FE' }]}>
-                                                <Feather name="check-square" size={24} color="#0284C7" />
-                                            </View>
-                                            <Text style={styles.actionLabel}>My Tasks</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            </>
+                            </PremiumCard>
                         )}
 
-                        {activeTab === 'attendance' && (
-                            <View style={styles.section}>
-                                <View style={styles.attendanceHeader}>
-                                    <View>
-                                        <Text style={{ fontSize: 13, color: colors.textSecondary, marginLeft: 4 }}>
-                                            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                                        </Text>
-                                    </View>
-                                    <TouchableOpacity onPress={markAllPresent} style={styles.markAllBtn}>
-                                        <Text style={styles.markAllText}>Mark All Present</Text>
+                        {/* Quick Actions Grid */}
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Essential Actions</Text>
+                            <View style={styles.quickActionsGridThree}>
+                                {quickActions.map((action) => (
+                                    <TouchableOpacity
+                                        key={action.id}
+                                        style={styles.actionCardCompact}
+                                        onPress={() => router.push(action.route as any)}
+                                    >
+                                        <View style={[styles.actionIconCircle, { backgroundColor: action.bg }]}>
+                                            <Feather name={action.icon as any} size={20} color={action.color} />
+                                        </View>
+                                        <Text style={styles.actionLabelCompact} numberOfLines={1}>{action.label}</Text>
                                     </TouchableOpacity>
-                                </View>
-
-                                {filteredStudents.map(student => {
-                                    const status = attendanceRecords.get(student.id);
-                                    return (
-                                        <PremiumCard
-                                            key={student.id}
-                                            style={[
-                                                styles.attendanceCard,
-                                                status === 'present' && { backgroundColor: '#F0FDF4', borderColor: colors.success },
-                                                status === 'absent' && { backgroundColor: '#FEF2F2', borderColor: colors.danger },
-                                                status === 'late' && { backgroundColor: '#FFFBEB', borderColor: colors.warning },
-                                            ]}
-                                        >
-                                            <View style={styles.studentInfo}>
-                                                <View style={styles.studentAvatar}>
-                                                    <Feather name="user" size={20} color={colors.primary} />
-                                                </View>
-                                                <View style={{ flex: 1 }}>
-                                                    <Text style={styles.studentName}>{student.name}</Text>
-                                                    <Text style={styles.studentDetail}>{student.class}</Text>
-                                                </View>
-                                            </View>
-                                            <View style={styles.statusButtons}>
-                                                {(['present', 'absent', 'late'] as const).map(s => {
-                                                    const isActive = status === s;
-                                                    let activeStyle = {};
-                                                    if (isActive) {
-                                                        if (s === 'present') activeStyle = styles.presentBtnActive;
-                                                        if (s === 'absent') activeStyle = styles.absentBtnActive;
-                                                        if (s === 'late') activeStyle = styles.lateBtnActive;
-                                                    }
-
-                                                    return (
-                                                        <TouchableOpacity
-                                                            key={s}
-                                                            style={[
-                                                                styles.statusBtn,
-                                                                isActive && styles.statusBtnActive,
-                                                                isActive ? activeStyle : {},
-                                                            ]}
-                                                            onPress={() => toggleAttendance(student.id, s)}
-                                                        >
-                                                            <Text style={[
-                                                                styles.statusBtnText,
-                                                                isActive && styles.statusBtnTextActive
-                                                            ]}>
-                                                                {s.charAt(0).toUpperCase() + s.slice(1)}
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                    );
-                                                })}
-                                            </View>
-                                        </PremiumCard>
-                                    );
-                                })}
-
-                                <PremiumButton
-                                    title={savingAttendance ? "Saving..." : "Save Attendance"}
-                                    onPress={saveAttendance}
-                                    loading={savingAttendance}
-                                    style={{ marginTop: 16 }}
-                                />
+                                ))}
                             </View>
-                        )}
+                        </View>
 
-                        {activeTab === 'students' && (
-                            <View style={styles.section}>
-                                <View style={{ height: 12 }} />
-
-                                <TextInput
-                                    style={styles.searchInput}
-                                    placeholder="Search students..."
-                                    value={searchQuery}
-                                    onChangeText={setSearchQuery}
-                                />
-
-                                {filteredStudents.map(student => (
-                                    <PremiumCard key={student.id} style={{ marginBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
-                                        <View style={styles.studentAvatar}>
-                                            <Feather name="user" size={24} color={colors.primary} />
+                        {/* Recent Activity Section */}
+                        {dashboardData?.recentActivities?.length > 0 && (
+                            <View style={[styles.section, { marginTop: 10 }]}>
+                                <Text style={styles.sectionTitle}>Recent Updates</Text>
+                                {dashboardData.recentActivities.map((activity: any) => (
+                                    <PremiumCard key={activity.id} style={styles.activityCard}>
+                                        <View style={styles.activityIcon}>
+                                            <Feather name="file-text" size={16} color={colors.primary} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={styles.studentName}>{student.name}</Text>
-                                            <Text style={styles.studentDetail}>{student.class}</Text>
+                                            <Text style={styles.activityTitle}>{activity.title}</Text>
+                                            <Text style={styles.activityTime}>{new Date(activity.posted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
                                         </View>
                                     </PremiumCard>
                                 ))}
@@ -422,25 +184,16 @@ export default function TeacherHomeScreen() {
                 )}
             </ScrollView>
 
-            {/* Sidebar Drawer */}
             <PremiumDrawer
                 isVisible={drawerVisible}
                 onClose={() => setDrawerVisible(false)}
-                activeTab={activeTab}
+                activeTab="dashboard"
                 onSelectTab={(t) => {
-                    if (t === 'post_update') {
-                        router.push('/(teacher)/post-update');
+                    const action = quickActions.find(a => a.id === t || a.label.toLowerCase().includes(t.toLowerCase()));
+                    if (action) {
+                        router.push(action.route as any);
                         setDrawerVisible(false);
-                    } else if (t === 'history') {
-                        router.push('/(teacher)/attendance-history');
-                        setDrawerVisible(false);
-                    } else if (t === 'update_history') {
-                        router.push('/(teacher)/update-history' as any);
-                        setDrawerVisible(false);
-                    } else {
-                        setActiveTab(t as TabType);
                     }
-
                 }}
                 user={{ name: user?.name || 'Teacher', role: user?.role || 'teacher' }}
                 onLogout={logout}
@@ -448,241 +201,181 @@ export default function TeacherHomeScreen() {
                     { id: 'dashboard', label: 'Dashboard', icon: 'home' },
                     { id: 'attendance', label: 'Mark Attendance', icon: 'check-square' },
                     { id: 'post_update', label: 'Post Update', icon: 'edit-3' },
-                    { id: 'update_history', label: 'Update History', icon: 'calendar' },
                     { id: 'students', label: 'My Students', icon: 'users' },
-                    { id: 'history', label: 'Attendance History', icon: 'clock' },
                 ]}
             />
-
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    headerContainer: {
-        backgroundColor: colors.background,
-        paddingTop: Platform.OS === 'ios' ? 60 : 40,
-        paddingBottom: 20,
+    container: { flex: 1, backgroundColor: '#F9FAFB' },
+    content: { flex: 1 },
+    headerContainerFixed: {
+        height: 240,
+        justifyContent: 'flex-start',
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+        overflow: 'hidden',
+    },
+    headerGradient: { ...StyleSheet.absoluteFillObject },
+    headerContentFixed: {
+        flex: 1,
+        paddingTop: Platform.OS === 'ios' ? 60 : 50,
         paddingHorizontal: spacing.lg,
-    },
-    headerContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
     },
-    menuBtn: {
-        padding: 4,
-        marginLeft: -4,
-        marginBottom: 8,
+    headerTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    menuBtnFixed: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    dateText: {
-        fontSize: 12,
-        color: colors.textSecondary,
+    dateTextFixed: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.7)',
+        fontFamily: 'Lexend_Medium',
         textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        fontWeight: '600',
-        marginBottom: 2,
     },
-    greetingText: {
-        fontSize: 24,
-        fontWeight: '300',
-        color: colors.textPrimary,
-        letterSpacing: -0.5,
+    greetingTextFixed: {
+        fontSize: 22,
+        color: 'rgba(255,255,255,0.8)',
+        fontFamily: 'Lexend_Regular',
     },
-    teacherNameText: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: colors.textPrimary,
-        marginTop: -4,
-        letterSpacing: -0.5,
+    teacherNameTextFixed: {
+        fontSize: 28,
+        color: '#fff',
+        fontFamily: 'Outfit_Bold',
+        marginTop: 2,
     },
-    profileButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: colors.primary,
+    avatarContainerFixed: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: 'rgba(255,255,255,0.2)',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
-        marginTop: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.3)',
     },
-    profileInitials: {
-        color: 'white',
-        fontSize: 18,
-        fontWeight: '700',
+    avatarTextFixed: { color: '#fff', fontSize: 20, fontFamily: 'Outfit_Bold' },
+    snapshotCard: {
+        marginTop: -40,
+        marginBottom: 24,
+        padding: 20,
+        borderRadius: 24,
+        ...shadows.lg,
     },
-
-    statsGridPremium: {
+    snapshotHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: spacing.xl,
-        marginTop: spacing.md,
-        paddingHorizontal: 0,
-    },
-    statCardPremium: {
-        width: '31%',
-        borderRadius: 20,
-        padding: 12,
-        justifyContent: 'space-between',
-        aspectRatio: 0.9,
-    },
-    statIconHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
-    statIconBox: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
         alignItems: 'center',
-        justifyContent: 'center',
+        marginBottom: 20,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.04)',
     },
-    percentBadge: {
-        backgroundColor: 'rgba(255,255,255,0.6)',
-        paddingHorizontal: 4,
-        paddingVertical: 2,
-        borderRadius: 8,
+    snapshotTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
-    percentText: {
-        fontSize: 9,
-        fontWeight: '700',
+    snapshotTitle: {
+        fontSize: 16,
+        fontFamily: 'Outfit_Bold',
         color: colors.textPrimary,
     },
-    statValuePremium: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: colors.textPrimary,
-        marginTop: 8,
-    },
-    statLabelPremium: {
-        fontSize: 11,
-        fontWeight: '600',
+    snapshotDate: {
+        fontSize: 12,
+        fontFamily: 'Lexend_Medium',
         color: colors.textSecondary,
     },
-
-    quickActionsGrid: {
+    snapshotGrid: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
         justifyContent: 'space-between',
-        marginBottom: 8,
+        alignItems: 'center',
     },
-    actionCard: {
-        width: '48%',
-        marginBottom: 16,
-        padding: 16,
-        borderRadius: 20,
-        borderWidth: 1,
+    snapshotItem: {
+        flex: 1,
+        alignItems: 'center',
+        gap: 8,
+    },
+    snapshotDivider: {
+        borderRightWidth: 1,
+        borderRightColor: 'rgba(0,0,0,0.06)',
+    },
+    snapshotIconBox: {
+        width: 36,
+        height: 36,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    actionIconBox: {
-        width: 48,
-        height: 48,
-        borderRadius: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 12,
-    },
-    actionLabel: {
-        fontSize: 14,
-        fontWeight: '600',
+    snapshotValue: {
+        fontSize: 20,
+        fontFamily: 'Outfit_Bold',
         color: colors.textPrimary,
         textAlign: 'center',
     },
-
-    // ... Keep existing styles that are still used or refactor them
-    content: { flex: 1 },
+    snapshotLabel: {
+        fontSize: 10,
+        fontFamily: 'Lexend_Medium',
+        color: colors.textSecondary,
+        textAlign: 'center',
+    },
     section: { marginBottom: spacing.xl },
-    sectionTitle: { ...typography.h3, marginBottom: spacing.md },
-
-    attendanceHeader: {
+    sectionTitle: { fontSize: 18, fontFamily: 'Outfit_Bold', color: colors.textPrimary, marginBottom: 16 },
+    quickActionsGridThree: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: spacing.md,
+        flexWrap: 'wrap',
+        gap: 10,
+        justifyContent: 'flex-start',
     },
-    markAllBtn: {
-        backgroundColor: colors.primary,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 6,
-    },
-    markAllText: {
-        color: 'white',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-
-    attendanceCard: {
-        marginBottom: 12,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'transparent',
-    },
-    studentInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    studentAvatar: {
-        width: 48,
-        height: 48,
+    actionCardCompact: {
+        width: '31%',
+        aspectRatio: 1.05,
+        backgroundColor: '#fff',
         borderRadius: 24,
-        backgroundColor: colors.surfaceHighlight || '#F3F4F6',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12
+        padding: 8,
+        ...shadows.sm,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.02)',
     },
-    studentName: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-    studentDetail: { ...typography.caption, fontSize: 13 },
-
-    statusButtons: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    statusBtn: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: 12,
-        backgroundColor: colors.background,
+    actionIconCircle: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.border,
+        justifyContent: 'center',
+        marginBottom: 8,
     },
-    statusBtnActive: {
-        borderWidth: 0,
+    actionLabelCompact: {
+        fontSize: 11,
+        fontFamily: 'Lexend_Medium',
+        color: colors.textPrimary,
+        textAlign: 'center',
     },
-    presentBtn: { backgroundColor: colors.success + '20', borderColor: colors.success }, // Light green
-    absentBtn: { backgroundColor: colors.danger + '20', borderColor: colors.danger },   // Light red
-    lateBtn: { backgroundColor: colors.warning + '20', borderColor: colors.warning },   // Light orange
-
-    presentBtnActive: { backgroundColor: colors.success },
-    absentBtnActive: { backgroundColor: colors.danger },
-    lateBtnActive: { backgroundColor: colors.warning },
-
-    statusBtnText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: colors.textSecondary,
+    activityCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        marginBottom: 8,
     },
-    statusBtnTextActive: {
-        color: 'white',
+    activityIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.primary + '10',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
     },
-
-    searchInput: {
-        backgroundColor: 'white',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: colors.border,
-        fontSize: 16,
-    },
+    activityTitle: { fontSize: 14, fontFamily: 'Lexend_Medium', color: colors.textPrimary },
+    activityTime: { fontSize: 11, fontFamily: 'Lexend_Regular', color: colors.textSecondary },
 });

@@ -87,39 +87,39 @@ router.get('/dashboard', async (req: Request, res: Response) => {
 
         const { supabase } = await import('../../supabase.js');
 
-        // Get teacher info
+        // 1. Get teacher info
         const { data: teacher } = await supabase
             .from('staff')
             .select('id, name, role')
             .eq('id', staffId)
             .single();
 
-        // Get today's date in IST
-        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        // 2. Get teacher's assigned students (lead_id list)
+        const { data: assignedStudents } = await supabase
+            .from('teacher_student_assignments')
+            .select('lead_id')
+            .eq('staff_id', staffId);
 
-        // Get today's attendance summary
+        const assignedLeadIds = assignedStudents?.map((s: any) => s.lead_id) || [];
+        const studentsCount = assignedStudents?.length || 0;
+
+        // 3. Get today's attendance summary for ONLY assigned students
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        
         const { data: todayAttendance } = await supabase
             .from('student_attendance')
             .select('lead_id, status')
             .eq('organization_id', organizationId)
-            .eq('date', today);
+            .eq('date', today)
+            .in('lead_id', assignedLeadIds.length > 0 ? assignedLeadIds : [-1]); // Filter by assigned students
 
-        // Count present/absent/not marked
         const attendanceSummary = {
             present: todayAttendance?.filter(a => a.status === 'present' || a.status === 'late').length || 0,
             absent: todayAttendance?.filter(a => a.status === 'absent').length || 0,
             total: todayAttendance?.length || 0
         };
 
-        // Get enrolled students count (filtered by teacher assignment)
-        const { data: assignedStudents } = await supabase
-            .from('teacher_student_assignments')
-            .select('lead_id')
-            .eq('staff_id', staffId);
-        
-        const studentsCount = assignedStudents?.length || 0;
-
-        // Get recent activities posted by this teacher
+        // 4. Get recent activities posted by this teacher
         const { data: recentActivities } = await supabase
             .from('daily_updates')
             .select('id, lead_id, activity_type, title, posted_at')
