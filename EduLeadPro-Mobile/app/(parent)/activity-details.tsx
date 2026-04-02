@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -7,11 +7,15 @@ import {
     TouchableOpacity,
     Image,
     Dimensions,
+    Alert,
+    ActivityIndicator
 } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { colors, spacing, typography, shadows } from '../../src/theme';
 
 const { width, height } = Dimensions.get('window');
@@ -20,6 +24,32 @@ export default function ActivityDetailsScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const insets = useSafeAreaInsets();
+    const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
+
+    const handleDownload = async (url: string) => {
+        try {
+            setDownloadingUrl(url);
+            const fileName = url.split('/').pop()?.split('?')[0] || `photo_${Date.now()}.jpg`;
+            const fileDirectory = (FileSystem as any).documentDirectory || 'file:///data/user/0/host.exp.exponent/files/';
+            const fileUri = `${fileDirectory}${fileName}`;
+            
+            const { uri } = await FileSystem.downloadAsync(url, fileUri);
+            
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri, {
+                    dialogTitle: 'Save or Share Photo',
+                    mimeType: 'image/jpeg'
+                });
+            } else {
+                Alert.alert('Error', 'Sharing is not available on this device');
+            }
+        } catch (e) {
+            Alert.alert('Download Failed', 'Could not download the image.');
+            console.error(e);
+        } finally {
+            setDownloadingUrl(null);
+        }
+    };
 
     // Parse activity data from params
     const activity = params.activity ? JSON.parse(params.activity as string) : null;
@@ -104,6 +134,19 @@ export default function ActivityDetailsScreen() {
                                         style={styles.mainImage}
                                         resizeMode="contain"
                                     />
+
+                                    {/* Download Button */}
+                                    <TouchableOpacity 
+                                        style={[styles.downloadButton, { top: insets.top + 10 }]} 
+                                        onPress={() => handleDownload(url)}
+                                        disabled={downloadingUrl === url}
+                                    >
+                                        {downloadingUrl === url ? (
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        ) : (
+                                            <Feather name="download" size={20} color="#fff" />
+                                        )}
+                                    </TouchableOpacity>
 
                                     {mediaList.length > 1 && (
                                         <View style={styles.photoCountBadge}>
@@ -211,6 +254,17 @@ const styles = StyleSheet.create({
         height: 44,
         borderRadius: 22,
         backgroundColor: 'rgba(0,0,0,0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    downloadButton: {
+        position: 'absolute',
+        right: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 10,
