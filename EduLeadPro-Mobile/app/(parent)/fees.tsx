@@ -70,6 +70,7 @@ export default function ParentFeesScreen() {
                 className: currentChild?.class || 'N/A',
                 paymentMode: payment.mode || 'N/A',
                 amount: Math.round(payment.amount).toLocaleString('en-IN'),
+                discount: payment.discount && payment.discount !== '0' ? Math.round(payment.discount).toLocaleString('en-IN') : undefined,
                 date: formatDate(payment.date),
                 transactionId: payment.transactionId || undefined,
                 receiptNumber: payment.receiptNumber || 'N/A',
@@ -120,11 +121,14 @@ export default function ParentFeesScreen() {
 
     const tuitionPaid = fees?.tuitionPaid || 0;
     const additionalPaid = fees?.additionalPaid || 0;
-    const paidPercentage = fees && fees.totalFees > 0
-        ? Math.min((tuitionPaid / fees.totalFees) * 100, 100)
+    const totalDiscount = fees?.totalDiscount || 0;
+    const netTotalFees = fees?.netTotalFees || fees?.totalFees || 0;
+
+    const paidPercentage = fees && netTotalFees > 0
+        ? Math.min((tuitionPaid / netTotalFees) * 100, 100)
         : (fees && fees.balance <= 0 ? 100 : 0);
 
-    const progressDisplay = (fees?.totalFees === 0 && fees?.balance <= 0) ? "Settled" : `${Math.round(paidPercentage)}%`;
+    const progressDisplay = (netTotalFees === 0 && fees?.balance <= 0) ? "Settled" : `${Math.round(paidPercentage)}%`;
 
     return (
         <View style={styles.container}>
@@ -192,8 +196,20 @@ export default function ParentFeesScreen() {
                                                     Additional Paid: {formatCurrency(additionalPaid)}
                                                 </Text>
                                             )}
+                                            {totalDiscount > 0 && (
+                                                <Text style={[styles.progressSub, { color: '#10B981', marginTop: 2 }]}>
+                                                    Total Discount: -{formatCurrency(totalDiscount)}
+                                                </Text>
+                                            )}
                                         </View>
-                                        <Text style={styles.progressSub}>Total: {formatCurrency(fees.totalFees)}</Text>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={styles.progressSub}>Total: {formatCurrency(fees.totalFees)}</Text>
+                                            {totalDiscount > 0 && (
+                                                <Text style={[styles.progressSub, { fontWeight: '700', marginTop: 2 }]}>
+                                                    Net: {formatCurrency(netTotalFees)}
+                                                </Text>
+                                            )}
+                                        </View>
                                     </View>
                                 </View>
                             </LinearGradient>

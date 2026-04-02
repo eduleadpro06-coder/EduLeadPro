@@ -27,6 +27,13 @@ export default {
       package: 'com.bloomdale.app',
       softwareKeyboardLayoutMode: 'resize',
       versionCode: 5,
+      permissions: [
+        'READ_EXTERNAL_STORAGE',
+        'WRITE_EXTERNAL_STORAGE',
+        'READ_MEDIA_IMAGES',
+        'READ_MEDIA_VIDEO',
+        'READ_MEDIA_AUDIO'
+      ],
     },
     web: {
       favicon: './assets/logo.png',
@@ -41,6 +48,14 @@ export default {
         'expo-camera',
         {
           cameraPermission: 'Allow Bloomdale Connect to access camera for attendance',
+        },
+      ],
+      [
+        'expo-media-library',
+        {
+          photosPermission: 'Allow Bloomdale Connect to access your photos',
+          savePhotosPermission: 'Allow Bloomdale Connect to save photos to your library',
+          isAccessMediaLocationEnabled: true,
         },
       ],
     ],

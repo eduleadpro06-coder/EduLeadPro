@@ -14,8 +14,10 @@ import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 import { colors, spacing, typography, shadows } from '../../src/theme';
 
 const { width, height } = Dimensions.get('window');
@@ -29,25 +31,77 @@ export default function ActivityDetailsScreen() {
     const handleDownload = async (url: string) => {
         try {
             setDownloadingUrl(url);
-            const fileName = url.split('/').pop()?.split('?')[0] || `photo_${Date.now()}.jpg`;
-            const fileDirectory = (FileSystem as any).documentDirectory || 'file:///data/user/0/host.exp.exponent/files/';
-            const fileUri = `${fileDirectory}${fileName}`;
             
-            const { uri } = await FileSystem.downloadAsync(url, fileUri);
+            // 1. Request Media Library Permission (writeOnly: true avoids AUDIO permission over-request on Android 13+)
+            const { status } = await MediaLibrary.requestPermissionsAsync(true);
+            if (status !== 'granted') {
+                // Fallback to sharing if permission is denied
+                console.log('[Download] Permission denied, falling back to sharing');
+                return await handleSharingFallback(url);
+            }
+
+            // Extract filename from URL or provide fallback
+            const urlParts = url.split('/');
+            const nameWithParams = urlParts[urlParts.length - 1];
+            const cleanName = nameWithParams.split('?')[0] || `photo_${Date.now()}.jpg`;
+            
+            // Use modern Paths.cache for temporary storage
+            const destFile = new File(Paths.cache, cleanName);
+            const fileUri = destFile.uri;
+
+            console.log(`[Download] Starting download: ${url} -> ${fileUri}`);
+            
+            const downloadRes = await FileSystem.downloadAsync(url, fileUri);
+            
+            if (downloadRes.status !== 200) {
+                throw new Error(`Download failed with status ${downloadRes.status}`);
+            }
+
+            // 2. Save directly to Media Library (Gallery)
+            const asset = await MediaLibrary.createAssetAsync(downloadRes.uri);
+            
+            // Optional: Create an album for the school for better organization
+            try {
+                const album = await MediaLibrary.getAlbumAsync('EduLeadPro');
+                if (album === null) {
+                    await MediaLibrary.createAlbumAsync('EduLeadPro', asset, false);
+                } else {
+                    await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+                }
+            } catch (albumError) {
+                console.warn('[Download] Could not create/add to album, image saved to default gallery.', albumError);
+            }
+
+            Alert.alert('Download Successful', 'The photo has been saved to your gallery.');
+            
+        } catch (e) {
+            console.error('[Download Error]', e);
+            // Fallback to sharing on any error
+            await handleSharingFallback(url);
+        } finally {
+            setDownloadingUrl(null);
+        }
+    };
+
+    const handleSharingFallback = async (url: string) => {
+        try {
+            const urlParts = url.split('/');
+            const cleanName = urlParts[urlParts.length - 1].split('?')[0] || `photo_${Date.now()}.jpg`;
+            const destFile = new File(Paths.cache, cleanName);
+            
+            const downloadRes = await FileSystem.downloadAsync(url, destFile.uri);
             
             if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri, {
+                await Sharing.shareAsync(downloadRes.uri, {
                     dialogTitle: 'Save or Share Photo',
                     mimeType: 'image/jpeg'
                 });
             } else {
-                Alert.alert('Error', 'Sharing is not available on this device');
+                Alert.alert('Download Failed', 'Could not save the photo directly and sharing is unavailable.');
             }
-        } catch (e) {
-            Alert.alert('Download Failed', 'Could not download the image.');
-            console.error(e);
-        } finally {
-            setDownloadingUrl(null);
+        } catch (err) {
+            console.error('[Sharing Fallback Error]', err);
+            Alert.alert('Error', 'An unexpected error occurred during download.');
         }
     };
 

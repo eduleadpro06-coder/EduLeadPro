@@ -209,14 +209,16 @@ export default function ParentHomeScreen() {
                                         <Feather name="user" size={32} color="#fff" />
                                     </View>
                                     <View style={styles.studentInfo}>
-                                        <Text style={styles.studentName}>{currentChild.student_name}</Text>
+                                        <View style={styles.nameRow}>
+                                            <Text style={styles.studentName} numberOfLines={1}>{currentChild.student_name}</Text>
+                                            <View style={styles.statusBadge}>
+                                                <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
+                                                <Text style={[styles.statusText, { color: '#10B981' }]}>
+                                                    {(currentChild as any).status || 'ENROLLED'}
+                                                </Text>
+                                            </View>
+                                        </View>
                                         <Text style={styles.studentDetail}>{currentChild.class || 'Student'}</Text>
-                                    </View>
-                                    <View style={styles.statusBadge}>
-                                        <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
-                                        <Text style={[styles.statusText, { color: '#10B981', textTransform: 'uppercase' }]}>
-                                            {(currentChild as any).status || 'ENROLLED'}
-                                        </Text>
                                     </View>
                                 </View>
 
@@ -473,11 +475,19 @@ const styles = StyleSheet.create({
     studentInfo: {
         flex: 1,
         marginLeft: 16,
+        justifyContent: 'center',
+    },
+    nameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
     },
     studentName: {
         color: '#fff',
         fontSize: 18,
         fontWeight: '700',
+        flex: 1,
+        marginRight: 8,
     },
     studentDetail: {
         color: 'rgba(255,255,255,0.6)',
@@ -485,9 +495,10 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     statusBadge: {
-        backgroundColor: 'rgba(16, 185, 129, 0.2)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
+        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+        paddingLeft: 8,
+        paddingRight: 10,
+        paddingVertical: 3,
         borderRadius: 100,
         flexDirection: 'row',
         alignItems: 'center',
@@ -504,6 +515,8 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '800',
         letterSpacing: 0.5,
+        textTransform: 'uppercase',
+        includeFontPadding: false,
     },
     cardDivider: {
         height: 1,

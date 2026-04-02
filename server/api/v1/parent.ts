@@ -409,7 +409,7 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
         // Check for EMI Plan (specific to student)
         const { data: emiPlan } = await supabase
             .from('emi_plans')
-            .select('id, total_amount, status')
+            .select('id, total_amount, status, discount')
             .eq('student_id', childId)
             .eq('status', 'active')
             .order('created_at', { ascending: false })
@@ -465,7 +465,7 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
         // 2. Get Payment History & Calculate Paid Amount
         const { data: payments, error: paymentsError } = await supabase
             .from('fee_payments')
-            .select('id, amount, payment_date, payment_mode, receipt_number, transaction_id, status, installment_number, payment_category')
+            .select('id, amount, discount, payment_date, payment_mode, receipt_number, transaction_id, status, installment_number, payment_category')
             .eq('lead_id', childId)
             .eq('status', 'completed')
             .order('payment_date', { ascending: false });
@@ -475,6 +475,12 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
         const tuitionPaid = (payments || []).filter(p => !p.payment_category || p.payment_category === 'fee_payment').reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
         const additionalPaid = (payments || []).filter(p => p.payment_category === 'additional_charge').reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
         const totalPaid = tuitionPaid + additionalPaid;
+
+        // Calculate total discount
+        const paymentDiscounts = (payments || []).reduce((sum, p) => sum + parseFloat(p.discount || '0'), 0);
+        const emiDiscount = emiPlan ? parseFloat(emiPlan.discount || '0') : 0;
+        const totalDiscount = paymentDiscounts + emiDiscount;
+        const netTotalFees = Math.max(0, totalFees - totalDiscount);
 
         // Dynamic Status Calculation to fix rounding issues
         if (emiDetails && emiDetails.installments.length > 0) {
@@ -524,10 +530,12 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
             success: true,
             data: {
                 totalFees: Math.round(totalFees),
+                totalDiscount: Math.round(totalDiscount),
+                netTotalFees: Math.round(netTotalFees),
                 totalPaid: Math.round(totalPaid),
                 tuitionPaid: Math.round(tuitionPaid),
                 additionalPaid: Math.round(additionalPaid),
-                balance: Math.round(Math.max(0, totalFees - tuitionPaid)),
+                balance: Math.round(Math.max(0, netTotalFees - tuitionPaid)),
                 payments: formattedPayments,
                 emiDetails: emiDetails ? {
                     ...emiDetails,

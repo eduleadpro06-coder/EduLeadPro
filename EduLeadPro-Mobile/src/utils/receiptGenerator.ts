@@ -6,6 +6,7 @@
 
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { File, Paths } from 'expo-file-system';
 
 export interface FeeReceiptData {
@@ -13,6 +14,7 @@ export interface FeeReceiptData {
     className: string;
     paymentMode: string;
     amount: string;
+    discount?: string; // New field
     date: string;
     transactionId?: string;
     organizationName?: string;
@@ -30,6 +32,13 @@ function buildReceiptCopyHtml(data: FeeReceiptData, copyLabel: string): string {
         ? `<tr>
             <td style="padding: 6px 0; color: #333; font-size: 13px;">Transaction ID :</td>
             <td style="padding: 6px 0; color: #111; font-size: 13px; font-weight: 500;">${data.transactionId}</td>
+           </tr>`
+        : '';
+
+    const discountRow = data.discount && data.discount !== '0'
+        ? `<tr>
+            <td style="padding: 6px 0; color: #059669; font-size: 13px;">Discount :</td>
+            <td style="padding: 6px 0; color: #059669; font-size: 13px; font-weight: 500;">Rs. ${data.discount}</td>
            </tr>`
         : '';
 
@@ -74,6 +83,7 @@ function buildReceiptCopyHtml(data: FeeReceiptData, copyLabel: string): string {
                 <td style="padding: 6px 0; color: #333; font-size: 13px;">Payment Mode :</td>
                 <td style="padding: 6px 0; color: #111; font-size: 13px; font-weight: 500;">${data.paymentMode}</td>
             </tr>
+            ${discountRow}
             ${transactionRow}
         </table>
         
@@ -150,7 +160,39 @@ export async function generateMobileFeeReceipt(data: FeeReceiptData): Promise<vo
         // Fall back to original uri if rename fails
     }
 
-    // Share the renamed PDF
+    // Direct Download / Save logic
+    const { Platform, Alert } = await import('react-native');
+    
+    if (Platform.OS === 'android') {
+        try {
+            const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+            
+            if (permissions.granted) {
+                // Read the file as base64 using the legacy FileSystem API
+                const base64 = await FileSystem.readAsStringAsync(shareUri, { 
+                    encoding: FileSystem.EncodingType.Base64 
+                });
+                
+                const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+                    permissions.directoryUri,
+                    fileName,
+                    'application/pdf'
+                );
+                
+                await FileSystem.StorageAccessFramework.writeAsStringAsync(fileUri, base64, { 
+                    encoding: FileSystem.EncodingType.Base64 
+                });
+                
+                Alert.alert('Download Successful', 'Receipt has been saved to your selected folder.');
+                return;
+            }
+        } catch (err) {
+            console.error('Android direct save error:', err);
+            // Fallback to sharing if direct save fails
+        }
+    }
+
+    // Share the renamed PDF (Default for iOS and Fallback for Android)
     if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(shareUri, {
             mimeType: 'application/pdf',
