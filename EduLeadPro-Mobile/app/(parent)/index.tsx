@@ -242,6 +242,13 @@ export default function ParentHomeScreen() {
 
                 {/* Quick Actions (Centered Row) */}
                 <View style={styles.actionsContainerFixed}>
+                    <TouchableOpacity style={styles.actionItem} onPress={() => setShowPass(true)}>
+                        <View style={[styles.actionIcon, { backgroundColor: '#E0E7FF' }]}>
+                            <Ionicons name="qr-code-outline" size={24} color={colors.primary} />
+                        </View>
+                        <Text style={styles.actionLabel}>Gate Pass</Text>
+                    </TouchableOpacity>
+
                     <TouchableOpacity style={styles.actionItem} onPress={handleActivities}>
                         <View style={[styles.actionIcon, { backgroundColor: '#D1FAE5' }]}>
                             <Feather name="calendar" size={24} color="#10B981" />
@@ -249,25 +256,11 @@ export default function ParentHomeScreen() {
                         <Text style={styles.actionLabel}>Activities</Text>
                     </TouchableOpacity>
 
-                    {/* <TouchableOpacity style={styles.actionItem} onPress={handleTrackBus}>
-                        <View style={[styles.actionIcon, { backgroundColor: '#F3F4F6' }]}>
-                            <MaterialCommunityIcons name="bus-school" size={28} color="#4B5563" />
-                        </View>
-                        <Text style={styles.actionLabel}>School Bus</Text>
-                    </TouchableOpacity> */}
-
                     <TouchableOpacity style={styles.actionItem} onPress={handleFees}>
                         <View style={[styles.actionIcon, { backgroundColor: '#FEE2E2' }]}>
                             <Feather name="credit-card" size={24} color="#EF4444" />
                         </View>
                         <Text style={styles.actionLabel}>Fees</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.actionItem} onPress={() => setShowPass(true)}>
-                        <View style={[styles.actionIcon, { backgroundColor: '#E0E7FF' }]}>
-                            <Ionicons name="qr-code-outline" size={24} color={colors.primary} />
-                        </View>
-                        <Text style={styles.actionLabel}>Gate Pass</Text>
                     </TouchableOpacity>
                 </View>
 
