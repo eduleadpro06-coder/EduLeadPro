@@ -223,7 +223,7 @@ export function StaffLeavesTab({ staffId }: StaffLeavesTabProps) {
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant="outline" className={((leave as any).leaveType === 'EL' || (leave as any).leave_type === 'EL') ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-blue-50 text-blue-700 border-blue-200'}>
+                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                                             {(leave as any).leaveType || (leave as any).leave_type || 'CL'}
                                         </Badge>
                                     </TableCell>

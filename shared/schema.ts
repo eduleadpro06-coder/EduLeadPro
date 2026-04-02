@@ -1735,7 +1735,7 @@ export const teacherLeaves = pgTable("teacher_leaves", {
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   reason: text("reason").notNull(),
-  leaveType: varchar("leave_type", { length: 20 }).default("CL").notNull(), // CL, EL, Other
+  leaveType: varchar("leave_type", { length: 20 }).default("CL").notNull(), // CL, Other
   status: varchar("status", { length: 20 }).default("pending"), // pending, approved, rejected
   rejectionReason: text("rejection_reason"),
   appliedAt: timestamp("applied_at").defaultNow().notNull(),
