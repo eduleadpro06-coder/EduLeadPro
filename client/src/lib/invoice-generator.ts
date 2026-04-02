@@ -357,15 +357,13 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
 
     yPosition += totalsBoxHeight + 2;
 
-    // ========== ORANGE DIVIDER BAR 3 (Bottom) ==========
-    // Position right after the totals box
+    // ========== ORANGE DIVIDER BAR 3 (Top Footer Bar) ==========
     doc.setFillColor(orangeR, orangeG, orangeB);
-    doc.rect(margin, yPosition, pageWidth - (2 * margin), 4, 'F');
-
-    yPosition += 10; // Move past the orange bar with generous spacing
-
     // Position Notes and Signature near the bottom consistently
-    const notesSignatureY = Math.max(yPosition + 5, pageHeight - margin - 25);
+    const footerBaseY = Math.max(yPosition, pageHeight - margin - 150);
+    doc.rect(margin, footerBaseY, pageWidth - (2 * margin), 4, 'F');
+
+    const notesSignatureY = footerBaseY + 9;
 
     // ========== NOTES SECTION (Left Side) ==========
     doc.setFont("helvetica", "bold");
@@ -386,12 +384,15 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
     // ========== SIGNATURE AREA (Right Side - Same Baseline as Notes) ==========
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.setTextColor(darkTextR, darkTextG, darkTextB);
+    doc.setTextColor(100, 58, 229); // Brand Purple #643ae5
 
-    const signatureX = pageWidth - 65;
-    doc.text("Authorized Signatory", signatureX, notesSignatureY, { align: "center" });
+    const signatureX = pageWidth - margin;
     doc.setFontSize(9);
-    doc.text("(School Stamp & Sign)", signatureX, notesSignatureY + 6, { align: "center" });
+    doc.text("(School Stamp & Sign)", signatureX, notesSignatureY + 6, { align: "right" });
+
+    // ========== ORANGE DIVIDER BAR 4 (Bottom Footer Bar) ==========
+    doc.setFillColor(orangeR, orangeG, orangeB);
+    doc.rect(margin, notesSignatureY + 15, pageWidth - (2 * margin), 4, 'F');
 
     // Save the PDF
     doc.save(`Invoice_${invoiceNo}_${invoiceData.student.name.replace(/\s+/g, "_")}.pdf`);
