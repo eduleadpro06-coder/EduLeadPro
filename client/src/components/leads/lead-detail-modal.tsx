@@ -441,7 +441,8 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
       month: 'long',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata'
     });
   };
 
@@ -1067,8 +1068,8 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                               <div className="flex justify-between items-start mb-2">
                                 <div className="flex items-center gap-2">
                                   <Calendar size={14} className="text-gray-500" />
-                                  <span className="text-sm font-medium">{new Date(fp.scheduledAt).toLocaleDateString('en-IN')}</span>
-                                  <span className="text-xs text-gray-500">{new Date(fp.scheduledAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                                  <span className="text-sm font-medium">{new Date(fp.scheduledAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
+                                  <span className="text-xs text-gray-500">{new Date(fp.scheduledAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}</span>
                                 </div>
                                 {fp.completedAt ? (
                                   <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Completed</Badge>

@@ -92,7 +92,8 @@ export default function ParentFeesScreen() {
         return new Date(dateString).toLocaleDateString('en-IN', {
             day: 'numeric',
             month: 'short',
-            year: 'numeric'
+            year: 'numeric',
+            timeZone: 'Asia/Kolkata'
         });
     };
 

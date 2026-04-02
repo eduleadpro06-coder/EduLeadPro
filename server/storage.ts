@@ -2378,10 +2378,94 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteStaff(id: number): Promise<boolean> {
-    // Replicate deleteLead behaviour for staff
     const staff = await this.getStaff(id);
     if (!staff) return false;
+
     try {
+      console.log(`🗑️ Starting deletion for staff ID ${id} (${staff.name})...`);
+
+      await db.transaction(async (tx) => {
+        // 1. Leads - set counselorId to null
+        console.log(`🧹 Clearing counselor assignments for leads...`);
+        await tx.update(schema.leads)
+          .set({ counselorId: null })
+          .where(eq(schema.leads.counselorId, id));
+
+        // 2. Follow-ups (non-nullable counselorId, so we delete them)
+        console.log(`🧹 Deleting follow-up records...`);
+        await tx.delete(schema.followUps)
+          .where(eq(schema.followUps.counselorId, id));
+
+        // 3. Teacher Leaves (non-nullable staffId)
+        console.log(`🧹 Deleting teacher leave requests...`);
+        await tx.delete(schema.teacherLeaves)
+          .where(eq(schema.teacherLeaves.staffId, id));
+
+        // 4. Teacher Tasks (non-nullable staffId)
+        console.log(`🧹 Deleting teacher tasks...`);
+        await tx.delete(schema.teacherTasks)
+          .where(eq(schema.teacherTasks.staffId, id));
+
+        // 5. Teacher-Student Assignments (non-nullable teacherStaffId)
+        console.log(`🧹 Deleting teacher-student assignments...`);
+        await tx.delete(schema.teacherStudentAssignments)
+          .where(eq(schema.teacherStudentAssignments.teacherStaffId, id));
+
+        // 6. Bus Management
+        console.log(`🧹 Clearing bus driver assignments...`);
+        await tx.update(schema.busRoutes)
+          .set({ driverId: null })
+          .where(eq(schema.busRoutes.driverId, id));
+        await tx.update(schema.busLiveLocations)
+          .set({ driverId: null })
+          .where(eq(schema.busLiveLocations.driverId, id));
+
+        // 7. Gate/Visitor logs
+        console.log(`🧹 Updating activity log recorder IDs...`);
+        await tx.update(schema.studentGateLogs)
+          .set({ recordedBy: null })
+          .where(eq(schema.studentGateLogs.recordedBy, id));
+        await tx.update(schema.visitorLogs)
+          .set({ recordedBy: null })
+          .where(eq(schema.visitorLogs.recordedBy, id));
+
+        // 8. Payroll and Attendance (handled originally)
+        console.log(`🧹 Clearing payroll and attendance records...`);
+        await tx.delete(schema.payroll)
+          .where(eq(schema.payroll.staffId, id));
+        await tx.delete(schema.attendance)
+          .where(eq(schema.attendance.staffId, id));
+
+        // 9. Save to recently deleted for audit
+        console.log(`📝 Moving record to recently_deleted_employee...`);
+        const insertObj = {
+          original_staff_id: staff.id,
+          employee_id: staff.employeeId,
+          name: staff.name,
+          email: staff.email,
+          phone: staff.phone,
+          role: staff.role,
+          department: staff.department,
+          date_of_joining: staff.dateOfJoining,
+          salary: staff.salary,
+          is_active: staff.isActive,
+          address: staff.address,
+          emergency_contact: staff.emergencyContact,
+          qualifications: staff.qualifications,
+          bank_account_number: staff.bankAccountNumber,
+          ifsc_code: staff.ifscCode,
+          pan_number: staff.panNumber,
+          created_at: staff.createdAt,
+          updated_at: staff.updatedAt,
+          deleted_at: new Date()
+        };
+        await tx.insert(schema.recentlyDeletedEmployee).values(insertObj);
+
+        // 10. Finally, delete the staff record
+        console.log(`🗑️ Executing final delete for staff ID ${id}...`);
+        await tx.delete(schema.staff).where(eq(schema.staff.id, id));
+      });
+
       await this.notifyChange(
         'staff',
         'Staff Deleted',
@@ -2390,34 +2474,11 @@ export class DatabaseStorage implements IStorage {
         'staff_deleted',
         staff.id.toString()
       );
-      const insertObj = {
-        original_staff_id: staff.id,
-        employee_id: staff.employeeId,
-        name: staff.name,
-        email: staff.email,
-        phone: staff.phone,
-        role: staff.role,
-        department: staff.department,
-        date_of_joining: staff.dateOfJoining,
-        salary: staff.salary,
-        is_active: staff.isActive,
-        address: staff.address,
-        emergency_contact: staff.emergencyContact,
-        qualifications: staff.qualifications,
-        bank_account_number: staff.bankAccountNumber,
-        ifsc_code: staff.ifscCode,
-        pan_number: staff.panNumber,
-        created_at: staff.createdAt,
-        updated_at: staff.updatedAt,
-        deleted_at: new Date()
-      };
-      await db.insert(schema.recentlyDeletedEmployee).values(insertObj);
-      await db.delete(schema.payroll).where(eq(schema.payroll.staffId, id));
-      await db.delete(schema.attendance).where(eq(schema.attendance.staffId, id));
-      await db.delete(schema.staff).where(eq(schema.staff.id, id));
+
+      console.log(`✅ Staff ID ${id} deleted successfully.`);
       return true;
     } catch (err) {
-      console.error('Error moving staff to recently_deleted_employee:', err);
+      console.error(`💥 Error in deleteStaff transaction for ID ${id}:`, err);
       throw err;
     }
   }

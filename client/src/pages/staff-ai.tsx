@@ -1589,7 +1589,7 @@ export default function StaffAI() {
       member.phone,
       member.role,
       member.department || "",
-      member.dateOfJoining ? new Date(member.dateOfJoining).toLocaleDateString() : "",
+      member.dateOfJoining ? new Date(member.dateOfJoining).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : "",
       member.salary ? `₹${Number(member.salary).toLocaleString()}` : "",
       member.isActive !== false ? "Active" : "Inactive",
       member.address || "",
@@ -1933,7 +1933,7 @@ export default function StaffAI() {
                           {/* Additional Info with Bank Details */}
                           <div className="w-full glass-card rounded-lg border bg-card text-card-foreground shadow-lg p-6">
                             <div className="font-semibold mb-2">Additional Information</div>
-                            <div className="mb-1"><span className="font-medium">Date of Joining:</span> {selectedStaff.dateOfJoining ? new Date(selectedStaff.dateOfJoining).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}</div>
+                            <div className="mb-1"><span className="font-medium">Date of Joining:</span> {selectedStaff.dateOfJoining ? new Date(selectedStaff.dateOfJoining).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' }) : 'N/A'}</div>
                             <div className="mb-1"><span className="font-medium">Salary:</span> ₹{selectedStaff.salary ? Number(selectedStaff.salary).toLocaleString() : 'N/A'}</div>
                             <div className="mt-4 font-semibold">Bank Details</div>
                             <div className="mb-1">Account Number: <span className="font-medium">{selectedStaff.bankAccountNumber || 'N/A'}</span></div>
@@ -2469,7 +2469,7 @@ export default function StaffAI() {
                                 className="border rounded px-2 py-1"
                               >
                                 {availableMonths(historyYear).map(m => (
-                                  <option key={m} value={m}>{new Date(historyYear, m - 1).toLocaleDateString('en-IN', { month: 'long' })}</option>
+                                  <option key={m} value={m}>{new Date(historyYear, m - 1).toLocaleDateString('en-IN', { month: 'long', timeZone: 'Asia/Kolkata' })}</option>
                                 ))}
                               </select>
                             </div>
@@ -2581,7 +2581,7 @@ export default function StaffAI() {
                                       </div>
                                     </TableCell>
                                     <TableCell className="font-medium">
-                                      {new Date(payrollRecord.year, payrollRecord.month - 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                                      {new Date(payrollRecord.year, payrollRecord.month - 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                                     </TableCell>
                                     <TableCell>₹{Number(payrollRecord.basicSalary).toLocaleString()}</TableCell>
                                     <TableCell>₹{Number(payrollRecord.allowances || 0).toLocaleString()}</TableCell>
@@ -2602,7 +2602,7 @@ export default function StaffAI() {
                                     </TableCell>
                                     <TableCell>
                                       {payrollRecord.status === 'processed'
-                                        ? new Date(payrollRecord.generatedAt || new Date()).toLocaleDateString('en-IN')
+                                        ? new Date(payrollRecord.generatedAt || new Date()).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })
                                         : '-'
                                       }
                                     </TableCell>

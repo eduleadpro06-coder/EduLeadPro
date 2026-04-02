@@ -318,9 +318,10 @@ class APIService {
         return (data.announcements || []).map(a => ({
             id: a.id,
             title: a.title,
-            content: a.content,
+            content: a.content || a.message || '',
             priority: a.priority,
-            publishedAt: a.published_at
+            publishedAt: a.published_at || a.publishedAt,
+            expiresAt: a.expires_at || a.expiresAt
         }));
     }
 
@@ -331,10 +332,10 @@ class APIService {
         return (data.events || []).map(e => ({
             id: e.id,
             title: e.title,
-            description: e.description,
-            eventDate: e.event_date,
-            eventTime: e.event_time,
-            eventType: e.event_type
+            description: e.description || e.content || '',
+            eventDate: e.event_date || e.eventDate,
+            eventTime: e.event_time || e.eventTime,
+            eventType: e.event_type || e.eventType
         }));
     }
 

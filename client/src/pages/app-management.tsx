@@ -1843,6 +1843,7 @@ export default function AppManagement() {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Title</TableHead>
+                                            <TableHead>Content</TableHead>
                                             <TableHead>Posted Date</TableHead>
                                             <TableHead>Expiration Date</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
@@ -1857,7 +1858,10 @@ export default function AppManagement() {
                                             announcements.map((ann) => (
                                                 <TableRow key={ann.id}>
                                                     <TableCell className="font-medium">{ann.title}</TableCell>
-                                                    <TableCell>{new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(ann.publishedAt!))}</TableCell>
+                                                    <TableCell className="max-w-xs truncate" title={ann.content}>
+                                                        {ann.content || "-"}
+                                                    </TableCell>
+                                                    <TableCell>{ann.publishedAt ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(ann.publishedAt)) : '-'}</TableCell>
                                                     <TableCell>{ann.expiresAt ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(ann.expiresAt)) : '-'}</TableCell>
                                                     <TableCell className="text-right">
                                                         <Button variant="ghost" size="sm" onClick={() => {
@@ -1935,6 +1939,7 @@ export default function AppManagement() {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Holiday Name</TableHead>
+                                            <TableHead>Description</TableHead>
                                             <TableHead>Date</TableHead>
                                             <TableHead>Type</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
@@ -1951,6 +1956,9 @@ export default function AppManagement() {
                                                 .map((ev) => (
                                                     <TableRow key={ev.id}>
                                                         <TableCell className="font-medium">{ev.title}</TableCell>
+                                                        <TableCell className="max-w-xs truncate" title={ev.description}>
+                                                            {ev.description || "-"}
+                                                        </TableCell>
                                                         <TableCell>{ev.eventDate}</TableCell>
                                                         <TableCell><Badge variant="outline" className="bg-purple-50 text-purple-700">{ev.eventType}</Badge></TableCell>
                                                         <TableCell className="text-right">

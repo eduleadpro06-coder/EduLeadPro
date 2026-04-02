@@ -126,7 +126,7 @@ export default function ActivitiesScreen() {
                                             <Text style={[styles.miniBadgeText, { color: config.color }]}>{config.label}</Text>
                                         </View>
                                     </View>
-                                    <Text style={styles.timestamp}>{item.postedAt || item.posted_at || item.created_at ? new Date(item.postedAt || item.posted_at || item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}</Text>
+                                    <Text style={styles.timestamp}>{item.postedAt || item.posted_at || item.created_at ? new Date(item.postedAt || item.posted_at || item.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) : 'Just now'}</Text>
                                 </View>
                             </View>
                             <Text style={styles.updateTitle}>{item.title || config.label}</Text>
@@ -160,7 +160,7 @@ export default function ActivitiesScreen() {
                             <Text style={styles.announcementTitle}>{item.title}</Text>
                         </View>
                         <Text style={styles.updateContent}>{item.content}</Text>
-                        <Text style={styles.timestamp}>{item.published_at ? new Date(item.published_at).toLocaleDateString() : ''}</Text>
+                        <Text style={styles.timestamp}>{item.publishedAt ? new Date(item.publishedAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }) : ''}</Text>
                     </PremiumCard>
                 );
             });
@@ -171,7 +171,7 @@ export default function ActivitiesScreen() {
             if (validHolidays.length === 0) return renderEmpty('No upcoming events');
             return validHolidays.map((item) => {
                 // Parse date safely - append T00:00:00 to avoid UTC midnight timezone shift
-                const rawDate = item.event_date || item.eventDate;
+                const rawDate = item.eventDate || item.event_date;
                 const date = rawDate ? new Date(rawDate + 'T00:00:00') : new Date();
 
                 // Determine type and styling

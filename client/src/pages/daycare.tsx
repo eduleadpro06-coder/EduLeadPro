@@ -474,7 +474,7 @@ export default function Daycare() {
                                                         <div className="flex items-center gap-2 mt-1">
                                                             <Clock className="h-3 w-3 text-gray-500" />
                                                             <span className="text-xs text-gray-500">
-                                                                In for {hours}h {minutes}m • Since {checkInTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                                                In for {hours}h {minutes}m • Since {checkInTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -550,11 +550,11 @@ export default function Daycare() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <CardTitle>Daily Attendance</CardTitle>
-                                <CardDescription>Track check-ins and check-outs for {currentTime.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</CardDescription>
+                                <CardDescription>Track check-ins and check-outs for {currentTime.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata' })}</CardDescription>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                                 <Clock className="h-4 w-4" />
-                                <span className="font-mono">{currentTime.toLocaleTimeString('en-IN')}</span>
+                                <span className="font-mono">{currentTime.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
                             </div>
                         </div>
                     </CardHeader>
@@ -647,8 +647,8 @@ export default function Daycare() {
                                                             <div className="flex items-center gap-2 mt-1">
                                                                 <Clock className="h-3 w-3 text-gray-500" />
                                                                 <span className="text-xs text-gray-500">
-                                                                    {checkInTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                                                                    {checkOutTime && ` - ${checkOutTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`}
+                                                                    {checkInTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+                                                                    {checkOutTime && ` - ${checkOutTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}`}
                                                                     {' • '}{hours}h {minutes}m
                                                                 </span>
                                                             </div>
@@ -1335,8 +1335,8 @@ export default function Daycare() {
                                                                 </div>
                                                             ) : 'Unknown Child'}
                                                         </TableCell>
-                                                        <TableCell>{new Date(enrollment.startDate).toLocaleDateString('en-GB')}</TableCell>
-                                                        <TableCell>{enrollment.endDate ? new Date(enrollment.endDate).toLocaleDateString('en-GB') : '-'}</TableCell>
+                                                        <TableCell>{new Date(enrollment.startDate).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' })}</TableCell>
+                                                        <TableCell>{enrollment.endDate ? new Date(enrollment.endDate).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' }) : '-'}</TableCell>
                                                         <TableCell className="text-right font-medium">{enrollment.customHourlyRate ? `₹${parseFloat(enrollment.customHourlyRate).toLocaleString('en-IN')}` : '-'}</TableCell>
                                                         <TableCell className="text-right font-semibold">{enrollment.customMonthlyRate ? `₹${parseFloat(enrollment.customMonthlyRate).toLocaleString('en-IN')}` : '-'}</TableCell>
                                                         <TableCell>
@@ -1397,7 +1397,7 @@ export default function Daycare() {
                                                 <span className="text-gray-500">Blood Group:</span>
                                                 <span>{selectedChild.bloodGroup || '-'}</span>
                                                 <span className="text-gray-500">Date of Birth:</span>
-                                                <span>{selectedChild.dateOfBirth ? new Date(selectedChild.dateOfBirth).toLocaleDateString('en-IN') : '-'}</span>
+                                                <span>{selectedChild.dateOfBirth ? new Date(selectedChild.dateOfBirth).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : '-'}</span>
                                             </div>
 
                                             <h4 className="font-semibold text-lg text-purple-700 border-b pb-2 mt-6">Emergency Contact</h4>
@@ -1631,7 +1631,7 @@ export default function Daycare() {
                                                 return (
                                                     <TableRow key={payment.id}>
                                                         <TableCell className="font-medium">{payment.receiptNumber}</TableCell>
-                                                        <TableCell>{new Date(payment.paymentDate).toLocaleDateString('en-IN')}</TableCell>
+                                                        <TableCell>{new Date(payment.paymentDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</TableCell>
                                                         <TableCell>{child?.childName || 'Unknown'}</TableCell>
                                                         <TableCell className="text-right font-semibold">
                                                             ₹{parseFloat(payment.totalAmount).toLocaleString('en-IN')}
@@ -1741,7 +1741,7 @@ export default function Daycare() {
                                             <SelectContent>
                                                 {Array.from({ length: 12 }, (_, i) => (
                                                     <SelectItem key={i} value={i.toString()}>
-                                                        {new Date(0, i).toLocaleString('default', { month: 'long' })}
+                                                        {new Date(0, i).toLocaleString('default', { month: 'long', timeZone: 'Asia/Kolkata' })}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -1772,7 +1772,7 @@ export default function Daycare() {
                                             generateDaycareAttendancePDF({
                                                 childName: child?.childName || "N/A",
                                                 parentName: child?.parentName || "N/A",
-                                                month: new Date(0, selectedMonth).toLocaleString('default', { month: 'long' }),
+                                                month: new Date(0, selectedMonth).toLocaleString('default', { month: 'long', timeZone: 'Asia/Kolkata' }),
                                                 year: selectedYear,
                                                 totalDays: attendanceReport.data.totalDays,
                                                 totalHours: attendanceReport.data.totalHours.toFixed(2),
@@ -1837,14 +1837,14 @@ export default function Daycare() {
                                                 {attendanceReport.data.attendances.map((att: any) => (
                                                     <TableRow key={att.id}>
                                                         <TableCell className="font-medium">
-                                                            {new Date(att.attendanceDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                            {new Date(att.attendanceDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                                                         </TableCell>
                                                         <TableCell className="font-mono text-sm text-green-600">
-                                                            {new Date(att.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                            {new Date(att.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}
                                                         </TableCell>
                                                         <TableCell className="font-mono text-sm text-blue-600">
                                                             {att.checkOutTime
-                                                                ? new Date(att.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                                                                ? new Date(att.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
                                                                 : <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">Active</Badge>
                                                             }
                                                         </TableCell>

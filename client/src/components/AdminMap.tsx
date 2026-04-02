@@ -65,7 +65,7 @@ export default function AdminMap({ activeBuses }: AdminMapProps) {
                             <p className="text-sm"><strong>Driver:</strong> {bus.driverName}</p>
                             <p className="text-sm"><strong>Speed:</strong> {bus.currentLocation.speed} km/h</p>
                             <p className="text-xs text-gray-500 mt-1">
-                                Last updated: {new Date(bus.lastUpdated).toLocaleTimeString()}
+                                Last updated: {new Date(bus.lastUpdated).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}
                             </p>
                         </div>
                     </Popup>

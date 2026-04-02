@@ -272,7 +272,7 @@ export default function LeadManagement() {
       lead.fatherFirstName ? `${lead.fatherFirstName} ${lead.fatherLastName || ''}`.trim() : (lead.motherFirstName ? `${lead.motherFirstName} ${lead.motherLastName || ''}`.trim() : ""),
       lead.fatherPhone || lead.motherPhone || "",
       lead.address || "",
-      lead.lastContactedAt ? new Date(lead.lastContactedAt).toLocaleDateString() : "",
+      lead.lastContactedAt ? new Date(lead.lastContactedAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : "",
       lead.notes || ""
     ]);
 
@@ -337,30 +337,30 @@ export default function LeadManagement() {
               // Generate Breakdown String
               // Example: "EMI 1 (Due: 12/01/25): ₹5000\nEMI 2 (Due: 12/02/25): ₹5000"
               const breakdown = sortedEmis.map((emi: any) =>
-                `Inst ${emi.installmentNumber} (Due: ${new Date(emi.dueDate).toLocaleDateString('en-IN')}): ₹${emi.amount}`
+                `Inst ${emi.installmentNumber} (Due: ${new Date(emi.dueDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}): ₹${emi.amount}`
               ).join('\n');
 
               setFinancialData({
                 amount: nextEmi.amount, // ONLY the next installment amount
                 totalPending: totalPending.toString(),
-                dueDate: new Date(nextEmi.dueDate).toLocaleDateString('en-IN'),
+                dueDate: new Date(nextEmi.dueDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }),
                 breakdown: breakdown
               });
             } else {
-              setFinancialData({ amount: "0", totalPending: "0", dueDate: new Date().toLocaleDateString('en-IN'), breakdown: "No pending dues" });
+              setFinancialData({ amount: "0", totalPending: "0", dueDate: new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }), breakdown: "No pending dues" });
             }
           } else {
-            setFinancialData({ amount: "0", totalPending: "0", dueDate: new Date().toLocaleDateString('en-IN'), breakdown: "No active plan" });
+            setFinancialData({ amount: "0", totalPending: "0", dueDate: new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }), breakdown: "No active plan" });
           }
         } catch (err) {
           console.error("Error fetching financial data:", err);
-          setFinancialData({ amount: "0", totalPending: "0", dueDate: new Date().toLocaleDateString('en-IN'), breakdown: "Error fetching data" });
+          setFinancialData({ amount: "0", totalPending: "0", dueDate: new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }), breakdown: "Error fetching data" });
         }
       };
       fetchFinancials();
     } else {
       // Reset for non-enrolled leads
-      setFinancialData({ amount: "0", totalPending: "0", dueDate: new Date().toLocaleDateString('en-IN'), breakdown: "" });
+      setFinancialData({ amount: "0", totalPending: "0", dueDate: new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }), breakdown: "" });
     }
   }, [whatsappLead]);
 

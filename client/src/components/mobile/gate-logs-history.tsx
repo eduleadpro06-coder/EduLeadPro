@@ -11,6 +11,39 @@ import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 
+const formatIST = (date: Date | string | number, formatStr: string = 'dd MMM yyyy, hh:mm a') => {
+    if (!date) return '-';
+    return new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    }).format(new Date(date));
+};
+
+const formatISTTime = (date: Date | string | number) => {
+    if (!date) return '-';
+    return new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    }).format(new Date(date));
+};
+
+const formatISTDate = (date: Date | string | number) => {
+    if (!date) return '-';
+    return new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    }).format(new Date(date));
+};
+
 export default function GateLogsHistory() {
     // Helper to get IST date string (YYYY-MM-DD)
     const getISTDateString = () => {
@@ -55,15 +88,15 @@ export default function GateLogsHistory() {
         if (activeTab === "students") {
             csvContent += "Date,Student Name,Class,Check-In,Check-Out,Status,Recorded By\n";
             data.forEach(log => {
-                const checkIn = log.check_in_time ? format(new Date(log.check_in_time), 'hh:mm a') : '-';
-                const checkOut = log.check_out_time ? format(new Date(log.check_out_time), 'hh:mm a') : '-';
+                const checkIn = log.check_in_time ? formatISTTime(log.check_in_time) : '-';
+                const checkOut = log.check_out_time ? formatISTTime(log.check_out_time) : '-';
                 csvContent += `${log.date},${log.student?.name},${log.student?.class},${checkIn},${checkOut},${log.status},${log.recorder?.name || 'N/A'}\n`;
             });
         } else {
             csvContent += "Time,Visitor Name,Phone,Purpose,Check-Out,Status,Recorded By\n";
             data.forEach(log => {
-                const checkIn = format(new Date(log.check_in_time), 'dd/MM/yyyy hh:mm a');
-                const checkOut = log.check_out_time ? format(new Date(log.check_out_time), 'hh:mm a') : '-';
+                const checkIn = formatIST(log.check_in_time);
+                const checkOut = log.check_out_time ? formatISTTime(log.check_out_time) : '-';
                 csvContent += `${checkIn},${log.visitorName},${log.visitorPhone},${log.visitorPurpose},${checkOut},${log.status},${log.recorder?.name || 'N/A'}\n`;
             });
         }
@@ -160,7 +193,7 @@ export default function GateLogsHistory() {
                                         studentLogs.map((log) => (
                                             <TableRow key={log.id} className="hover:bg-gray-50/50 transition-colors">
                                                 <TableCell className="font-medium text-gray-600">
-                                                    {format(new Date(log.date), 'dd MMM yyyy')}
+                                                    {formatISTDate(log.date)}
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex flex-col">
@@ -177,7 +210,7 @@ export default function GateLogsHistory() {
                                                     {log.check_in_time ? (
                                                         <div className="flex flex-col items-center">
                                                             <Clock className="h-3 w-3 text-green-500 mb-1" />
-                                                            <span className="text-sm font-semibold">{format(new Date(log.check_in_time), 'hh:mm a')}</span>
+                                                            <span className="text-sm font-semibold">{formatISTTime(log.check_in_time)}</span>
                                                         </div>
                                                     ) : '-'}
                                                 </TableCell>
@@ -185,7 +218,7 @@ export default function GateLogsHistory() {
                                                     {log.check_out_time ? (
                                                         <div className="flex flex-col items-center">
                                                             <Clock className="h-3 w-3 text-orange-500 mb-1" />
-                                                            <span className="text-sm font-semibold">{format(new Date(log.check_out_time), 'hh:mm a')}</span>
+                                                            <span className="text-sm font-semibold">{formatISTTime(log.check_out_time)}</span>
                                                         </div>
                                                     ) : '-'}
                                                 </TableCell>
@@ -223,7 +256,7 @@ export default function GateLogsHistory() {
                                                                         <img src={log.pickup_photo_url} alt="Pickup person" className="w-full rounded-lg" />
                                                                         <p className="text-sm text-gray-500 mt-2">
                                                                             Picked up by: <span className="font-medium text-gray-700">{log.pickup_person_name || log.pickup_person_type || 'Unknown'}</span>
-                                                                            {' • '}{log.check_out_time ? format(new Date(log.check_out_time), 'dd MMM yyyy, hh:mm a') : ''}
+                                                                            {' • '}{log.check_out_time ? formatIST(log.check_out_time) : ''}
                                                                         </p>
                                                                     </DialogContent>
                                                                 </Dialog>
@@ -279,8 +312,8 @@ export default function GateLogsHistory() {
                                             <TableRow key={log.id} className="hover:bg-gray-50/50 transition-colors">
                                                 <TableCell>
                                                     <div className="flex flex-col">
-                                                        <span className="font-medium text-gray-600">{format(new Date(log.check_in_time), 'dd MMM yyyy')}</span>
-                                                        <span className="text-xs font-bold text-gray-900">{format(new Date(log.check_in_time), 'hh:mm a')}</span>
+                                                        <span className="font-medium text-gray-600">{formatISTDate(log.check_in_time)}</span>
+                                                        <span className="text-xs font-bold text-gray-900">{formatISTTime(log.check_in_time)}</span>
                                                     </div>
                                                 </TableCell>
 
@@ -297,7 +330,7 @@ export default function GateLogsHistory() {
                                                     {log.check_out_time ? (
                                                         <div className="flex flex-col items-center">
                                                             <Clock className="h-3 w-3 text-orange-500 mb-1" />
-                                                            <span className="text-sm font-semibold">{format(new Date(log.check_out_time), 'hh:mm a')}</span>
+                                                            <span className="text-sm font-semibold">{formatISTTime(log.check_out_time)}</span>
                                                         </div>
                                                     ) : (
                                                         <span className="text-gray-400 italic">Still inside</span>

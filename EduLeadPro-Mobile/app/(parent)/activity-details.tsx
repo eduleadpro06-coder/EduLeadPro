@@ -75,7 +75,8 @@ export default function ActivityDetailsScreen() {
         month: 'long',
         year: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        timeZone: 'Asia/Kolkata'
     }) : 'Just now';
 
     // Helper for type styling

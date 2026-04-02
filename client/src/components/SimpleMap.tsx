@@ -373,7 +373,7 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ activeBuses, allRoutes }) => {
         <p><strong>Speed:</strong> ${bus.currentLocation.speed.toFixed(1)} km/h</p>
       </div>
       <p class="text-xs text-gray-500 mt-2 border-t pt-2">
-        Last updated: ${new Date(bus.lastUpdated).toLocaleTimeString()}
+        Last updated: ${new Date(bus.lastUpdated).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}
       </p>
     </div>
   `;

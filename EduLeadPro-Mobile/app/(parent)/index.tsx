@@ -129,7 +129,7 @@ export default function ParentHomeScreen() {
 
         // Case 2: Has Dues (Show next EMI)
         if (nextPending) {
-            const dateStr = new Date(nextPending.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const dateStr = new Date(nextPending.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' });
 
             return (
                 <View style={styles.statItem}>
@@ -360,7 +360,7 @@ export default function ParentHomeScreen() {
                                     <Text style={styles.highlightSubtitle} numberOfLines={1}>{stats.lastUpdate.content}</Text>
                                 </View>
                                 <Text style={styles.highlightDate}>
-                                    {new Date(stats.lastUpdate.postedAt).toLocaleDateString()}
+                                    {new Date(stats.lastUpdate.postedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                                 </Text>
                             </View>
                         </PremiumCard>
