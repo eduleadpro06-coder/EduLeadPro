@@ -2929,12 +2929,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      let message = "Payment recorded successfully.";
+      if (result.shortfall > 0) {
+        message = `Payment recorded. ₹${result.shortfall.toFixed(2)} shortfall carried over.`;
+      } else if (result.shortfall < 0) {
+        message = `Payment recorded. ₹${Math.abs(result.shortfall).toFixed(2)} excess deducted from next EMI.`;
+      }
+
       res.status(201).json({
         success: true,
         data: result,
-        message: result.shortfall > 0
-          ? `Payment recorded. ₹${result.shortfall.toFixed(2)} carried over to next installment.`
-          : "Payment recorded successfully."
+        message: message
       });
     } catch (error) {
       console.error("Partial EMI payment error:", error);

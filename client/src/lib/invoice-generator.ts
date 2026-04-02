@@ -302,8 +302,11 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
     const total = totalAmount - discount;
 
     const totalsBoxWidth = 90;
-    // Dynamic height: base 26 (Subtotal + Total), add 7 if discount > 0
-    const totalsBoxHeight = discount > 0 ? 33 : 26;
+    const totalPaid = invoiceData.payments?.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0) || 0;
+    const balanceDue = Math.max(0, total - totalPaid);
+
+    // Dynamic height: base 40 (Subtotal + Total + Amount Paid + Balance Due), add 7 if discount > 0
+    const totalsBoxHeight = discount > 0 ? 47 : 40;
     const totalsX = pageWidth - margin - totalsBoxWidth;
 
     // Draw totals box
@@ -331,11 +334,25 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
             totalsX + totalsBoxWidth - 5, totalY, { align: "right" });
     }
 
-    // Total (Bold)
+    // Total
     totalY += lineSpacing;
     doc.setFont("helvetica", "bold");
     doc.text("Total:", totalsX + 5, totalY);
     doc.text(`Rs. ${formatCurrency(total)}`,
+        totalsX + totalsBoxWidth - 5, totalY, { align: "right" });
+
+    // Amount Paid
+    totalY += lineSpacing;
+    doc.setFont("helvetica", "normal");
+    doc.text("Amount Paid:", totalsX + 5, totalY);
+    doc.text(`Rs. ${formatCurrency(totalPaid)}`,
+        totalsX + totalsBoxWidth - 5, totalY, { align: "right" });
+
+    // Balance Due
+    totalY += lineSpacing;
+    doc.setFont("helvetica", "bold");
+    doc.text("Balance Due:", totalsX + 5, totalY);
+    doc.text(`Rs. ${formatCurrency(balanceDue)}`,
         totalsX + totalsBoxWidth - 5, totalY, { align: "right" });
 
     yPosition += totalsBoxHeight + 2;

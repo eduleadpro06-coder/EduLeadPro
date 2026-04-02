@@ -4401,13 +4401,13 @@ export class DatabaseStorage implements IStorage {
         }).where(eq(schema.emiSchedule.id, scheduleItem.id));
       }
 
-      // 5. Calculate shortfall
-      const shortfall = Math.max(0, effectiveDue - amountPaid);
+      // 5. Calculate shortfall (can be negative if overpaid)
+      const shortfall = effectiveDue - amountPaid;
 
       let nextScheduleItem = undefined;
 
-      // 6. If shortfall > 0, add carryover to the next unpaid installment
-      if (shortfall > 0) {
+      // 6. If there is a difference (shortfall or excess), carry it over to the next installment
+      if (Math.abs(shortfall) > 0.001) {
         const nextItems = await tx.select().from(schema.emiSchedule)
           .where(and(
             eq(schema.emiSchedule.emiPlanId, emiPlanId),
@@ -4419,7 +4419,7 @@ export class DatabaseStorage implements IStorage {
           const existingCarryover = parseFloat(String(nextItem.carryoverAmount ?? '0'));
           const newCarryover = existingCarryover + shortfall;
           const scheduledAmt = parseFloat(String(nextItem.scheduledAmount ?? nextItem.amount));
-          const newEffective = scheduledAmt + newCarryover;
+          const newEffective = Math.max(0, scheduledAmt + newCarryover);
 
           const [updated] = await tx.update(schema.emiSchedule).set({
             carryoverAmount: String(newCarryover),

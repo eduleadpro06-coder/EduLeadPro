@@ -1379,7 +1379,9 @@ export default function StudentFees() {
         title: "Payment Recorded",
         description: shortfall > 0
           ? `₹${actualAmount.toLocaleString()} received. ₹${shortfall.toLocaleString()} carried over to next EMI.`
-          : `₹${actualAmount.toLocaleString()} recorded successfully.`
+          : shortfall < 0
+            ? `₹${actualAmount.toLocaleString()} received. ₹${Math.abs(shortfall).toLocaleString()} excess deducted from next EMI.`
+            : `₹${actualAmount.toLocaleString()} recorded successfully.`
       });
 
       // Activity Log
@@ -3833,6 +3835,9 @@ export default function StudentFees() {
                               #{emi.installmentNumber} — ₹{parseFloat(emi.amount).toLocaleString()}
                               {parseFloat(emi.carryoverAmount || '0') > 0 && (
                                 <span className="ml-1 text-orange-500">(+₹{parseFloat(emi.carryoverAmount).toLocaleString()} carryover)</span>
+                              )}
+                              {parseFloat(emi.carryoverAmount || '0') < 0 && (
+                                <span className="ml-1 text-green-500">(-₹{Math.abs(parseFloat(emi.carryoverAmount)).toLocaleString()} adjustment)</span>
                               )}
                             </button>
                           ))}
