@@ -8,7 +8,8 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import * as Updates from 'expo-updates';
 import * as SplashScreen from 'expo-splash-screen';
 import { 
     useFonts, 
@@ -51,9 +52,41 @@ function RootLayoutNav() {
         'Inter_SemiBold': Inter_600SemiBold,
     });
 
-    // Load user on app start
+    // Load user and check for OTA updates on app start
     useEffect(() => {
         loadUser();
+
+        // Check for OTA updates (only in production build)
+        if (!__DEV__) {
+            const checkForUpdates = async () => {
+                try {
+                    const update = await Updates.checkForUpdateAsync();
+                    if (update.isAvailable) {
+                        Alert.alert(
+                            'Update Available 🎉',
+                            'A new version of Bloomdale Connect is ready. Update now for the best experience!',
+                            [
+                                { text: 'Later', style: 'cancel' },
+                                {
+                                    text: 'Update Now',
+                                    onPress: async () => {
+                                        try {
+                                            await Updates.fetchUpdateAsync();
+                                            await Updates.reloadAsync();
+                                        } catch (e) {
+                                            Alert.alert('Error', 'Failed to download update. Please try again later.');
+                                        }
+                                    }
+                                }
+                            ]
+                        );
+                    }
+                } catch (error) {
+                    console.log('Error checking for updates:', error);
+                }
+            };
+            checkForUpdates();
+        }
     }, []);
 
     // Handle SplashScreen and Navigation
