@@ -84,11 +84,11 @@ export default function MarkAttendanceScreen() {
         setSavingAttendance(true);
         try {
             const records = Array.from(attendanceRecords.entries()).map(([studentId, status]) => ({
-                lead_id: studentId,
+                leadId: studentId,
                 status
             }));
 
-            await api.markAttendanceBatch(records);
+            await api.markAttendanceBulk(records);
             Alert.alert('Success', 'Attendance marked successfully');
             router.back();
         } catch (error: any) {

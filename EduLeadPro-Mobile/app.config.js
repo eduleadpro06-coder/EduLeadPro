@@ -2,7 +2,7 @@ export default {
   expo: {
     name: 'Bloomdale Connect',
     slug: 'yonerra',
-    version: '2.2.1',
+    version: '2.2.2',
     orientation: 'portrait',
     icon: './assets/logo.png',
     userInterfaceStyle: 'light',
@@ -13,7 +13,12 @@ export default {
     },
     assetBundlePatterns: ['**/*'],
     updates: {
-      enabled: false,
+      enabled: true,
+      url: 'https://u.expo.dev/30dace9c-63f8-4c50-8337-0a177603ecd1',
+      fallbackToCacheTimeout: 0,
+    },
+    runtimeVersion: {
+      policy: 'appVersion',
     },
     ios: {
       supportsTablet: true,
@@ -26,7 +31,7 @@ export default {
       },
       package: 'com.bloomdale.app',
       softwareKeyboardLayoutMode: 'resize',
-      versionCode: 6,
+      versionCode: 7,
       permissions: [
         'READ_EXTERNAL_STORAGE',
         'WRITE_EXTERNAL_STORAGE',
