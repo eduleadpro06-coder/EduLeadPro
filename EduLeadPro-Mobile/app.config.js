@@ -2,7 +2,7 @@ export default {
   expo: {
     name: 'Bloomdale Connect',
     slug: 'yonerra',
-    version: '2.2.2',
+    version: '2.2.3',
     orientation: 'portrait',
     icon: './assets/logo.png',
     userInterfaceStyle: 'light',
@@ -31,7 +31,7 @@ export default {
       },
       package: 'com.bloomdale.app',
       softwareKeyboardLayoutMode: 'resize',
-      versionCode: 7,
+      versionCode: 8,
       permissions: [
         'READ_EXTERNAL_STORAGE',
         'WRITE_EXTERNAL_STORAGE',
