@@ -94,13 +94,13 @@ router.get('/dashboard', async (req: Request, res: Response) => {
             .eq('id', staffId)
             .single();
 
-        // 2. Get teacher's assigned students (lead_id list)
+        // 2. Get teacher's assigned students
         const { data: assignedStudents } = await supabase
             .from('teacher_student_assignments')
-            .select('lead_id')
-            .eq('staff_id', staffId);
+            .select('student_lead_id')
+            .eq('teacher_staff_id', staffId);
 
-        const assignedLeadIds = assignedStudents?.map((s: any) => s.lead_id) || [];
+        const assignedLeadIds = assignedStudents?.map((s: any) => s.student_lead_id) || [];
         const studentsCount = assignedStudents?.length || 0;
 
         // 3. Get today's attendance summary for ONLY assigned students
