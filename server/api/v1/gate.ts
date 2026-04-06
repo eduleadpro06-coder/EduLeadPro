@@ -394,9 +394,19 @@ router.get('/history/students', optionalJwtMiddleware, async (req: Request, res:
             .order('date', { ascending: false })
             .order('check_in_time', { ascending: false });
 
-        if (startDate) query = query.gte('date', startDate);
-        if (endDate) query = query.lte('date', endDate);
-        
+        if (startDate) {
+            // Parse as start of day in IST
+            const startOfDay = new Date(`${startDate}T00:00:00.000+05:30`).toISOString();
+            query = query.gte('date', startDate); // 'date' is a DATE column, use as is
+            // Also filter by check_in_time for accuracy
+            query = query.gte('check_in_time', startOfDay);
+        }
+        if (endDate) {
+            // Parse as end of day in IST
+            const endOfDay = new Date(`${endDate}T23:59:59.999+05:30`).toISOString();
+            query = query.lte('check_in_time', endOfDay);
+        }
+
         const { data, error } = await query.limit(1000);
         if (error) throw error;
 
@@ -441,10 +451,15 @@ router.get('/history/visitors', optionalJwtMiddleware, async (req: Request, res:
             .eq('organization_id', organizationId)
             .order('check_in_time', { ascending: false });
 
-        if (startDate) query = query.gte('check_in_time', startDate);
+        if (startDate) {
+            // Parse as start of day in IST
+            const startOfDay = new Date(`${startDate}T00:00:00.000+05:30`).toISOString();
+            query = query.gte('check_in_time', startOfDay);
+        }
         if (endDate) {
-            // Append end-of-day time to include events that happened on the end date
-            query = query.lte('check_in_time', `${endDate}T23:59:59.999Z`);
+            // Parse as end of day in IST
+            const endOfDay = new Date(`${endDate}T23:59:59.999+05:30`).toISOString();
+            query = query.lte('check_in_time', endOfDay);
         }
         if (search) {
             query = query.or(`visitor_name.ilike.%${search}%,visitor_phone.ilike.%${search}%`);
