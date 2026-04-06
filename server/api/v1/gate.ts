@@ -4,22 +4,23 @@
  */
 
 import express, { Request, Response } from 'express';
-import { jwtMiddleware, roleGuard } from '../../middleware/auth.js';
+import { jwtMiddleware, optionalJwtMiddleware, roleGuard } from '../../middleware/auth.js';
 import { db } from '../../db.js';
 import { studentGateLogs, visitorLogs, leads, staff } from '../../../shared/schema.js';
 import { eq, and, sql, desc, or } from 'drizzle-orm';
+import { getOrganizationId } from '../../utils.js';
 
 const router = express.Router();
 
-// Apply JWT middleware and allow security/support/admin roles
-router.use(jwtMiddleware);
-router.use(roleGuard(['security', 'support_staff', 'admin']));
+// NOTE: We don't apply global middleware here anymore because we need 
+// to support both Mobile JWT and Web Session auth for history endpoints.
+// Individual routes will apply the appropriate middleware.
 
 /**
  * GET /api/v1/mobile/gate/students
  * Search students for gate check-in/out
  */
-router.get('/students', async (req: Request, res: Response) => {
+router.get('/students', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
     try {
         const organizationId = req.user!.organizationId;
         const search = (req.query.search as string || req.query.query as string || '').toLowerCase();
@@ -84,7 +85,7 @@ router.get('/students', async (req: Request, res: Response) => {
  * GET /api/v1/mobile/gate/students/:id
  * Get specific student details for gate
  */
-router.get('/students/:id', async (req: Request, res: Response) => {
+router.get('/students/:id', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const organizationId = req.user!.organizationId;
@@ -129,7 +130,7 @@ router.get('/students/:id', async (req: Request, res: Response) => {
  * POST /api/v1/mobile/gate/sync
  * Sync offline check-in/out logs
  */
-router.post('/sync', async (req: Request, res: Response) => {
+router.post('/sync', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
     try {
         const { logs } = req.body; // Array of log objects
         if (!Array.isArray(logs)) {
@@ -140,10 +141,13 @@ router.post('/sync', async (req: Request, res: Response) => {
         const staffId = req.user!.userId;
         const { supabase } = await import('../../supabase.js');
 
+        console.log(`[Gate Sync] Processing ${logs.length} logs for Org: ${organizationId}, Staff: ${staffId}`);
+
         const results = [];
 
         for (const log of logs) {
-            const studentId = log.student_id || log.studentId;
+            const rawStudentId = log.student_id || log.studentId;
+            const studentId = typeof rawStudentId === 'string' ? parseInt(rawStudentId, 10) : rawStudentId;
             const type = log.type || log.logType;
             const timestamp = log.timestamp;
             const offlineId = log.offline_id || log.offlineId;
@@ -275,7 +279,7 @@ router.post('/sync', async (req: Request, res: Response) => {
  * POST /api/v1/mobile/gate/visitors
  * Record new visitor entry
  */
-router.post('/visitors', async (req: Request, res: Response) => {
+router.post('/visitors', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
     try {
         const { name, phone, purpose, photoUrl, photo_url } = req.body;
         const finalPhotoUrl = photoUrl || photo_url;
@@ -312,7 +316,7 @@ router.post('/visitors', async (req: Request, res: Response) => {
  * PATCH /api/v1/mobile/gate/visitors/:id/checkout
  * Mark visitor exit
  */
-router.patch('/visitors/:id/checkout', async (req: Request, res: Response) => {
+router.patch('/visitors/:id/checkout', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const organizationId = req.user!.organizationId;
@@ -343,7 +347,7 @@ router.patch('/visitors/:id/checkout', async (req: Request, res: Response) => {
  * GET /api/v1/mobile/gate/visitors/active
  * Get currently inside visitors
  */
-router.get('/visitors/active', async (req: Request, res: Response) => {
+router.get('/visitors/active', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
     try {
         const organizationId = req.user!.organizationId;
         const { supabase } = await import('../../supabase.js');
@@ -368,9 +372,14 @@ router.get('/visitors/active', async (req: Request, res: Response) => {
  * GET /api/v1/gate/history/students
  * Get historical check-in/out logs for students
  */
-router.get('/history/students', async (req: Request, res: Response) => {
+router.get('/history/students', optionalJwtMiddleware, async (req: Request, res: Response) => {
     try {
-        const organizationId = req.user!.organizationId;
+        // Hybrid Auth: Try JWT first (req.user), fallback to session/header
+        const organizationId = req.user?.organizationId || await getOrganizationId(req);
+        
+        if (!organizationId) {
+            return res.status(401).json({ success: false, message: 'Authentication required' });
+        }
         const { startDate, endDate, search } = req.query;
         const { supabase } = await import('../../supabase.js');
 
@@ -413,9 +422,13 @@ router.get('/history/students', async (req: Request, res: Response) => {
  * GET /api/v1/gate/history/visitors
  * Get historical visitor logs
  */
-router.get('/history/visitors', async (req: Request, res: Response) => {
+router.get('/history/visitors', optionalJwtMiddleware, async (req: Request, res: Response) => {
     try {
-        const organizationId = req.user!.organizationId;
+        const organizationId = req.user?.organizationId || await getOrganizationId(req);
+
+        if (!organizationId) {
+            return res.status(401).json({ success: false, message: 'Authentication required' });
+        }
         const { startDate, endDate, search } = req.query;
         const { supabase } = await import('../../supabase.js');
 
@@ -429,7 +442,10 @@ router.get('/history/visitors', async (req: Request, res: Response) => {
             .order('check_in_time', { ascending: false });
 
         if (startDate) query = query.gte('check_in_time', startDate);
-        if (endDate) query = query.lte('check_in_time', endDate);
+        if (endDate) {
+            // Append end-of-day time to include events that happened on the end date
+            query = query.lte('check_in_time', `${endDate}T23:59:59.999Z`);
+        }
         if (search) {
             query = query.or(`visitor_name.ilike.%${search}%,visitor_phone.ilike.%${search}%`);
         }
@@ -448,7 +464,7 @@ router.get('/history/visitors', async (req: Request, res: Response) => {
  * GET /api/v1/mobile/gate/leaves
  * Get leave history
  */
-router.get('/leaves', async (req: Request, res: Response) => {
+router.get('/leaves', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
     try {
         const staffId = req.user!.userId;
         const organizationId = req.user!.organizationId;        
@@ -475,7 +491,7 @@ router.get('/leaves', async (req: Request, res: Response) => {
  * GET /api/v1/mobile/gate/leaves/balance
  * Get leave balance
  */
-router.get('/leaves/balance', async (req: Request, res: Response) => {
+router.get('/leaves/balance', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
     try {
         const staffId = req.user!.userId;
         const organizationId = req.user!.organizationId;        
@@ -527,7 +543,7 @@ router.get('/leaves/balance', async (req: Request, res: Response) => {
  * POST /api/v1/mobile/gate/leaves
  * Apply for leave
  */
-router.post('/leaves', async (req: Request, res: Response) => {
+router.post('/leaves', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
     try {
         const staffId = req.user!.userId;
         const organizationId = req.user!.organizationId;        

@@ -97,7 +97,7 @@ export default function GateLogsHistory() {
             data.forEach(log => {
                 const checkIn = formatIST(log.check_in_time);
                 const checkOut = log.check_out_time ? formatISTTime(log.check_out_time) : '-';
-                csvContent += `${checkIn},${log.visitorName},${log.visitorPhone},${log.visitorPurpose},${checkOut},${log.status},${log.recorder?.name || 'N/A'}\n`;
+                csvContent += `${checkIn},${log.visitor_name},${log.visitor_phone},${log.visitor_purpose},${checkOut},${log.status},${log.recorder?.name || 'N/A'}\n`;
             });
         }
 
@@ -119,20 +119,22 @@ export default function GateLogsHistory() {
                         <CardDescription>View and audit all student and visitor logs</CardDescription>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2 bg-white p-1 rounded-lg border shadow-sm">
-                            <Calendar className="h-4 w-4 ml-2 text-gray-400" />
+                        <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border shadow-sm hover:border-purple-300 transition-colors cursor-pointer group">
+                            <Calendar className="h-4 w-4 ml-1 text-gray-400 group-hover:text-[#643ae5] transition-colors" />
                             <Input 
                                 type="date" 
                                 value={startDate} 
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="border-none focus-visible:ring-0 w-36 h-8 text-sm"
+                                className="border-none focus-visible:ring-0 w-[150px] h-9 text-sm bg-transparent cursor-pointer"
+                                onClick={(e) => (e.target as any).showPicker?.()}
                             />
-                            <span className="text-gray-300">to</span>
+                            <span className="text-gray-400 font-medium px-1">to</span>
                             <Input 
                                 type="date" 
                                 value={endDate} 
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="border-none focus-visible:ring-0 w-36 h-8 text-sm"
+                                className="border-none focus-visible:ring-0 w-[150px] h-9 text-sm bg-transparent cursor-pointer"
+                                onClick={(e) => (e.target as any).showPicker?.()}
                             />
                         </div>
                         <div className="relative">
@@ -158,12 +160,18 @@ export default function GateLogsHistory() {
             </CardHeader>
             <CardContent>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full max-w-md grid-cols-2 mb-6 bg-gray-100/50 p-1">
-                        <TabsTrigger value="students" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                    <TabsList className="grid w-full max-w-md grid-cols-2 mb-6 bg-purple-50/50 p-1 border border-purple-100/50">
+                        <TabsTrigger 
+                            value="students" 
+                            className="data-[state=active]:bg-[#643ae5] data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200"
+                        >
                             <Users className="h-4 w-4 mr-2" />
                             Student Entries
                         </TabsTrigger>
-                        <TabsTrigger value="visitors" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                        <TabsTrigger 
+                            value="visitors" 
+                            className="data-[state=active]:bg-[#643ae5] data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200"
+                        >
                             <User className="h-4 w-4 mr-2" />
                             Visitor Logs
                         </TabsTrigger>
@@ -297,16 +305,14 @@ export default function GateLogsHistory() {
                                         <TableHead>Check-In</TableHead>
                                         <TableHead>Visitor Details</TableHead>
                                         <TableHead>Purpose</TableHead>
-                                        <TableHead className="text-center">Check-Out</TableHead>
-                                        <TableHead>Status</TableHead>
                                         <TableHead>Recorded By</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {isLoadingVisitors ? (
-                                        <TableRow><TableCell colSpan={6} className="text-center py-12 text-gray-500">Loading history...</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={4} className="text-center py-12 text-gray-500">Loading history...</TableCell></TableRow>
                                     ) : visitorLogs.length === 0 ? (
-                                        <TableRow><TableCell colSpan={6} className="text-center py-12 text-gray-400">No visitor logs found for this period</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={4} className="text-center py-12 text-gray-400">No visitor logs found for this period</TableCell></TableRow>
                                     ) : (
                                         visitorLogs.map((log) => (
                                             <TableRow key={log.id} className="hover:bg-gray-50/50 transition-colors">
@@ -319,34 +325,12 @@ export default function GateLogsHistory() {
 
                                                 <TableCell>
                                                     <div className="flex flex-col">
-                                                        <span className="font-bold text-gray-900">{log.visitorName}</span>
-                                                        <span className="text-xs text-gray-500">{log.visitorPhone}</span>
+                                                        <span className="font-bold text-gray-900">{log.visitor_name}</span>
+                                                        <span className="text-xs text-gray-500">{log.visitor_phone}</span>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="max-w-[200px] truncate" title={log.visitorPurpose}>
-                                                    {log.visitorPurpose}
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    {log.check_out_time ? (
-                                                        <div className="flex flex-col items-center">
-                                                            <Clock className="h-3 w-3 text-orange-500 mb-1" />
-                                                            <span className="text-sm font-semibold">{formatISTTime(log.check_out_time)}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-gray-400 italic">Still inside</span>
-                                                    )}
-                                                </TableCell>
-
-                                                <TableCell>
-                                                    {log.status === 'inside' ? (
-                                                        <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200 animate-pulse">
-                                                            <Users className="h-3 w-3 mr-1" /> Inside
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge variant="outline" className="bg-gray-100 text-gray-600 hover:bg-gray-100 border-gray-200">
-                                                            <CheckCircle2 className="h-3 w-3 mr-1" /> Exited
-                                                        </Badge>
-                                                    )}
+                                                <TableCell className="max-w-[200px] truncate" title={log.visitor_purpose}>
+                                                    {log.visitor_purpose}
                                                 </TableCell>
                                                 <TableCell className="text-gray-500 text-sm italic">
                                                     {log.recorder?.name || 'N/A'}
