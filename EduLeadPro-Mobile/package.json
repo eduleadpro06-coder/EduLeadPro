@@ -68,5 +68,19 @@
     "babel-preset-expo": "^54.0.9",
     "typescript": "~5.9.2"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "react-native-device-info": "^10.3.0"
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "sp-react-native-in-app-updates",
+          "react-native-ola-maps"
+        ],
+        "listUnknownPackages": false
+      }
+    }
+  }
 }
