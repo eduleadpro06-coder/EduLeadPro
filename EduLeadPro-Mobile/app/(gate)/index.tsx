@@ -209,6 +209,16 @@ export default function GateDashboard() {
                     </View>
                     <Text style={styles.navLabel}>Visitors</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity 
+                    style={styles.navItem}
+                    onPress={() => router.push('/(gate)/leaves')}
+                >
+                    <View style={[styles.navIconBox, { backgroundColor: '#FFF5F5' }]}>
+                        <Feather name="calendar" size={24} color={colors.danger} />
+                    </View>
+                    <Text style={styles.navLabel}>Leaves</Text>
+                </TouchableOpacity>
             </View>
 
             <PremiumDrawer 

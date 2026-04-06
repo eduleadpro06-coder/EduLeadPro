@@ -40,6 +40,12 @@ export default function GateLayout() {
                     title: 'Today\'s Logs',
                 }}
             />
+            <Stack.Screen
+                name="leaves"
+                options={{
+                    headerShown: false,
+                }}
+            />
         </Stack>
     );
 }

@@ -110,6 +110,30 @@ export const gateAPI = {
     async getVisitorHistory(): Promise<any[]> {
         const response = await apiClient.get('/gate/visitors/active');
         return response.data;
+    },
+
+    /**
+     * Get leave history
+     */
+    async getLeaves(): Promise<any[]> {
+        const response = await apiClient.get('/gate/leaves');
+        return response.data;
+    },
+
+    /**
+     * Get leave balance
+     */
+    async getLeaveBalance(): Promise<{ cl: any }> {
+        const response = await apiClient.get('/gate/leaves/balance');
+        return response.data;
+    },
+
+    /**
+     * Apply for leave
+     */
+    async applyLeave(data: { startDate: string; endDate: string; reason: string; leaveType: 'CL' }): Promise<any> {
+        const response = await apiClient.post('/gate/leaves', data);
+        return response.data;
     }
 };
 

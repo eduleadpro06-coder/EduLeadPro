@@ -444,4 +444,144 @@ router.get('/history/visitors', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * GET /api/v1/mobile/gate/leaves
+ * Get leave history
+ */
+router.get('/leaves', async (req: Request, res: Response) => {
+    try {
+        const staffId = req.user!.userId;
+        const organizationId = req.user!.organizationId;        
+
+        const { supabase } = await import('../../supabase.js'); 
+
+        const { data: leaves, error } = await supabase
+            .from('teacher_leaves')
+            .select('*')
+            .eq('staff_id', staffId)
+            .eq('organization_id', organizationId)
+            .order('applied_at', { ascending: false });
+
+        if (error) throw error;
+
+        res.json({ success: true, data: leaves });
+    } catch (error) {
+        console.error('[Mobile API] Gate get leaves error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch leave history' });
+    }
+});
+
+/**
+ * GET /api/v1/mobile/gate/leaves/balance
+ * Get leave balance
+ */
+router.get('/leaves/balance', async (req: Request, res: Response) => {
+    try {
+        const staffId = req.user!.userId;
+        const organizationId = req.user!.organizationId;        
+        const year = new Date().getFullYear();
+
+        const { supabase } = await import('../../supabase.js'); 
+
+        // Get Staff Limits
+        const { data: staff, error: staffError } = await supabase
+            .from('staff')
+            .select('cl_limit, el_limit, total_leaves')
+            .eq('id', staffId)
+            .single();
+
+        if (staffError) throw staffError;
+
+        // Get Used Leaves
+        const { data: usedLeaves, error: leavesError } = await supabase
+            .from('teacher_leaves')
+            .select('leave_type, start_date, end_date')
+            .eq('staff_id', staffId)
+            .eq('organization_id', organizationId)
+            .eq('status', 'approved')
+            .gte('start_date', `${year}-01-01`);
+
+        if (leavesError) throw leavesError;
+
+        let clUsed = 0;
+
+        usedLeaves?.forEach(leave => {
+            // Count instances instead of days as per user requirement
+            const type = leave.leave_type || (leave as any).leaveType;
+            if (type === 'CL') clUsed += 1;
+        });
+
+        res.json({
+            success: true,
+            data: {
+                cl: { limit: staff.cl_limit || 10, used: clUsed, balance: (staff.cl_limit || 10) - clUsed }
+            }
+        });
+    } catch (error) {
+        console.error('[Mobile API] Gate leave balance error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch leave balance' });
+    }
+});
+
+/**
+ * POST /api/v1/mobile/gate/leaves
+ * Apply for leave
+ */
+router.post('/leaves', async (req: Request, res: Response) => {
+    try {
+        const staffId = req.user!.userId;
+        const organizationId = req.user!.organizationId;        
+        const { startDate, endDate, reason, leaveType } = req.body;        
+
+        if (!startDate || !endDate || !reason) {
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+
+        const { supabase } = await import('../../supabase.js'); 
+
+        const { data, error } = await supabase
+            .from('teacher_leaves')
+            .insert({
+                staff_id: staffId,
+                organization_id: organizationId,
+                start_date: startDate,
+                end_date: endDate,
+                reason,
+                leave_type: leaveType || 'CL',
+                status: 'pending'
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Fetch name for notification
+        const { data: staffMember } = await supabase
+            .from('staff')
+            .select('name')
+            .eq('id', staffId)
+            .single();
+
+        // Send notification to admins
+        try {
+            await supabase.from('notifications').insert({
+                organization_id: organizationId,
+                type: 'leave_request',
+                title: 'New Leave Request',
+                message: `${staffMember?.name || 'Gate Staff'} applied for leave from ${startDate} to ${endDate}.`,
+                priority: 'normal',
+                status: 'unread',
+                created_at: new Date().toISOString()
+            });
+        } catch (nErr) {
+            console.error('Notification error:', nErr);
+        }
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('[Mobile API] Gate apply leave error:', error);
+        res.status(500).json({ success: false, error: 'Failed to apply for leave' });
+    }
+});
+
 export default router;
