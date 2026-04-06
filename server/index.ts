@@ -1,4 +1,6 @@
 import 'dotenv/config';
+// Force Node.js timezone to IST for Vercel environments (since Vercel reserves the TZ env variable)
+process.env.TZ = 'Asia/Kolkata';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
