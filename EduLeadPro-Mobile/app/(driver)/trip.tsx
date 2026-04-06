@@ -321,7 +321,7 @@ export default function DriverTripScreen() {
                                 const url = `https://www.google.com/maps/dir/?api=1&destination=${activeDestination.latitude},${activeDestination.longitude}&travelmode=driving`;
                                 Linking.openURL(url);
                             } else {
-                                Alert.alert(t('info'), t('no_destination_set') || "No active destination found.");
+                                Alert.alert(t('info' as any), t('no_destination_set' as any) || "No active destination found.");
                             }
                         }}
                     >

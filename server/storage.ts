@@ -5328,7 +5328,7 @@ export class DatabaseStorage implements IStorage {
           description: `Purchase: ${item?.name || inventoryTx.reference || 'Inventory Item'}`,
           amount: inventoryTx.totalCost,
           category: expenseCategory || 'School Supplies',
-          date: new Date().toISOString().split('T')[0],
+          date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
           status: 'pending',
           inventoryItemId: inventoryTx.itemId,
           organizationId: item?.organizationId

@@ -352,7 +352,7 @@ export class DaycareStorage {
             .values({
                 ...enrollment,
                 enrollmentNumber,
-                enrollmentDate: new Date().toISOString().split('T')[0]
+                enrollmentDate: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
             })
             .returning();
 
@@ -391,7 +391,7 @@ export class DaycareStorage {
     async cancelEnrollment(id: number, reason: string): Promise<DaycareEnrollment | undefined> {
         return await this.updateEnrollment(id, {
             status: "cancelled",
-            endDate: new Date().toISOString().split('T')[0],
+            endDate: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
             notes: reason
         });
     }
@@ -424,7 +424,7 @@ export class DaycareStorage {
 
     // NEW: Get enrollments that have expired (past end date)
     async getExpiredEnrollments(organizationId?: number): Promise<DaycareEnrollment[]> {
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         const conditions: SQL[] = [
             isNull(schema.daycareEnrollments.deletedAt),
@@ -749,7 +749,7 @@ export class DaycareStorage {
             totalAmount: amount.toString(),
             discount: "0",
             lateFee: "0",
-            paymentDate: new Date().toISOString().split('T')[0],
+            paymentDate: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
             paymentMode,
             paymentType,
             status,

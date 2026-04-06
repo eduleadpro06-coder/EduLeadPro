@@ -544,7 +544,7 @@ router.get('/teacher/dashboard/:staffId', async (req: Request, res: Response) =>
         }
 
         // Get today's date
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         // Get attendance summary for today (for enrolled students in this org)
         const { data: todayAttendance } = await supabase
@@ -598,7 +598,7 @@ router.post('/attendance/mark', async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         // Check if attendance already exists for today
         const { data: existing } = await supabase
@@ -1197,7 +1197,7 @@ router.get('/parent/bus/:routeId/live-location', async (req: Request, res: Respo
 
         if (req.query.studentId) {
             const studentId = parseInt(req.query.studentId as string);
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
             const { data: statusData } = await supabase
                 .from('student_trip_status')
@@ -1291,7 +1291,7 @@ router.post('/driver/student-status', async (req: Request, res: Response) => {
         }
 
         // Insert or update status for today
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         // Check if record exists for today/session
         const { data: existing } = await supabase
@@ -1627,7 +1627,7 @@ router.get('/daily-updates/:leadId', async (req: Request, res: Response) => {
 router.get('/homework/:class', async (req: Request, res: Response) => {
     try {
         const className = req.params.class;
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         const { data: homework, error } = await supabase
             .from('preschool_homework')
@@ -1657,7 +1657,7 @@ router.get('/attendance/:leadId', async (req: Request, res: Response) => {
 
         const daysAgo = new Date();
         daysAgo.setDate(daysAgo.getDate() - days);
-        const dateStr = daysAgo.toISOString().split('T')[0];
+        const dateStr = daysAgo.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         const { data: attendance, error } = await supabase
             .from('student_attendance')
@@ -1682,7 +1682,7 @@ router.get('/attendance/:leadId', async (req: Request, res: Response) => {
 router.get('/today-attendance/:leadId', async (req: Request, res: Response) => {
     try {
         const { leadId } = req.params;
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         const { data: attendance, error } = await supabase
             .from('student_attendance')
@@ -1738,7 +1738,7 @@ router.get('/announcements', async (req: Request, res: Response) => {
 router.get('/events', async (req: Request, res: Response) => {
     try {
         const { organizationId } = req.query;
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         if (!organizationId) {
             return res.status(400).json({ error: 'Organization ID required' });

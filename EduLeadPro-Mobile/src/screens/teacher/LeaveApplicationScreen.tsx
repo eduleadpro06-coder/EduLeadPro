@@ -22,6 +22,7 @@ import { colors, typography } from '../../theme';
 import teacherAPI from '../../services/api/teacher.api';
 import { LeaveApplication } from '../../types/teacher.types';
 import { format, addDays } from 'date-fns';
+import { formatISTMedium, formatISTShort, formatISTFull } from '../../utils/dateUtils';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 const LeaveApplicationScreen = () => {
@@ -121,14 +122,14 @@ const LeaveApplicationScreen = () => {
                 <View style={styles.dateContainer}>
                     <Text style={styles.dateLabel}>From:</Text>
                     <Text style={styles.dateValue}>
-                        {item.start_date ? format(new Date(item.start_date), 'MMM dd, yyyy') : '-'}
+                        {item.start_date ? formatISTMedium(item.start_date) : '-'}
                     </Text>
                 </View>
                 <MaterialCommunityIcons name="arrow-right" size={20} color="#666" style={{ marginHorizontal: 10 }} />
                 <View style={styles.dateContainer}>
                     <Text style={styles.dateLabel}>To:</Text>
                     <Text style={styles.dateValue}>
-                        {item.end_date ? format(new Date(item.end_date), 'MMM dd, yyyy') : '-'}
+                        {item.end_date ? formatISTMedium(item.end_date) : '-'}
                     </Text>
                 </View>
             </View>
@@ -151,7 +152,7 @@ const LeaveApplicationScreen = () => {
                     </Text>
                 </View>
                 <Text style={styles.appliedDate}>
-                    Applied: {item.applied_at ? format(new Date(item.applied_at), 'MMM dd') : ''}
+                    Applied: {item.applied_at ? formatISTShort(item.applied_at) : ''}
                 </Text>
             </View>
 
@@ -271,7 +272,7 @@ const LeaveApplicationScreen = () => {
                                 onPress={() => setShowStartPicker(true)}
                             >
                                 <Feather name="calendar" size={20} color="#666" />
-                                <Text style={styles.datePickerText}>{format(startDate, 'EEE, MMMM dd, yyyy')}</Text>
+                                <Text style={styles.datePickerText}>{formatISTFull(startDate)}</Text>
                             </TouchableOpacity>
                             {showStartPicker && (
                                 <DateTimePicker
@@ -289,7 +290,7 @@ const LeaveApplicationScreen = () => {
                                 onPress={() => setShowEndPicker(true)}
                             >
                                 <Feather name="calendar" size={20} color="#666" />
-                                <Text style={styles.datePickerText}>{format(endDate, 'EEE, MMMM dd, yyyy')}</Text>
+                                <Text style={styles.datePickerText}>{formatISTFull(endDate)}</Text>
                             </TouchableOpacity>
                             {showEndPicker && (
                                 <DateTimePicker

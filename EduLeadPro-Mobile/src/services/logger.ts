@@ -13,7 +13,7 @@ const API_BASE_URL = CONFIG_API_URL.replace('/mobile', '');
 class MobileLogger {
     private enabled: boolean = true;
     private batchLogs: any[] = [];
-    private flushInterval: NodeJS.Timeout | null = null;
+    private flushInterval: ReturnType<typeof setInterval> | null = null;
     private readonly BATCH_SIZE = 10;
     private readonly FLUSH_INTERVAL_MS = 5000; // 5 seconds
 

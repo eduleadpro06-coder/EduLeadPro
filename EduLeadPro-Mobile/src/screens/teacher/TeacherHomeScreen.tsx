@@ -196,7 +196,7 @@ export default function TeacherHomeScreen() {
                             <TouchableOpacity 
                                 key={student.id} 
                                 style={styles.studentCard}
-                                onPress={() => navigation.navigate('StudentDetail', { studentId: student.id })}
+                                onPress={() => (navigation as any).navigate('StudentDetail', { studentId: student.id })}
                             >
                                 <View style={[styles.avatar, { backgroundColor: getAvatarColor(student.id) }]}>
                                     <Text style={styles.avatarText}>{getInitials(student.name)}</Text>

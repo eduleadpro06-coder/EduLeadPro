@@ -44,7 +44,7 @@ export default function MarkAttendanceScreen() {
 
         try {
             setLoading(true);
-            const dashboard = await teacherAPI.getDashboard(user.userId);
+            const dashboard = await teacherAPI.getDashboard();
 
             // Map students with existing attendance
             const studentsWithAttendance: StudentAttendance[] = dashboard.students.map((student) => {
@@ -92,16 +92,15 @@ export default function MarkAttendanceScreen() {
             }
 
             // Save each attendance record
-            const promises = markedStudents.map((student) =>
-                teacherAPI.markAttendance({
-                    leadId: student.id,
-                    status: student.status as 'present' | 'absent' | 'late',
-                    markedBy: user.name,
-                    organizationId: user.organizationId!,
-                })
-            );
+            const attendanceRecords = markedStudents.map((student) => ({
+                leadId: student.id,
+                status: student.status as 'present' | 'absent' | 'late',
+                markedBy: user.name,
+                organizationId: user.organizationId,
+                checkInTime: student.status === 'present' ? new Date().toISOString() : null,
+            }));
 
-            await Promise.all(promises);
+            await teacherAPI.markAttendanceBulk(attendanceRecords);
 
             Alert.alert('Success', 'Attendance saved successfully', [
                 {

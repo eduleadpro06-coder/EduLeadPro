@@ -20,7 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, typography } from '../../theme';
 import teacherAPI from '../../services/api/teacher.api';
 import { TeacherTask } from '../../types/teacher.types';
-import { format } from 'date-fns';
+import { formatISTDateTimeShort } from '../../utils/dateUtils';
 
 const TeacherTasksScreen = () => {
     const navigation = useNavigation();
@@ -138,7 +138,7 @@ const TeacherTasksScreen = () => {
                 ) : null}
                 <Text style={styles.taskDate}>
                     {item.created_at && !isNaN(new Date(item.created_at).getTime())
-                        ? format(new Date(item.created_at), 'MMM dd, h:mm a')
+                        ? formatISTDateTimeShort(item.created_at)
                         : ''}
                 </Text>
             </View>

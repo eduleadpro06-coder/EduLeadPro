@@ -63,7 +63,7 @@ export default function BusTrackingScreen() {
 
                 // Calculate ETA time string
                 const etaTime = new Date(Date.now() + durationSeconds * 1000);
-                setEta(etaTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                setEta(etaTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }));
             }
         } catch (error) {
             console.log('Error calculating ETA:', error);

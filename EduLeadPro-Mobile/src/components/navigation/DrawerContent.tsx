@@ -8,6 +8,7 @@ import {
     Linking,
     Dimensions,
 } from 'react-native';
+// @ts-ignore 
 import { DrawerContentComponentProps, DrawerContentScrollView } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';

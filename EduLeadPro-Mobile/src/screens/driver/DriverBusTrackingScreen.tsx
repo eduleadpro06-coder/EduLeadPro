@@ -163,7 +163,7 @@ export default function DriverBusTrackingScreen({ navigation }: any) {
                                     <View style={styles.locationRow}>
                                         <Text style={styles.locationLabel}>Last Updated:</Text>
                                         <Text style={styles.locationValue}>
-                                            {new Date(lastLocation.timestamp).toLocaleTimeString()}
+                                            {new Date(lastLocation.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}
                                         </Text>
                                     </View>
                                 </View>

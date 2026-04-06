@@ -30,7 +30,7 @@ export default function MenuScreen() {
                 <View style={styles.userInfo}>
                     <View style={styles.avatarContainer}>
                         <Text style={styles.avatarText}>
-                            {((user?.role === 'teacher' ? 'Teacher' : 'Parent') || 'U').charAt(0).toUpperCase()}
+                            {(user?.role === 'teacher' ? 'Teacher' : 'Parent').charAt(0).toUpperCase()}
                         </Text>
                     </View>
                     <View>

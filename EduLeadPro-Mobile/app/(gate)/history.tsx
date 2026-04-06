@@ -33,7 +33,7 @@ export default function GateHistoryScreen() {
         try {
             // Fetch students to get their current status as a proxy for history if no explicit history API
             const students = await gateAPI.getGateStudents('');
-            setStudentLogs(students.filter(s => s.gateStatus).sort((a,b) => 
+            setStudentLogs(students.filter((s: any) => s.gateStatus).sort((a: any,b: any) => 
                 new Date(b.gateStatus.updated_at).getTime() - new Date(a.gateStatus.updated_at).getTime()
             ));
 
