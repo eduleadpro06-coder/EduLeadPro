@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import * as Updates from 'expo-updates';
 import * as SplashScreen from 'expo-splash-screen';
+import SpInAppUpdates, { IAUUpdateKind } from 'sp-react-native-in-app-updates';
 import { 
     useFonts, 
     Outfit_700Bold, 
@@ -63,7 +64,7 @@ function RootLayoutNav() {
                     const update = await Updates.checkForUpdateAsync();
                     if (update.isAvailable) {
                         Alert.alert(
-                            'Update Available 🎉',
+                            'Minor Update Available 🎉',
                             'A new version of Bloomdale Connect is ready. Update now for the best experience!',
                             [
                                 { text: 'Later', style: 'cancel' },
@@ -80,7 +81,19 @@ function RootLayoutNav() {
                                 }
                             ]
                         );
+                        return; // Stop here if we have an OTA update
                     }
+
+                    // Fallback to Native App Store checks if NO OTA update is found
+                    const inAppUpdates = new SpInAppUpdates(false); // false means debug mode disabled
+                    inAppUpdates.checkNeedsUpdate().then((result) => {
+                        if (result.shouldUpdate) {
+                            inAppUpdates.startUpdate({
+                                updateType: IAUUpdateKind.FLEXIBLE,
+                            });
+                        }
+                    }).catch((err) => console.log('In-App update check failed', err));
+
                 } catch (error) {
                     console.log('Error checking for updates:', error);
                 }
