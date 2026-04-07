@@ -113,9 +113,12 @@ function RootLayoutNav() {
 
             } catch (error: any) {
                 console.error('🔄 [UpdateCheck] Error in update check:', error.message || error);
+            } finally {
+                console.log('🔄 [UpdateCheck] Check complete.');
             }
         };
 
+        console.log('🔄 [UpdateCheck] Initializing (DevMode:', __DEV__, ')');
         // Delay slightly to ensure app is fully initialized
         const timer = setTimeout(checkForUpdates, 3000);
         return () => clearTimeout(timer);

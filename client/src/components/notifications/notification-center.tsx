@@ -147,10 +147,14 @@ export default function NotificationCenter() {
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          {notifications.length > 0 && unreadCount > 0 && (
-            <span className="absolute top-1 right-1 flex h-4 w-4 min-w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
+        <Button id="main-notification-bell" variant="ghost" size="icon" className="relative group/bell">
+          <Bell className="h-5 w-5 transition-transform group-hover/bell:scale-110" />
+          {!loading && unreadCount > 0 && notifications?.length > 0 && (
+            <span 
+              id="main-bell-badge"
+              className="absolute top-1 right-1 flex h-4 w-4 min-w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white ring-1 ring-white shadow-sm"
+              title={`${unreadCount} pending followups/daycare`}
+            >
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}

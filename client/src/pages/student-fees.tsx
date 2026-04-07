@@ -1830,25 +1830,6 @@ export default function StudentFees() {
         }
         primaryActions={
           <div className="flex items-center gap-3">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleImportCSV}
-              style={{ display: 'none' }}
-              id="csv-import"
-            />
-            <label htmlFor="csv-import">
-              <Button
-                variant="outline"
-                type="button"
-                className="h-10 px-4 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-lg flex items-center gap-2 cursor-pointer"
-                onClick={() => document.getElementById('csv-import')?.click()}
-              >
-                <Download className="h-4 w-4" />
-                <span>Import</span>
-              </Button>
-            </label>
-
             <Button
               onClick={exportToCSV}
               className="bg-[#643ae5] hover:bg-[#552dbf] text-white shadow-sm h-10 px-4 rounded-lg flex items-center gap-2 transition-all active:scale-95"

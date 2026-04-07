@@ -21,6 +21,7 @@ import mobileLogsRouter from "./routes/mobile-logs.js"; // Mobile app logging
 import inventoryRouter from "./routes/inventory.js"; // Inventory & Sell Orders
 import { comparePassword } from "./utils/password.js"; // Security: bcrypt password comparison
 import { supabase } from "./supabase.js"; // Shared Supabase client with Service Role Key
+import notificationsRouter from "./routes/notifications.js";
 
 // Helper function to get current academic year
 function getCurrentAcademicYear(): string {
@@ -62,6 +63,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // NEW: Inventory & Sell Orders Module
   app.use("/api/inventory", inventoryRouter);
   console.log("✅ Mounted Inventory API at /api/inventory");
+
+  // NEW: Notifications Module
+  app.use("/api/notifications", notificationsRouter);
+  console.log("✅ Mounted Notifications API at /api/notifications");
 
   // Test route to verify routes are working
   app.get("/api/test", (req, res) => {
