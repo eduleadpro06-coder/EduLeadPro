@@ -1178,7 +1178,7 @@ export default function StaffAI() {
 
   // Pagination and sorting state
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(6);
+  const [pageSize, setPageSize] = useState(7);
   const [maxVisiblePage, setMaxVisiblePage] = useState(2); // Controls how many pages are visible
   const [sortKey, setSortKey] = useState<'name' | 'role' | 'salary' | 'dateOfJoining'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -1690,14 +1690,6 @@ export default function StaffAI() {
                   <Button
                     variant="outline"
                     className="h-10 px-4 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-lg flex items-center gap-2"
-                    onClick={() => setIsCSVImportOpen(true)}
-                  >
-                    <Download className="h-4 w-4" />
-                    <span>Import</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-10 px-4 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-lg flex items-center gap-2"
                     onClick={exportStaff}
                   >
                     <Upload className="h-4 w-4" />
@@ -1733,100 +1725,82 @@ export default function StaffAI() {
                     );
                   })}
                 </div>
-
-                {/* Pagination */}
-                <div className="flex items-center gap-2 py-1">
-                  <span className="text-xs text-gray-500 mr-2 hidden md:inline-block">
-                    Page {page} of {totalPages}
-                  </span>
-                  <div className="flex items-center space-x-1">
-                    <button
-                      className={`h-8 w-8 flex items-center justify-center rounded-md border transition-all duration-200 ${page === 1
-                        ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:translate-y-0.5'
-                        }`}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-
-                    {/* Compact Page Numbers */}
-                    <div className="hidden sm:flex space-x-1">
-                      {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                        // Logic to show a window of pages can be complex, simplifying for now to show first few or surrounding
-                        // For simplicity in this constrained view:
-                        let pNum = i + 1;
-                        if (totalPages > 5 && page > 3) {
-                          pNum = page - 2 + i;
-                          if (pNum > totalPages) pNum = i + (totalPages - 4); // Clamp to end
-                        }
-                        // Simplified range logic for safety in this snippet
-                        if (totalPages <= 5) pNum = i + 1;
-
-                        return (pNum <= totalPages) ? (
-                          <button
-                            key={pNum}
-                            className={`h-8 w-8 flex items-center justify-center rounded-md text-xs font-medium transition-all duration-200 ${page === pNum
-                              ? 'bg-[#643ae5] text-white border-transparent shadow-sm'
-                              : 'bg-white text-gray-600 border border-gray-200 hover:border-[#643ae5] hover:text-[#643ae5]'
-                              }`}
-                            onClick={() => setPage(pNum)}
-                          >
-                            {pNum}
-                          </button>
-                        ) : null;
-                      })}
-                    </div>
-
-                    <button
-                      className={`h-8 w-8 flex items-center justify-center rounded-md border transition-all duration-200 ${page === totalPages
-                        ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:translate-y-0.5'
-                        }`}
-                      onClick={() => {
-                        const nextPage = Math.min(totalPages, page + 1);
-                        setPage(nextPage);
-                        if (nextPage > maxVisiblePage) {
-                          setMaxVisiblePage(nextPage);
-                        }
-                      }}
-                      disabled={page === totalPages}
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
             {/* Main Content: Two Column Layout */}
             <div className="flex items-start gap-6 px-8 pb-8">
               {/* Sidebar: Contact List */}
-              <aside className="w-[320px] glass-card rounded-lg border bg-card text-card-foreground shadow-lg flex flex-col max-h-[calc(100vh-250px)] sticky top-4">
-                <div className="px-6 pt-6 pb-2 text-base font-semibold border-b shrink-0">{staffTabFiltered.length} contacts</div>
-                <div className="flex-1 overflow-y-auto">
+              <aside className="w-[320px] bg-white rounded-2xl border border-gray-200 shadow h-fit sticky top-4 flex flex-col">
+                <div className="px-6 pt-6 pb-2 text-base font-semibold text-gray-800 border-b shrink-0">
+                  {staffTabFiltered.length} contacts
+                </div>
+                <div className="flex-1">
                   <ul className="divide-y divide-gray-200">
                     {paginatedStaff.map((member) => (
                       <li
                         key={member.id}
-                        className={`flex items-center gap-3 px-6 py-4 cursor-pointer hover:bg-purple-50 transition rounded-xl ${selectedStaff?.id === member.id ? 'glass-card rounded-lg border bg-card text-card-foreground shadow-lg' : ''}`}
+                        className={`flex items-center gap-3 px-6 py-4 cursor-pointer transition rounded-xl ${selectedStaff?.id === member.id ? 'bg-purple-50 border border-[#643ae5]' : 'hover:bg-gray-50/50'} text-gray-800`}
                         onClick={() => setSelectedStaff(member)}
                       >
                         <div className="relative">
-                          <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+                          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-purple-100 text-gray-800 font-bold text-sm border-2 border-gray-200">
                             {member.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                           </div>
-                          <span className="absolute bottom-0 right-0 block w-3 h-3 rounded-full border-2 border-gray-200" style={{ background: member.isActive !== false ? '#52C41A' : '#BFBFBF' }}></span>
+                          <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-gray-200" style={{ background: member.isActive !== false ? '#52C41A' : '#BFBFBF' }}></span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate">{member.name}</div>
-                          <div className="text-xs truncate">{member.department || 'No Dept'}</div>
-                          <div className="text-xs">{member.email || 'No email'}</div>
+                          <div className="font-medium text-gray-800 truncate mb-1">{member.name}</div>
+                          <div className="text-xs text-gray-500 truncate">{member.department || 'No Dept'}</div>
                         </div>
                       </li>
                     ))}
                   </ul>
                 </div>
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-white rounded-b-2xl">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3 text-xs font-medium text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700 rounded-lg transition-colors"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                    >
+                      Previous
+                    </Button>
+
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={page.toString()}
+                        onValueChange={(value) => setPage(parseInt(value))}
+                      >
+                        <SelectTrigger className="h-9 w-[60px] border-gray-200 text-xs font-medium focus:ring-purple-500/20">
+                          <SelectValue placeholder={page.toString()} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-gray-200 shadow-lg">
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pNum) => (
+                            <SelectItem key={pNum} value={pNum.toString()} className="text-xs">
+                              {pNum}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
+                        of {totalPages}
+                      </span>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3 text-xs font-medium text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700 rounded-lg transition-colors"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
               </aside>
               {/* Details Panel */}
               <main className="flex-1">

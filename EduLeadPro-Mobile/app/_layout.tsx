@@ -57,49 +57,68 @@ function RootLayoutNav() {
     useEffect(() => {
         loadUser();
 
-        // Check for OTA updates (only in production build)
-        if (!__DEV__) {
-            const checkForUpdates = async () => {
-                try {
-                    const update = await Updates.checkForUpdateAsync();
-                    if (update.isAvailable) {
-                        Alert.alert(
-                            'Minor Update Available 🎉',
-                            'A new version of Bloomdale Connect is ready. Update now for the best experience!',
-                            [
-                                { text: 'Later', style: 'cancel' },
-                                {
-                                    text: 'Update Now',
-                                    onPress: async () => {
-                                        try {
-                                            await Updates.fetchUpdateAsync();
-                                            await Updates.reloadAsync();
-                                        } catch (e) {
-                                            Alert.alert('Error', 'Failed to download update. Please try again later.');
-                                        }
+        // Check for updates (always check in diagnostics mode)
+        const checkForUpdates = async () => {
+            console.log('🔄 [UpdateCheck] Check started...');
+            try {
+                // Determine update channel from app.config (if possible) or just check
+                const update = await Updates.checkForUpdateAsync();
+                console.log('🔄 [UpdateCheck] OTA check result:', JSON.stringify(update, null, 2));
+
+                if (update.isAvailable) {
+                    console.log('🔄 [UpdateCheck] OTA update FOUND! Attempting to Alert user.');
+                    Alert.alert(
+                        'Minor Update Available 🎉',
+                        'A new version of Bloomdale Connect is ready. Update now for the best experience!',
+                        [
+                            { text: 'Later', style: 'cancel' },
+                            {
+                                text: 'Update Now',
+                                onPress: async () => {
+                                    try {
+                                        console.log('🔄 [UpdateCheck] User clicked Update Now, fetching...');
+                                        await Updates.fetchUpdateAsync();
+                                        console.log('🔄 [UpdateCheck] Fetch complete, re-launching!');
+                                        await Updates.reloadAsync();
+                                    } catch (e) {
+                                        console.error('🔄 [UpdateCheck] Fetch Error:', e);
+                                        Alert.alert('Error', 'Failed to download update. Please try again later.');
                                     }
                                 }
-                            ]
-                        );
-                        return; // Stop here if we have an OTA update
-                    }
+                            }
+                        ]
+                    );
+                    return; // Stop here if we have an OTA update
+                } else {
+                     console.log('🔄 [UpdateCheck] No OTA update available at this time.');
+                }
 
-                    // Fallback to Native App Store checks if NO OTA update is found
+                // Fallback to Native App Store checks if NO OTA update is found
+                // We only do this if it's NOT a development environment (__DEV__)
+                if (!__DEV__) {
+                    console.log('🔄 [UpdateCheck] Checking Native Store updates...');
                     const inAppUpdates = new SpInAppUpdates(false); // false means debug mode disabled
                     inAppUpdates.checkNeedsUpdate().then((result) => {
+                        console.log('🔄 [UpdateCheck] Native check result:', JSON.stringify(result, null, 2));
                         if (result.shouldUpdate) {
+                            console.log('🔄 [UpdateCheck] Native update FOUND! Prompting user...');
                             inAppUpdates.startUpdate({
                                 updateType: IAUUpdateKind.FLEXIBLE,
                             });
                         }
-                    }).catch((err) => console.log('In-App update check failed', err));
-
-                } catch (error) {
-                    console.log('Error checking for updates:', error);
+                    }).catch((err) => console.error('🔄 [UpdateCheck] Native check FAILED:', err));
+                } else {
+                    console.log('🔄 [UpdateCheck] Skipping Native check (DevMode)');
                 }
-            };
-            checkForUpdates();
-        }
+
+            } catch (error: any) {
+                console.error('🔄 [UpdateCheck] Error in update check:', error.message || error);
+            }
+        };
+
+        // Delay slightly to ensure app is fully initialized
+        const timer = setTimeout(checkForUpdates, 3000);
+        return () => clearTimeout(timer);
     }, []);
 
     // Handle SplashScreen and Navigation

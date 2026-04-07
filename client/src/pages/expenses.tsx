@@ -117,17 +117,16 @@ export default function Expenses() {
     .filter((exp: Expense) => (exp.type ?? "outward") === "outward")
     .reduce((sum: number, exp: Expense) => sum + Number(exp.amount), 0);
     
-  // Add "Budget Allocation" inward entries to the configured base monthly budget
-  const additionalBudgetFromInwards = monthFilteredExpenses
+  // Calculate budget across ALL time (carry forward / overall budget)
+  const additionalBudgetFromInwards = allExpenses
     .filter((exp: Expense) => (exp.type ?? "outward") === "inward" && exp.category === "Budget Allocation")
     .reduce((sum: number, exp: Expense) => sum + Number(exp.amount), 0);
     
-    
-  const budgetDeductions = monthFilteredExpenses
+  const budgetDeductions = allExpenses
     .filter((exp: Expense) => (exp.type ?? "outward") === "outward" && exp.deductFromBudget)
     .reduce((sum: number, exp: Expense) => sum + Number(exp.amount), 0);
 
-  const effectiveMonthlyBudget = monthlyBudget + additionalBudgetFromInwards - budgetDeductions;
+  const effectiveBudget = monthlyBudget + additionalBudgetFromInwards - budgetDeductions;
 
   // We recalculate current balance to be based on the original base budget calculation minus all outward 
   // expenses, or we can just leave it since the user asked to remove the "Current Balance" card anyway.
@@ -353,7 +352,7 @@ export default function Expenses() {
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-gray-500">Effective Budget</p>
-                  <h3 className="text-3xl font-bold text-gray-900 tracking-tight">₹{effectiveMonthlyBudget.toLocaleString()}</h3>
+                  <h3 className="text-3xl font-bold text-gray-900 tracking-tight">₹{effectiveBudget.toLocaleString()}</h3>
                 </div>
                 <div className="p-2 bg-purple-50/80 rounded-full">
                   <PieChartIcon className="h-5 w-5 text-purple-600" />
@@ -721,7 +720,7 @@ export default function Expenses() {
             <DialogHeader>
               <DialogTitle className="text-xl">Budget Settings</DialogTitle>
               <DialogDescription className="text-gray-600">
-                Set your monthly spending limit to track budget utilization.
+                Set your overall base spending limit to track budget utilization across all time.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6 pt-4">
