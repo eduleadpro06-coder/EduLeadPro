@@ -381,12 +381,12 @@ export default function Dashboard() {
                 >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(value) => `₹${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(value) => `${value >= 1000 ? `₹${(value / 1000).toFixed(0)}k` : `₹${value}`}`} />
                   <RechartsTooltip
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     labelStyle={{ fontSize: '14px', fontWeight: 'bold' }}
                     itemStyle={{ fontSize: '14px' }}
-                    formatter={(value: number) => [`₹${value.toLocaleString()}`, undefined]}
+                    formatter={(value: number) => [formatAmount(value), undefined]}
                   />
                   <Line type="monotone" dataKey="revenue" name="Total Revenue" stroke="#10b981" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#10b981' }} activeDot={{ r: 6 }} />
                   <Line type="monotone" dataKey="expense" name="Total Operating Expense" stroke="#ef4444" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#ef4444' }} activeDot={{ r: 6 }} />
@@ -414,12 +414,12 @@ export default function Dashboard() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={5} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(value) => `₹${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(value) => `${value >= 1000 ? `₹${(value / 1000).toFixed(0)}k` : `₹${value}`}`} />
                   <RechartsTooltip
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     labelStyle={{ fontSize: '14px', fontWeight: 'bold' }}
                     itemStyle={{ fontSize: '14px' }}
-                    formatter={(value: number) => [`₹${value.toLocaleString()}`, "Total Expense"]}
+                    formatter={(value: number) => [formatAmount(value), "Total Expense"]}
                   />
                   <Area type="monotone" dataKey="amount" stroke="#f97316" strokeWidth={2} fillOpacity={1} fill="url(#colorExpenseTrend)" dot={{ fill: '#f97316', r: 3 }} />
                 </RCAreaChart>

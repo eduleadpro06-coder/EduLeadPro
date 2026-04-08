@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, CreditCard, Receipt, AlertCircle, CheckCircle, Clock, Filter, Download, User, Phone, Mail, Trash2, Edit, ChevronDown, ChevronUp, GraduationCap } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { invalidateNotifications } from "@/lib/utils";
+import { invalidateNotifications, formatAmount } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
 import { format } from "date-fns";
@@ -374,7 +374,7 @@ export default function Students() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="bg-white text-gray-900">
-              <div className="text-2xl font-bold text-gray-800">₹{feeStats.totalPending?.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-gray-800">{formatAmount(feeStats.totalPending || 0)}</div>
             </CardContent>
           </Card>
           <Card className="bg-white text-gray-900">
@@ -383,7 +383,7 @@ export default function Students() {
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="bg-white text-gray-900">
-              <div className="text-2xl font-bold text-gray-800">₹{feeStats.totalPaid?.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-gray-800">{formatAmount(feeStats.totalPaid || 0)}</div>
             </CardContent>
           </Card>
           <Card className="bg-white text-gray-900">
@@ -392,7 +392,7 @@ export default function Students() {
               <AlertCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="bg-white text-gray-900">
-              <div className="text-2xl font-bold text-gray-800">₹{feeStats.totalOverdue?.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-gray-800">{formatAmount(feeStats.totalOverdue || 0)}</div>
             </CardContent>
           </Card>
           <Card className="bg-white text-gray-900">
@@ -574,7 +574,7 @@ export default function Students() {
                       )}
                       <div className="pt-2 border-t border-gray-700">
                         <div className="text-muted-foreground text-gray-800">Outstanding: </div>
-                        <div className={`font-semibold ${outstanding > 0 ? 'text-red-400' : 'text-green-400'}`}>₹{outstanding.toLocaleString()}</div>
+                        <div className={`font-semibold ${outstanding > 0 ? 'text-red-400' : 'text-green-400'}`}>{formatAmount(outstanding)}</div>
                       </div>
                     </div>
                     <div className="flex gap-2 mt-4">
@@ -645,7 +645,7 @@ export default function Students() {
                     <TableRow key={fee.id} className={isOverdue ? "bg-red-50" : ""}>
                       <TableCell>{student?.name}</TableCell>
                       <TableCell>{fee.feeType}</TableCell>
-                      <TableCell className="text-gray-800">₹{parseFloat(fee.amount).toLocaleString()}</TableCell>
+                      <TableCell className="text-gray-800">{formatAmount(parseFloat(fee.amount))}</TableCell>
                       <TableCell>{format(new Date(fee.dueDate), "MMM dd, yyyy")}</TableCell>
                       <TableCell>
                         <Badge className={getFeeStatusColor(isOverdue ? "overdue" : fee.status)}>
@@ -692,9 +692,9 @@ export default function Students() {
                   return (
                     <TableRow key={payment.id}>
                       <TableCell>{student?.name}</TableCell>
-                      <TableCell className="font-semibold text-gray-800">₹{parseFloat((payment as any).amount).toLocaleString()}</TableCell>
+                      <TableCell className="font-semibold text-gray-800">{formatAmount(parseFloat((payment as any).amount))}</TableCell>
                       <TableCell className="text-green-600">
-                        {parseFloat(payment.discount) > 0 ? `-₹${parseFloat(payment.discount).toLocaleString()}` : '-'}
+                        {parseFloat(payment.discount) > 0 ? `-${formatAmount(parseFloat(payment.discount))}` : '-'}
                       </TableCell>
                       <TableCell>{format(new Date(payment.paymentDate), "MMM dd, yyyy")}</TableCell>
                       <TableCell>
@@ -1020,7 +1020,7 @@ export default function Students() {
                                 </p>
                               </div>
                               <div className="text-right">
-                                <p className="font-semibold text-lg">₹{(payment as any).amount.toLocaleString()}</p>
+                                <p className="font-semibold text-lg">{formatAmount((payment as any).amount)}</p>
                               </div>
                             </div>
                           ))}
@@ -1041,14 +1041,14 @@ export default function Students() {
                                 <div>
                                   <p className="font-medium">EMI Plan #{plan.id}</p>
                                   <p className="text-sm text-gray-600">
-                                    {plan.numberOfInstallments} installments of ₹{plan.installmentAmount.toLocaleString()} each
+                                    {plan.numberOfInstallments} installments of {formatAmount(plan.installmentAmount)} each
                                   </p>
                                   <p className="text-sm text-gray-600">
                                     Period: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(plan.startDate))} to {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(plan.endDate))}
                                   </p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-semibold">₹{plan.totalAmount.toLocaleString()}</p>
+                                  <p className="font-semibold">{formatAmount(plan.totalAmount)}</p>
                                   <p className="text-sm text-gray-600">Total Amount</p>
                                 </div>
                               </div>
@@ -1080,7 +1080,7 @@ export default function Students() {
                                   <p className="text-sm text-gray-600">Due: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(payment.paymentDate))}</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-semibold text-lg">₹{(payment as any).amount.toLocaleString()}</p>
+                                  <p className="font-semibold text-lg">{formatAmount((payment as any).amount)}</p>
                                 </div>
                               </div>
                             </div>
@@ -1108,7 +1108,7 @@ export default function Students() {
                                   </p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-semibold">₹{mandate.maxAmount.toLocaleString()}</p>
+                                  <p className="font-semibold">{formatAmount(mandate.maxAmount)}</p>
                                   <p className="text-sm text-gray-600">Max Amount</p>
                                 </div>
                               </div>
@@ -1123,7 +1123,7 @@ export default function Students() {
                       <div className="bg-orange-50 p-4 rounded-lg">
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-orange-900">Total Outstanding Amount:</span>
-                          <span className="text-xl font-bold text-orange-900">₹{financialBlockingDetails.totalOutstanding.toLocaleString()}</span>
+                          <span className="text-xl font-bold text-orange-900">{formatAmount(financialBlockingDetails.totalOutstanding)}</span>
                         </div>
                       </div>
                     )}

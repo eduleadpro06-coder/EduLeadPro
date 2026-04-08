@@ -48,6 +48,7 @@ import { generateFeeReceipt, type FeeReceiptData } from "@/lib/receipt-generator
 import { NotificationManager } from "@/lib/notificationManager";
 import { generateInvoicePDF } from "@/lib/invoice-generator";
 import { format } from "date-fns";
+import { formatAmount } from "@/lib/utils";
 import { formatDateTimeIST } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useQueryState } from "@/hooks/use-query-state";
@@ -253,7 +254,7 @@ function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, stat
   return (
     <div className="space-y-1">
       <div className="text-sm">
-        <span className="text-gray-500">EMI Amount:</span> ₹{Math.round(instAmount).toLocaleString()}
+        <span className="text-gray-500">EMI Amount:</span> {formatAmount(Math.round(instAmount))}
       </div>
       <div className="text-sm">
         <span className="text-gray-500">Progress:</span> {paidCount}/{totalInstallments} installments
@@ -1378,10 +1379,10 @@ export default function StudentFees() {
       toast({
         title: "Payment Recorded",
         description: shortfall > 0
-          ? `₹${actualAmount.toLocaleString()} received. ₹${shortfall.toLocaleString()} carried over to next EMI.`
+          ? `${formatAmount(actualAmount)} received. ${formatAmount(shortfall)} carried over to next EMI.`
           : shortfall < 0
-            ? `₹${actualAmount.toLocaleString()} received. ₹${Math.abs(shortfall).toLocaleString()} excess deducted from next EMI.`
-            : `₹${actualAmount.toLocaleString()} recorded successfully.`
+            ? `${formatAmount(actualAmount)} received. ${formatAmount(Math.abs(shortfall))} excess deducted from next EMI.`
+            : `${formatAmount(actualAmount)} recorded successfully.`
       });
 
       // Activity Log
@@ -2002,24 +2003,24 @@ export default function StudentFees() {
 
                             return (
                               <>
-                                <div><span className="font-semibold text-gray-700">Tuition Fees:</span> ₹{totalFees.toLocaleString()}</div>
+                                <div><span className="font-semibold text-gray-700">Tuition Fees:</span> {formatAmount(totalFees)}</div>
                                 {totalDiscounts > 0 && (
-                                  <div><span className="font-semibold text-gray-700">Discount:</span> <span className="text-green-600">-₹{totalDiscounts.toLocaleString()}</span></div>
+                                  <div><span className="font-semibold text-gray-700">Discount:</span> <span className="text-green-600">-{formatAmount(totalDiscounts)}</span></div>
                                 )}
                                 {totalDiscounts > 0 && (
-                                  <div><span className="font-semibold text-gray-700">Net Tuition Payable:</span> ₹{netFees.toLocaleString()}</div>
+                                  <div><span className="font-semibold text-gray-700">Net Tuition Payable:</span> {formatAmount(netFees)}</div>
                                 )}
                                 {totalDiscounts === 0 && (
-                                  <div><span className="font-semibold text-gray-700">Tuition Paid:</span> <span className="text-green-600">₹{tuitionPaid.toLocaleString()}</span></div>
+                                  <div><span className="font-semibold text-gray-700">Tuition Paid:</span> <span className="text-green-600">{formatAmount(tuitionPaid)}</span></div>
                                 )}
-                                <div><span className="font-semibold text-gray-700">Outstanding:</span> <span className="text-red-500">₹{outstanding.toLocaleString()}</span></div>
+                                <div><span className="font-semibold text-gray-700">Outstanding:</span> <span className="text-red-500">{formatAmount(outstanding)}</span></div>
                               </>
                             );
                           })()}
 
                           <div className="my-2 border-t border-gray-100"></div>
 
-                          <div><span className="font-semibold text-gray-700">Additional Paid:</span> <span className="text-amber-600">₹{calculateAdditionalPaidAmount(getStudentPayments(selectedStudent.id)).toLocaleString()}</span></div>
+                          <div><span className="font-semibold text-gray-700">Additional Paid:</span> <span className="text-amber-600">{formatAmount(calculateAdditionalPaidAmount(getStudentPayments(selectedStudent.id)))}</span></div>
 
                           <div className="my-2 border-t border-gray-100"></div>
 
@@ -2077,7 +2078,7 @@ export default function StudentFees() {
                         {getStudentPayments(selectedStudent.id).map(payment => (
                           <TableRow key={payment.id}>
                             <TableCell>{formatDate(payment.paymentDate)}</TableCell>
-                            <TableCell>₹{payment.amount}</TableCell>
+                            <TableCell>{formatAmount(parseFloat(payment.amount))}</TableCell>
                             <TableCell>{payment.paymentMode.charAt(0).toUpperCase() + payment.paymentMode.slice(1)}</TableCell>
                             <TableCell>{payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}</TableCell>
                             <TableCell>
@@ -2187,7 +2188,7 @@ export default function StudentFees() {
                                     setItemToDelete({ 
                                       id: payment.id, 
                                       type: 'payment', 
-                                      details: `₹${parseFloat(payment.amount).toLocaleString()} on ${formatDate(payment.paymentDate)}`
+                                      details: `${formatAmount(parseFloat(payment.amount))} on ${formatDate(payment.paymentDate)}`
                                     });
                                     setDeleteConfirmOpen(true);
                                   }}
@@ -2329,7 +2330,7 @@ export default function StudentFees() {
                             <TableCell>{mandate.mandateId}</TableCell>
                             <TableCell>{mandate.status}</TableCell>
                             <TableCell>{mandate.bankName}</TableCell>
-                            <TableCell>₹{mandate.maxAmount}</TableCell>
+                            <TableCell>{formatAmount(parseFloat(mandate.maxAmount || "0"))}</TableCell>
                             <TableCell>
                               <Button variant="destructive" size="sm" className="bg-red-600 text-white rounded-lg" onClick={() => handleDeleteMandate(mandate.id)}>Delete</Button>
                             </TableCell>
@@ -2465,11 +2466,11 @@ export default function StudentFees() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="font-medium text-gray-900">
-                                    ₹{parseFloat(plan.totalAmount || "0").toLocaleString()}
+                                    {formatAmount(parseFloat(plan.totalAmount || "0"))}
                                   </div>
                                   {parseFloat(plan.discount || "0") > 0 && (
                                     <div className="text-sm text-green-600">
-                                      -₹{parseFloat(plan.discount || "0").toLocaleString()} discount
+                                      -{formatAmount(parseFloat(plan.discount || "0"))} discount
                                     </div>
                                   )}
                                 </TableCell>
@@ -2569,7 +2570,7 @@ export default function StudentFees() {
                                           setItemToDelete({
                                             id: plan.id,
                                             type: 'emi_cancel',
-                                            details: `EMI Plan: ₹${parseFloat(plan.totalAmount).toLocaleString()}`
+                                            details: `EMI Plan: ${formatAmount(parseFloat(plan.totalAmount))}`
                                           });
                                           setDeleteConfirmOpen(true);
                                         }}
@@ -2585,7 +2586,7 @@ export default function StudentFees() {
                                         setItemToDelete({
                                           id: plan.id,
                                           type: 'emi_plan',
-                                          details: `EMI Plan: ₹${parseFloat(plan.totalAmount).toLocaleString()}`
+                                          details: `EMI Plan: ${formatAmount(parseFloat(plan.totalAmount))}`
                                         });
                                         setDeleteConfirmOpen(true);
                                       }}
@@ -2950,17 +2951,17 @@ export default function StudentFees() {
                                 <div className="space-y-3">
                                   <div className="flex justify-between">
                                     <span className="text-muted-foreground">Total Amount:</span>
-                                    <span className="font-medium">₹{emiFormData.totalAmount || '0'}</span>
+                                    <span className="font-medium text-gray-900">{formatAmount(parseFloat(emiFormData.totalAmount || '0'))}</span>
                                   </div>
                                   {paymentType === 'emi' && (
                                     <>
                                       <div className="flex justify-between">
                                         <span className="text-muted-foreground">Registration Fee:</span>
-                                        <span className="font-medium">₹{emiFormData.registrationFee || '0'}</span>
+                                        <span className="font-medium text-gray-900">{formatAmount(parseFloat(emiFormData.registrationFee || '0'))}</span>
                                       </div>
                                       <div className="flex justify-between">
                                         <span className="text-muted-foreground">Discount:</span>
-                                        <span className="font-medium">₹{emiFormData.discount || '0'}</span>
+                                        <span className="font-medium text-gray-900">{formatAmount(parseFloat(emiFormData.discount || '0'))}</span>
                                       </div>
                                       <div className="flex justify-between items-center py-2 px-2 rounded bg-primary/10 border border-primary/20 my-2">
                                         <span className="text-muted-foreground text-base font-medium">EMI Amount:</span>
@@ -3062,7 +3063,7 @@ export default function StudentFees() {
           <form onSubmit={handleUpdateEmiPlan} className="space-y-4">
             {/* Current & New Amount Row */}
             <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-500 space-y-1">
-              <p><span className="font-medium">Current Total:</span> ₹{selectedEmiPlanForEdit?.totalAmount}</p>
+              <p><span className="font-medium">Current Total:</span> {formatAmount(parseFloat(selectedEmiPlanForEdit?.totalAmount || "0"))}</p>
               <p><span className="font-medium">Current EMIs:</span> {selectedEmiPlanForEdit?.numberOfInstallments}</p>
             </div>
 
@@ -3633,7 +3634,7 @@ export default function StudentFees() {
                                 </p>
                               </div>
                               <div className="text-right">
-                                <p className="font-semibold text-lg">₹{payment.amount.toLocaleString()}</p>
+                                <p className="font-semibold text-lg">{formatAmount(payment.amount)}</p>
                               </div>
                             </div>
                           ))}
@@ -3654,14 +3655,14 @@ export default function StudentFees() {
                                 <div>
                                   <p className="font-medium">EMI Plan #{plan.id}</p>
                                   <p className="text-sm text-gray-600">
-                                    {plan.numberOfInstallments} installments of ₹{plan.installmentAmount.toLocaleString()} each
+                                    {plan.numberOfInstallments} installments of {formatAmount(plan.installmentAmount)} each
                                   </p>
                                   <p className="text-sm text-gray-600">
                                     Period: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(plan.startDate))} to {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(plan.endDate))}
                                   </p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-semibold">₹{plan.totalAmount.toLocaleString()}</p>
+                                  <p className="font-semibold">{formatAmount(plan.totalAmount)}</p>
                                   <p className="text-sm text-gray-600">Total Amount</p>
                                 </div>
                               </div>
@@ -3693,7 +3694,7 @@ export default function StudentFees() {
                                   <p className="text-sm text-gray-600">Due: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(payment.paymentDate))}</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-semibold text-lg">₹{payment.amount.toLocaleString()}</p>
+                                  <p className="font-semibold text-lg">{formatAmount(payment.amount)}</p>
                                 </div>
                               </div>
                             </div>
@@ -3721,7 +3722,7 @@ export default function StudentFees() {
                                   </p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-semibold">₹{mandate.maxAmount.toLocaleString()}</p>
+                                  <p className="font-semibold">{formatAmount(mandate.maxAmount)}</p>
                                   <p className="text-sm text-gray-600">Max Amount</p>
                                 </div>
                               </div>
@@ -3736,7 +3737,7 @@ export default function StudentFees() {
                       <div className="bg-orange-50 p-4 rounded-lg">
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-orange-900">Total Outstanding Amount:</span>
-                          <span className="text-xl font-bold text-orange-900">₹{financialBlockingDetails.totalOutstanding.toLocaleString()}</span>
+                          <span className="text-xl font-bold text-orange-900">{formatAmount(financialBlockingDetails.totalOutstanding)}</span>
                         </div>
                       </div>
                     )}
@@ -3786,8 +3787,8 @@ export default function StudentFees() {
                     <div className="bg-slate-50 p-4 rounded-lg">
                       <h4 className="font-semibold mb-2">EMI Plan Details</h4>
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div><span className="text-gray-600">Total Amount:</span> ₹{parseFloat(selectedEmiPlan.totalAmount).toLocaleString()}</div>
-                        <div><span className="text-gray-600">Base Installment:</span> ₹{parseFloat(selectedEmiPlan.installmentAmount).toLocaleString()}</div>
+                        <div><span className="text-gray-600">Total Amount:</span> {formatAmount(parseFloat(selectedEmiPlan.totalAmount))}</div>
+                        <div><span className="text-gray-600">Base Installment:</span> {formatAmount(parseFloat(selectedEmiPlan.installmentAmount))}</div>
                         <div><span className="text-gray-600">Installments:</span> {selectedEmiPlan.numberOfInstallments}</div>
                         <div><span className="text-gray-600">Status:</span> {selectedEmiPlan.status}</div>
                       </div>
@@ -3813,12 +3814,12 @@ export default function StudentFees() {
                                   : 'bg-white text-gray-700 border-gray-300 hover:border-[#643ae5]'
                                 }`}
                             >
-                              #{emi.installmentNumber} — ₹{parseFloat(emi.amount).toLocaleString()}
+                              #{emi.installmentNumber} — {formatAmount(parseFloat(emi.amount))}
                               {parseFloat(emi.carryoverAmount || '0') > 0 && (
-                                <span className="ml-1 text-orange-500">(+₹{parseFloat(emi.carryoverAmount).toLocaleString()} carryover)</span>
+                                <span className="ml-1 text-orange-500">(+{formatAmount(parseFloat(emi.carryoverAmount))} carryover)</span>
                               )}
                               {parseFloat(emi.carryoverAmount || '0') < 0 && (
-                                <span className="ml-1 text-green-500">(-₹{Math.abs(parseFloat(emi.carryoverAmount)).toLocaleString()} adjustment)</span>
+                                <span className="ml-1 text-green-500">(-{formatAmount(Math.abs(parseFloat(emi.carryoverAmount)))} adjustment)</span>
                               )}
                             </button>
                           ))}
@@ -3831,7 +3832,7 @@ export default function StudentFees() {
                       <div>
                         <Label>Scheduled Due Amount</Label>
                         <div className="flex items-center h-10 px-3 rounded-md border bg-gray-50 font-semibold text-gray-700">
-                          ₹{parseFloat(emiPaymentFormData.amount || '0').toLocaleString()}
+                          {formatAmount(parseFloat(emiPaymentFormData.amount || '0'))}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Includes any carryover from previous</p>
                       </div>
@@ -3857,8 +3858,8 @@ export default function StudentFees() {
                           return (
                             <div className={`mt-1 text-xs font-medium px-2 py-1 rounded ${diff < 0 ? 'bg-orange-50 text-orange-700' : 'bg-green-50 text-green-700'}`}>
                               {diff < 0
-                                ? `⚠ ₹${Math.abs(diff).toLocaleString()} shortfall → will carry over to next EMI`
-                                : `✓ ₹${diff.toLocaleString()} excess received`}
+                                ? `⚠ ${formatAmount(Math.abs(diff))} shortfall → will carry over to next EMI`
+                                : `✓ ${formatAmount(diff)} excess received`}
                             </div>
                           );
                         })()}
@@ -3943,7 +3944,7 @@ export default function StudentFees() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-gray-500">Amount</Label>
-                  <div className="font-semibold text-lg">₹{parseFloat(selectedPaymentForDetails.amount).toLocaleString()}</div>
+                  <div className="font-semibold text-lg">{formatAmount(parseFloat(selectedPaymentForDetails.amount))}</div>
                 </div>
                 <div>
                   <Label className="text-gray-500">Payment Date</Label>
@@ -4015,7 +4016,7 @@ export default function StudentFees() {
               {selectedPaymentForDetails.discount && parseFloat(selectedPaymentForDetails.discount) > 0 && (
                 <div>
                   <Label className="text-gray-500">Discount Applied</Label>
-                  <div className="font-medium text-green-600">₹{parseFloat(selectedPaymentForDetails.discount).toLocaleString()}</div>
+                  <div className="font-medium text-green-600">{formatAmount(parseFloat(selectedPaymentForDetails.discount))}</div>
                 </div>
               )}
 
