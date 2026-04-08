@@ -11,6 +11,7 @@ import { Notification } from "@shared/schema";
 import { useAuth } from "@/contexts/AuthContext";
 import OrganizationOnboarding from "@/components/onboarding/organization-onboarding";
 import { apiRequest } from "@/lib/queryClient";
+import { formatAmount } from "@/lib/utils";
 import DashboardPinGuard from "@/components/dashboard/dashboard-pin-guard";
 
 interface DashboardAnalytics {
@@ -167,7 +168,7 @@ export default function Dashboard() {
 
           <KPICard
             title="Total Revenue"
-            value={`₹${analytics.kpis.studentFee.value.toLocaleString()}`}
+            value={formatAmount(analytics.kpis.studentFee.value)}
             change={analytics.kpis.studentFee.change}
             icon={IndianRupee}
             color="green"
@@ -176,17 +177,18 @@ export default function Dashboard() {
           />
 
           <KPICard
-            title="Staff Payroll"
-            value={`₹${analytics.kpis.payroll.value.toLocaleString()}`}
+            title="Staff Payroll (Yearly)"
+            value={formatAmount(analytics.kpis.payroll.value)}
             change={analytics.kpis.payroll.change}
             icon={Banknote}
             color="purple"
             progress={80}
+            tooltip="Total cumulative payroll for the current calendar year."
           />
 
           <KPICard
             title="Total Expenses"
-            value={`₹${analytics.kpis.expenses.value.toLocaleString()}`}
+            value={formatAmount(analytics.kpis.expenses.value)}
             change={analytics.kpis.expenses.change}
             icon={CreditCard}
             color="orange"
@@ -195,7 +197,7 @@ export default function Dashboard() {
 
           <KPICard
             title="Total Receivables"
-            value={`₹${analytics.kpis.totalReceivables.value.toLocaleString()}`}
+            value={formatAmount(analytics.kpis.totalReceivables.value)}
             change={analytics.kpis.totalReceivables.change}
             icon={IndianRupee}
             color="orange"
@@ -205,7 +207,7 @@ export default function Dashboard() {
 
           <KPICard
             title="Fee Collected"
-            value={`₹${analytics.feeAnalytics.totalRevenue.toLocaleString()}`}
+            value={formatAmount(analytics.feeAnalytics.totalRevenue)}
             change={analytics.kpis.avgOrderValue.change}
             icon={Wallet}
             color="purple"
@@ -215,7 +217,7 @@ export default function Dashboard() {
 
           <KPICard
             title="Pending Fees"
-            value={`₹${analytics.feeAnalytics.totalPending.toLocaleString()}`}
+            value={formatAmount(analytics.feeAnalytics.totalPending)}
             change="Outstanding"
             icon={AlertCircle}
             color="red"
@@ -223,12 +225,13 @@ export default function Dashboard() {
           />
 
           <KPICard
-            title="Total Daycare Revenue"
-            value={`₹${analytics.kpis.daycareRevenue.value.toLocaleString()}`}
+            title="Total Daycare Revenue (Till Date)"
+            value={formatAmount(analytics.kpis.daycareRevenue.value)}
             change={analytics.kpis.daycareRevenue.change}
             icon={IndianRupee}
             color="amber"
             progress={50}
+            tooltip="Total cumulative revenue from daycare payments since inception."
           />
         </div>
 

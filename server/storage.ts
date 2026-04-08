@@ -1241,7 +1241,7 @@ export class DatabaseStorage implements IStorage {
     let currentPayroll = 0;
     let prevPayroll = 0;
 
-    const [currPayrollResult, prevPayrollResult] = await Promise.all([
+    const [currPayrollResult, prevPayrollResult, yearlyPayrollResult] = await Promise.all([
       db.select({ total: sql<number>`cast(coalesce(sum(${schema.payroll.netSalary}), 0) as integer)` })
         .from(schema.payroll)
         .where(
@@ -1261,11 +1261,21 @@ export class DatabaseStorage implements IStorage {
             eq(schema.payroll.year, currentMonth === 0 ? currentYear - 1 : currentYear)
           )
         )
+        .leftJoin(schema.staff, eq(schema.payroll.staffId, schema.staff.id)),
+      db.select({ total: sql<number>`cast(coalesce(sum(${schema.payroll.netSalary}), 0) as integer)` })
+        .from(schema.payroll)
+        .where(
+          and(
+            organizationId ? eq(schema.staff.organizationId, organizationId) : sql`1=1`,
+            eq(schema.payroll.year, currentYear)
+          )
+        )
         .leftJoin(schema.staff, eq(schema.payroll.staffId, schema.staff.id))
     ]);
 
     currentPayroll = currPayrollResult[0]?.total || 0;
     prevPayroll = prevPayrollResult[0]?.total || 0;
+    const yearlyPayrollTotal = yearlyPayrollResult[0]?.total || 0;
 
     // Fallback: If no payroll data for this month, sum up active staff salaries as an estimate
     if (currentPayroll === 0) {
@@ -1288,6 +1298,10 @@ export class DatabaseStorage implements IStorage {
     const payrollChange = prevPayroll > 0
       ? (((currentPayroll - prevPayroll) / prevPayroll) * 100).toFixed(1)
       : "0.0";
+
+    // Final Yearly Payroll (if no records in DB yet, fallback to single month estimate * months passed)
+    const currentMonthNum = currentMonth + 1;
+    const finalYearlyPayroll = yearlyPayrollTotal > 0 ? yearlyPayrollTotal : (currentPayroll * currentMonthNum);
 
     // 5. Expenses KPI
     // 5. Expenses KPI
@@ -1959,8 +1973,8 @@ export class DatabaseStorage implements IStorage {
           change: `${staffChange >= "0" ? '+' : ''}${staffChange}%`
         },
         payroll: {
-          value: currentPayroll,
-          change: `${payrollChange >= "0" ? '+' : ''}${payrollChange}%`
+          value: finalYearlyPayroll,
+          change: `Yearly Total`
         },
         expenses: {
           value: totalExpensesAllTime,
@@ -1979,8 +1993,8 @@ export class DatabaseStorage implements IStorage {
           change: `${parseFloat(avgFeeChange) >= 0 ? '+' : ''}${avgFeeChange}%`
         },
         daycareRevenue: {
-          value: monthlyDaycareRevenue,
-          change: `${parseFloat(daycareRevenueChange) >= 0 ? '+' : ''}${daycareRevenueChange}%`
+          value: totalDaycareAllTime,
+          change: `Till Date`
         }
       },
       leadAnalytics: {

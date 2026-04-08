@@ -7,7 +7,7 @@ import { Pencil, Trash2, Plus, Wallet, TrendingUp, TrendingDown, ArrowDownCircle
 import Header from "@/components/layout/header";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequest, invalidateNotifications } from "@/lib/utils";
+import { apiRequest, invalidateNotifications, formatAmount } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -328,7 +328,7 @@ export default function Expenses() {
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-gray-500">Total Inward</p>
-                  <h3 className="text-3xl font-bold text-gray-900 tracking-tight">₹{totalInward.toLocaleString()}</h3>
+                  <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{formatAmount(totalInward)}</h3>
                 </div>
                 <div className="p-2 bg-emerald-50/80 rounded-full">
                   <ArrowDownCircle className="h-5 w-5 text-emerald-600" />
@@ -347,7 +347,7 @@ export default function Expenses() {
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-gray-500">Total Outward</p>
-                  <h3 className="text-3xl font-bold text-gray-900 tracking-tight">₹{totalOutward.toLocaleString()}</h3>
+                  <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{formatAmount(totalOutward)}</h3>
                 </div>
                 <div className="p-2 bg-red-50/80 rounded-full">
                   <ArrowUpCircle className="h-5 w-5 text-red-500" />
@@ -368,7 +368,7 @@ export default function Expenses() {
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-gray-500">Effective Budget</p>
-                  <h3 className="text-3xl font-bold text-gray-900 tracking-tight">₹{effectiveBudget.toLocaleString()}</h3>
+                  <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{formatAmount(effectiveBudget)}</h3>
                 </div>
                 <div className="p-2 bg-purple-50/80 rounded-full">
                   <PieChartIcon className="h-5 w-5 text-purple-600" />
@@ -376,10 +376,10 @@ export default function Expenses() {
               </div>
               <div className="mt-6 flex flex-col gap-3">
                 <div className="flex items-center text-xs font-medium justify-between">
-                  <span className="text-gray-500">Base: ₹{monthlyBudget.toLocaleString()}</span>
+                  <span className="text-gray-500">Base: {formatAmount(monthlyBudget)}</span>
                   <div className="flex gap-2">
-                    {budgetDeductions > 0 && <span className="text-red-500">-₹{budgetDeductions.toLocaleString()}</span>}
-                    {additionalBudgetFromInwards > 0 && <span className="text-purple-500">+₹{additionalBudgetFromInwards.toLocaleString()}</span>}
+                    {budgetDeductions > 0 && <span className="text-red-500">-{formatAmount(budgetDeductions)}</span>}
+                    {additionalBudgetFromInwards > 0 && <span className="text-purple-500">+{formatAmount(additionalBudgetFromInwards)}</span>}
                   </div>
                 </div>
                 <Button
@@ -504,7 +504,7 @@ export default function Expenses() {
                             </Badge>
                           </td>
                           <td className={`px-6 py-4 font-semibold ${isInward ? 'text-emerald-700' : isTransfer ? 'text-blue-600' : 'text-red-600'}`}>
-                            {isInward ? '+' : isTransfer ? '↔' : '-'}₹{Number(exp.amount).toLocaleString()}
+                            {isInward ? '+' : isTransfer ? '↔' : '-'}{formatAmount(Number(exp.amount))}
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="flex justify-end gap-2">

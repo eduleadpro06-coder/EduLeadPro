@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQueryState } from "@/hooks/use-query-state";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/utils";
+import { apiRequest, formatAmount } from "@/lib/utils";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -242,7 +242,7 @@ export default function Inventory() {
                                         <div>
                                             <p className="text-caption font-medium text-gray-500">Stock Value</p>
                                             <h3 className="text-h3 mt-2">
-                                                ₹{statsLoading ? "..." : Number(stats?.totalValue || 0).toLocaleString()}
+                                                {statsLoading ? "..." : formatAmount(Number(stats?.totalValue || 0))}
                                             </h3>
                                         </div>
                                         <div className="p-2 bg-emerald-50 rounded-lg">
@@ -423,7 +423,7 @@ export default function Inventory() {
                                                                 </div>
                                                             </td>
                                                             <td className="px-6 py-4 text-gray-900">
-                                                                {item.costPrice ? `₹${Number(item.costPrice).toLocaleString()}` : '-'}
+                                                                {item.costPrice ? formatAmount(Number(item.costPrice)) : '-'}
                                                             </td>
                                                             <td className="px-6 py-4">
                                                                 {item.isActive ? (
