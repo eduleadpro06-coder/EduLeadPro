@@ -236,7 +236,10 @@ function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, stat
   // Calculate paid count simply by counting schedule items with status = paid
   const paidCount = schedule?.filter((item: any) => item.status === 'paid').length || 0;
   const progress = (paidCount / totalInstallments) * 100;
-  const instAmount = parseFloat(installmentAmount || "0");
+  
+  // Find the next pending installment to show the dynamic amount
+  const nextPending = schedule?.find((item: any) => item.status !== 'paid');
+  const currentAmount = nextPending ? parseFloat(nextPending.amount) : parseFloat(installmentAmount || "0");
 
   useEffect(() => {
     // Check if fully paid
@@ -254,7 +257,7 @@ function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, stat
   return (
     <div className="space-y-1">
       <div className="text-sm">
-        <span className="text-gray-500">EMI Amount:</span> {formatAmount(Math.round(instAmount))}
+        <span className="text-gray-500">EMI Amount:</span> {formatAmount(Math.round(currentAmount))}
       </div>
       <div className="text-sm">
         <span className="text-gray-500">Progress:</span> {paidCount}/{totalInstallments} installments
@@ -3788,8 +3791,8 @@ export default function StudentFees() {
                       <h4 className="font-semibold mb-2">EMI Plan Details</h4>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div><span className="text-gray-600">Total Amount:</span> {formatAmount(parseFloat(selectedEmiPlan.totalAmount))}</div>
-                        <div><span className="text-gray-600">Base Installment:</span> {formatAmount(parseFloat(selectedEmiPlan.installmentAmount))}</div>
-                        <div><span className="text-gray-600">Installments:</span> {selectedEmiPlan.numberOfInstallments}</div>
+                        <div><span className="text-gray-600">Base EMI:</span> {formatAmount(parseFloat(selectedEmiPlan.installmentAmount))}</div>
+                        <div><span className="text-gray-600">Next Due:</span> <span className="font-bold text-[#643ae5]">{emiPaymentFormData.amount ? formatAmount(parseFloat(emiPaymentFormData.amount.toString())) : 'N/A'}</span></div>
                         <div><span className="text-gray-600">Status:</span> {selectedEmiPlan.status}</div>
                       </div>
                     </div>
