@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NotificationManager } from "@/lib/notificationManager";
+import { useOrganization } from "@/hooks/use-organization";
+import { useEffect } from "react";
 
 const outwardCategories = [
   "Salaries",
@@ -72,19 +74,33 @@ export default function Expenses() {
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth().toString());
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString());
 
-  // Monthly Budget State (persisted in localStorage)
-  const [monthlyBudget, setMonthlyBudget] = useState(() => {
-    const saved = localStorage.getItem("monthlyBudget");
-    return saved ? parseInt(saved) : 100000;
-  });
+  const { settings: orgSettings, updateSettings, isLoading: isOrgLoading } = useOrganization();
+
+  // Monthly Budget State (persisted in organization settings)
+  const [monthlyBudget, setMonthlyBudget] = useState(0);
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
-  const [newBudget, setNewBudget] = useState(monthlyBudget.toString());
+  const [newBudget, setNewBudget] = useState("0");
+
+  // Sync state with organization settings when loaded
+  useEffect(() => {
+    if (orgSettings?.baseBudget !== undefined) {
+      const budget = Number(orgSettings.baseBudget);
+      setMonthlyBudget(budget);
+      setNewBudget(budget.toString());
+    }
+  }, [orgSettings]);
 
   const handleBudgetUpdate = () => {
     const budget = parseInt(newBudget);
     if (isNaN(budget) || budget < 0) return;
+    
+    // Update server settings
+    updateSettings({
+      ...orgSettings,
+      baseBudget: budget
+    });
+    
     setMonthlyBudget(budget);
-    localStorage.setItem("monthlyBudget", budget.toString());
     setIsBudgetDialogOpen(false);
   };
 
