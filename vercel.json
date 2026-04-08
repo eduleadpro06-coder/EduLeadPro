@@ -14,6 +14,14 @@
       "dest": "/api/cron/backup.ts"
     },
     {
+      "src": "/api/cron/backup-payments",
+      "dest": "/api/cron/backup-payments.ts"
+    },
+    {
+      "src": "/api/cron/cleanup-storage",
+      "dest": "/api/cron/cleanup-storage.ts"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/index.ts"
     },
@@ -41,6 +49,14 @@
     {
       "path": "/api/cron/backup",
       "schedule": "0 2 */2 * *"
+    },
+    {
+      "path": "/api/cron/backup-payments",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-storage",
+      "schedule": "0 3 * * *"
     }
   ],
   "functions": {
@@ -54,6 +70,12 @@
       "maxDuration": 30
     },
     "api/cron/backup.ts": {
+      "maxDuration": 60
+    },
+    "api/cron/backup-payments.ts": {
+      "maxDuration": 60
+    },
+    "api/cron/cleanup-storage.ts": {
       "maxDuration": 60
     }
   }

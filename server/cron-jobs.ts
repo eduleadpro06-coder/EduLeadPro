@@ -90,5 +90,130 @@ export function initializeCronJobs() {
         timezone: "Asia/Kolkata"
     });
 
-    logger.info('[CRON] Cron jobs initialized - Daily checks scheduled (Daycare & Payments: 9:00 AM IST)');
+    // 3. Automated Payment Backup Cron
+    // Run daily at 2:00 AM IST to backup all financial records
+    cron.schedule('0 2 * * *', async () => {
+        try {
+            logger.info('[CRON] Starting automated payment backup...');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const backupData: Record<string, any> = {};
+
+            const paymentRelatedTables = [
+                'organizations',
+                'leads',
+                'students',
+                'feeStructure',
+                'globalClassFees',
+                'feePayments',
+                'eMandates',
+                'emiSchedule',
+                'emiPlans',
+                'expenses',
+                'payroll',
+                'daycarePayments',
+                'daycareEnrollments',
+                'daycareBillingConfig',
+                'inventoryItems',
+                'inventoryTransactions',
+                'sellOrders',
+                'sellOrderItems'
+            ];
+
+            let tableCount = 0;
+            for (const tableName of paymentRelatedTables) {
+                const table = (schema as any)[tableName];
+                if (table) {
+                    try {
+                        const records = await db.select().from(table);
+                        backupData[tableName] = records;
+                        tableCount++;
+                    } catch (err) {
+                        logger.error(`[CRON] Failed to dump ${tableName}:`, err);
+                    }
+                }
+            }
+
+            const buffer = Buffer.from(JSON.stringify(backupData, null, 2), 'utf-8');
+            const fileName = `payments/backup_payments_${timestamp}.json`;
+
+            // Import supabase dynamically to avoid top-level dependency if not initialized
+            const { supabase } = await import('./supabase.js');
+
+            const { data, error } = await supabase.storage
+                .from('backups')
+                .upload(fileName, buffer, {
+                    contentType: 'application/json',
+                    upsert: false
+                });
+
+            if (error) {
+                logger.error('[CRON] Payment backup upload failed:', error);
+            } else {
+                logger.info(`[CRON] Payment backup successful: ${data.path} (${tableCount} tables)`);
+            }
+
+        } catch (error) {
+            logger.error('[CRON] Error in payment backup cron:', error);
+        }
+    }, {
+        timezone: "Asia/Kolkata"
+    });
+
+    // 4. Automated Storage & Data Cleanup Cron
+    // Run daily at 3:00 AM IST to prune files/data older than 30 days
+    cron.schedule('0 3 * * *', async () => {
+        try {
+            logger.info('[CRON] Starting automated storage cleanup...');
+            const retentionDays = 30;
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+
+            // Import supabase dynamically
+            const { supabase } = await import('./supabase.js');
+
+            // 1. Storage Cleanup Helper
+            const cleanupBucket = async (bucket: string, folder: string = '') => {
+                const { data: files } = await supabase.storage.from(bucket).list(folder, { limit: 1000 });
+                if (!files || files.length === 0) return 0;
+
+                const toDelete = files.filter(f => f.created_at && new Date(f.created_at) < cutoffDate);
+                if (toDelete.length === 0) return 0;
+
+                const paths = toDelete.map(f => folder ? `${folder}/${f.name}` : f.name);
+                const { error } = await supabase.storage.from(bucket).remove(paths);
+                
+                if (error) logger.error(`[CRON] Error cleaning ${bucket}/${folder}:`, error);
+                return paths.length;
+            };
+
+            // Cleanup storage
+            const backupsDeleted = await cleanupBucket('backups');
+            const paymentBackupsDeleted = await cleanupBucket('backups', 'payments');
+            
+            // Cleanup updates (per org)
+            let updatesDeleted = 0;
+            const { data: orgFolders } = await supabase.storage.from('uploads').list('', { limit: 100 });
+            if (orgFolders) {
+                for (const org of orgFolders) {
+                    if (org.id === null) updatesDeleted += await cleanupBucket('uploads', `updates/${org.name}`);
+                }
+            }
+
+            const gateLogsMediaDeleted = await cleanupBucket('media', 'public/gate_logs');
+            const visitorsMediaDeleted = await cleanupBucket('media', 'public/visitors');
+
+            // 2. Database Cleanup
+            const delNotifications = await db.delete(schema.notifications).where(lt(schema.notifications.createdAt, cutoffDate)).returning();
+            const delUpdates = await db.delete(schema.dailyUpdates).where(lt(schema.dailyUpdates.postedAt, cutoffDate)).returning();
+
+            logger.info(`[CRON] Cleanup successful: ${backupsDeleted + paymentBackupsDeleted} backups, ${updatesDeleted} updates, ${gateLogsMediaDeleted + visitorsMediaDeleted} media, ${delNotifications.length} notifications, ${delUpdates.length} updates removed.`);
+
+        } catch (error) {
+            logger.error('[CRON] Error in cleanup cron:', error);
+        }
+    }, {
+        timezone: "Asia/Kolkata"
+    });
+
+    logger.info('[CRON] Cron jobs initialized - Daily checks scheduled (Daycare & Payments: 9:00 AM IST, Backup: 2:00 AM IST, Cleanup: 3:00 AM IST)');
 }
