@@ -260,6 +260,21 @@ router.post('/attendance/bulk', async (req: Request, res: Response) => {
             });
         }
 
+        // Validation: Prevent weekends (Saturday = 6, Sunday = 0)
+        const dateParts = attendanceDate.split('-').map(Number);
+        const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+        const dayOfWeek = dateObj.getDay();
+
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'WEEKEND_RESTRICTION',
+                    message: 'Student attendance cannot be marked on Saturdays or Sundays'
+                }
+            });
+        }
+
         const { supabase } = await import('../../supabase.js');
 
         // Process each attendance record

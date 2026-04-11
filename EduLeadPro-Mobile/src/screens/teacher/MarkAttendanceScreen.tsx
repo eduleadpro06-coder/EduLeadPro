@@ -80,6 +80,17 @@ export default function MarkAttendanceScreen() {
     const handleSave = async () => {
         if (!user?.organizationId || !user?.name) return;
 
+        // Weekend check
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            Alert.alert(
+                'Weekend Restriction',
+                'Student attendance cannot be marked on Saturdays or Sundays.'
+            );
+            return;
+        }
+
         try {
             setSaving(true);
 
@@ -138,6 +149,15 @@ export default function MarkAttendanceScreen() {
                 <Text style={styles.headerTitle}>Mark Attendance</Text>
                 <View style={{ width: 60 }} />
             </View>
+
+            {/* Weekend Warning Banner */}
+            {(new Date().getDay() === 0 || new Date().getDay() === 6) && (
+                <View style={styles.weekendBanner}>
+                    <Text style={styles.weekendBannerText}>
+                        Today is a weekend. Attendance marking is disabled.
+                    </Text>
+                </View>
+            )}
 
             {/* Progress */}
             <View style={styles.progressBar}>
@@ -356,5 +376,18 @@ const styles = StyleSheet.create({
         color: colors.white,
         fontSize: typography.fontSize.lg,
         fontWeight: typography.fontWeight.semibold,
+    },
+    weekendBanner: {
+        backgroundColor: '#fee2e2',
+        padding: spacing.md,
+        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#fecaca',
+    },
+    weekendBannerText: {
+        color: '#b91c1c',
+        fontSize: typography.fontSize.sm,
+        fontWeight: typography.fontWeight.medium,
+        textAlign: 'center',
     },
 });
