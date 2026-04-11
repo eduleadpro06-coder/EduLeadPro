@@ -354,10 +354,10 @@ class APIService {
         return data.students || [];
     }
 
-    async markAttendanceBulk(attendanceRecords: Array<{ leadId: number; status: string; checkInTime?: string }>): Promise<any> {
+    async markAttendanceBulk(attendanceRecords: Array<{ leadId: number; status: string; checkInTime?: string }>, date?: string): Promise<any> {
         return await this.fetchWithAuth('/teacher/attendance/bulk', {
             method: 'POST',
-            body: JSON.stringify({ attendanceRecords })
+            body: JSON.stringify({ attendanceRecords, date })
         });
     }
 
@@ -388,8 +388,9 @@ class APIService {
         return data.url;
     }
 
-    async getTodayAttendanceAll(): Promise<any> {
-        return await this.fetchWithAuth('/teacher/attendance/today');
+    async getTodayAttendanceAll(date?: string): Promise<any> {
+        const endpoint = date ? `/teacher/attendance/today?date=${encodeURIComponent(date)}` : '/teacher/attendance/today';
+        return await this.fetchWithAuth(endpoint);
     }
 
     async getStudentAttendanceHistory(studentId: number, days: number = 30): Promise<any[]> {

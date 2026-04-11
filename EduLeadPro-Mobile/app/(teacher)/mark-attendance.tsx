@@ -94,6 +94,16 @@ export default function MarkAttendanceScreen() {
             return;
         }
 
+        // Weekend check based on selectedDate
+        const dayOfWeek = selectedDate.getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            Alert.alert(
+                'Weekend Restriction',
+                'Student attendance cannot be marked on Saturdays or Sundays.'
+            );
+            return;
+        }
+
         setSavingAttendance(true);
         try {
             const records = Array.from(attendanceRecords.entries()).map(([studentId, status]) => ({
@@ -143,6 +153,16 @@ export default function MarkAttendanceScreen() {
                     <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
                 ) : (
                     <>
+                        {/* Weekend Warning Banner */}
+                        {(selectedDate.getDay() === 0 || selectedDate.getDay() === 6) && (
+                            <View style={styles.weekendBanner}>
+                                <Feather name="alert-circle" size={18} color="#b91c1c" style={{ marginRight: 8 }} />
+                                <Text style={styles.weekendBannerText}>
+                                    Attendance cannot be marked for weekends.
+                                </Text>
+                            </View>
+                        )}
+
                         <TouchableOpacity 
                             style={styles.dateSelector} 
                             onPress={() => setShowDatePicker(true)}
@@ -399,5 +419,21 @@ const styles = StyleSheet.create({
     },
     saveBtn: {
         ...shadows.md,
-    }
+    },
+    weekendBanner: {
+        backgroundColor: '#fee2e2',
+        padding: 12,
+        borderRadius: 12,
+        marginBottom: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#fecaca',
+    },
+    weekendBannerText: {
+        color: '#b91c1c',
+        fontSize: 13,
+        fontFamily: 'Lexend_Medium',
+        flex: 1,
+    },
 });
