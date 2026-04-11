@@ -110,19 +110,28 @@ export interface IStorage {
       leadManagement: { value: number; change: string };
       studentFee: { value: number; change: string };
       staffManagement: { value: number; change: string };
+      payroll: { value: number; change: string };
       expenses: { value: number; change: string };
+      totalReceivables: { value: number; change: string };
+      avgOrderValue: { value: number; change: string };
+      conversionRate: { value: number; change: string };
+      daycareRevenue: { value: number; change: string };
     };
     leadAnalytics: {
       sourceDistribution: Array<{ label: string; value: number }>;
       monthlyTrends: Array<{ month: string; leads: number; conversions: number }>;
       conversionRate: number;
       bestPerformingSource: string;
+      engagementCurve: Array<{ date: string; impressions: number; conversions: number }>;
+      funnelData: Array<{ month: string; captured: number; engaged: number; qualified: number; readyForAdmission: number; converted: number }>;
+      statusTotals: { new: number; contacted: number; interested: number; readyForAdmission: number; enrolled: number; dropped: number };
     };
     feeAnalytics: {
       paidVsPending: Array<{ label: string; value: number }>;
       monthlyCollection: Array<{ month: string; collected: number; pending: number }>;
       collectionRate: number;
       totalRevenue: number;
+      totalPending: number;
     };
     staffAnalytics: {
       departmentDistribution: Array<{ label: string; value: number }>;
@@ -134,6 +143,8 @@ export interface IStorage {
       totalExpenses: number;
       monthlyTrend: Array<{ month: string; amount: number }>;
     };
+    recentLeads: Array<Lead>;
+    recentActivity: Array<any>;
   }>;
 
   // Staff Management
@@ -1109,7 +1120,7 @@ export class DatabaseStorage implements IStorage {
       bestPerformingSource: string;
       engagementCurve: Array<{ date: string; impressions: number; conversions: number }>; // New Chart Data
       funnelData: Array<{ month: string; captured: number; engaged: number; qualified: number; converted: number }>; // Updated for monthly trend
-      statusTotals: { new: number; contacted: number; interested: number; readyForAdmission: number; enrolled: number }; // All-time status counts
+      statusTotals: { new: number; contacted: number; interested: number; readyForAdmission: number; enrolled: number; dropped: number }; // All-time status counts
     };
     feeAnalytics: {
       paidVsPending: Array<{ label: string; value: number }>;
@@ -1922,7 +1933,8 @@ export class DatabaseStorage implements IStorage {
         contacted: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'contacted') as integer)`,
         interested: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'interested') as integer)`,
         readyForAdmission: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'ready_for_admission') as integer)`,
-        enrolled: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'enrolled') as integer)`
+        enrolled: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'enrolled') as integer)`,
+        dropped: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'dropped') as integer)`
       })
       .from(schema.leads)
       .where(organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`);
@@ -1932,7 +1944,8 @@ export class DatabaseStorage implements IStorage {
       contacted: statusTotalsData[0]?.contacted || 0,
       interested: statusTotalsData[0]?.interested || 0,
       readyForAdmission: statusTotalsData[0]?.readyForAdmission || 0,
-      enrolled: statusTotalsData[0]?.enrolled || 0
+      enrolled: statusTotalsData[0]?.enrolled || 0,
+      dropped: statusTotalsData[0]?.dropped || 0
     };
 
     // 6. RECENT ACTIVITY (Last 10 notifications)

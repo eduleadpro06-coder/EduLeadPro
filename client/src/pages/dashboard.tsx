@@ -33,7 +33,7 @@ interface DashboardAnalytics {
     bestPerformingSource: string;
     engagementCurve: Array<{ date: string; impressions: number; conversions: number }>;
     funnelData: Array<{ month: string; captured: number; engaged: number; qualified: number; readyForAdmission: number; converted: number }>;
-    statusTotals: { new: number; contacted: number; interested: number; readyForAdmission: number; enrolled: number };
+    statusTotals: { new: number; contacted: number; interested: number; readyForAdmission: number; enrolled: number; dropped: number };
   };
   feeAnalytics: {
     paidVsPending: Array<{ label: string; value: number }>;
@@ -254,9 +254,11 @@ export default function Dashboard() {
                       data={(() => {
                         const funnelData = [
                           { label: 'New', value: analytics.leadAnalytics.statusTotals?.new || 0, color: '#3b82f6' },
+                          { label: 'Contacted', value: analytics.leadAnalytics.statusTotals?.contacted || 0, color: '#6366f1' },
                           { label: 'Interested', value: analytics.leadAnalytics.statusTotals?.interested || 0, color: '#f59e0b' },
                           { label: 'Ready for Admission', value: analytics.leadAnalytics.statusTotals?.readyForAdmission || 0, color: '#14b8a6' },
-                          { label: 'Enrolled', value: analytics.leadAnalytics.statusTotals?.enrolled || 0, color: '#10b981' }
+                          { label: 'Enrolled', value: analytics.leadAnalytics.statusTotals?.enrolled || 0, color: '#10b981' },
+                          { label: 'Dropped', value: analytics.leadAnalytics.statusTotals?.dropped || 0, color: '#ef4444' }
                         ];
                         return funnelData.filter(item => item.value > 0);
                       })()}
@@ -265,9 +267,11 @@ export default function Dashboard() {
                       {(() => {
                         const funnelData = [
                           { label: 'New', value: analytics.leadAnalytics.statusTotals?.new || 0, color: '#3b82f6' },
+                          { label: 'Contacted', value: analytics.leadAnalytics.statusTotals?.contacted || 0, color: '#6366f1' },
                           { label: 'Interested', value: analytics.leadAnalytics.statusTotals?.interested || 0, color: '#f59e0b' },
                           { label: 'Ready for Admission', value: analytics.leadAnalytics.statusTotals?.readyForAdmission || 0, color: '#14b8a6' },
-                          { label: 'Enrolled', value: analytics.leadAnalytics.statusTotals?.enrolled || 0, color: '#10b981' }
+                          { label: 'Enrolled', value: analytics.leadAnalytics.statusTotals?.enrolled || 0, color: '#10b981' },
+                          { label: 'Dropped', value: analytics.leadAnalytics.statusTotals?.dropped || 0, color: '#ef4444' }
                         ];
                         return funnelData.filter(item => item.value > 0).map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
@@ -283,6 +287,10 @@ export default function Dashboard() {
                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">New</p>
                   <p className="text-sm font-bold text-blue-600">{analytics.leadAnalytics.statusTotals?.new || 0}</p>
                 </div>
+                <div className="text-center py-1.5 bg-indigo-50/50 rounded-lg">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Contacted</p>
+                  <p className="text-sm font-bold text-indigo-600">{analytics.leadAnalytics.statusTotals?.contacted || 0}</p>
+                </div>
                 <div className="text-center py-1.5 bg-amber-50/50 rounded-lg">
                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Interested</p>
                   <p className="text-sm font-bold text-amber-600">{analytics.leadAnalytics.statusTotals?.interested || 0}</p>
@@ -294,6 +302,10 @@ export default function Dashboard() {
                 <div className="text-center py-1.5 bg-green-50/50 rounded-lg">
                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Enrolled</p>
                   <p className="text-sm font-bold text-green-600">{analytics.leadAnalytics.statusTotals?.enrolled || 0}</p>
+                </div>
+                <div className="text-center py-1.5 bg-red-50/50 rounded-lg">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Dropped</p>
+                  <p className="text-sm font-bold text-red-600">{analytics.leadAnalytics.statusTotals?.dropped || 0}</p>
                 </div>
               </div>
             </CardContent>
