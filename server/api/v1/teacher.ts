@@ -229,7 +229,7 @@ router.get('/students', async (req: Request, res: Response) => {
  */
 router.post('/attendance/bulk', async (req: Request, res: Response) => {
     try {
-        const { attendanceRecords } = req.body;
+        const { attendanceRecords, date: providedDate } = req.body;
         // attendanceRecords: [{ leadId, status, checkInTime? }]
 
         if (!Array.isArray(attendanceRecords) || attendanceRecords.length === 0) {
@@ -244,7 +244,21 @@ router.post('/attendance/bulk', async (req: Request, res: Response) => {
 
         const organizationId = req.user!.organizationId;
         const markedBy = req.user!.username;
+        
+        // Use provided date or default to today (IST)
         const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        const attendanceDate = providedDate || today;
+
+        // Validation: Prevent future dates
+        if (attendanceDate > today) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'INVALID_DATE',
+                    message: 'Cannot mark attendance for future dates'
+                }
+            });
+        }
 
         const { supabase } = await import('../../supabase.js');
 
@@ -258,7 +272,7 @@ router.post('/attendance/bulk', async (req: Request, res: Response) => {
                 .from('student_attendance')
                 .select('id')
                 .eq('lead_id', leadId)
-                .eq('date', today)
+                .eq('date', attendanceDate)
                 .single();
 
             if (existing) {
@@ -285,7 +299,7 @@ router.post('/attendance/bulk', async (req: Request, res: Response) => {
                     .insert({
                         organization_id: organizationId,
                         lead_id: leadId,
-                        date: today,
+                        date: attendanceDate,
                         status,
                         check_in_time: checkInTime || null,
                         marked_by: markedBy,
@@ -496,7 +510,8 @@ router.get('/daily-updates', async (req: Request, res: Response) => {
 router.get('/attendance/today', async (req: Request, res: Response) => {
     try {
         const organizationId = req.user!.organizationId;
-        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        const date = (req.query.date as string) || todayStr;
 
         const { supabase } = await import('../../supabase.js');
 
@@ -513,7 +528,7 @@ router.get('/attendance/today', async (req: Request, res: Response) => {
             .from('student_attendance')
             .select('lead_id, status, check_in_time')
             .eq('organization_id', organizationId)
-            .eq('date', today);
+            .eq('date', date);
 
         // Map attendance to students
         const attendanceMap = new Map(
@@ -528,7 +543,7 @@ router.get('/attendance/today', async (req: Request, res: Response) => {
         res.json({
             success: true,
             data: {
-                date: today,
+                date: date,
                 students: studentsWithAttendance
             }
         });

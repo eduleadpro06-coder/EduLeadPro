@@ -9,8 +9,10 @@ import {
     RefreshControl,
     Platform,
     Alert,
-    SafeAreaView
+    SafeAreaView,
+    Modal
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,18 +29,21 @@ export default function MarkAttendanceScreen() {
     const [students, setStudents] = useState<any[]>([]);
     const [attendanceRecords, setAttendanceRecords] = useState<Map<number, 'present' | 'absent' | 'late'>>(new Map());
     const [savingAttendance, setSavingAttendance] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [showDatePicker, setShowDatePicker] = useState(false);
 
-    const loadStudents = async () => {
+    const loadStudents = async (dateOverride?: Date) => {
+        const dateToUse = dateOverride || selectedDate;
         setLoading(true);
         try {
             const data = await api.getTeacherStudents('');
             setStudents(data);
 
-            const todayData = await api.getTodayAttendanceAll();
+            const formattedDate = dateToUse.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+            const todayData = await api.getTodayAttendanceAll(formattedDate);
             const attMap = new Map();
 
-            const clientToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-            if (todayData?.date === clientToday) {
+            if (todayData?.date === formattedDate) {
                 todayData?.students?.forEach((s: any) => {
                     if (s.attendance?.status) {
                         attMap.set(s.id, s.attendance.status);
@@ -52,6 +57,14 @@ export default function MarkAttendanceScreen() {
         } finally {
             setLoading(false);
             setRefreshing(false);
+        }
+    };
+
+    const handleDateChange = (event: any, date?: Date) => {
+        setShowDatePicker(false);
+        if (date) {
+            setSelectedDate(date);
+            loadStudents(date);
         }
     };
 
@@ -88,7 +101,8 @@ export default function MarkAttendanceScreen() {
                 status
             }));
 
-            await api.markAttendanceBulk(records);
+            const formattedDate = selectedDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+            await api.markAttendanceBulk(records, formattedDate);
             Alert.alert('Success', 'Attendance marked successfully');
             router.back();
         } catch (error: any) {
@@ -129,9 +143,40 @@ export default function MarkAttendanceScreen() {
                     <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
                 ) : (
                     <>
+                        <TouchableOpacity 
+                            style={styles.dateSelector} 
+                            onPress={() => setShowDatePicker(true)}
+                        >
+                            <View style={styles.dateSelectorContent}>
+                                <View style={styles.dateIconBox}>
+                                    <Feather name="calendar" size={20} color={colors.primary} />
+                                </View>
+                                <View>
+                                    <Text style={styles.dateSelectorLabel}>Attendance Date</Text>
+                                    <Text style={styles.dateSelectorValue}>
+                                        {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </Text>
+                                </View>
+                            </View>
+                            <Feather name="chevron-down" size={20} color={colors.textSecondary} />
+                        </TouchableOpacity>
+
+                        {showDatePicker && (
+                            <DateTimePicker
+                                value={selectedDate}
+                                mode="date"
+                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                onChange={handleDateChange}
+                                maximumDate={new Date()}
+                            />
+                        )}
+
                         <View style={styles.infoRow}>
-                            <Text style={styles.dateLabel}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</Text>
-                            <Text style={styles.countLabel}>{students.length} Students</Text>
+                            <Text style={styles.countLabel}>{students.length} Students Total</Text>
+                            <View style={styles.statusSummary}>
+                                <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
+                                <Text style={styles.statusSummaryText}>{attendanceRecords.size} Marked</Text>
+                            </View>
                         </View>
 
                         {students.map(student => {
@@ -247,7 +292,57 @@ const styles = StyleSheet.create({
     countLabel: {
         fontSize: 14,
         fontFamily: 'Lexend_Bold',
-        color: colors.primary,
+        color: colors.textSecondary,
+    },
+    dateSelector: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        ...shadows.sm,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.05)',
+    },
+    dateSelectorContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    dateIconBox: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: colors.primary + '10',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    dateSelectorLabel: {
+        fontSize: 12,
+        fontFamily: 'Lexend_Regular',
+        color: colors.textSecondary,
+    },
+    dateSelectorValue: {
+        fontSize: 15,
+        fontFamily: 'Outfit_Bold',
+        color: colors.textPrimary,
+    },
+    statusSummary: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    statusDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginRight: 6,
+    },
+    statusSummaryText: {
+        fontSize: 13,
+        fontFamily: 'Lexend_Medium',
+        color: colors.success,
     },
     attendanceCard: {
         marginBottom: 12,

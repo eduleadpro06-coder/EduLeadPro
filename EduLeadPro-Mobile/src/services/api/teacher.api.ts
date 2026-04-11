@@ -74,8 +74,11 @@ export const teacherAPI = {
     /**
      * Mark student attendance in bulk
      */
-    async markAttendanceBulk(attendanceRecords: any[]): Promise<any> {
-        const response = await apiClient.post('/teacher/attendance/bulk', { attendanceRecords });
+    async markAttendanceBulk(attendanceRecords: any[], date?: string): Promise<any> {
+        const response = await apiClient.post('/teacher/attendance/bulk', { 
+            attendanceRecords,
+            date 
+        });
         return response.data;
     },
 
@@ -178,10 +181,11 @@ export const teacherAPI = {
     },
 
     /**
-     * Get today's attendance for all students
+     * Get attendance for all students by date
      */
-    async getTodayAttendanceAll(): Promise<any> {
-        const response = await apiClient.get('/teacher/attendance/today');
+    async getTodayAttendanceAll(date?: string): Promise<any> {
+        const url = date ? `/teacher/attendance/today?date=${date}` : '/teacher/attendance/today';
+        const response = await apiClient.get(url);
         return response.data;
     },
 
