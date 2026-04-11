@@ -11,7 +11,6 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import * as Updates from 'expo-updates';
 import * as SplashScreen from 'expo-splash-screen';
-import SpInAppUpdates, { IAUUpdateKind } from 'sp-react-native-in-app-updates';
 import { 
     useFonts, 
     Outfit_700Bold, 
@@ -97,16 +96,19 @@ function RootLayoutNav() {
                 // We only do this if it's NOT a development environment (__DEV__)
                 if (!__DEV__) {
                     console.log('🔄 [UpdateCheck] Checking Native Store updates...');
-                    const inAppUpdates = new SpInAppUpdates(false); // false means debug mode disabled
-                    inAppUpdates.checkNeedsUpdate().then((result) => {
-                        console.log('🔄 [UpdateCheck] Native check result:', JSON.stringify(result, null, 2));
-                        if (result.shouldUpdate) {
-                            console.log('🔄 [UpdateCheck] Native update FOUND! Prompting user...');
-                            inAppUpdates.startUpdate({
-                                updateType: IAUUpdateKind.FLEXIBLE,
-                            });
-                        }
-                    }).catch((err) => console.error('🔄 [UpdateCheck] Native check FAILED:', err));
+                    // Native store updates are temporarily disabled to fix an EAS export error
+                    // try {
+                    //     const SpInAppUpdates = require('sp-react-native-in-app-updates').default;
+                    //     const { IAUUpdateKind } = require('sp-react-native-in-app-updates');
+                    //     const inAppUpdates = new SpInAppUpdates(false);
+                    //     inAppUpdates.checkNeedsUpdate().then((result: any) => {
+                    //         if (result.shouldUpdate) {
+                    //             inAppUpdates.startUpdate({ updateType: IAUUpdateKind.FLEXIBLE });
+                    //         }
+                    //     }).catch((err: any) => console.error('Native check FAILED:', err));
+                    // } catch (e) {
+                    //     console.error('Dynamic import failed:', e);
+                    // }
                 } else {
                     console.log('🔄 [UpdateCheck] Skipping Native check (DevMode)');
                 }

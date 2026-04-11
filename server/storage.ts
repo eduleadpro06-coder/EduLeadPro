@@ -1361,12 +1361,12 @@ export class DatabaseStorage implements IStorage {
     // --- Lead Analytics (Same as before) ---
     const sourceData = await db
       .select({
-        source: schema.leads.source,
+        source: sql<string>`initcap(lower(${schema.leads.source}))`,
         count: sql<number>`cast(count(*) as integer)`
       })
       .from(schema.leads)
       .where(organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`)
-      .groupBy(schema.leads.source);
+      .groupBy(sql`initcap(lower(${schema.leads.source}))`);
 
     const sourceDistribution = sourceData.map(s => ({
       label: s.source || 'Unknown',
@@ -1410,17 +1410,13 @@ export class DatabaseStorage implements IStorage {
 
     const bestSource = await db
       .select({
-        source: schema.leads.source,
-        conversionRate: sql<number>`cast(
-          (count(*) filter (where ${schema.leads.status} = 'enrolled')::float / 
-           nullif(count(*)::float, 0) * 100) as integer
-        )`
+        source: sql<string>`initcap(lower(${schema.leads.source}))`,
+        enrolledCount: sql<number>`cast(count(*) filter (where ${schema.leads.status} = 'enrolled') as integer)`
       })
       .from(schema.leads)
       .where(organizationId ? eq(schema.leads.organizationId, organizationId) : sql`1=1`)
-      .groupBy(schema.leads.source)
-      .orderBy(sql`(count(*) filter (where ${schema.leads.status} = 'enrolled')::float / 
-                     nullif(count(*)::float, 0) * 100) desc`)
+      .groupBy(sql`initcap(lower(${schema.leads.source}))`)
+      .orderBy(sql`count(*) filter (where ${schema.leads.status} = 'enrolled') desc`)
       .limit(1);
 
     const bestPerformingSource = bestSource[0]?.source || 'N/A';
@@ -1681,12 +1677,11 @@ export class DatabaseStorage implements IStorage {
       .groupBy(sql`to_char(to_date(year || '-' || month || '-01', 'YYYY-MM-DD'), 'Mon')`, sql`year || '-' || lpad(month::text, 2, '0')`)
       .orderBy(sql`year || '-' || lpad(month::text, 2, '0')`);
 
-    // Merge General Expenses + Payroll for "Total Operating Expenses"
+    // Merge General Expenses (Payroll merging removed per user request to align with Ledger)
     const monthlyTrend = expenseTrendData.map(e => {
-      const payroll = payrollTrendData.find(p => p.month === e.month);
       return {
         month: e.month,
-        amount: e.amount + (payroll ? payroll.amount : 0)
+        amount: e.amount
       };
     });
 
@@ -1990,7 +1985,7 @@ export class DatabaseStorage implements IStorage {
           change: `Yearly Total`
         },
         expenses: {
-          value: totalExpensesAllTime,
+          value: monthlyExpenses,
           change: `${parseFloat(expenseChange) >= 0 ? '+' : ''}${expenseChange}%`
         },
         totalReceivables: {

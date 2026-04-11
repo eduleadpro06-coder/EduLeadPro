@@ -327,7 +327,7 @@ export default function Dashboard() {
                     ...item,
                     label: item.label.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
                   }))}
-                  colors={["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981"]}
+                  colors={["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#f43f5e", "#06b6d4", "#f97316", "#84cc16", "#eab308", "#64748b", "#0ea5e9"]}
                 />
               </div>
               <div className="mt-4 text-center">
@@ -355,7 +355,7 @@ export default function Dashboard() {
                     ...item,
                     label: item.label.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
                   }))}
-                  colors={["#f43f5e", "#f97316", "#eab308", "#84cc16", "#06b6d4"]}
+                  colors={["#f43f5e", "#f97316", "#eab308", "#84cc16", "#06b6d4", "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#0891b2", "#be123c"]}
                 />
               </div>
               <div className="mt-4 text-center">
