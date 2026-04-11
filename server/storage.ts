@@ -5844,6 +5844,14 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async updateAnnouncement(id: number, updates: Partial<InsertPreschoolAnnouncement>): Promise<PreschoolAnnouncement> {
+    const [result] = await db.update(schema.preschoolAnnouncements)
+      .set(updates)
+      .where(eq(schema.preschoolAnnouncements.id, id))
+      .returning();
+    return result;
+  }
+
   async deleteAnnouncement(id: number): Promise<boolean> {
     await db.delete(schema.preschoolAnnouncements).where(eq(schema.preschoolAnnouncements.id, id));
     return true;
@@ -5859,6 +5867,14 @@ export class DatabaseStorage implements IStorage {
   async createEvent(event: InsertPreschoolEvent): Promise<PreschoolEvent> {
     const result = await db.insert(schema.preschoolEvents).values(event).returning();
     return result[0];
+  }
+
+  async updateEvent(id: number, updates: Partial<InsertPreschoolEvent>): Promise<PreschoolEvent> {
+    const [result] = await db.update(schema.preschoolEvents)
+      .set(updates)
+      .where(eq(schema.preschoolEvents.id, id))
+      .returning();
+    return result;
   }
 
   async deleteEvent(id: number): Promise<boolean> {

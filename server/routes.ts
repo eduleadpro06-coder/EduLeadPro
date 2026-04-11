@@ -1428,6 +1428,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/announcements/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const updates = { ...req.body };
+      
+      // Transform dates if present
+      if (updates.expiresAt) updates.expiresAt = new Date(updates.expiresAt);
+      if (updates.publishedAt) updates.publishedAt = new Date(updates.publishedAt);
+      
+      const announcement = await storage.updateAnnouncement(id, updates);
+      res.json(announcement);
+    } catch (error) {
+      console.error("Failed to update announcement:", error);
+      res.status(500).json({ message: "Failed to update announcement" });
+    }
+  });
+
   // Events
   app.get("/api/events", async (req, res) => {
     try {
@@ -1458,6 +1475,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete event" });
+    }
+  });
+
+  app.patch("/api/events/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const event = await storage.updateEvent(id, req.body);
+      res.json(event);
+    } catch (error) {
+      console.error("Failed to update event:", error);
+      res.status(500).json({ message: "Failed to update event" });
     }
   });
 

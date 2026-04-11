@@ -27,6 +27,8 @@ import TaskManagement from "@/components/mobile/task-management";
 import ActivityApproval from "@/components/mobile/activity-approval";
 import GateLogsHistory from "@/components/mobile/gate-logs-history";
 import StopSelectionMap from "@/components/StopSelectionMap";
+import { useOrganization } from "@/hooks/use-organization";
+import { Eye, Pencil } from "lucide-react";
 // import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 // import hooks consolidated above
 // import 'leaflet/dist/leaflet.css';
@@ -179,19 +181,26 @@ function LiveBusTrackingMap() {
 
 
 export default function AppManagement() {
-    const [mainTab, setMainTab] = useQueryState<string>("tab", "users");
-    const [activeTab, setActiveTab] = useQueryState<string>("subtab", "parents");
+    const { settings } = useOrganization();
+    const [mainTab, setMainTab] = useQueryState<string>("tab", "content"); // Default to content as requested
+    const [activeTab, setActiveTab] = useQueryState<string>("subtab", "approvals");
     const [searchTerm, setSearchTerm] = useState("");
     const [classFilter, setClassFilter] = useState("all");
     const [teacherFilter, setTeacherFilter] = useState("all");
     const { toast } = useToast();
 
-    // Form States
+    // Announcements state
+    const [annDialogMode, setAnnDialogMode] = useState<"create" | "view" | "edit">("create");
+    const [selectedAnnouncement, setSelectedAnnouncement] = useState<PreschoolAnnouncement | null>(null);
     const [title, setTitle] = useState("");
     const [content, setContent] = useState("");
     const [priority, setPriority] = useState("normal");
     const [date, setDate] = useState("");
-    const [type, setType] = useState("");
+
+    // Events state
+    const [eventDialogMode, setEventDialogMode] = useState<"create" | "view" | "edit">("create");
+    const [selectedEvent, setSelectedEvent] = useState<PreschoolEvent | null>(null);
+    const [type, setType] = useState("holiday");
     const [studentPhone, setStudentPhone] = useState("");
     const [className, setClassName] = useState("");
     const [dueDate, setDueDate] = useState("");
@@ -391,20 +400,78 @@ export default function AppManagement() {
         },
         enabled: Number(selectedRouteId) > 0
     });
+    // Bus Assignments Query
     const { data: busAssignments = [], isLoading: isLoadingBusAssignments } = useQuery<StudentBusAssignment[]>({
         queryKey: ['/api/bus/assignments', selectedRouteId],
         enabled: !!selectedRouteId || activeTab === "assignments"
     });
 
+    const resetAnnForm = () => {
+        setTitle("");
+        setContent("");
+        setPriority("normal");
+        setDate("");
+        setSelectedAnnouncement(null);
+        setAnnDialogMode("create");
+    };
+
+    const resetEventForm = () => {
+        setTitle("");
+        setContent("");
+        setDate("");
+        setType("holiday");
+        setSelectedEvent(null);
+        setEventDialogMode("create");
+    };
+
+    const openAnnDialog = (mode: "create" | "view" | "edit", ann?: PreschoolAnnouncement) => {
+        setAnnDialogMode(mode);
+        if (ann) {
+            setSelectedAnnouncement(ann);
+            setTitle(ann.title);
+            setContent(ann.content || "");
+            setPriority(ann.priority || "normal");
+            setDate(ann.expiresAt ? new Date(ann.expiresAt).toISOString().split('T')[0] : "");
+        } else {
+            resetAnnForm();
+        }
+    };
+
+    const openEventDialog = (mode: "create" | "view" | "edit", ev?: PreschoolEvent) => {
+        setEventDialogMode(mode);
+        if (ev) {
+            setSelectedEvent(ev);
+            setTitle(ev.title);
+            setContent(ev.description || "");
+            setDate(ev.eventDate);
+            setType(ev.eventType || "holiday");
+        } else {
+            resetEventForm();
+        }
+    };
+
     // Mutations for Mobile Content
     const createAnnouncementMutation = useMutation({
-        mutationFn: async (data: any) => {
-            const res = await apiRequest("POST", "/api/announcements", data);
-            return res.json();
+        mutationFn: async (ann: any) => {
+            const response = await apiRequest("POST", "/api/announcements", ann);
+            return response.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['/api/announcements'] });
-            toast({ title: "Success", description: "Announcement posted successfully" });
+            queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
+            toast({ title: "Success", description: "Announcement posted" });
+            resetAnnForm();
+        }
+    });
+
+    const updateAnnouncementMutation = useMutation({
+        mutationFn: async (ann: any) => {
+            const response = await apiRequest("PATCH", `/api/announcements/${selectedAnnouncement?.id}`, ann);
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
+            toast({ title: "Updated", description: "Announcement updated successfully" });
+            resetAnnForm();
         }
     });
 
@@ -419,13 +486,26 @@ export default function AppManagement() {
     });
 
     const createEventMutation = useMutation({
-        mutationFn: async (data: any) => {
-            const res = await apiRequest("POST", "/api/events", data);
-            return res.json();
+        mutationFn: async (ev: any) => {
+            const response = await apiRequest("POST", "/api/events", ev);
+            return response.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['/api/events'] });
-            toast({ title: "Success", description: "Event created successfully" });
+            queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+            toast({ title: "Success", description: "Event created" });
+            resetEventForm();
+        }
+    });
+
+    const updateEventMutation = useMutation({
+        mutationFn: async (ev: any) => {
+            const response = await apiRequest("PATCH", `/api/events/${selectedEvent?.id}`, ev);
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+            toast({ title: "Updated", description: "Event updated successfully" });
+            resetEventForm();
         }
     });
 
@@ -661,28 +741,6 @@ export default function AppManagement() {
                     {/* Tab Navigation - Daycare Style */}
                     <div className="flex gap-2 -mb-px w-full">
                         <Button
-                            variant={mainTab === "users" ? "default" : "ghost"}
-                            onClick={() => {
-                                setMainTab("users");
-                                setActiveTab("parents");
-                            }}
-                            className="rounded-b-none flex-1"
-                        >
-                            <Users className="h-4 w-4 mr-2" />
-                            Mobile Users
-                        </Button>
-                        <Button
-                            variant={mainTab === "bus" ? "default" : "ghost"}
-                            onClick={() => {
-                                setMainTab("bus");
-                                setActiveTab("routes");
-                            }}
-                            className="rounded-b-none flex-1"
-                        >
-                            <Bus className="h-4 w-4 mr-2" />
-                            Bus Management
-                        </Button>
-                        <Button
                             variant={mainTab === "content" ? "default" : "ghost"}
                             onClick={() => {
                                 setMainTab("content");
@@ -691,8 +749,32 @@ export default function AppManagement() {
                             className="rounded-b-none flex-1"
                         >
                             <Megaphone className="h-4 w-4 mr-2" />
-                            Mobile Content
+                            App Content
                         </Button>
+                        <Button
+                            variant={mainTab === "users" ? "default" : "ghost"}
+                            onClick={() => {
+                                setMainTab("users");
+                                setActiveTab("parents");
+                            }}
+                            className="rounded-b-none flex-1"
+                        >
+                            <Users className="h-4 w-4 mr-2" />
+                            App Users
+                        </Button>
+                        {settings?.enableBusManagement && (
+                            <Button
+                                variant={mainTab === "bus" ? "default" : "ghost"}
+                                onClick={() => {
+                                    setMainTab("bus");
+                                    setActiveTab("routes");
+                                }}
+                                className="rounded-b-none flex-1"
+                            >
+                                <Bus className="h-4 w-4 mr-2" />
+                                Bus Management
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -700,11 +782,11 @@ export default function AppManagement() {
             {/* Mobile Users Tab */}
             {mainTab === "users" && (
                 <div className="px-4 py-6 space-y-6">
-                    <div className="flex gap-2 -mb-px border-b mb-6">
+                    <div className="flex w-full gap-2 -mb-px border-b mb-6">
                         <Button
                             variant={activeTab === "parents" ? "default" : "ghost"}
                             onClick={() => setActiveTab("parents")}
-                            className="rounded-b-none"
+                            className="rounded-b-none flex-1"
                         >
                             <Key className="mr-2 h-4 w-4" />
                             Parents
@@ -712,7 +794,7 @@ export default function AppManagement() {
                         <Button
                             variant={activeTab === "teachers" ? "default" : "ghost"}
                             onClick={() => setActiveTab("teachers")}
-                            className="rounded-b-none"
+                            className="rounded-b-none flex-1"
                         >
                             <Users className="mr-2 h-4 w-4" />
                             Staff & Security
@@ -720,7 +802,7 @@ export default function AppManagement() {
                         <Button
                             variant={activeTab === "drivers" ? "default" : "ghost"}
                             onClick={() => setActiveTab("drivers")}
-                            className="rounded-b-none"
+                            className="rounded-b-none flex-1"
                         >
                             <Bus className="mr-2 h-4 w-4" />
                             Drivers
@@ -728,7 +810,7 @@ export default function AppManagement() {
                         <Button
                             variant={activeTab === "gate-logs" ? "default" : "ghost"}
                             onClick={() => setActiveTab("gate-logs")}
-                            className="rounded-b-none"
+                            className="rounded-b-none flex-1"
                         >
                             <ClipboardList className="mr-2 h-4 w-4" />
                             Gate Logs
@@ -1332,11 +1414,11 @@ export default function AppManagement() {
             {/* Bus Management Tab */}
             {mainTab === "bus" && (
                 <div className="px-4 py-6 space-y-6">
-                    <div className="flex gap-2 -mb-px border-b mb-6">
+                    <div className="flex w-full gap-2 -mb-px border-b mb-6">
                         <Button
                             variant={activeTab === "routes" ? "default" : "ghost"}
                             onClick={() => setActiveTab("routes")}
-                            className="rounded-b-none"
+                            className="rounded-b-none flex-1"
                         >
                             <Bus className="mr-2 h-4 w-4" />
                             Routes
@@ -1345,7 +1427,7 @@ export default function AppManagement() {
                         <Button
                             variant={activeTab === "assignments" ? "default" : "ghost"}
                             onClick={() => setActiveTab("assignments")}
-                            className="rounded-b-none"
+                            className="rounded-b-none flex-1"
                         >
                             <Users className="mr-2 h-4 w-4" />
                             Assignments
@@ -1353,7 +1435,7 @@ export default function AppManagement() {
                         <Button
                             variant={activeTab === "tracking" ? "default" : "ghost"}
                             onClick={() => setActiveTab("tracking")}
-                            className="rounded-b-none"
+                            className="rounded-b-none flex-1"
                         >
                             <Radio className="mr-2 h-4 w-4" />
                             Live Tracking
@@ -1375,7 +1457,7 @@ export default function AppManagement() {
                                             Add Route
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent>
+                                    <DialogContent className="sm:max-w-[600px]">
                                         <DialogHeader>
                                             <DialogTitle>{editingRouteId ? 'Edit Bus Route' : 'Add Bus Route'}</DialogTitle>
                                         </DialogHeader>
@@ -1581,7 +1663,7 @@ export default function AppManagement() {
                                             Assign Student
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent>
+                                    <DialogContent className="sm:max-w-[600px]">
                                         <DialogHeader>
                                             <DialogTitle>Assign Student to Bus</DialogTitle>
                                         </DialogHeader>
@@ -1697,11 +1779,11 @@ export default function AppManagement() {
             {/* Mobile Content Tab */}
             {mainTab === "content" && (
                 <div className="px-4 py-6 space-y-6">
-                    <div className="flex gap-2 -mb-px border-b mb-6">
+                    <div className="flex w-full gap-2 -mb-px border-b mb-6">
                         <Button
                             variant={activeTab === "approvals" ? "default" : "ghost"}
                             onClick={() => setActiveTab("approvals")}
-                            className="rounded-b-none"
+                            className="rounded-b-none flex-1"
                         >
                             <ClipboardList className="mr-2 h-4 w-4" />
                             Daily Updates
@@ -1709,7 +1791,7 @@ export default function AppManagement() {
                         <Button
                             variant={activeTab === "announcements" ? "default" : "ghost"}
                             onClick={() => setActiveTab("announcements")}
-                            className="rounded-b-none"
+                            className="rounded-b-none flex-1"
                         >
                             <Megaphone className="mr-2 h-4 w-4" />
                             Announcements
@@ -1717,7 +1799,7 @@ export default function AppManagement() {
                         <Button
                             variant={activeTab === "events" ? "default" : "ghost"}
                             onClick={() => setActiveTab("events")}
-                            className="rounded-b-none"
+                            className="rounded-b-none flex-1"
                         >
                             <Calendar className="mr-2 h-4 w-4" />
                             Events & Holidays
@@ -1725,7 +1807,7 @@ export default function AppManagement() {
                         <Button
                             variant={activeTab === "tasks" ? "default" : "ghost"}
                             onClick={() => setActiveTab("tasks")}
-                            className="rounded-b-none"
+                            className="rounded-b-none flex-1"
                         >
                             <BookOpen className="mr-2 h-4 w-4" />
                             Tasks
@@ -1750,22 +1832,32 @@ export default function AppManagement() {
                                     <CardTitle>School Announcements</CardTitle>
                                     <CardDescription>Post news and alerts for all parents</CardDescription>
                                 </div>
-                                <Dialog>
+                                <Dialog onOpenChange={(open) => !open && resetAnnForm()}>
                                     <DialogTrigger asChild>
-                                        <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => { setTitle(""); setContent(""); setPriority("normal"); setDate(""); }}>
+                                        <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => openAnnDialog("create")}>
                                             <Plus className="mr-2" size={18} />
                                             New Announcement
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent>
+                                    <DialogContent className="sm:max-w-[600px]">
                                         <DialogHeader>
-                                            <DialogTitle>Create Announcement</DialogTitle>
-                                            <DialogDescription>This will be visible to all parents in the mobile app.</DialogDescription>
+                                            <DialogTitle>
+                                                {annDialogMode === "view" ? "View Announcement" : annDialogMode === "edit" ? "Edit Announcement" : "Create Announcement"}
+                                            </DialogTitle>
+                                            <DialogDescription>
+                                                {annDialogMode === "view" ? "View the details of this announcement below." : "This will be visible to all parents in the mobile app."}
+                                            </DialogDescription>
                                         </DialogHeader>
                                         <div className="space-y-4 py-4">
                                             <div className="space-y-2">
                                                 <Label htmlFor="ann-title">Title</Label>
-                                                <Input id="ann-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Annual Day Celebration" />
+                                                <Input
+                                                    id="ann-title"
+                                                    value={title}
+                                                    onChange={(e) => setTitle(e.target.value)}
+                                                    placeholder="e.g. Annual Day Celebration"
+                                                    disabled={annDialogMode === "view"}
+                                                />
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-2">
@@ -1775,6 +1867,7 @@ export default function AppManagement() {
                                                         className="w-full border rounded-md p-2"
                                                         value={priority}
                                                         onChange={(e) => setPriority(e.target.value)}
+                                                        disabled={annDialogMode === "view"}
                                                     >
                                                         <option value="normal">Normal</option>
                                                         <option value="high">Urgent</option>
@@ -1788,52 +1881,54 @@ export default function AppManagement() {
                                                         value={date}
                                                         onChange={(e) => setDate(e.target.value)}
                                                         required
+                                                        disabled={annDialogMode === "view"}
                                                     />
                                                 </div>
                                             </div>
                                             <div className="space-y-2">
                                                 <Label htmlFor="ann-content">Content</Label>
-                                                <Textarea id="ann-content" value={content} onChange={(e) => setContent(e.target.value)} placeholder="Enter announcement details..." />
+                                                <Textarea
+                                                    id="ann-content"
+                                                    value={content}
+                                                    onChange={(e) => setContent(e.target.value)}
+                                                    placeholder="Enter announcement details..."
+                                                    disabled={annDialogMode === "view"}
+                                                    className="min-h-[200px]"
+                                                />
                                             </div>
                                         </div>
                                         <DialogFooter>
-                                            <DialogClose asChild>
-                                                <Button
-                                                    onClick={() => {
-                                                        if (!date) {
-                                                            alert('Please select an expiration date');
-                                                            return;
-                                                        }
-                                                        createAnnouncementMutation.mutate({
-                                                            title,
-                                                            content,
-                                                            priority,
-                                                            // Only send date if selected, mapped to expiresAt or handled by backend? 
-                                                            // Actually schema has published_at (now) and expires_at. 
-                                                            // "Date" in announcement often means "This is concerning date X".
-                                                            // If "not mandatory", I'll send it if present. 
-                                                            // Previous backend logic for announcements:
-                                                            // .or(`expires_at.is.null,expires_at.gt."${now}"`)
-                                                            // So if I map this to expiresAt, and they pick a past date, it disappears.
-                                                            // If they mean "Event Date", maybe I should put it in content?
-                                                            // Or maybe they just want a reference date.
-                                                            // Given the "School Events" context, "Announcements" might be "School Closed on X".
-                                                            // I'll stick to mapping it to a dedicated field if available, or just sending it.
-                                                            // Wait, `createAnnouncement` on server expects what?
-                                                            // I should check existing mutation or server endpoint.
-                                                            // Assuming I can pass it. I'll pass `eventDate: date` or `expiresAt: date`.
-                                                            // Let's assume `expiresAt` due to schema, but user says "date not mandatory". 
-                                                            // If I map to `expiresAt`, it auto-hides. Users might not want that.
-                                                            // I'll map to `expiresAt` for now as it's the only date field in schema besides `published_at`.
-                                                            // AND `priority`.
-                                                            expiresAt: date,
-                                                            publishedAt: new Date().toISOString()
-                                                        });
-                                                    }}
-                                                >
-                                                    Post Announcement
-                                                </Button>
-                                            </DialogClose>
+                                            {annDialogMode !== "view" ? (
+                                                <DialogClose asChild>
+                                                    <Button
+                                                        onClick={() => {
+                                                            if (!date) {
+                                                                alert('Please select an expiration date');
+                                                                return;
+                                                            }
+                                                            const data = {
+                                                                title,
+                                                                content,
+                                                                priority,
+                                                                expiresAt: date,
+                                                                publishedAt: annDialogMode === 'edit' ? selectedAnnouncement?.publishedAt : new Date().toISOString()
+                                                            };
+
+                                                            if (annDialogMode === 'edit') {
+                                                                updateAnnouncementMutation.mutate(data);
+                                                            } else {
+                                                                createAnnouncementMutation.mutate(data);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {annDialogMode === "edit" ? "Save Changes" : "Post Announcement"}
+                                                    </Button>
+                                                </DialogClose>
+                                            ) : (
+                                                <DialogClose asChild>
+                                                    <Button variant="outline">Close</Button>
+                                                </DialogClose>
+                                            )}
                                         </DialogFooter>
                                     </DialogContent>
                                 </Dialog>
@@ -1851,9 +1946,9 @@ export default function AppManagement() {
                                     </TableHeader>
                                     <TableBody>
                                         {isLoadingAnnouncements ? (
-                                            <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={5} className="text-center py-8">Loading...</TableCell></TableRow>
                                         ) : announcements.length === 0 ? (
-                                            <TableRow><TableCell colSpan={4} className="text-center text-gray-500 py-8">No announcements yet</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={5} className="text-center text-gray-500 py-8">No announcements yet</TableCell></TableRow>
                                         ) : (
                                             announcements.map((ann) => (
                                                 <TableRow key={ann.id}>
@@ -1864,11 +1959,100 @@ export default function AppManagement() {
                                                     <TableCell>{ann.publishedAt ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(ann.publishedAt)) : '-'}</TableCell>
                                                     <TableCell>{ann.expiresAt ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(ann.expiresAt)) : '-'}</TableCell>
                                                     <TableCell className="text-right">
-                                                        <Button variant="ghost" size="sm" onClick={() => {
-                                                            if (confirm("Delete this announcement?")) deleteAnnouncementMutation.mutate(ann.id);
-                                                        }}>
-                                                            <Trash2 className="text-red-500" size={16} />
-                                                        </Button>
+                                                        <div className="flex justify-end gap-1">
+                                                            <Dialog>
+                                                                <DialogTrigger asChild>
+                                                                    <Button variant="ghost" size="sm" onClick={() => openAnnDialog("view", ann)}>
+                                                                        <Eye className="text-blue-500" size={20} />
+                                                                    </Button>
+                                                                </DialogTrigger>
+                                                                {/* Reuse same DialogContent structure for View/Edit */}
+                                                                <DialogContent className="sm:max-w-[600px]">
+                                                                    <DialogHeader>
+                                                                        <DialogTitle>View Announcement</DialogTitle>
+                                                                    </DialogHeader>
+                                                                    <div className="space-y-4 py-4">
+                                                                        <div className="space-y-2">
+                                                                            <Label>Title</Label>
+                                                                            <Input value={ann.title} disabled />
+                                                                        </div>
+                                                                        <div className="grid grid-cols-2 gap-4">
+                                                                            <div className="space-y-2">
+                                                                                <Label>Priority</Label>
+                                                                                <Input value={ann.priority || "normal"} disabled className="capitalize" />
+                                                                            </div>
+                                                                            <div className="space-y-2">
+                                                                                <Label>Expiration Date</Label>
+                                                                                <Input value={ann.expiresAt ? new Date(ann.expiresAt).toISOString().split('T')[0] : "-"} disabled />
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label>Content</Label>
+                                                                            <Textarea value={ann.content || ""} disabled className="min-h-[150px]" />
+                                                                        </div>
+                                                                    </div>
+                                                                    <DialogFooter>
+                                                                        <DialogClose asChild>
+                                                                            <Button variant="outline">Close</Button>
+                                                                        </DialogClose>
+                                                                    </DialogFooter>
+                                                                </DialogContent>
+                                                            </Dialog>
+
+                                                            <Dialog>
+                                                                <DialogTrigger asChild>
+                                                                    <Button variant="ghost" size="sm" onClick={() => openAnnDialog("edit", ann)}>
+                                                                        <Pencil className="text-amber-500" size={20} />
+                                                                    </Button>
+                                                                </DialogTrigger>
+                                                                <DialogContent className="sm:max-w-[600px]">
+                                                                    <DialogHeader>
+                                                                        <DialogTitle>Edit Announcement</DialogTitle>
+                                                                    </DialogHeader>
+                                                                    <div className="space-y-4 py-4">
+                                                                        <div className="space-y-2">
+                                                                            <Label htmlFor="edit-ann-title">Title</Label>
+                                                                            <Input id="edit-ann-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+                                                                        </div>
+                                                                        <div className="grid grid-cols-2 gap-4">
+                                                                            <div className="space-y-2">
+                                                                                <Label htmlFor="edit-ann-priority">Priority</Label>
+                                                                                <select
+                                                                                    id="edit-ann-priority"
+                                                                                    className="w-full border rounded-md p-2"
+                                                                                    value={priority}
+                                                                                    onChange={(e) => setPriority(e.target.value)}
+                                                                                >
+                                                                                    <option value="normal">Normal</option>
+                                                                                    <option value="high">Urgent</option>
+                                                                                </select>
+                                                                            </div>
+                                                                            <div className="space-y-2">
+                                                                                <Label htmlFor="edit-ann-date">Expiration Date</Label>
+                                                                                <Input id="edit-ann-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label htmlFor="edit-ann-content">Content</Label>
+                                                                            <Textarea id="edit-ann-content" value={content} onChange={(e) => setContent(e.target.value)} className="min-h-[200px]" />
+                                                                        </div>
+                                                                    </div>
+                                                                    <DialogFooter>
+                                                                        <DialogClose asChild>
+                                                                            <Button onClick={() => updateAnnouncementMutation.mutate({ title, content, priority, expiresAt: date })}>
+                                                                                Save Changes
+                                                                            </Button>
+                                                                        </DialogClose>
+                                                                    </DialogFooter>
+                                                                </DialogContent>
+                                                            </Dialog>
+
+                                                            <Button variant="ghost" size="sm" onClick={() => {
+                                                                if (confirm("Delete this announcement?")) deleteAnnouncementMutation.mutate(ann.id);
+                                                            }}>
+                                                                <Trash2 className="text-red-500" size={16} />
+                                                            </Button>
+                                                        </div>
                                                     </TableCell>
                                                 </TableRow>
                                             ))
@@ -1887,25 +2071,39 @@ export default function AppManagement() {
                                     <CardTitle>Public Holidays</CardTitle>
                                     <CardDescription>Manage holiday calendar for the school year</CardDescription>
                                 </div>
-                                <Dialog>
+                                <Dialog onOpenChange={(open) => !open && resetEventForm()}>
                                     <DialogTrigger asChild>
-                                        <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => { setTitle(""); setContent(""); setDate(""); setType("holiday"); }}>
+                                        <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => openEventDialog("create")}>
                                             <Plus className="mr-2" size={18} />
                                             New Holiday
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent>
+                                    <DialogContent className="sm:max-w-[600px]">
                                         <DialogHeader>
-                                            <DialogTitle>Add Holiday</DialogTitle>
+                                            <DialogTitle>
+                                                {eventDialogMode === "view" ? "View Holiday" : eventDialogMode === "edit" ? "Edit Holiday" : "Add Holiday"}
+                                            </DialogTitle>
                                         </DialogHeader>
                                         <div className="space-y-4 py-4">
                                             <div className="space-y-2">
                                                 <Label htmlFor="ev-title">Holiday Name</Label>
-                                                <Input id="ev-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Winter Break" />
+                                                <Input
+                                                    id="ev-title"
+                                                    value={title}
+                                                    onChange={(e) => setTitle(e.target.value)}
+                                                    placeholder="e.g. Winter Break"
+                                                    disabled={eventDialogMode === "view"}
+                                                />
                                             </div>
                                             <div className="space-y-2">
                                                 <Label htmlFor="ev-date">Date</Label>
-                                                <Input id="ev-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                                                <Input
+                                                    id="ev-date"
+                                                    type="date"
+                                                    value={date}
+                                                    onChange={(e) => setDate(e.target.value)}
+                                                    disabled={eventDialogMode === "view"}
+                                                />
                                             </div>
                                             <div className="space-y-2">
                                                 <Label htmlFor="ev-type">Type</Label>
@@ -1914,6 +2112,7 @@ export default function AppManagement() {
                                                     className="w-full border rounded-md p-2"
                                                     value={type}
                                                     onChange={(e) => setType(e.target.value)}
+                                                    disabled={eventDialogMode === "view"}
                                                 >
                                                     <option value="holiday">Holiday</option>
                                                     <option value="event">Event</option>
@@ -1921,15 +2120,42 @@ export default function AppManagement() {
                                             </div>
                                             <div className="space-y-2">
                                                 <Label htmlFor="ev-content">Description</Label>
-                                                <Textarea id="ev-content" value={content} onChange={(e) => setContent(e.target.value)} placeholder="Optional details..." />
+                                                <Textarea
+                                                    id="ev-content"
+                                                    value={content}
+                                                    onChange={(e) => setContent(e.target.value)}
+                                                    placeholder="Optional description..."
+                                                    disabled={eventDialogMode === "view"}
+                                                    className="min-h-[150px]"
+                                                />
                                             </div>
                                         </div>
                                         <DialogFooter>
-                                            <DialogClose asChild>
-                                                <Button onClick={() => createEventMutation.mutate({ title, description: content, eventDate: date, eventType: type })}>
-                                                    Add {type === 'holiday' ? 'Holiday' : 'Event'}
-                                                </Button>
-                                            </DialogClose>
+                                            {eventDialogMode !== "view" ? (
+                                                <DialogClose asChild>
+                                                    <Button
+                                                        onClick={() => {
+                                                            const data = {
+                                                                title,
+                                                                description: content,
+                                                                eventDate: date,
+                                                                eventType: type
+                                                            };
+                                                            if (eventDialogMode === 'edit') {
+                                                                updateEventMutation.mutate(data);
+                                                            } else {
+                                                                createEventMutation.mutate(data);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {eventDialogMode === "edit" ? "Save Changes" : "Create Holiday"}
+                                                    </Button>
+                                                </DialogClose>
+                                            ) : (
+                                                <DialogClose asChild>
+                                                    <Button variant="outline">Close</Button>
+                                                </DialogClose>
+                                            )}
                                         </DialogFooter>
                                     </DialogContent>
                                 </Dialog>
@@ -1938,8 +2164,7 @@ export default function AppManagement() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Holiday Name</TableHead>
-                                            <TableHead>Description</TableHead>
+                                            <TableHead>Event Name</TableHead>
                                             <TableHead>Date</TableHead>
                                             <TableHead>Type</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
@@ -1948,28 +2173,107 @@ export default function AppManagement() {
                                     <TableBody>
                                         {isLoadingEvents ? (
                                             <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
-                                        ) : events.filter(e => e.eventType === 'holiday').length === 0 ? (
-                                            <TableRow><TableCell colSpan={4} className="text-center text-gray-500 py-8">No holidays scheduled</TableCell></TableRow>
+                                        ) : events.length === 0 ? (
+                                            <TableRow><TableCell colSpan={4} className="text-center text-gray-500 py-8">No holidays added yet</TableCell></TableRow>
                                         ) : (
-                                            events
-                                                .filter(ev => ev.eventType === 'holiday')
-                                                .map((ev) => (
-                                                    <TableRow key={ev.id}>
-                                                        <TableCell className="font-medium">{ev.title}</TableCell>
-                                                        <TableCell className="max-w-xs truncate" title={ev.description}>
-                                                            {ev.description || "-"}
-                                                        </TableCell>
-                                                        <TableCell>{ev.eventDate}</TableCell>
-                                                        <TableCell><Badge variant="outline" className="bg-purple-50 text-purple-700">{ev.eventType}</Badge></TableCell>
-                                                        <TableCell className="text-right">
+                                            events.map((ev) => (
+                                                <TableRow key={ev.id}>
+                                                    <TableCell className="font-medium">{ev.title}</TableCell>
+                                                    <TableCell>{new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(ev.eventDate))}</TableCell>
+                                                    <TableCell><Badge variant="outline" className="capitalize">{ev.eventType || 'holiday'}</Badge></TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end gap-1">
+                                                            <Dialog>
+                                                                <DialogTrigger asChild>
+                                                                    <Button variant="ghost" size="sm" onClick={() => openEventDialog("view", ev)}>
+                                                                        <Eye className="text-blue-500" size={20} />
+                                                                    </Button>
+                                                                </DialogTrigger>
+                                                                <DialogContent className="sm:max-w-[600px]">
+                                                                    <DialogHeader>
+                                                                        <DialogTitle>View Holiday</DialogTitle>
+                                                                    </DialogHeader>
+                                                                    <div className="space-y-4 py-4">
+                                                                        <div className="space-y-2">
+                                                                            <Label>Holiday Name</Label>
+                                                                            <Input value={ev.title} disabled />
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label>Date</Label>
+                                                                            <Input value={ev.eventDate} disabled />
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label>Type</Label>
+                                                                            <Input value={ev.eventType || "holiday"} disabled className="capitalize" />
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label>Description</Label>
+                                                                            <Textarea value={ev.description || ""} disabled className="min-h-[150px]" />
+                                                                        </div>
+                                                                    </div>
+                                                                    <DialogFooter>
+                                                                        <DialogClose asChild>
+                                                                            <Button variant="outline">Close</Button>
+                                                                        </DialogClose>
+                                                                    </DialogFooter>
+                                                                </DialogContent>
+                                                            </Dialog>
+
+                                                            <Dialog>
+                                                                <DialogTrigger asChild>
+                                                                    <Button variant="ghost" size="sm" onClick={() => openEventDialog("edit", ev)}>
+                                                                        <Pencil className="text-amber-500" size={20} />
+                                                                    </Button>
+                                                                </DialogTrigger>
+                                                                <DialogContent className="sm:max-w-[600px]">
+                                                                    <DialogHeader>
+                                                                        <DialogTitle>Edit Holiday</DialogTitle>
+                                                                    </DialogHeader>
+                                                                    <div className="space-y-4 py-4">
+                                                                        <div className="space-y-2">
+                                                                            <Label htmlFor="edit-ev-title">Holiday Name</Label>
+                                                                            <Input id="edit-ev-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label htmlFor="edit-ev-date">Date</Label>
+                                                                            <Input id="edit-ev-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label htmlFor="edit-ev-type">Type</Label>
+                                                                            <select
+                                                                                id="edit-ev-type"
+                                                                                className="w-full border rounded-md p-2"
+                                                                                value={type}
+                                                                                onChange={(e) => setType(e.target.value)}
+                                                                            >
+                                                                                <option value="holiday">Holiday</option>
+                                                                                <option value="event">Event</option>
+                                                                            </select>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label htmlFor="edit-ev-content">Description</Label>
+                                                                            <Textarea id="edit-ev-content" value={content} onChange={(e) => setContent(e.target.value)} className="min-h-[150px]" />
+                                                                        </div>
+                                                                    </div>
+                                                                    <DialogFooter>
+                                                                        <DialogClose asChild>
+                                                                            <Button onClick={() => updateEventMutation.mutate({ title, description: content, eventDate: date, eventType: type })}>
+                                                                                Save Changes
+                                                                            </Button>
+                                                                        </DialogClose>
+                                                                    </DialogFooter>
+                                                                </DialogContent>
+                                                            </Dialog>
+
                                                             <Button variant="ghost" size="sm" onClick={() => {
-                                                                if (confirm("Remove this holiday?")) deleteEventMutation.mutate(ev.id);
+                                                                if (confirm("Delete this holiday?")) deleteEventMutation.mutate(ev.id);
                                                             }}>
                                                                 <Trash2 className="text-red-500" size={16} />
                                                             </Button>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
                                         )}
                                     </TableBody>
                                 </Table>
