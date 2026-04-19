@@ -28,31 +28,23 @@ export default function ActivityDetailsScreen() {
     const params = useLocalSearchParams();
     const insets = useSafeAreaInsets();
     const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
-    const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
+    const [fullScreenIndex, setFullScreenIndex] = useState<number | null>(null);
 
     const handleDownload = async (url: string) => {
         try {
             setDownloadingUrl(url);
             
-            // 1. Request Media Library Permission (writeOnly: true avoids AUDIO permission over-request on Android 13+)
-            const { status } = await MediaLibrary.requestPermissionsAsync(true);
+            // 1. Request Media Library Permission 
+            const { status } = await MediaLibrary.requestPermissionsAsync();
             if (status !== 'granted') {
-                // Fallback to sharing if permission is denied
-                console.log('[Download] Permission denied, falling back to sharing');
-                return await handleSharingFallback(url);
+                Alert.alert('Permission Denied', 'Storage permission is required to save photos.');
+                return;
             }
 
-            // Extract filename from URL or provide fallback
-            const urlParts = url.split('/');
-            const nameWithParams = urlParts[urlParts.length - 1];
-            const cleanName = nameWithParams.split('?')[0] || `photo_${Date.now()}.jpg`;
-            
-            // Use modern Paths.cache for temporary storage
-            const destFile = new File(Paths.cache, cleanName);
-            const fileUri = destFile.uri;
+            // Provide a reliable cache URI with .jpg extension
+            const fileUri = `${FileSystem.cacheDirectory}photo_${Date.now()}.jpg`;
 
             console.log(`[Download] Starting download: ${url} -> ${fileUri}`);
-            
             const downloadRes = await FileSystem.downloadAsync(url, fileUri);
             
             if (downloadRes.status !== 200) {
@@ -75,11 +67,8 @@ export default function ActivityDetailsScreen() {
 
     const handleSharingFallback = async (url: string) => {
         try {
-            const urlParts = url.split('/');
-            const cleanName = urlParts[urlParts.length - 1].split('?')[0] || `photo_${Date.now()}.jpg`;
-            const destFile = new File(Paths.cache, cleanName);
-            
-            const downloadRes = await FileSystem.downloadAsync(url, destFile.uri);
+            const destUri = `${FileSystem.cacheDirectory}share_${Date.now()}.jpg`;
+            const downloadRes = await FileSystem.downloadAsync(url, destUri);
             
             if (await Sharing.isAvailableAsync()) {
                 await Sharing.shareAsync(downloadRes.uri, {
@@ -174,7 +163,7 @@ export default function ActivityDetailsScreen() {
                                     {/* Main Image - Tap to open full screen */}
                                     <TouchableOpacity
                                         activeOpacity={0.9}
-                                        onPress={() => setFullScreenImage(url)}
+                                        onPress={() => setFullScreenIndex(index)}
                                         style={styles.mainImageTouchable}
                                     >
                                         <Image
@@ -251,16 +240,16 @@ export default function ActivityDetailsScreen() {
 
             {/* Full Screen Image Viewer Modal */}
             <Modal
-                visible={!!fullScreenImage}
+                visible={fullScreenIndex !== null}
                 transparent={true}
                 animationType="fade"
-                onRequestClose={() => setFullScreenImage(null)}
+                onRequestClose={() => setFullScreenIndex(null)}
             >
                 <View style={styles.fullScreenOverlay}>
                     {/* Close Button */}
                     <TouchableOpacity
                         style={[styles.fullScreenClose, { top: insets.top + 10 }]}
-                        onPress={() => setFullScreenImage(null)}
+                        onPress={() => setFullScreenIndex(null)}
                     >
                         <Feather name="x" size={24} color="#fff" />
                     </TouchableOpacity>
@@ -268,7 +257,7 @@ export default function ActivityDetailsScreen() {
                     {/* Download Button in Full Screen */}
                     <TouchableOpacity
                         style={[styles.fullScreenDownload, { top: insets.top + 10 }]}
-                        onPress={() => fullScreenImage && handleDownload(fullScreenImage)}
+                        onPress={() => fullScreenIndex !== null && handleDownload(mediaList[fullScreenIndex])}
                         disabled={!!downloadingUrl}
                     >
                         {downloadingUrl ? (
@@ -278,13 +267,35 @@ export default function ActivityDetailsScreen() {
                         )}
                     </TouchableOpacity>
 
-                    {/* Full Screen Image */}
-                    {fullScreenImage && (
-                        <Image
-                            source={{ uri: fullScreenImage }}
-                            style={styles.fullScreenImg}
-                            resizeMode="contain"
-                        />
+                    {/* Scrollable Full Screen Images */}
+                    {fullScreenIndex !== null && (
+                        <ScrollView
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                            contentOffset={{ x: fullScreenIndex * width, y: 0 }}
+                            onMomentumScrollEnd={(e) => {
+                                const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
+                                setFullScreenIndex(newIndex);
+                            }}
+                        >
+                            {mediaList.map((url: string, idx: number) => (
+                                <View key={idx} style={{ width, height, justifyContent: 'center' }}>
+                                    <Image
+                                        source={{ uri: url }}
+                                        style={styles.fullScreenImg}
+                                        resizeMode="contain"
+                                    />
+                                </View>
+                            ))}
+                        </ScrollView>
+                    )}
+
+                    {/* Full Screen Badge showing current position */}
+                    {mediaList.length > 1 && fullScreenIndex !== null && (
+                        <View style={styles.fullScreenBadgeContainer}>
+                            <Text style={styles.photoCountText}>{fullScreenIndex + 1} / {mediaList.length}</Text>
+                        </View>
                     )}
                 </View>
             </Modal>
@@ -376,7 +387,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 12,
     },
     typeBadge: {
         backgroundColor: '#ECFDF5',
@@ -399,12 +410,12 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: '#111827',
         lineHeight: 32,
-        marginBottom: 16,
+        marginBottom: 8,
     },
     authorRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 12,
     },
     avatar: {
         width: 32,
@@ -423,11 +434,11 @@ const styles = StyleSheet.create({
     divider: {
         height: 1,
         backgroundColor: '#F3F4F6',
-        marginBottom: 20,
+        marginBottom: 12,
     },
     contentBody: {
         fontSize: 16,
-        lineHeight: 26,
+        lineHeight: 24,
         color: '#374151',
     },
     subTitle: {
@@ -483,5 +494,14 @@ const styles = StyleSheet.create({
     fullScreenImg: {
         width: width,
         height: height * 0.8,
+    },
+    fullScreenBadgeContainer: {
+        position: 'absolute',
+        bottom: 50,
+        alignSelf: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
     },
 });

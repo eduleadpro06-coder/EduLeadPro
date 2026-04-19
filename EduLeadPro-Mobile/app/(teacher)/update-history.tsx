@@ -32,7 +32,7 @@ const UpdateHistoryScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [selectedPost, setSelectedPost] = useState<any>(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
-    const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
+    const [fullScreenIndex, setFullScreenIndex] = useState<number | null>(null);
 
     const fetchHistory = async () => {
         try {
@@ -184,7 +184,7 @@ const UpdateHistoryScreen = () => {
                                             <TouchableOpacity
                                                 key={idx}
                                                 activeOpacity={0.9}
-                                                onPress={() => setFullScreenImage(url)}
+                                                onPress={() => setFullScreenIndex(idx)}
                                             >
                                                 <Image 
                                                     source={{ uri: url }} 
@@ -265,24 +265,48 @@ const UpdateHistoryScreen = () => {
 
             {/* Full Screen Image Viewer */}
             <Modal
-                visible={!!fullScreenImage}
+                visible={fullScreenIndex !== null}
                 transparent={true}
                 animationType="fade"
-                onRequestClose={() => setFullScreenImage(null)}
+                onRequestClose={() => setFullScreenIndex(null)}
             >
                 <View style={styles.fullScreenOverlay}>
                     <TouchableOpacity
                         style={styles.fullScreenClose}
-                        onPress={() => setFullScreenImage(null)}
+                        onPress={() => setFullScreenIndex(null)}
                     >
                         <Feather name="x" size={24} color="#fff" />
                     </TouchableOpacity>
-                    {fullScreenImage && (
-                        <Image
-                            source={{ uri: fullScreenImage }}
-                            style={styles.fullScreenImg}
-                            resizeMode="contain"
-                        />
+
+                    {/* Scrollable Full Screen Images */}
+                    {fullScreenIndex !== null && selectedPost?.media_urls && (
+                        <ScrollView
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                            contentOffset={{ x: fullScreenIndex * width, y: 0 }}
+                            onMomentumScrollEnd={(e) => {
+                                const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
+                                setFullScreenIndex(newIndex);
+                            }}
+                        >
+                            {selectedPost.media_urls.map((url: string, idx: number) => (
+                                <View key={idx} style={{ width, height, justifyContent: 'center' }}>
+                                    <Image
+                                        source={{ uri: url }}
+                                        style={styles.fullScreenImg}
+                                        resizeMode="contain"
+                                    />
+                                </View>
+                            ))}
+                        </ScrollView>
+                    )}
+
+                    {/* Badge for full screen */}
+                    {selectedPost?.media_urls?.length > 1 && fullScreenIndex !== null && (
+                        <View style={styles.fullScreenBadgeContainer}>
+                            <Text style={styles.photoCountText}>{fullScreenIndex + 1} / {selectedPost.media_urls.length}</Text>
+                        </View>
                     )}
                 </View>
             </Modal>
@@ -539,7 +563,7 @@ const styles = StyleSheet.create({
     modalStudentRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 24,
+        marginBottom: 16,
         gap: 15,
     },
     avatarLarge: {
@@ -577,7 +601,7 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
     },
     modalBody: {
-        marginBottom: 20,
+        marginBottom: 12,
     },
     modalActivityType: {
         fontSize: 12,
@@ -590,14 +614,14 @@ const styles = StyleSheet.create({
         fontSize: 22,
         fontFamily: 'Outfit_Bold',
         color: colors.textPrimary,
-        marginBottom: 12,
+        marginBottom: 8,
     },
     modalContentText: {
         fontSize: 16,
         lineHeight: 24,
         color: colors.textSecondary,
         fontFamily: 'Lexend_Regular',
-        marginBottom: 24,
+        marginBottom: 16,
     },
     modalImageGallery: {
         gap: 15,
@@ -669,6 +693,20 @@ const styles = StyleSheet.create({
     fullScreenImg: {
         width: width,
         height: height * 0.8,
+    },
+    fullScreenBadgeContainer: {
+        position: 'absolute',
+        bottom: 50,
+        alignSelf: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
+    photoCountText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
 
