@@ -210,7 +210,7 @@ export default function ParentHomeScreen() {
                                     </View>
                                     <View style={styles.studentInfo}>
                                         <View style={styles.nameRow}>
-                                            <Text style={styles.studentName} numberOfLines={1}>{currentChild.student_name}</Text>
+                                            <Text style={styles.studentName}>{currentChild.student_name}</Text>
                                             <View style={styles.statusBadge}>
                                                 <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
                                                 <Text style={[styles.statusText, { color: '#10B981' }]}>
@@ -473,14 +473,14 @@ const styles = StyleSheet.create({
     nameRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 8,
     },
     studentName: {
         color: '#fff',
         fontSize: 18,
         fontWeight: '700',
-        flex: 1,
-        marginRight: 8,
+        flexShrink: 1,
     },
     studentDetail: {
         color: 'rgba(255,255,255,0.6)',

@@ -8,7 +8,8 @@ import {
     Image,
     Dimensions,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    Modal,
 } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +28,7 @@ export default function ActivityDetailsScreen() {
     const params = useLocalSearchParams();
     const insets = useSafeAreaInsets();
     const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
+    const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
 
     const handleDownload = async (url: string) => {
         try {
@@ -57,22 +59,10 @@ export default function ActivityDetailsScreen() {
                 throw new Error(`Download failed with status ${downloadRes.status}`);
             }
 
-            // 2. Save directly to Media Library (Gallery)
-            const asset = await MediaLibrary.createAssetAsync(downloadRes.uri);
-            
-            // Optional: Create an album for the school for better organization
-            try {
-                const album = await MediaLibrary.getAlbumAsync('EduLeadPro');
-                if (album === null) {
-                    await MediaLibrary.createAlbumAsync('EduLeadPro', asset, false);
-                } else {
-                    await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-                }
-            } catch (albumError) {
-                console.warn('[Download] Could not create/add to album, image saved to default gallery.', albumError);
-            }
+            // 2. Save directly to gallery using saveToLibraryAsync (most reliable method)
+            await MediaLibrary.saveToLibraryAsync(downloadRes.uri);
 
-            Alert.alert('Download Successful', 'The photo has been saved to your gallery.');
+            Alert.alert('✅ Saved!', 'Photo has been saved to your gallery.');
             
         } catch (e) {
             console.error('[Download Error]', e);
@@ -128,8 +118,6 @@ export default function ActivityDetailsScreen() {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
         timeZone: 'Asia/Kolkata'
     }) : 'Just now';
 
@@ -183,12 +171,18 @@ export default function ActivityDetailsScreen() {
                                         style={StyleSheet.absoluteFill}
                                     />
 
-                                    {/* Main Image - Full visibility */}
-                                    <Image
-                                        source={{ uri: url }}
-                                        style={styles.mainImage}
-                                        resizeMode="contain"
-                                    />
+                                    {/* Main Image - Tap to open full screen */}
+                                    <TouchableOpacity
+                                        activeOpacity={0.9}
+                                        onPress={() => setFullScreenImage(url)}
+                                        style={styles.mainImageTouchable}
+                                    >
+                                        <Image
+                                            source={{ uri: url }}
+                                            style={styles.mainImage}
+                                            resizeMode="contain"
+                                        />
+                                    </TouchableOpacity>
 
                                     {/* Download Button */}
                                     <TouchableOpacity 
@@ -254,6 +248,46 @@ export default function ActivityDetailsScreen() {
 
                 </View>
             </ScrollView>
+
+            {/* Full Screen Image Viewer Modal */}
+            <Modal
+                visible={!!fullScreenImage}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setFullScreenImage(null)}
+            >
+                <View style={styles.fullScreenOverlay}>
+                    {/* Close Button */}
+                    <TouchableOpacity
+                        style={[styles.fullScreenClose, { top: insets.top + 10 }]}
+                        onPress={() => setFullScreenImage(null)}
+                    >
+                        <Feather name="x" size={24} color="#fff" />
+                    </TouchableOpacity>
+
+                    {/* Download Button in Full Screen */}
+                    <TouchableOpacity
+                        style={[styles.fullScreenDownload, { top: insets.top + 10 }]}
+                        onPress={() => fullScreenImage && handleDownload(fullScreenImage)}
+                        disabled={!!downloadingUrl}
+                    >
+                        {downloadingUrl ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <Feather name="download" size={22} color="#fff" />
+                        )}
+                    </TouchableOpacity>
+
+                    {/* Full Screen Image */}
+                    {fullScreenImage && (
+                        <Image
+                            source={{ uri: fullScreenImage }}
+                            style={styles.fullScreenImg}
+                            resizeMode="contain"
+                        />
+                    )}
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -268,14 +302,14 @@ const styles = StyleSheet.create({
     },
     imageHeader: {
         width: width,
-        height: height * 0.55,
+        height: height * 0.48,
         backgroundColor: '#0F172A',
         justifyContent: 'center',
         alignItems: 'center',
     },
     carouselContainer: {
         width: width,
-        height: height * 0.55,
+        height: height * 0.48,
     },
     photoCountBadge: {
         position: 'absolute',
@@ -292,6 +326,10 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     mainImage: {
+        width: '100%',
+        height: '100%',
+    },
+    mainImageTouchable: {
         width: '100%',
         height: '100%',
     },
@@ -327,10 +365,12 @@ const styles = StyleSheet.create({
     infoContainer: {
         flex: 1,
         backgroundColor: '#fff',
-        borderTopLeftRadius: 32,
-        borderTopRightRadius: 32,
-        marginTop: -32,
-        padding: 24,
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        marginTop: -28,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 24,
     },
     badgeRow: {
         flexDirection: 'row',
@@ -410,5 +450,38 @@ const styles = StyleSheet.create({
         height: 120,
         borderRadius: 16,
         backgroundColor: '#F3F4F6',
+    },
+    // Full screen image viewer styles
+    fullScreenOverlay: {
+        flex: 1,
+        backgroundColor: '#000',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    fullScreenClose: {
+        position: 'absolute',
+        left: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    fullScreenDownload: {
+        position: 'absolute',
+        right: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    fullScreenImg: {
+        width: width,
+        height: height * 0.8,
     },
 });

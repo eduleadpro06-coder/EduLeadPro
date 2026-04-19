@@ -126,12 +126,16 @@ function RootLayoutNav() {
         return () => clearTimeout(timer);
     }, []);
 
-    // Handle SplashScreen and Navigation
+    // Hide splash screen as soon as auth state and fonts are ready
+    useEffect(() => {
+        if (!isLoading && fontsLoaded) {
+            SplashScreen.hideAsync();
+        }
+    }, [isLoading, fontsLoaded]);
+
+    // Handle Navigation separately
     useEffect(() => {
         if (isLoading || !fontsLoaded) return;
-
-        // Hide splash screen when ready
-        SplashScreen.hideAsync();
 
         const inAuthGroup = segments[0] === '(auth)';
 

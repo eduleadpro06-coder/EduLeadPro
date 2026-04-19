@@ -32,6 +32,7 @@ const UpdateHistoryScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [selectedPost, setSelectedPost] = useState<any>(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
 
     const fetchHistory = async () => {
         try {
@@ -180,12 +181,17 @@ const UpdateHistoryScreen = () => {
                                 {selectedPost.media_urls && selectedPost.media_urls.length > 0 && (
                                     <View style={styles.modalImageGallery}>
                                         {selectedPost.media_urls.map((url: string, idx: number) => (
-                                            <Image 
-                                                key={idx} 
-                                                source={{ uri: url }} 
-                                                style={styles.fullImage} 
-                                                resizeMode="cover"
-                                            />
+                                            <TouchableOpacity
+                                                key={idx}
+                                                activeOpacity={0.9}
+                                                onPress={() => setFullScreenImage(url)}
+                                            >
+                                                <Image 
+                                                    source={{ uri: url }} 
+                                                    style={styles.fullImage} 
+                                                    resizeMode="cover"
+                                                />
+                                            </TouchableOpacity>
                                         ))}
                                     </View>
                                 )}
@@ -256,6 +262,30 @@ const UpdateHistoryScreen = () => {
             />
 
             {renderDetailModal()}
+
+            {/* Full Screen Image Viewer */}
+            <Modal
+                visible={!!fullScreenImage}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setFullScreenImage(null)}
+            >
+                <View style={styles.fullScreenOverlay}>
+                    <TouchableOpacity
+                        style={styles.fullScreenClose}
+                        onPress={() => setFullScreenImage(null)}
+                    >
+                        <Feather name="x" size={24} color="#fff" />
+                    </TouchableOpacity>
+                    {fullScreenImage && (
+                        <Image
+                            source={{ uri: fullScreenImage }}
+                            style={styles.fullScreenImg}
+                            resizeMode="contain"
+                        />
+                    )}
+                </View>
+            </Modal>
 
             {/* Floating Action Button */}
             {!loading && (
@@ -616,6 +646,29 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: colors.textTertiary,
         fontFamily: 'Lexend_Medium',
+    },
+    // Full screen image viewer
+    fullScreenOverlay: {
+        flex: 1,
+        backgroundColor: '#000',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    fullScreenClose: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    fullScreenImg: {
+        width: width,
+        height: height * 0.8,
     },
 });
 

@@ -25,8 +25,11 @@ export const useAuthStore = create<AuthStore>((set) => ({
      */
     loadUser: async () => {
         try {
-            const user = await authAPI.getCurrentUser();
-            const isAuthenticated = await authAPI.isAuthenticated();
+            // Run both SecureStore reads in parallel for faster startup
+            const [user, isAuthenticated] = await Promise.all([
+                authAPI.getCurrentUser(),
+                authAPI.isAuthenticated(),
+            ]);
 
             set({
                 user,
