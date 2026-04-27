@@ -2,7 +2,7 @@ export default {
   expo: {
     name: 'Bloomdale Connect',
     slug: 'yonerra',
-    version: '2.2.4',
+    version: '2.2.5',
     orientation: 'portrait',
     icon: './assets/logo.png',
     userInterfaceStyle: 'light',
@@ -31,7 +31,7 @@ export default {
       },
       package: 'com.bloomdale.app',
       softwareKeyboardLayoutMode: 'resize',
-      versionCode: 9,
+      versionCode: 10,
       permissions: [
         'READ_EXTERNAL_STORAGE',
         'WRITE_EXTERNAL_STORAGE',
@@ -62,6 +62,14 @@ export default {
           savePhotosPermission: 'Allow Bloomdale Connect to save photos to your library',
           isAccessMediaLocationEnabled: true,
         },
+      ],
+      [
+        'expo-build-properties',
+        {
+          android: {
+            pageAlign16k: true
+          }
+        }
       ],
     ],
     experiments: {

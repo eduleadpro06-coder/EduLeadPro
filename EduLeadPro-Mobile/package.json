@@ -1,6 +1,6 @@
 {
   "name": "eduleadpro-mobile",
-  "version": "2.2.4",
+  "version": "2.2.5",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
@@ -28,6 +28,7 @@
     "base64-arraybuffer": "^1.0.2",
     "date-fns": "^4.1.0",
     "expo": "~54.0.34",
+    "expo-build-properties": "~1.0.10",
     "expo-camera": "^17.0.10",
     "expo-constants": "~18.0.13",
     "expo-device": "~8.0.10",
