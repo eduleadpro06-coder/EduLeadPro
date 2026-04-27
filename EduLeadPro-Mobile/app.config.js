@@ -14,7 +14,7 @@ export default {
     assetBundlePatterns: ['**/*'],
     updates: {
       enabled: true,
-      url: 'https://u.expo.dev/30dace9c-63f8-4c50-8337-0a177603ecd1',
+      url: 'https://u.expo.dev/76a4a40f-0830-4dfa-9e16-a82b76bb5b8d',
       fallbackToCacheTimeout: 0,
     },
     runtimeVersion: {
@@ -80,10 +80,10 @@ export default {
       wsUrl: process.env.EXPO_PUBLIC_WS_URL,
       olaMapsApiKey: process.env.EXPO_PUBLIC_OLA_MAPS_KEY,
       eas: {
-        projectId: '30dace9c-63f8-4c50-8337-0a177603ecd1',
+        projectId: '76a4a40f-0830-4dfa-9e16-a82b76bb5b8d',
       },
     },
-    owner: 'gauravkachwaha',
+    owner: 'educonnect06',
     scheme: 'bloomdale',
   },
 };
