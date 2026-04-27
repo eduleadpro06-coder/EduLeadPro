@@ -15,11 +15,19 @@ export default function MenuScreen() {
         router.replace('/(auth)/login');
     };
 
-    const menuItems = user?.role === 'teacher' ? [{ icon: 'grid-outline', label: 'Dashboard', route: '/(teacher)/dashboard' },
-    { icon: 'calendar-outline', label: 'Mark Attendance', route: '/(teacher)/attendance' },
-    { icon: 'create-outline', label: 'Post Update', route: '/(teacher)/activity' },
-    { icon: 'people-outline', label: 'My Students', route: '/(teacher)/students' },
-    ] : []; // Added an empty array for non-teacher roles to ensure menuItems is always an array
+    const isAdmin = ['counselor', 'staff', 'director', 'admin'].includes(user?.role || '');
+
+    const menuItems = isAdmin ? [
+        { icon: 'grid-outline', label: 'Dashboard', route: '/(teacher)' },
+        { icon: 'eye-outline', label: 'Attendance Monitor', route: '/(teacher)/attendance-monitor' },
+        { icon: 'checkbox-outline', label: 'Approve Updates', route: '/(teacher)/approve-updates' },
+        { icon: 'people-outline', label: 'All Students', route: '/(teacher)/my-students' },
+    ] : [
+        { icon: 'grid-outline', label: 'Dashboard', route: '/(teacher)' },
+        { icon: 'calendar-outline', label: 'Mark Attendance', route: '/(teacher)/mark-attendance' },
+        { icon: 'create-outline', label: 'Post Update', route: '/(teacher)/post-update' },
+        { icon: 'people-outline', label: 'My Students', route: '/(teacher)/my-students' },
+    ];
 
     return (
         <SafeAreaView style={styles.container}>
@@ -30,12 +38,14 @@ export default function MenuScreen() {
                 <View style={styles.userInfo}>
                     <View style={styles.avatarContainer}>
                         <Text style={styles.avatarText}>
-                            {(user?.role === 'teacher' ? 'Teacher' : 'Parent').charAt(0).toUpperCase()}
+                            {(user?.role ? user.role : 'Teacher').charAt(0).toUpperCase()}
                         </Text>
                     </View>
                     <View>
                         <Text style={styles.userName}>{user?.name || 'User'}</Text>
-                        <Text style={styles.userRole}>Teacher</Text>
+                        <Text style={[styles.userRole, { textTransform: 'capitalize', color: 'rgba(255,255,255,0.8)' }]}>
+                            {user?.role || 'Teacher'}
+                        </Text>
                     </View>
                 </View>
             </LinearGradient>

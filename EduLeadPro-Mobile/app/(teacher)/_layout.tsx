@@ -8,7 +8,7 @@ export default function TeacherLayout() {
     const { isAuthenticated, user, isLoading } = useAuthStore();
 
     useEffect(() => {
-        if (!isLoading && (!isAuthenticated || !['teacher', 'counselor'].includes(user?.role || ''))) {
+        if (!isLoading && (!isAuthenticated || !['teacher', 'counselor', 'staff', 'director', 'admin'].includes(user?.role || ''))) {
             router.replace('/(auth)/login');
         }
     }, [isAuthenticated, user, isLoading]);
@@ -26,6 +26,8 @@ export default function TeacherLayout() {
             <Stack.Screen name="index" />
             <Stack.Screen name="mark-attendance" />
             <Stack.Screen name="post-update" />
+            <Stack.Screen name="attendance-monitor" />
+            <Stack.Screen name="approve-updates" />
             <Stack.Screen name="menu" options={{ presentation: 'modal', headerShown: true, title: 'Menu' }} />
         </Stack>
     );

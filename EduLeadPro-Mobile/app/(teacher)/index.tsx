@@ -32,11 +32,19 @@ export default function TeacherHomeScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [dashboardData, setDashboardData] = useState<any>(null);
 
+    // Determine if this is an admin-type role
+    const isAdmin = ['counselor', 'staff', 'director', 'admin'].includes(user?.role || '');
+
     const loadDashboard = async () => {
         setLoading(true);
         try {
-            const data = await api.getTeacherDashboard();
-            setDashboardData(data);
+            if (isAdmin) {
+                const data = await api.getAdminDashboard();
+                setDashboardData(data);
+            } else {
+                const data = await api.getTeacherDashboard();
+                setDashboardData(data);
+            }
         } catch (error) {
             console.error('Dashboard error:', error);
         } finally {
@@ -62,13 +70,25 @@ export default function TeacherHomeScreen() {
         return 'Good Evening,';
     };
 
-    const quickActions = [
+    // Role-based Quick Actions
+    const adminActions = [
+        { id: 'att_monitor', label: 'Att. Monitor', icon: 'eye', color: '#0EA5E9', bg: '#E0F2FE', route: '/(teacher)/attendance-monitor' },
+        { id: 'approve', label: 'Approve Updates', icon: 'check-square', color: '#7C3AED', bg: '#F3E8FF', route: '/(teacher)/approve-updates' },
+        { id: 'leaves', label: 'Leaves', icon: 'briefcase', color: '#6366F1', bg: '#EEF2FF', route: '/(teacher)/leaves' },
+        { id: 'history', label: 'Att. History', icon: 'clock', color: '#F97316', bg: '#FFF7ED', route: '/(teacher)/attendance-history' },
+        { id: 'students', label: 'All Students', icon: 'users', color: '#2196F3', bg: '#E3F2FD', route: '/(teacher)/my-students' },
+        { id: 'tasks', label: 'Tasks', icon: 'check-square', color: '#06B6D4', bg: '#ECFEFF', route: '/(teacher)/tasks' },
+    ];
+
+    const teacherActions = [
         { id: 'attendance', label: 'Attendance', icon: 'user-check', color: '#4CAF50', bg: '#E8F5E9', route: '/(teacher)/mark-attendance' },
         { id: 'a_history', label: 'Att. History', icon: 'clock', color: '#F97316', bg: '#FFF7ED', route: '/(teacher)/attendance-history' },
         { id: 'history', label: 'Post Updates', icon: 'clipboard', color: '#2196F3', bg: '#E3F2FD', route: '/(teacher)/update-history' },
         { id: 'leaves', label: 'Leaves', icon: 'briefcase', color: '#6366F1', bg: '#EEF2FF', route: '/(teacher)/leaves' },
         { id: 'tasks', label: 'Tasks', icon: 'check-square', color: '#06B6D4', bg: '#ECFEFF', route: '/(teacher)/tasks' },
     ];
+
+    const quickActions = isAdmin ? adminActions : teacherActions;
 
     return (
         <View style={styles.container}>
@@ -94,24 +114,28 @@ export default function TeacherHomeScreen() {
                     </View>
                 ) : dashboardData && (
                     <>
-                        {/* Class Snapshot Card */}
+                        {/* Snapshot Card - Role Aware */}
                         <PremiumCard style={styles.snapshotCard}>
                             <View style={styles.snapshotHeader}>
                                 <View style={styles.snapshotTitleRow}>
                                     <View style={[styles.snapshotIconBox, { backgroundColor: colors.primary + '10' }]}>
-                                        <Feather name="activity" size={16} color={colors.primary} />
+                                        <Feather name={isAdmin ? 'bar-chart-2' : 'activity'} size={16} color={colors.primary} />
                                     </View>
-                                    <Text style={styles.snapshotTitle}>Class Snapshot</Text>
+                                    <Text style={styles.snapshotTitle}>{isAdmin ? 'School Overview' : 'Class Snapshot'}</Text>
                                 </View>
                                 <Text style={styles.snapshotDate}>{new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</Text>
                             </View>
                             
                             <View style={styles.snapshotGrid}>
-                                {[
+                                {(isAdmin ? [
+                                    { label: 'Students', value: dashboardData.totalStudents || 0, icon: 'users', color: colors.primary, bg: '#EEF2FF' },
+                                    { label: 'Att. Rate', value: `${dashboardData.attendanceRate || 0}%`, icon: 'check-circle', color: colors.success, bg: '#ECFDF5' },
+                                    { label: 'Pending', value: dashboardData.pendingUpdates || 0, icon: 'clock', color: '#F59E0B', bg: '#FEF3C7', route: '/(teacher)/approve-updates' },
+                                ] : [
                                     { label: 'My Students', value: dashboardData.studentsCount || 0, icon: 'users', color: colors.primary, bg: '#EEF2FF', route: '/(teacher)/my-students' },
                                     { label: 'Present', value: dashboardData.attendance?.present || 0, icon: 'user-check', color: colors.success, bg: '#ECFDF5' },
                                     { label: 'Absent', value: dashboardData.attendance?.absent || 0, icon: 'user-x', color: colors.danger, bg: '#FEF2F2' },
-                                ].map((stat, i) => (
+                                ]).map((stat: any, i: number) => (
                                     <TouchableOpacity 
                                         key={stat.label} 
                                         style={[styles.snapshotItem, i < 2 && styles.snapshotDivider]}
@@ -209,9 +233,14 @@ export default function TeacherHomeScreen() {
                         setDrawerVisible(false);
                     }
                 }}
-                user={{ name: user?.name || 'Teacher', role: user?.role || 'teacher' }}
+                user={{ name: user?.name || 'User', role: user?.role || 'teacher' }}
                 onLogout={logout}
-                menuItems={[
+                menuItems={isAdmin ? [
+                    { id: 'dashboard', label: 'Dashboard', icon: 'home' },
+                    { id: 'att_monitor', label: 'Attendance Monitor', icon: 'eye' },
+                    { id: 'approve', label: 'Approve Updates', icon: 'check-square' },
+                    { id: 'students', label: 'All Students', icon: 'users' },
+                ] : [
                     { id: 'dashboard', label: 'Dashboard', icon: 'home' },
                     { id: 'attendance', label: 'Mark Attendance', icon: 'check-square' },
                     { id: 'post_update', label: 'Post Update', icon: 'edit-3' },

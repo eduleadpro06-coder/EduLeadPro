@@ -16,6 +16,7 @@ import {
     RefreshControl,
     Modal,
 } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter, useNavigation } from 'expo-router';
 
@@ -44,53 +45,54 @@ export default function ParentHomeScreen() {
     // Restore currentChild definition
     const currentChild = user?.children?.[currentChildIndex];
 
-    const [stats, setStats] = useState({
-        attendance: null as any,
-        fees: null as any,
-        lastUpdate: null as any,
-        latestNotice: null as any,
+    const queryClient = useQueryClient();
+
+    // Queries
+    const orgId = user ? ((user as any).organization_id || (user as any).organizationId) : null;
+    const childId = currentChild ? Number(currentChild.id) : null;
+
+    const { data: attendance, refetch: refetchAttendance } = useQuery({
+        queryKey: ['attendance', childId],
+        queryFn: () => api.getTodayAttendance(childId!),
+        enabled: !!childId,
     });
-    const [loading, setLoading] = useState(true);
 
-    const loadDashboardData = async () => {
-        if (!currentChild || !user) {
-            setLoading(false);
-            return;
-        }
-        // setLoading(true); // Don't show full loading state on refresh to keep UI stable
-        try {
-            const orgId = (user as any).organization_id || (user as any).organizationId;
-            const childId = Number(currentChild.id);
-            const [attendance, fees, updates, notices] = await Promise.all([
-                api.getTodayAttendance(childId),
-                api.getStudentFees(childId),
-                api.getDailyUpdates(childId),
-                api.getAnnouncements(orgId)
-            ]);
+    const { data: fees, refetch: refetchFees } = useQuery({
+        queryKey: ['fees', childId],
+        queryFn: () => api.getStudentFees(childId!),
+        enabled: !!childId,
+    });
 
-            setStats({
-                attendance,
-                fees,
-                lastUpdate: updates[0] || null,
-                latestNotice: notices[0] || null
-            });
-        } catch (error) {
-            console.error('Dashboard load error:', error);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
+    const { data: updates, refetch: refetchUpdates } = useQuery({
+        queryKey: ['daily-updates', childId],
+        queryFn: () => api.getDailyUpdates(childId!),
+        enabled: !!childId,
+    });
+
+    const { data: notices, refetch: refetchNotices } = useQuery({
+        queryKey: ['announcements', orgId],
+        queryFn: () => api.getAnnouncements(orgId!),
+        enabled: !!orgId,
+    });
+
+    const stats = {
+        attendance,
+        fees,
+        lastUpdate: updates?.[0] || null,
+        latestNotice: notices?.[0] || null
     };
-
-    useEffect(() => {
-        if (currentChild) {
-            loadDashboardData();
-        }
-    }, [currentChild]);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        loadDashboardData();
+        if (childId && orgId) {
+            await Promise.all([
+                refetchAttendance(),
+                refetchFees(),
+                refetchUpdates(),
+                refetchNotices()
+            ]);
+        }
+        setRefreshing(false);
     };
 
     const handleTrackBus = () => router.push('/(parent)/bus-tracking');

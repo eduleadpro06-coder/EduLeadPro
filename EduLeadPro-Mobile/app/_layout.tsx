@@ -3,7 +3,7 @@
  * Handles authentication state and provides global providers
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -56,8 +56,13 @@ function RootLayoutNav() {
     useEffect(() => {
         loadUser();
 
-        // Check for updates (always check in diagnostics mode)
+        // Check for updates (only in production)
         const checkForUpdates = async () => {
+            if (__DEV__) {
+                console.log('🔄 [UpdateCheck] Skipping OTA update check in development mode.');
+                return;
+            }
+
             console.log('🔄 [UpdateCheck] Check started...');
             try {
                 // Determine update channel from app.config (if possible) or just check
@@ -133,7 +138,7 @@ function RootLayoutNav() {
         }
     }, [isLoading, fontsLoaded]);
 
-    // Handle Navigation separately
+    // Handle Navigation based on auth state
     useEffect(() => {
         if (isLoading || !fontsLoaded) return;
 
@@ -143,20 +148,21 @@ function RootLayoutNav() {
             // User is authenticated but still on the login screen -> route them to their dashboard!
             if (user?.role === 'parent') {
                 router.replace('/(parent)');
-            } else if (user?.role === 'teacher') {
+            } else if (['teacher', 'staff', 'counselor', 'director', 'admin'].includes(user?.role || '')) {
                 router.replace('/(teacher)');
             } else if (user?.role === 'driver') {
                 router.replace('/(driver)');
             } else if (user?.role === 'security' || user?.role === 'support_staff') {
                 router.replace('/(gate)');
             } else {
-                router.replace('/'); 
+                console.warn(`[Layout] Unknown role "${user?.role}", defaulting to teacher`);
+                router.replace('/(teacher)');
             }
         } else if (!isAuthenticated && !inAuthGroup) {
             // User is NOT authenticated but is trying to access a secure screen -> route to login!
             router.replace('/(auth)/login');
         }
-    }, [isAuthenticated, segments, isLoading, user]);
+    }, [isAuthenticated, segments, isLoading, fontsLoaded, user]);
 
     // Show nothing (Splash Screen stays visible) while checking auth or loading fonts
     if (isLoading || !fontsLoaded) {

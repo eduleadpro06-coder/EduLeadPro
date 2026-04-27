@@ -11,6 +11,7 @@ import driverRouter from './driver.js';
 import commonRouter from './common.js';
 import teacherAssignments from './teacher-assignments.js';
 import gateRouter from './gate.js';
+import adminRouter from './admin.js';
 
 import authRouter from './auth.js';
 
@@ -29,6 +30,7 @@ router.use('/driver', driverRouter);
 router.use('/common', commonRouter);
 router.use('/teacher-assignments', teacherAssignments);
 router.use('/gate', gateRouter);
+router.use('/admin', adminRouter);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

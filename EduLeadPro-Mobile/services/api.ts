@@ -484,6 +484,31 @@ class APIService {
         // This would need a v1 endpoint - placeholder for now
         return [];
     }
+
+    // ============================
+    // Admin Methods (V1 API)
+    // ============================
+
+    async getAdminDashboard(): Promise<any> {
+        return await this.fetchWithAuth('/admin/dashboard');
+    }
+
+    async getAttendanceOverview(): Promise<any> {
+        return await this.fetchWithAuth('/admin/attendance-overview');
+    }
+
+    async getAdminDailyUpdates(status?: string): Promise<any[]> {
+        const query = status ? `?status=${encodeURIComponent(status)}` : '';
+        const data = await this.fetchWithAuth<any[]>(`/admin/daily-updates${query}`);
+        return Array.isArray(data) ? data : [];
+    }
+
+    async updateDailyUpdateStatus(id: number, status: 'approved' | 'rejected' | 'pending', rejectionReason?: string): Promise<any> {
+        return await this.fetchWithAuth(`/admin/daily-updates/${id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status, rejectionReason })
+        });
+    }
 }
 
 export const api = new APIService();
