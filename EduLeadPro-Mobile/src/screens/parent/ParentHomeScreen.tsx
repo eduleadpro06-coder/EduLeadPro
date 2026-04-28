@@ -37,7 +37,7 @@ export default function ParentHomeScreen() {
                 </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.content}>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
                 {/* Children List */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>My Children</Text>

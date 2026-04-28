@@ -210,7 +210,7 @@ export default function PostUpdateScreen() {
                     <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             ) : (
-                <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+                <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
                     {/* Activity Type Selection */}
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Activity Type *</Text>

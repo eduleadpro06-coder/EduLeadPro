@@ -26,9 +26,10 @@ export default {
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: './assets/logo.png',
-        backgroundColor: '#ffffff',
+        foregroundImage: './assets/adaptive-icon.png',
+        backgroundColor: '#FFFFFF',
       },
+      label: 'Bloomdale',
       package: 'com.bloomdale.app',
       softwareKeyboardLayoutMode: 'resize',
       versionCode: 13,

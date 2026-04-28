@@ -1,7 +1,5 @@
 import { Platform, Dimensions } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
-
 // 1. Color Palette: "Deep Slate & Gold"
 // A sophisticated, high-contrast palette for a premium feel.
 export const colors = {
@@ -157,10 +155,13 @@ export const animation = {
     spring: { damping: 15, stiffness: 120 },
 };
 
+// 6. Layout — Dynamic dimensions (always fresh, never stale)
+// Use the `useResponsive()` hook from src/hooks/useResponsive.ts for reactive values in components.
+// This export is for non-component code that can't use hooks.
 export const layout = {
-    width,
-    height,
-    isSmallDevice: width < 375,
+    get width() { return Dimensions.get('window').width; },
+    get height() { return Dimensions.get('window').height; },
+    get isSmallDevice() { return Dimensions.get('window').width < 375; },
 };
 
 export default { colors, shadows, spacing, typography, animation, layout };

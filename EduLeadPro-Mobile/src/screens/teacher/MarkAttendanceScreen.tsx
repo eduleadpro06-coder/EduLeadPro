@@ -150,7 +150,7 @@ export default function MarkAttendanceScreen() {
             </View>
 
             {/* Student List */}
-            <ScrollView style={styles.content}>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 24 }}>
                 {students.map((student) => (
                     <View key={student.id} style={styles.studentCard}>
                         <View style={styles.studentInfo}>

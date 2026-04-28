@@ -128,6 +128,7 @@ export default function TeacherHomeScreen() {
 
             <ScrollView
                 style={styles.content}
+                contentContainerStyle={{ paddingBottom: 40 }}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }

@@ -78,7 +78,7 @@ router.post('/login', async (req: Request, res: Response) => {
                 const isSecurity = userRole.includes('security');
                 const isSupport = userRole.includes('support');
                 
-                let normalizedRole = 'staff';
+                let normalizedRole = userRole; // Preserve actual role (counselor, director, etc)
                 if (isDriver) normalizedRole = 'driver';
                 else if (isTeacher) normalizedRole = 'teacher';
                 else if (isSecurity) normalizedRole = 'security';

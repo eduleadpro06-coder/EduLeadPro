@@ -73,7 +73,10 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "..", "dist");
+  // In dev: import.meta.dirname = server/ → ../dist = dist/ ✓
+  // In prod: import.meta.dirname = dist/server/ → ../dist = dist/dist ✗ (wrong)
+  // Fix: use process.cwd() which is always the project root regardless of bundling.
+  const distPath = path.resolve(process.cwd(), "dist");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(

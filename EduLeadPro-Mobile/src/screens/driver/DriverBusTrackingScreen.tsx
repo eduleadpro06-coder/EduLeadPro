@@ -218,7 +218,7 @@ export default function DriverBusTrackingScreen({ navigation }: any) {
                     </Text>
                 </View>
 
-                <View style={{ height: 40 }} />
+                <View style={{ height: 24 }} />
             </ScrollView>
         </SafeAreaView>
     );
