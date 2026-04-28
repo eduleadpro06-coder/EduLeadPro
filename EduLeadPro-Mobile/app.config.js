@@ -14,7 +14,7 @@ export default {
     assetBundlePatterns: ['**/*'],
     updates: {
       enabled: true,
-      url: 'https://u.expo.dev/76a4a40f-0830-4dfa-9e16-a82b76bb5b8d',
+      url: 'https://u.expo.dev/30dace9c-63f8-4c50-8337-0a177603ecd1',
       fallbackToCacheTimeout: 0,
     },
     runtimeVersion: {
@@ -31,14 +31,8 @@ export default {
       },
       package: 'com.bloomdale.app',
       softwareKeyboardLayoutMode: 'resize',
-      versionCode: 10,
-      permissions: [
-        'READ_EXTERNAL_STORAGE',
-        'WRITE_EXTERNAL_STORAGE',
-        'READ_MEDIA_IMAGES',
-        'READ_MEDIA_VIDEO',
-        'READ_MEDIA_AUDIO'
-      ],
+      versionCode: 11,
+      permissions: [],
     },
     web: {
       favicon: './assets/logo.png',
@@ -60,7 +54,7 @@ export default {
         {
           photosPermission: 'Allow Bloomdale Connect to access your photos',
           savePhotosPermission: 'Allow Bloomdale Connect to save photos to your library',
-          isAccessMediaLocationEnabled: true,
+          isAccessMediaLocationEnabled: false,
         },
       ],
       [
@@ -71,6 +65,16 @@ export default {
           }
         }
       ],
+      [
+        './plugins/withBlockedPermissions',
+        [
+          'android.permission.READ_MEDIA_IMAGES',
+          'android.permission.READ_MEDIA_VIDEO',
+          'android.permission.READ_MEDIA_AUDIO',
+          'android.permission.READ_EXTERNAL_STORAGE',
+          'android.permission.ACCESS_MEDIA_LOCATION',
+        ],
+      ],
     ],
     experiments: {
       typedRoutes: true,
@@ -80,10 +84,10 @@ export default {
       wsUrl: process.env.EXPO_PUBLIC_WS_URL,
       olaMapsApiKey: process.env.EXPO_PUBLIC_OLA_MAPS_KEY,
       eas: {
-        projectId: '76a4a40f-0830-4dfa-9e16-a82b76bb5b8d',
+        projectId: '30dace9c-63f8-4c50-8337-0a177603ecd1',
       },
     },
-    owner: 'educonnect06',
+    owner: 'gauravkachwaha',
     scheme: 'bloomdale',
   },
 };
