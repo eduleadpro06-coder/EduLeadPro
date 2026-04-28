@@ -103,7 +103,7 @@ export default function SupportScreen() {
                 </View>
             </LinearGradient>
 
-            <View style={styles.content}>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                 {/* Hero Section */}
                 <LinearGradient
                     colors={['#0F172A', '#1E293B']}
@@ -160,7 +160,7 @@ export default function SupportScreen() {
                 </View>
 
                 <View style={styles.footer} />
-            </View>
+            </ScrollView>
         </View>
     );
 }

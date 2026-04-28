@@ -10,6 +10,7 @@ import {
     StyleSheet,
     Animated,
     KeyboardAvoidingView,
+    ScrollView,
     Platform,
     Dimensions,
     StatusBar,
@@ -26,6 +27,7 @@ import PremiumInput from '../../src/components/ui/PremiumInput';
 import PremiumCard from '../../src/components/ui/PremiumCard';
 
 const { width, height } = Dimensions.get('window');
+const isSmallScreen = height < 700;
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -186,73 +188,80 @@ export default function LoginScreen() {
                         style={styles.background}
                     />
 
-                    {/* Header Content */}
-                    <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-                        <View style={styles.logoContainer}>
-                            <Image
-                                source={require('../../assets/logo.png')}
-                                style={styles.logoImage}
-                                resizeMode="cover"
-                            />
-                        </View>
-                        <Text style={styles.title}>Bloomdale Connect</Text>
-                    </Animated.View>
-
-                    {/* Login Form Card */}
                     <KeyboardAvoidingView
                         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                        style={styles.keyboardView}
+                        style={{ flex: 1 }}
                     >
-                        <Animated.View style={{
-                            transform: [{ translateY: slideAnim }],
-                            opacity: fadeAnim,
-                            width: '100%',
-                            paddingHorizontal: spacing.lg
-                        }}>
-                            <PremiumCard style={styles.card}>
-                                <Text style={styles.cardTitle}>Welcome Back</Text>
-                                <Text style={styles.cardSub}>Stay connected with your child's progress</Text>
-
-                                <View style={{ height: spacing.lg }} />
-
-                                <PremiumInput
-                                    label="Mobile Number"
-                                    placeholder="9876543210"
-                                    icon="smartphone"
-                                    value={phone}
-                                    onChangeText={setPhone}
-                                    keyboardType="phone-pad"
-                                />
-
-                                <PremiumInput
-                                    label="Password"
-                                    placeholder="Enter your password"
-                                    icon="lock"
-                                    secureTextEntry
-                                    value={password}
-                                    onChangeText={setPassword}
-                                />
-
-                                <View style={{ height: spacing.md }} />
-
-                                <PremiumButton
-                                    title="Sign In"
-                                    onPress={handleLogin}
-                                    loading={loading}
-                                    icon="log-in"
-                                />
-
-                                <View style={styles.divider}>
-                                    <View style={styles.line} />
-                                    <Text style={styles.orText}>Internal Access</Text>
-                                    <View style={styles.line} />
+                        <ScrollView
+                            contentContainerStyle={styles.scrollContent}
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                            bounces={false}
+                        >
+                            {/* Header Content */}
+                            <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
+                                <View style={styles.logoContainer}>
+                                    <Image
+                                        source={require('../../assets/logo.png')}
+                                        style={styles.logoImage}
+                                        resizeMode="cover"
+                                    />
                                 </View>
+                                <Text style={styles.title}>Bloomdale Connect</Text>
+                            </Animated.View>
 
-                                <Text style={styles.footerText}>
-                                    Teachers & Staff members use your registered credentials.
-                                </Text>
-                            </PremiumCard>
-                        </Animated.View>
+                            {/* Login Form Card */}
+                            <Animated.View style={{
+                                transform: [{ translateY: slideAnim }],
+                                opacity: fadeAnim,
+                                width: '100%',
+                                paddingHorizontal: spacing.lg
+                            }}>
+                                <PremiumCard style={styles.card}>
+                                    <Text style={styles.cardTitle}>Welcome Back</Text>
+                                    <Text style={styles.cardSub}>Stay connected with your child's progress</Text>
+
+                                    <View style={{ height: spacing.md }} />
+
+                                    <PremiumInput
+                                        label="Mobile Number"
+                                        placeholder="9876543210"
+                                        icon="smartphone"
+                                        value={phone}
+                                        onChangeText={setPhone}
+                                        keyboardType="phone-pad"
+                                    />
+
+                                    <PremiumInput
+                                        label="Password"
+                                        placeholder="Enter your password"
+                                        icon="lock"
+                                        secureTextEntry
+                                        value={password}
+                                        onChangeText={setPassword}
+                                    />
+
+                                    <View style={{ height: spacing.md }} />
+
+                                    <PremiumButton
+                                        title="Sign In"
+                                        onPress={handleLogin}
+                                        loading={loading}
+                                        icon="log-in"
+                                    />
+
+                                    <View style={styles.divider}>
+                                        <View style={styles.line} />
+                                        <Text style={styles.orText}>Internal Access</Text>
+                                        <View style={styles.line} />
+                                    </View>
+
+                                    <Text style={styles.footerText}>
+                                        Teachers & Staff members use your registered credentials.
+                                    </Text>
+                                </PremiumCard>
+                            </Animated.View>
+                        </ScrollView>
                     </KeyboardAvoidingView>
                 </>
             )}
@@ -274,20 +283,24 @@ const styles = StyleSheet.create({
     background: {
         position: 'absolute',
         left: 0, right: 0, top: 0,
-        height: height * 0.6,
+        height: height * 0.55,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingBottom: 40,
     },
     header: {
-        marginTop: height * 0.12,
+        marginTop: isSmallScreen ? height * 0.06 : height * 0.1,
         alignItems: 'center',
-        marginBottom: spacing.xl,
+        marginBottom: isSmallScreen ? spacing.md : spacing.xl,
     },
     logoContainer: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
+        width: isSmallScreen ? 90 : 120,
+        height: isSmallScreen ? 90 : 120,
+        borderRadius: isSmallScreen ? 45 : 60,
         backgroundColor: colors.surface,
         overflow: 'hidden',
-        marginBottom: spacing.md,
+        marginBottom: isSmallScreen ? spacing.sm : spacing.md,
         ...shadows.lg,
         borderWidth: 3,
         borderColor: 'rgba(255,255,255,0.2)',
@@ -301,7 +314,7 @@ const styles = StyleSheet.create({
     title: {
         ...typography.h1,
         color: colors.textInverted,
-        fontSize: 32,
+        fontSize: isSmallScreen ? 26 : 32,
     },
     subtitle: {
         ...typography.caption,
@@ -309,10 +322,6 @@ const styles = StyleSheet.create({
         marginTop: spacing.xs,
         fontSize: 14,
         letterSpacing: 0.5,
-    },
-    keyboardView: {
-        flex: 1,
-        justifyContent: 'flex-start',
     },
     card: {
         paddingVertical: spacing.xl,
