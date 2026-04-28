@@ -3,7 +3,7 @@ export default {
     name: 'Bloomdale Connect',
     slug: 'yonerra',
     version: '2.2.7',
-    orientation: 'portrait',
+    orientation: 'default',
     icon: './assets/logo.png',
     userInterfaceStyle: 'light',
     splash: {
@@ -32,6 +32,7 @@ export default {
       label: 'Bloomdale',
       package: 'com.bloomdale.app',
       softwareKeyboardLayoutMode: 'resize',
+      resizeableActivity: true,
       versionCode: 14,
       permissions: [],
     },
@@ -55,7 +56,8 @@ export default {
         'expo-build-properties',
         {
           android: {
-            pageAlign16k: true
+            ndkVersion: "27.1.12297006",
+            useLegacyPackaging: false
           }
         }
       ],
