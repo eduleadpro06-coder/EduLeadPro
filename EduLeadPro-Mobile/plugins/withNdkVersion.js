@@ -1,23 +1,19 @@
-const { withAppBuildGradle, withProjectBuildGradle, withGradleProperties } = require('@expo/config-plugins');
+const { withAppBuildGradle, withProjectBuildGradle, withGradleProperties, withAndroidManifest } = require('@expo/config-plugins');
 
 module.exports = function with16KBAlignment(config) {
-  // 1. Force NDK 27 in project build.gradle
-  config = withProjectBuildGradle(config, (config) => {
-    if (config.modResults.language === 'groovy') {
-      config.modResults.contents = config.modResults.contents.replace(
-        /ndkVersion = .*/g,
-        'ndkVersion = "27.1.12297006"'
-      );
-    }
-    return config;
-  });
-
-  // 2. Configure Packaging in app build.gradle
+  // 1. Force NDK 27 in app build.gradle (more reliable for alignment)
   config = withAppBuildGradle(config, (config) => {
     if (config.modResults.language === 'groovy') {
       let contents = config.modResults.contents;
 
-      // Define the packaging block clearly
+      // Force NDK version 27
+      if (contents.includes('ndkVersion')) {
+        contents = contents.replace(/ndkVersion\s+.*/, 'ndkVersion "27.1.12297006"');
+      } else {
+        contents = contents.replace(/android\s*\{/, 'android {\n    ndkVersion "27.1.12297006"');
+      }
+
+      // Ensure packaging block for 16KB alignment
       const packagingBlock = `
     packaging {
         jniLibs {
@@ -25,13 +21,8 @@ module.exports = function with16KBAlignment(config) {
         }
     }
 `;
-      
-      // Inject it right after the android { line
       if (!contents.includes('useLegacyPackaging = false')) {
-        contents = contents.replace(
-          /android\s*\{/,
-          `android {${packagingBlock}`
-        );
+        contents = contents.replace(/android\s*\{/, `android {${packagingBlock}`);
       }
 
       config.modResults.contents = contents;
@@ -39,25 +30,37 @@ module.exports = function with16KBAlignment(config) {
     return config;
   });
 
-  // 3. Enable 16KB page size support in gradle.properties
+  // 2. Explicitly set extractNativeLibs="false" in AndroidManifest
+  config = withAndroidManifest(config, (config) => {
+    const androidManifest = config.modResults.manifest;
+    const mainApplication = androidManifest.application[0];
+    mainApplication.$['android:extractNativeLibs'] = 'false';
+    return config;
+  });
+
+  // 3. Set required Gradle properties for 16KB support
   config = withGradleProperties(config, (config) => {
     const props = config.modResults;
 
-    // Remove any existing entry to avoid duplicates
-    const filtered = props.filter(
-      (p) => !(p.type === 'property' && p.key === 'android.use16KPageSize')
-    );
+    const requiredProps = [
+      { key: 'android.use16KPageSize', value: 'true' },
+      { key: 'android.bundle.enableUncompressedNativeLibs', value: 'false' },
+      { key: 'expo.useLegacyPackaging', value: 'false' }
+    ];
 
-    // Add the property
-    filtered.push({
-      type: 'property',
-      key: 'android.use16KPageSize',
-      value: 'true',
+    requiredProps.forEach(({ key, value }) => {
+      const index = props.findIndex((p) => p.type === 'property' && p.key === key);
+      if (index > -1) {
+        props[index].value = value;
+      } else {
+        props.push({ type: 'property', key, value });
+      }
     });
 
-    config.modResults = filtered;
+    config.modResults = props;
     return config;
   });
 
   return config;
 };
+
