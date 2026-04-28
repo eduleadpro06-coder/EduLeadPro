@@ -148,7 +148,7 @@ function RootLayoutNav() {
             // User is authenticated but still on the login screen -> route them to their dashboard!
             if (user?.role === 'parent') {
                 router.replace('/(parent)');
-            } else if (['teacher', 'staff', 'counselor', 'director', 'admin'].includes(user?.role || '')) {
+            } else if (['teacher', 'staff', 'counselor', 'director', 'admin', 'principal'].includes(user?.role || '')) {
                 router.replace('/(teacher)');
             } else if (user?.role === 'driver') {
                 router.replace('/(driver)');

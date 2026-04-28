@@ -1981,8 +1981,8 @@ export class DatabaseStorage implements IStorage {
           change: `${staffChange >= "0" ? '+' : ''}${staffChange}%`
         },
         payroll: {
-          value: finalYearlyPayroll,
-          change: `Yearly Total`
+          value: currentPayroll,
+          change: `Monthly Total`
         },
         expenses: {
           value: monthlyExpenses,

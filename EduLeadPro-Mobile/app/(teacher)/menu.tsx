@@ -15,7 +15,7 @@ export default function MenuScreen() {
         router.replace('/(auth)/login');
     };
 
-    const isAdmin = ['counselor', 'staff', 'director', 'admin'].includes(user?.role || '');
+    const isAdmin = ['counselor', 'staff', 'director', 'admin', 'principal'].includes(user?.role || '');
 
     const menuItems = isAdmin ? [
         { icon: 'grid-outline', label: 'Dashboard', route: '/(teacher)' },

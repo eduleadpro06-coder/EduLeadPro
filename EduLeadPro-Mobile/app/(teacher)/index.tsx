@@ -33,7 +33,7 @@ export default function TeacherHomeScreen() {
     const [dashboardData, setDashboardData] = useState<any>(null);
 
     // Determine if this is an admin-type role
-    const isAdmin = ['counselor', 'staff', 'director', 'admin'].includes(user?.role || '');
+    const isAdmin = ['counselor', 'staff', 'director', 'admin', 'principal'].includes(user?.role || '');
 
     const loadDashboard = async () => {
         setLoading(true);

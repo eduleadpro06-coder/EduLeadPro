@@ -177,13 +177,13 @@ export default function Dashboard() {
           />
 
           <KPICard
-            title="Staff Payroll (Yearly)"
+            title="Staff Payroll (Monthly)"
             value={formatAmount(analytics.kpis.payroll.value)}
             change={analytics.kpis.payroll.change}
             icon={Banknote}
             color="purple"
             progress={80}
-            tooltip="Total cumulative payroll for the current calendar year."
+            tooltip="Total cumulative payroll for the current month."
           />
 
           <KPICard

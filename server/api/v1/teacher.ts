@@ -10,7 +10,7 @@ const router = express.Router();
 
 // Apply JWT middleware and role guard to all teacher routes
 router.use(jwtMiddleware);
-router.use(roleGuard(['teacher', 'counselor', 'staff']));
+router.use(roleGuard(['teacher', 'counselor', 'staff', 'director', 'admin', 'principal']));
 
 /**
  * GET /api/v1/mobile/teacher/holidays

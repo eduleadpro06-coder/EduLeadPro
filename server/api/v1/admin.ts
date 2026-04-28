@@ -10,7 +10,7 @@ const router = express.Router();
 
 // Apply JWT middleware and role guard — counselors, staff, directors can access
 router.use(jwtMiddleware);
-router.use(roleGuard(['counselor', 'staff', 'director', 'admin']));
+router.use(roleGuard(['counselor', 'staff', 'director', 'admin', 'principal']));
 
 /**
  * GET /api/v1/mobile/admin/dashboard

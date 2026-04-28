@@ -15,7 +15,7 @@ export default function Index() {
     // Redirect based on user role
     if (user?.role === 'parent') {
         return <Redirect href="/(parent)" />;
-    } else if (['teacher', 'staff', 'counselor', 'director', 'admin'].includes(user?.role || '')) {
+    } else if (['teacher', 'staff', 'counselor', 'director', 'admin', 'principal'].includes(user?.role || '')) {
         return <Redirect href="/(teacher)" />;
     } else if (user?.role === 'driver') {
         return <Redirect href="/(driver)" />;

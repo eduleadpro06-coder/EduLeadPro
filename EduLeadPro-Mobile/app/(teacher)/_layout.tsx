@@ -8,7 +8,7 @@ export default function TeacherLayout() {
     const { isAuthenticated, user, isLoading } = useAuthStore();
 
     useEffect(() => {
-        if (!isLoading && (!isAuthenticated || !['teacher', 'counselor', 'staff', 'director', 'admin'].includes(user?.role || ''))) {
+        if (!isLoading && (!isAuthenticated || !['teacher', 'counselor', 'staff', 'director', 'admin', 'principal'].includes(user?.role || ''))) {
             router.replace('/(auth)/login');
         }
     }, [isAuthenticated, user, isLoading]);
