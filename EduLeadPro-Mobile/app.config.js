@@ -33,7 +33,7 @@ export default {
       package: 'com.bloomdale.app',
       softwareKeyboardLayoutMode: 'resize',
       resizeableActivity: true,
-      versionCode: 16,
+      versionCode: 17,
       permissions: [],
     },
     web: {
@@ -51,17 +51,9 @@ export default {
           cameraPermission: 'Allow Bloomdale Connect to access camera for attendance',
         },
       ],
-      [
-        'expo-build-properties',
-        {
-          android: {
-            useLegacyPackaging: false
-          }
-        }
-      ],
       './plugins/withNdkVersion.js',
       [
-        './plugins/withBlockedPermissions',
+        './plugins/withBlockedPermissions.js',
         [
           'android.permission.READ_MEDIA_IMAGES',
           'android.permission.READ_MEDIA_VIDEO',
