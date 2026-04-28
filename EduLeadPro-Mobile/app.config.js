@@ -33,7 +33,7 @@ export default {
       package: 'com.bloomdale.app',
       softwareKeyboardLayoutMode: 'resize',
       resizeableActivity: true,
-      versionCode: 17,
+      versionCode: 18,
       permissions: [],
     },
     web: {
