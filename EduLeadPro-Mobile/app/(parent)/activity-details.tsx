@@ -18,7 +18,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as FileSystem from 'expo-file-system/legacy';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
 import { colors, spacing, typography, shadows } from '../../src/theme';
 
 const { width, height } = Dimensions.get('window');
@@ -33,54 +32,29 @@ export default function ActivityDetailsScreen() {
     const handleDownload = async (url: string) => {
         try {
             setDownloadingUrl(url);
-            
-            // 1. Request Media Library Permission 
-            const { status } = await MediaLibrary.requestPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permission Denied', 'Storage permission is required to save photos.');
-                return;
-            }
 
-            // Provide a reliable cache URI with .jpg extension
+            // Download to cache directory (no permissions needed)
             const fileUri = `${FileSystem.cacheDirectory}photo_${Date.now()}.jpg`;
-
-            console.log(`[Download] Starting download: ${url} -> ${fileUri}`);
             const downloadRes = await FileSystem.downloadAsync(url, fileUri);
-            
+
             if (downloadRes.status !== 200) {
                 throw new Error(`Download failed with status ${downloadRes.status}`);
             }
 
-            // 2. Save directly to gallery using saveToLibraryAsync (most reliable method)
-            await MediaLibrary.saveToLibraryAsync(downloadRes.uri);
-
-            Alert.alert('✅ Saved!', 'Photo has been saved to your gallery.');
-            
-        } catch (e) {
-            console.error('[Download Error]', e);
-            // Fallback to sharing on any error
-            await handleSharingFallback(url);
-        } finally {
-            setDownloadingUrl(null);
-        }
-    };
-
-    const handleSharingFallback = async (url: string) => {
-        try {
-            const destUri = `${FileSystem.cacheDirectory}share_${Date.now()}.jpg`;
-            const downloadRes = await FileSystem.downloadAsync(url, destUri);
-            
+            // Use the system share sheet — user can save to gallery, share via apps, etc.
             if (await Sharing.isAvailableAsync()) {
                 await Sharing.shareAsync(downloadRes.uri, {
                     dialogTitle: 'Save or Share Photo',
-                    mimeType: 'image/jpeg'
+                    mimeType: 'image/jpeg',
                 });
             } else {
-                Alert.alert('Download Failed', 'Could not save the photo directly and sharing is unavailable.');
+                Alert.alert('Error', 'Sharing is not available on this device.');
             }
-        } catch (err) {
-            console.error('[Sharing Fallback Error]', err);
-            Alert.alert('Error', 'An unexpected error occurred during download.');
+        } catch (e) {
+            console.error('[Download Error]', e);
+            Alert.alert('Error', 'Failed to download the photo. Please try again.');
+        } finally {
+            setDownloadingUrl(null);
         }
     };
 

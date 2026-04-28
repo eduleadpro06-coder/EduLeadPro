@@ -31,7 +31,7 @@ export default {
       },
       package: 'com.bloomdale.app',
       softwareKeyboardLayoutMode: 'resize',
-      versionCode: 11,
+      versionCode: 12,
       permissions: [],
     },
     web: {
@@ -49,14 +49,7 @@ export default {
           cameraPermission: 'Allow Bloomdale Connect to access camera for attendance',
         },
       ],
-      [
-        'expo-media-library',
-        {
-          photosPermission: 'Allow Bloomdale Connect to access your photos',
-          savePhotosPermission: 'Allow Bloomdale Connect to save photos to your library',
-          isAccessMediaLocationEnabled: false,
-        },
-      ],
+
       [
         'expo-build-properties',
         {
