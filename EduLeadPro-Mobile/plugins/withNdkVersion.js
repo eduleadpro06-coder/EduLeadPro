@@ -1,4 +1,4 @@
-const { withAppBuildGradle, withProjectBuildGradle } = require('@expo/config-plugins');
+const { withAppBuildGradle, withProjectBuildGradle, withGradleProperties } = require('@expo/config-plugins');
 
 module.exports = function with16KBAlignment(config) {
   // 1. Force NDK 27 in project build.gradle
@@ -36,6 +36,26 @@ module.exports = function with16KBAlignment(config) {
 
       config.modResults.contents = contents;
     }
+    return config;
+  });
+
+  // 3. Enable 16KB page size support in gradle.properties
+  config = withGradleProperties(config, (config) => {
+    const props = config.modResults;
+
+    // Remove any existing entry to avoid duplicates
+    const filtered = props.filter(
+      (p) => !(p.type === 'property' && p.key === 'android.use16KPageSize')
+    );
+
+    // Add the property
+    filtered.push({
+      type: 'property',
+      key: 'android.use16KPageSize',
+      value: 'true',
+    });
+
+    config.modResults = filtered;
     return config;
   });
 
