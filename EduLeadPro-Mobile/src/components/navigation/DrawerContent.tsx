@@ -98,7 +98,7 @@ export default function DrawerContent(props: DrawerContentComponentProps) {
         }
     ];
 
-    const menuItems = user?.role === 'security' || user?.role === 'support_staff' 
+    const menuItems = user?.role === 'security' || user?.role === 'support_staff' || user?.role === 'care giver'
         ? securityMenu 
         : (user?.role === 'teacher' || user?.role === 'driver' ? staffMenu : parentMenu);
 
@@ -116,7 +116,7 @@ export default function DrawerContent(props: DrawerContentComponentProps) {
                             style={styles.avatarGradient}
                         >
                             <Text style={styles.avatarText}>
-                                {user?.name?.charAt(0).toUpperCase() || (user?.role === 'security' ? 'S' : 'P')}
+                                {user?.name?.charAt(0).toUpperCase() || (user?.role === 'security' || user?.role === 'care giver' ? 'S' : 'P')}
                             </Text>
                         </LinearGradient>
                     </View>
@@ -125,7 +125,7 @@ export default function DrawerContent(props: DrawerContentComponentProps) {
                             {user?.name || 'Bloomdale Connect'}
                         </Text>
                         <Text style={styles.userRole}>
-                            {user?.role === 'security' ? 'Security Staff' : user?.role === 'teacher' ? 'Faculty Member' : user?.role === 'driver' ? 'Transport Staff' : 'Guardian'}
+                            {user?.role === 'security' || user?.role === 'care giver' ? 'Security Staff' : user?.role === 'teacher' ? 'Faculty Member' : user?.role === 'driver' ? 'Transport Staff' : 'Guardian'}
                         </Text>
                     </View>
                 </View>

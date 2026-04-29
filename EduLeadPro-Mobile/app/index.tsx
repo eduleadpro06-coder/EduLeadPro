@@ -19,7 +19,7 @@ export default function Index() {
         return <Redirect href="/(teacher)" />;
     } else if (user?.role === 'driver') {
         return <Redirect href="/(driver)" />;
-    } else if (['security', 'support_staff'].includes(user?.role || '')) {
+    } else if (['security', 'support_staff', 'care giver'].includes(user?.role || '')) {
         return <Redirect href="/(gate)" />;
     }
 

@@ -152,7 +152,7 @@ function RootLayoutNav() {
                 router.replace('/(teacher)');
             } else if (user?.role === 'driver') {
                 router.replace('/(driver)');
-            } else if (user?.role === 'security' || user?.role === 'support_staff') {
+            } else if (user?.role === 'security' || user?.role === 'support_staff' || user?.role === 'care giver') {
                 router.replace('/(gate)');
             } else {
                 console.warn(`[Layout] Unknown role "${user?.role}", defaulting to teacher`);

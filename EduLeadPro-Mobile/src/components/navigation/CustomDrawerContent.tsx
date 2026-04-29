@@ -21,7 +21,7 @@ export default function CustomDrawerContent(props: any) {
     };
 
     const isTeacher = user?.role === 'teacher';
-    const isSecurity = user?.role === 'security' || user?.role === 'support_staff';
+    const isSecurity = user?.role === 'security' || user?.role === 'support_staff' || user?.role === 'care giver';
     
     const teacherItems = [
         { label: 'Dashboard', icon: 'home', route: '/(teacher)' },

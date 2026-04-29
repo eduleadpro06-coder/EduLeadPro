@@ -5,7 +5,7 @@ export interface User {
     userId: number;
     name: string;
     email: string;
-    role: 'parent' | 'teacher' | 'driver' | 'admin' | 'security' | 'support_staff';
+    role: 'parent' | 'teacher' | 'driver' | 'admin' | 'security' | 'support_staff' | 'care giver';
     organizationId: number;
     children?: Student[];
 }

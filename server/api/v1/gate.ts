@@ -20,7 +20,7 @@ const router = express.Router();
  * GET /api/v1/mobile/gate/students
  * Search students for gate check-in/out
  */
-router.get('/students', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
+router.get('/students', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin', 'care giver']), async (req: Request, res: Response) => {
     try {
         const organizationId = req.user!.organizationId;
         const search = (req.query.search as string || req.query.query as string || '').toLowerCase();
@@ -85,7 +85,7 @@ router.get('/students', jwtMiddleware, roleGuard(['security', 'support_staff', '
  * GET /api/v1/mobile/gate/students/:id
  * Get specific student details for gate
  */
-router.get('/students/:id', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
+router.get('/students/:id', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin', 'care giver']), async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const organizationId = req.user!.organizationId;
@@ -130,7 +130,7 @@ router.get('/students/:id', jwtMiddleware, roleGuard(['security', 'support_staff
  * POST /api/v1/mobile/gate/sync
  * Sync offline check-in/out logs
  */
-router.post('/sync', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
+router.post('/sync', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin', 'care giver']), async (req: Request, res: Response) => {
     try {
         const { logs } = req.body; // Array of log objects
         if (!Array.isArray(logs)) {
@@ -279,7 +279,7 @@ router.post('/sync', jwtMiddleware, roleGuard(['security', 'support_staff', 'adm
  * POST /api/v1/mobile/gate/visitors
  * Record new visitor entry
  */
-router.post('/visitors', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
+router.post('/visitors', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin', 'care giver']), async (req: Request, res: Response) => {
     try {
         const { name, phone, purpose, photoUrl, photo_url } = req.body;
         const finalPhotoUrl = photoUrl || photo_url;
@@ -316,7 +316,7 @@ router.post('/visitors', jwtMiddleware, roleGuard(['security', 'support_staff', 
  * PATCH /api/v1/mobile/gate/visitors/:id/checkout
  * Mark visitor exit
  */
-router.patch('/visitors/:id/checkout', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
+router.patch('/visitors/:id/checkout', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin', 'care giver']), async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const organizationId = req.user!.organizationId;
@@ -347,7 +347,7 @@ router.patch('/visitors/:id/checkout', jwtMiddleware, roleGuard(['security', 'su
  * GET /api/v1/mobile/gate/visitors/active
  * Get currently inside visitors
  */
-router.get('/visitors/active', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
+router.get('/visitors/active', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin', 'care giver']), async (req: Request, res: Response) => {
     try {
         const organizationId = req.user!.organizationId;
         const { supabase } = await import('../../supabase.js');
@@ -479,7 +479,7 @@ router.get('/history/visitors', optionalJwtMiddleware, async (req: Request, res:
  * GET /api/v1/mobile/gate/leaves
  * Get leave history
  */
-router.get('/leaves', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
+router.get('/leaves', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin', 'care giver']), async (req: Request, res: Response) => {
     try {
         const staffId = req.user!.userId;
         const organizationId = req.user!.organizationId;        
@@ -506,7 +506,7 @@ router.get('/leaves', jwtMiddleware, roleGuard(['security', 'support_staff', 'ad
  * GET /api/v1/mobile/gate/leaves/balance
  * Get leave balance
  */
-router.get('/leaves/balance', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
+router.get('/leaves/balance', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin', 'care giver']), async (req: Request, res: Response) => {
     try {
         const staffId = req.user!.userId;
         const organizationId = req.user!.organizationId;        
@@ -558,7 +558,7 @@ router.get('/leaves/balance', jwtMiddleware, roleGuard(['security', 'support_sta
  * POST /api/v1/mobile/gate/leaves
  * Apply for leave
  */
-router.post('/leaves', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin']), async (req: Request, res: Response) => {
+router.post('/leaves', jwtMiddleware, roleGuard(['security', 'support_staff', 'admin', 'care giver']), async (req: Request, res: Response) => {
     try {
         const staffId = req.user!.userId;
         const organizationId = req.user!.organizationId;        
