@@ -44,7 +44,6 @@ module.exports = function with16KBAlignment(config) {
 
     const requiredProps = [
       { key: 'android.use16KPageSize', value: 'true' },
-      { key: 'android.bundle.enableUncompressedNativeLibs', value: 'false' },
       { key: 'expo.useLegacyPackaging', value: 'false' }
     ];
 
