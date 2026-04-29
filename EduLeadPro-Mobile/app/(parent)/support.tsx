@@ -47,7 +47,7 @@ export default function SupportScreen() {
     const orgName = orgDetails?.name || defaultOrgName;
     const phone = orgDetails?.phone || '+91 98765 43210';
     const email = orgDetails?.email && orgDetails?.email !== '' ? orgDetails.email : 'Not Available';
-    const website = orgDetails?.website && orgDetails?.website !== '' ? orgDetails.website : 'Not Available';
+    const website = orgDetails?.website && orgDetails?.website !== '' ? orgDetails.website : 'bloomdalepreschool.in';
     const address = orgDetails?.address
         ? `${orgDetails.address}${orgDetails.city ? ', ' + orgDetails.city : ''}${orgDetails.state ? ', ' + orgDetails.state : ''}${orgDetails.pincode ? ' - ' + orgDetails.pincode : ''}`
         : 'Address not available';
