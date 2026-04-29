@@ -2,7 +2,7 @@ export default {
   expo: {
     name: 'Bloomdale Connect',
     slug: 'yonerra',
-    version: '2.3.1',
+    version: '2.3.2',
     orientation: 'default',
     icon: './assets/logo.png',
     userInterfaceStyle: 'light',
@@ -33,7 +33,7 @@ export default {
       package: 'com.bloomdale.app',
       softwareKeyboardLayoutMode: 'resize',
       resizeableActivity: true,
-      versionCode: 21,
+      versionCode: 22,
       permissions: [],
     },
     web: {
@@ -51,7 +51,6 @@ export default {
           cameraPermission: 'Allow Bloomdale Connect to access camera for attendance',
         },
       ],
-      './plugins/withNdkVersion.js',
       [
         './plugins/withBlockedPermissions.js',
         [
