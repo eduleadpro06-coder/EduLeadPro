@@ -2547,7 +2547,8 @@ export default function StudentFees() {
                                                 installments: Array.isArray(schedule) ? schedule.map((s: any) => ({
                                                   installmentNumber: s.installmentNumber,
                                                   amount: s.amount,
-                                                  dueDate: s.dueDate ? new Date(s.dueDate).toISOString().split('T')[0] : ''
+                                                  dueDate: s.dueDate ? new Date(s.dueDate).toISOString().split('T')[0] : '',
+                                                  status: s.status
                                                 })) : [],
                                                 recalculate: false,
                                                 strategy: 'distribute',
@@ -3281,9 +3282,9 @@ export default function StudentFees() {
                                 min="0"
                                 step="1"
                                 value={inst.amount}
-                                readOnly={isLast}
-                                className={`h-8 w-32 ml-auto text-right ${isLast ? 'bg-gray-50 cursor-not-allowed font-semibold text-purple-700' : ''}`}
-                                title={isLast ? 'Auto-calculated to balance total' : 'Edit this installment amount'}
+                                readOnly={isLast || inst.status === 'paid'}
+                                className={`h-8 w-32 ml-auto text-right ${isLast ? 'bg-gray-50 cursor-not-allowed font-semibold text-purple-700' : inst.status === 'paid' ? 'bg-green-50 text-green-700 cursor-not-allowed' : ''}`}
+                                title={isLast ? 'Auto-calculated to balance total' : inst.status === 'paid' ? 'Cannot edit a paid installment' : 'Edit this installment amount'}
                                 onChange={(e) => {
                                   if (isLast) return;
                                   const newAmount = e.target.value;
@@ -3301,6 +3302,7 @@ export default function StudentFees() {
                                 }}
                               />
                               {isLast && <div className="text-[10px] text-purple-500 text-right mt-0.5">auto-balanced</div>}
+                              {inst.status === 'paid' && <div className="text-[10px] text-green-600 font-medium text-right mt-0.5">PAID</div>}
                             </TableCell>
                           </TableRow>
                         );
