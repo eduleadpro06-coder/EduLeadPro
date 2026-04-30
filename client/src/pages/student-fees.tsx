@@ -361,6 +361,7 @@ export default function StudentFees() {
       const payload: any = {
         totalAmount: editEmiFormData.totalAmount,
         discount: editEmiFormData.discount,
+        registrationFee: editEmiFormData.registrationFee,
         numberOfInstallments: editEmiFormData.emiPeriod,
         recalculate: editEmiFormData.recalculate
       };
@@ -404,6 +405,17 @@ export default function StudentFees() {
       }
 
       await refetchEmiPlans();
+      await queryClient.invalidateQueries({ queryKey: ["/api/fee-payments"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/fee-stats"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/emi-progress"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/pending-emis"] });
+      
+      if (selectedStudent) {
+        await queryClient.invalidateQueries({ queryKey: [`/api/emi-plans/${selectedEmiPlanForEdit.id}/schedule`] });
+        await queryClient.invalidateQueries({ queryKey: [`/api/emi-plans/${selectedEmiPlanForEdit.id}/payments`] });
+        await queryClient.invalidateQueries({ queryKey: [`/api/students/${selectedStudent.id}/invoice-data`] });
+      }
+
       setEditEmiModalOpen(false);
       toast({ title: "Success", description: "EMI plan updated successfully" });
     } catch (error: any) {
@@ -2520,19 +2532,22 @@ export default function StudentFees() {
                                         className="border-orange-500 text-orange-600 hover:bg-orange-50"
                                         onClick={() => {
                                           setSelectedEmiPlanForEdit(plan);
+                                          const regFeePayment = feePayments.find(p => p.leadId === plan.studentId && p.installmentNumber === 0);
+                                          const actualRegFee = regFeePayment ? regFeePayment.amount : '0';
+
                                           // Fetch schedule details
                                           apiRequest("GET", `/api/emi-plans/${plan.id}/schedule`)
                                             .then(res => res.json())
                                             .then(schedule => {
                                               setEditEmiFormData({
                                                 totalAmount: plan.totalAmount || "0",
-                                                registrationFee: (plan as any).registrationFee || '0',
-                                                discount: (plan as any).discount || plan.discount || '0',
+                                                registrationFee: actualRegFee,
+                                                discount: plan.discount || '0',
                                                 emiPeriod: String(plan.numberOfInstallments || '2'),
                                                 installments: Array.isArray(schedule) ? schedule.map((s: any) => ({
                                                   installmentNumber: s.installmentNumber,
                                                   amount: s.amount,
-                                                  dueDate: s.dueDate
+                                                  dueDate: s.dueDate ? new Date(s.dueDate).toISOString().split('T')[0] : ''
                                                 })) : [],
                                                 recalculate: false,
                                                 strategy: 'distribute',
@@ -2546,8 +2561,8 @@ export default function StudentFees() {
                                               console.error("Failed to fetch EMI schedule", err);
                                               setEditEmiFormData({
                                                 totalAmount: plan.totalAmount || "0",
-                                                registrationFee: (plan as any).registrationFee || '0',
-                                                discount: (plan as any).discount || plan.discount || '0',
+                                                registrationFee: actualRegFee,
+                                                discount: plan.discount || '0',
                                                 emiPeriod: String(plan.numberOfInstallments || '2'),
                                                 installments: [],
                                                 recalculate: false,

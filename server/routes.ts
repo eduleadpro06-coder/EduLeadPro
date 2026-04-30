@@ -2849,6 +2849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status, 
         totalAmount, 
         discount, 
+        registrationFee,
         numberOfInstallments, 
         recalculate, 
         strategy, 
@@ -2869,9 +2870,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
               numInstallmentsToRemove: numInstallmentsToRemove || undefined
             }
           );
+          
           if (!updatedPlan) {
             return res.status(404).json({ message: "EMI plan not found" });
           }
+          
+          if (registrationFee !== undefined) {
+             const { db } = await import("./db");
+             const { schema } = await import("@shared/schema");
+             const { eq, and } = await import("drizzle-orm");
+             await db.update(schema.feePayments)
+               .set({ amount: registrationFee, totalAmount: registrationFee })
+               .where(and(
+                 eq(schema.feePayments.leadId, updatedPlan.studentId),
+                 eq(schema.feePayments.installmentNumber, 0)
+               ));
+          }
+
           return res.json(updatedPlan);
         } catch (err: any) {
           return res.status(400).json({ message: err.message || "Failed to recalculate EMI plan" });
@@ -2894,6 +2909,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedPlan = await storage.updateEmiPlan(planId, updates, customInstallments);
       if (!updatedPlan) {
         return res.status(404).json({ message: "EMI plan not found" });
+      }
+      
+      if (registrationFee !== undefined) {
+         const { db } = await import("./db");
+         const { schema } = await import("@shared/schema");
+         const { eq, and } = await import("drizzle-orm");
+         await db.update(schema.feePayments)
+           .set({ amount: registrationFee, totalAmount: registrationFee })
+           .where(and(
+             eq(schema.feePayments.leadId, updatedPlan.studentId),
+             eq(schema.feePayments.installmentNumber, 0)
+           ));
       }
 
       res.json(updatedPlan);

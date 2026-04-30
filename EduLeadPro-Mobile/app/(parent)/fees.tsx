@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     View,
     Text,
@@ -26,34 +27,25 @@ export default function ParentFeesScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { user } = useAuthStore();
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
-    const [fees, setFees] = useState<any>(null);
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
+    const queryClient = useQueryClient();
 
     const currentChild = user?.children?.[0];
+    const childId = currentChild ? Number(currentChild.id) : null;
 
-    const fetchFees = async () => {
-        if (currentChild) {
-            try {
-                const data = await api.getStudentFees(Number(currentChild.id));
-                setFees(data);
-            } catch (e) {
-                console.error('Fees fetch error:', e);
-            } finally {
-                setLoading(false);
-                setRefreshing(false);
-            }
-        }
-    };
+    const { data: fees, isLoading: loading, refetch } = useQuery({
+        queryKey: ['fees', childId],
+        queryFn: () => api.getStudentFees(childId!),
+        enabled: !!childId,
+    });
 
-    useEffect(() => {
-        fetchFees();
-    }, [currentChild]);
+    const [refreshing, setRefreshing] = useState(false);
 
-    const onRefresh = () => {
+    const onRefresh = async () => {
         setRefreshing(true);
-        fetchFees();
+        await queryClient.invalidateQueries({ queryKey: ['fees', childId] });
+        await refetch();
+        setRefreshing(false);
     };
 
     const formatCurrency = (amount: number) => {

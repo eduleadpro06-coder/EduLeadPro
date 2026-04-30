@@ -444,7 +444,7 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
                 .from('emi_schedule')
                 .select('id, installment_number, amount, due_date, status, paid_date')
                 .eq('emi_plan_id', emiPlan.id)
-                .order('due_date', { ascending: true });
+                .order('installment_number', { ascending: true });
 
             if (schedule) {
                 emiDetails = {
@@ -476,39 +476,29 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
         const additionalPaid = (payments || []).filter(p => p.payment_category === 'additional_charge').reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
         const totalPaid = tuitionPaid + additionalPaid;
 
-        // Calculate total discount
-        const paymentDiscounts = (payments || []).reduce((sum, p) => sum + parseFloat(p.discount || '0'), 0);
-        const emiDiscount = emiPlan ? parseFloat(emiPlan.discount || '0') : 0;
-        const totalDiscount = paymentDiscounts + emiDiscount;
+        // Calculate total discount — use only EMI plan discount to avoid double-counting
+        // (individual fee_payment discounts are already factored into total_amount on the web)
+        const totalDiscount = emiPlan ? parseFloat(emiPlan.discount || '0') : 0;
         const netTotalFees = Math.max(0, totalFees - totalDiscount);
 
-        // Dynamic Status Calculation to fix rounding issues
+        // Trust the emi_schedule.status from DB — the web updates it when payments are recorded.
+        // Only apply dynamic status override as a safety net for installments without an explicit
+        // DB status set (i.e. when emi_schedule was generated before the status tracking was added).
         if (emiDetails && emiDetails.installments.length > 0) {
-            // Calculate explicit down payment (Total - Sum of Installments)
-            const sumInstallments = emiDetails.installments.reduce((sum: number, i: any) => sum + parseFloat(i.amount), 0);
-            const implicitDownPayment = Math.max(0, totalFees - sumInstallments);
-
-            // Start checking coverage from down payment
-            let coveredAmount = implicitDownPayment;
-
-            // Tolerance for rounding errors (e.g. ₹1 difference)
-            const TOLERANCE = 10;
+            // Build a set of paid installment numbers from fee_payments for cross-check
+            const paidInstallmentNumbers = new Set(
+                (payments || [])
+                    .filter(p => p.installment_number !== null && p.installment_number > 0 && p.payment_category === 'fee_payment')
+                    .map(p => p.installment_number)
+            );
 
             emiDetails.installments = emiDetails.installments.map((inst: any) => {
-                const amount = parseFloat(inst.amount);
-                const requiredTotal = coveredAmount + amount;
-
-                // If total paid covers this installment (within tolerance)
-                if (totalPaid >= (requiredTotal - TOLERANCE)) {
-                    // Update covered amount for next iteration
-                    coveredAmount += amount;
+                // If DB already says 'paid', trust it
+                if (inst.status === 'paid') return inst;
+                // If we have a matching fee_payment record, mark as paid
+                if (paidInstallmentNumbers.has(inst.installmentNumber)) {
                     return { ...inst, status: 'paid' };
                 }
-
-                // If partial coverage or strictly pending
-                // Keep original status unless we want to show partial? 
-                // For now, adhere to "paid" vs "pending" based on full coverage
-                coveredAmount += amount; // Still increment to check next segments correctly in sequential logic
                 return inst;
             });
         }
@@ -517,6 +507,7 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
         const formattedPayments = (payments || []).map((p: any) => ({
             id: p.id,
             amount: Math.round(parseFloat(p.amount)),
+            discount: p.discount ? Math.round(parseFloat(p.discount)) : 0,
             date: p.payment_date,
             mode: p.payment_mode,
             receiptNumber: p.receipt_number,
@@ -539,6 +530,7 @@ router.get('/child/:childId/fees', async (req: Request, res: Response) => {
                 payments: formattedPayments,
                 emiDetails: emiDetails ? {
                     ...emiDetails,
+                    discount: Math.round(totalDiscount),
                     totalAmount: Math.round(emiDetails.totalAmount),
                     installments: emiDetails.installments.map((inst: any) => ({
                         ...inst,
