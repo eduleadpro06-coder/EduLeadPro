@@ -3282,9 +3282,9 @@ export default function StudentFees() {
                                 min="0"
                                 step="1"
                                 value={inst.amount}
-                                readOnly={isLast || inst.status === 'paid'}
-                                className={`h-8 w-32 ml-auto text-right ${isLast ? 'bg-gray-50 cursor-not-allowed font-semibold text-purple-700' : inst.status === 'paid' ? 'bg-green-50 text-green-700 cursor-not-allowed' : ''}`}
-                                title={isLast ? 'Auto-calculated to balance total' : inst.status === 'paid' ? 'Cannot edit a paid installment' : 'Edit this installment amount'}
+                                readOnly={isLast}
+                                className={`h-8 w-32 ml-auto text-right ${isLast ? 'bg-gray-50 cursor-not-allowed font-semibold text-purple-700' : ''}`}
+                                title={isLast ? 'Auto-calculated to balance total' : 'Edit this installment amount'}
                                 onChange={(e) => {
                                   if (isLast) return;
                                   const newAmount = e.target.value;

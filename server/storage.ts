@@ -4002,7 +4002,7 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
-        // Insert new custom installments (skipping those that were already paid)
+        // Insert new custom installments or update paid ones
         for (const inst of customInstallments) {
           if (!paidNumbers.has(inst.installmentNumber)) {
             await tx.insert(schema.emiSchedule).values({
@@ -4013,6 +4013,20 @@ export class DatabaseStorage implements IStorage {
               dueDate: inst.dueDate,
               status: 'pending'
             });
+          } else {
+            // Update the amount and dueDate of the PAID installment to allow admins to fix data entry mistakes
+            await tx.update(schema.emiSchedule)
+              .set({
+                amount: inst.amount,
+                dueDate: inst.dueDate,
+                updatedAt: new Date()
+              })
+              .where(
+                and(
+                  eq(schema.emiSchedule.emiPlanId, plan.id),
+                  eq(schema.emiSchedule.installmentNumber, inst.installmentNumber)
+                )
+              );
           }
         }
       }
