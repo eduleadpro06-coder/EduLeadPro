@@ -2876,9 +2876,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           if (registrationFee !== undefined) {
-             const { db } = await import("./db");
-             const { schema } = await import("@shared/schema");
-             const { eq, and } = await import("drizzle-orm");
              await db.update(schema.feePayments)
                .set({ amount: registrationFee, totalAmount: registrationFee })
                .where(and(
@@ -2912,9 +2909,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (registrationFee !== undefined) {
-         const { db } = await import("./db");
-         const { schema } = await import("@shared/schema");
-         const { eq, and } = await import("drizzle-orm");
          await db.update(schema.feePayments)
            .set({ amount: registrationFee, totalAmount: registrationFee })
            .where(and(
