@@ -3114,7 +3114,22 @@ export default function StudentFees() {
                           const classFeeAmount = parseFloat(standardFee.amount);
                           const tuitionPaid = calculateTuitionPaidAmount(getStudentPayments(selectedStudent.id));
                           const outstanding = Math.max(0, classFeeAmount - tuitionPaid);
-                          setEditEmiFormData(prev => ({ ...prev, totalAmount: outstanding.toString() }));
+                          setEditEmiFormData(prev => {
+                            const count = parseInt(prev.emiPeriod) || 0;
+                            const total = outstanding;
+                            const reg = parseFloat(prev.registrationFee) || 0;
+                            const disc = parseFloat(prev.discount) || 0;
+                            const payable = Math.max(0, total - reg - disc);
+                            const newInst = count > 0 && payable > 0
+                              ? Array.from({ length: count }, (_, i) => ({
+                                  installmentNumber: i + 1,
+                                  amount: Math.round(payable / count).toString(),
+                                  dueDate: prev.installments[i]?.dueDate || new Date().toISOString().split('T')[0],
+                                  status: prev.installments[i]?.status || 'pending'
+                                }))
+                              : prev.installments;
+                            return { ...prev, totalAmount: outstanding.toString(), installments: newInst };
+                          });
                           toast({
                             title: "Applied Class Fee",
                             description: `Outstanding: ₹${outstanding.toLocaleString()}`
