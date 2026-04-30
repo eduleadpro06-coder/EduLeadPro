@@ -3095,25 +3095,10 @@ export default function StudentFees() {
                     id="editTotalAmount"
                     type="number"
                     required
+                    readOnly
+                    className="bg-gray-50 text-gray-500 cursor-not-allowed"
+                    title="Total amount is fetched from the backend or class fee. It cannot be edited manually."
                     value={editEmiFormData.totalAmount}
-                    onChange={e => {
-                      const totalAmount = e.target.value;
-                      setEditEmiFormData(prev => {
-                        const count = parseInt(prev.emiPeriod) || 0;
-                        const total = parseFloat(totalAmount) || 0;
-                        const reg = parseFloat(prev.registrationFee) || 0;
-                        const disc = parseFloat(prev.discount) || 0;
-                        const payable = Math.max(0, total - reg - disc);
-                        const newInst = count > 0 && payable > 0
-                          ? Array.from({ length: count }, (_, i) => ({
-                              installmentNumber: i + 1,
-                              amount: Math.round(payable / count).toString(),
-                              dueDate: prev.installments[i]?.dueDate || new Date().toISOString().split('T')[0]
-                            }))
-                          : prev.installments;
-                        return { ...prev, totalAmount, installments: newInst };
-                      });
-                    }}
                   />
                   {selectedStudent && (
                     <Button
