@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQueryState } from "@/hooks/use-query-state";
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Filter, Download, FileText } from "lucide-react";
+import { Filter, Download, FileText, ArrowUpDown } from "lucide-react";
 
 export default function Reports() {
   const [paymentProgram, setPaymentProgram] = useState<string>("all");
@@ -30,6 +30,38 @@ export default function Reports() {
   });
 
   const [activeTab, setActiveTab] = useQueryState("tab", "payment-due");
+
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+  const sortedData = useMemo(() => {
+    let sortableData = [...(paymentDueData || [])];
+    if (sortConfig !== null) {
+      sortableData.sort((a, b) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableData;
+  }, [paymentDueData, sortConfig]);
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -164,19 +196,37 @@ export default function Reports() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b bg-gray-50/50 text-xs text-gray-500">
-                          <th className="px-2 py-2 text-left font-medium w-[160px]">Student</th>
-                          <th className="px-2 py-2 text-left font-medium w-[160px]">Father / Phone</th>
-                          <th className="px-2 py-2 text-left font-medium">Program</th>
-                          <th className="px-2 py-2 text-right font-medium whitespace-nowrap">Tuition Fee</th>
-                          <th className="px-2 py-2 text-right font-medium whitespace-nowrap">Tuition Paid</th>
-                          <th className="px-2 py-2 text-right font-medium whitespace-nowrap">Add. Paid</th>
-                          <th className="px-2 py-2 text-left font-medium pl-4 w-[120px]">Dates</th>
-                          <th className="px-2 py-2 text-right font-medium whitespace-nowrap">Total Due</th>
-                          <th className="px-2 py-2 text-center font-medium w-[100px]">Status</th>
+                          <th className="px-2 py-2 text-left font-medium w-[160px] cursor-pointer hover:bg-gray-100" onClick={() => requestSort('studentName')}>
+                            <div className="flex items-center gap-1">Student <ArrowUpDown size={12} className="text-gray-400" /></div>
+                          </th>
+                          <th className="px-2 py-2 text-left font-medium w-[160px] cursor-pointer hover:bg-gray-100" onClick={() => requestSort('fatherName')}>
+                            <div className="flex items-center gap-1">Father / Phone <ArrowUpDown size={12} className="text-gray-400" /></div>
+                          </th>
+                          <th className="px-2 py-2 text-left font-medium cursor-pointer hover:bg-gray-100" onClick={() => requestSort('program')}>
+                            <div className="flex items-center gap-1">Program <ArrowUpDown size={12} className="text-gray-400" /></div>
+                          </th>
+                          <th className="px-2 py-2 text-right font-medium whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => requestSort('invoiceAmount')}>
+                            <div className="flex items-center justify-end gap-1">Tuition Fee <ArrowUpDown size={12} className="text-gray-400" /></div>
+                          </th>
+                          <th className="px-2 py-2 text-right font-medium whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => requestSort('collectedTuition')}>
+                            <div className="flex items-center justify-end gap-1">Tuition Paid <ArrowUpDown size={12} className="text-gray-400" /></div>
+                          </th>
+                          <th className="px-2 py-2 text-right font-medium whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => requestSort('additionalPaid')}>
+                            <div className="flex items-center justify-end gap-1">Add. Paid <ArrowUpDown size={12} className="text-gray-400" /></div>
+                          </th>
+                          <th className="px-2 py-2 text-left font-medium pl-4 w-[120px] cursor-pointer hover:bg-gray-100" onClick={() => requestSort('nextDueDate')}>
+                            <div className="flex items-center gap-1">Dates <ArrowUpDown size={12} className="text-gray-400" /></div>
+                          </th>
+                          <th className="px-2 py-2 text-right font-medium whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => requestSort('totalDue')}>
+                            <div className="flex items-center justify-end gap-1">Total Due <ArrowUpDown size={12} className="text-gray-400" /></div>
+                          </th>
+                          <th className="px-2 py-2 text-center font-medium w-[100px] cursor-pointer hover:bg-gray-100" onClick={() => requestSort('paymentStatus')}>
+                            <div className="flex items-center justify-center gap-1">Status <ArrowUpDown size={12} className="text-gray-400" /></div>
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {paymentDueData.map((row: any) => (
+                        {sortedData.map((row: any) => (
                           <tr key={row.id} className="border-b hover:bg-gray-50/50 transition-colors text-sm">
                             <td className="px-2 py-2 align-top">
                               <div className="font-medium text-gray-900">{row.studentName}</div>
@@ -242,17 +292,6 @@ export default function Reports() {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot>
-                        <tr className="bg-white border-t-2 border-gray-100 font-semibold text-sm">
-                          <td colSpan={3} className="px-2 py-2 text-right text-gray-600">TOTAL:</td>
-                          <td className="px-2 py-2 text-right">₹{paymentDueData.reduce((sum: number, r: any) => sum + r.invoiceAmount, 0).toLocaleString()}</td>
-                          <td className="px-2 py-2 text-right text-green-600">₹{paymentDueData.reduce((sum: number, r: any) => sum + (r.collectedTuition || 0), 0).toLocaleString()}</td>
-                          <td className="px-2 py-2 text-right text-blue-600">₹{paymentDueData.reduce((sum: number, r: any) => sum + (r.additionalPaid || 0), 0).toLocaleString()}</td>
-                          <td></td>
-                          <td className="px-2 py-2 text-right text-orange-600">₹{paymentDueData.reduce((sum: number, r: any) => sum + r.totalDue, 0).toLocaleString()}</td>
-                          <td></td>
-                        </tr>
-                      </tfoot>
                     </table>
                   </div>
                 ) : (
