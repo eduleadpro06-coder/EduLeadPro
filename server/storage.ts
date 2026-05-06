@@ -1247,96 +1247,23 @@ export class DatabaseStorage implements IStorage {
       ? (((totalStaff - prevTotalStaff) / prevTotalStaff) * 100).toFixed(1)
       : totalStaff > 0 ? "100.0" : "0.0";
 
-    // 4. Payroll KPI (Current Month Cost)
-    // We try to get from payroll table first
-    let currentPayroll = 0;
-    let prevPayroll = 0;
-
-    const [currPayrollResult, prevPayrollResult, yearlyPayrollResult] = await Promise.all([
+    // 4. Payroll KPI (Total All Time)
+    const [allTimePayrollResult] = await Promise.all([
       db.select({ total: sql<number>`cast(coalesce(sum(${schema.payroll.netSalary}), 0) as integer)` })
         .from(schema.payroll)
         .where(
           and(
             organizationId ? eq(schema.staff.organizationId, organizationId) : sql`1=1`,
-            eq(schema.payroll.month, currentMonth + 1), // JS month is 0-based
-            eq(schema.payroll.year, currentYear)
-          )
-        )
-        .leftJoin(schema.staff, eq(schema.payroll.staffId, schema.staff.id)), // Implicit join for org filter
-      db.select({ total: sql<number>`cast(coalesce(sum(${schema.payroll.netSalary}), 0) as integer)` })
-        .from(schema.payroll)
-        .where(
-          and(
-            organizationId ? eq(schema.staff.organizationId, organizationId) : sql`1=1`,
-            eq(schema.payroll.month, currentMonth), // Previous month
-            eq(schema.payroll.year, currentMonth === 0 ? currentYear - 1 : currentYear)
-          )
-        )
-        .leftJoin(schema.staff, eq(schema.payroll.staffId, schema.staff.id)),
-      db.select({ total: sql<number>`cast(coalesce(sum(${schema.payroll.netSalary}), 0) as integer)` })
-        .from(schema.payroll)
-        .where(
-          and(
-            organizationId ? eq(schema.staff.organizationId, organizationId) : sql`1=1`,
-            eq(schema.payroll.year, currentYear)
+            eq(schema.payroll.status, 'processed')
           )
         )
         .leftJoin(schema.staff, eq(schema.payroll.staffId, schema.staff.id))
     ]);
 
-    currentPayroll = currPayrollResult[0]?.total || 0;
-    prevPayroll = prevPayrollResult[0]?.total || 0;
-    const yearlyPayrollTotal = yearlyPayrollResult[0]?.total || 0;
+    const totalPayrollAllTime = allTimePayrollResult[0]?.total || 0;
 
-    // Fallback: If no payroll data for this month, sum up active staff salaries as an estimate
-    if (currentPayroll === 0) {
-      const staffSalaries = await db.select({ total: sql<number>`cast(coalesce(sum(${schema.staff.salary}), 0) as integer)` })
-        .from(schema.staff)
-        .where(
-          and(
-            eq(schema.staff.isActive, true),
-            organizationId ? eq(schema.staff.organizationId, organizationId) : sql`1=1`
-          )
-        );
-      currentPayroll = staffSalaries[0]?.total || 0;
-    }
-    // Fallback for previous if 0 (rough estimate)
-    if (prevPayroll === 0) {
-      // Just use same as current for fallback to avoid wild swings, unless we truly have 0 payroll history
-      prevPayroll = currentPayroll;
-    }
-
-    const payrollChange = prevPayroll > 0
-      ? (((currentPayroll - prevPayroll) / prevPayroll) * 100).toFixed(1)
-      : "0.0";
-
-    // Final Yearly Payroll (if no records in DB yet, fallback to single month estimate * months passed)
-    const currentMonthNum = currentMonth + 1;
-    const finalYearlyPayroll = yearlyPayrollTotal > 0 ? yearlyPayrollTotal : (currentPayroll * currentMonthNum);
-
-    // 5. Expenses KPI
-    // 5. Expenses KPI
-    const [currentExpenses, prevExpenses, allTimeExpenses] = await Promise.all([
-      db.select({ total: sql<number>`cast(coalesce(sum(${schema.expenses.amount}), 0) as integer)` })
-        .from(schema.expenses)
-        .where(
-          and(
-            organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`,
-            eq(schema.expenses.type, 'outward'),
-            gte(schema.expenses.date, currentMonthStart.toISOString().split('T')[0]),
-            lte(schema.expenses.date, currentMonthEnd.toISOString().split('T')[0])
-          )
-        ),
-      db.select({ total: sql<number>`cast(coalesce(sum(${schema.expenses.amount}), 0) as integer)` })
-        .from(schema.expenses)
-        .where(
-          and(
-            organizationId ? eq(schema.expenses.organizationId, organizationId) : sql`1=1`,
-            eq(schema.expenses.type, 'outward'),
-            gte(schema.expenses.date, prevMonthStart.toISOString().split('T')[0]),
-            lte(schema.expenses.date, prevMonthEnd.toISOString().split('T')[0])
-          )
-        ),
+    // 5. Expenses KPI (Total All Time)
+    const [allTimeExpensesResult] = await Promise.all([
       db.select({ total: sql<number>`cast(coalesce(sum(${schema.expenses.amount}), 0) as integer)` })
         .from(schema.expenses)
         .where(
@@ -1347,13 +1274,7 @@ export class DatabaseStorage implements IStorage {
         )
     ]);
 
-    const monthlyExpenses = currentExpenses[0]?.total || 0;
-    const prevMonthlyExpenses = prevExpenses[0]?.total || 0;
-    const totalExpensesAllTime = allTimeExpenses[0]?.total || 0;
-
-    const expenseChange = prevMonthlyExpenses > 0
-      ? (((monthlyExpenses - prevMonthlyExpenses) / prevMonthlyExpenses) * 100).toFixed(1)
-      : monthlyExpenses > 0 ? "100.0" : "0.0";
+    const totalExpensesAllTime = allTimeExpensesResult[0]?.total || 0;
 
 
     // ===== DETAILED ANALYTICS =====
@@ -1973,20 +1894,20 @@ export class DatabaseStorage implements IStorage {
           change: `${leadChange >= "0" ? '+' : ''}${leadChange}%`
         },
         studentFee: {
-          value: totalCalculatedRevenue,
-          change: `${parseFloat(totalRevenueChange) >= 0 ? '+' : ''}${totalRevenueChange}%`
+          value: totalCollectedAllTime + totalDaycareAllTime,
+          change: `Till Date`
         },
         staffManagement: {
           value: totalStaff,
           change: `${staffChange >= "0" ? '+' : ''}${staffChange}%`
         },
         payroll: {
-          value: currentPayroll,
-          change: `Monthly Total`
+          value: totalPayrollAllTime,
+          change: `Till Date`
         },
         expenses: {
-          value: monthlyExpenses,
-          change: `${parseFloat(expenseChange) >= 0 ? '+' : ''}${expenseChange}%`
+          value: totalExpensesAllTime,
+          change: `Till Date`
         },
         totalReceivables: {
           value: planExpectation,

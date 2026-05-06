@@ -146,9 +146,11 @@ export const payroll = pgTable("payroll", {
   basicSalary: decimal("basic_salary", { precision: 10, scale: 2 }).notNull(),
   allowances: decimal("allowances", { precision: 10, scale: 2 }).default("0"),
   deductions: decimal("deductions", { precision: 10, scale: 2 }).default("0"),
+  deposit: decimal("deposit", { precision: 10, scale: 2 }).default("0"),
   overtime: decimal("overtime", { precision: 10, scale: 2 }).default("0"),
   netSalary: decimal("net_salary", { precision: 10, scale: 2 }).notNull(),
   attendedDays: integer("attended_days").default(30),
+  remark: text("remark"),
   paymentDate: date("payment_date"),
   status: varchar("status", { length: 20 }).default("pending"), // pending, paid, cancelled
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

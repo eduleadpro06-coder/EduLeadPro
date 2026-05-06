@@ -50,6 +50,7 @@ import {
   ShieldCheck,
   Building,
   Pencil,
+  History,
 } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import { format } from "date-fns";
@@ -83,18 +84,36 @@ import StaffDetailModal from "@/components/staff/StaffDetailModal";
 import StaffCSVImport from "@/components/staff/csv-import";
 import StaffActivityTab from "@/components/staff/staff-activity-tab";
 import StaffLeavesTab from "@/components/staff/staff-leaves-tab";
+import StaffPayrollSheetTab from "@/components/staff/StaffPayrollSheetTab";
 import { Textarea } from "@/components/ui/textarea";
 import PageHeader from "@/components/layout/page-header";
 
 const STAFF_ROLES = [
-  "Teacher",
+  "Director",
+  "Principal",
   "Counselor",
-  "Accountant",
+  "Teacher",
   "Care Giver",
   "Security Guard",
-  "Peon/Office Assistant",
-  "Principal"
+  "Accountant",
+  "Peon/Office Assistant"
 ] as const;
+
+const ROLE_PRIORITY: Record<string, number> = {
+  "Director": 1,
+  "Principal": 2,
+  "Counselor": 3,
+  "Teacher": 4,
+  "Care Giver": 5,
+  "Security Guard": 6
+};
+
+const getRolePriority = (role?: string) => {
+  if (!role) return 100;
+  return ROLE_PRIORITY[role] || 50;
+};
+
+
 
 interface Staff {
   id: number;
@@ -221,7 +240,11 @@ export default function StaffAI() {
       allowances: number | ''; // Added allowances
       deductions: number | ''; // Added deductions
       overtime: number | '';   // Added overtime
-      netSalary: number
+      netSalary: number;
+      absent?: number | '';
+      deposit?: number | '';
+      reimbursment?: number | '';
+      remark?: string;
     }
   }>(() => {
     // Load from localStorage on component mount with month/year key
@@ -723,7 +746,7 @@ export default function StaffAI() {
     return Math.round(net);
   };
 
-  const handlePayrollDataChange = (staffId: number, field: 'attendedDays' | 'basicSalary' | 'allowances' | 'deductions' | 'overtime', value: string) => {
+  const handlePayrollDataChange = (staffId: number, field: 'attendedDays' | 'basicSalary' | 'allowances' | 'deductions' | 'overtime' | 'absent' | 'deposit' | 'reimbursment' | 'remark', value: string) => {
     const staffMember = (staff as Staff[]).find(s => s.id === staffId);
     if (!staffMember) return;
 
@@ -733,19 +756,23 @@ export default function StaffAI() {
       allowances: 0,
       deductions: 0,
       overtime: 0,
-      netSalary: staffMember.salary
+      netSalary: staffMember.salary,
+      absent: 0,
+      deposit: 0,
+      reimbursment: 0,
+      remark: ''
     };
 
-    // Convert string to number and handle empty input
-    const numericValue = value === '' ? '' : Number(value);
+    let finalValue: string | number = value;
 
-    // Validate and constrain values
-    let finalValue = numericValue;
-    if (field === 'attendedDays') {
-      finalValue = numericValue === '' ? '' : Math.max(0, Math.min(Number(numericValue), 30)); // Allow up to 30 days
-    } else {
-      // For salary, allowances, deductions, overtime - just ensure non-negative
-      finalValue = numericValue === '' ? '' : Math.max(0, Number(numericValue));
+    if (field !== 'remark') {
+      const numericValue = value === '' ? '' : Number(value);
+      if (field === 'attendedDays' || field === 'absent') {
+        finalValue = numericValue === '' ? '' : Math.max(0, Math.min(Number(numericValue), 30)); // Allow up to 30 days
+      } else {
+        // For salary, allowances, deductions, overtime - just ensure non-negative
+        finalValue = numericValue === '' ? '' : Math.max(0, Number(numericValue));
+      }
     }
 
     const newData = {
@@ -763,13 +790,18 @@ export default function StaffAI() {
       Number(newData.overtime) || 0
     );
 
-    setEditablePayrollData(prev => ({
-      ...prev,
-      [staffId]: {
-        ...newData,
-        netSalary
-      }
-    }));
+    setEditablePayrollData(prev => {
+      const updated = {
+        ...prev,
+        [staffId]: {
+          ...newData,
+          netSalary
+        }
+      };
+      const key = 'editablePayrollData_' + selectedMonth + '_' + selectedYear;
+      localStorage.setItem(key, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const handleManualPayrollInputChange = (staffId: number, field: 'daysWorked', value: string) => {
@@ -1425,7 +1457,7 @@ export default function StaffAI() {
     selectedStaffMembers.forEach(staffMember => handleDownloadSalarySlip(staffMember));
   };
 
-  // Add state for paymentHistoryStatusFilter at the top of the component
+  // Set default paymentHistoryStatusFilter to all
   const [paymentHistoryStatusFilter, setPaymentHistoryStatusFilter] = useState('all');
 
   // 1. Compute summary card values from payrollOverview (all active staff for selected month/year)
@@ -1437,28 +1469,6 @@ export default function StaffAI() {
   const summaryActiveEmployees = summaryActiveStaff.length;
   const summaryProcessedPayrolls = payrollOverview.filter(s => s.isActive !== false && s.payrollStatus === 'processed').length;
 
-  // Set default selectedMonth and selectedYear to previous month/year for Payment History
-  const today = new Date();
-  const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const defaultHistoryMonth = prevMonthDate.getMonth() + 1;
-  const defaultHistoryYear = prevMonthDate.getFullYear();
-  const [historyMonth, setHistoryMonth] = useState(defaultHistoryMonth);
-  const [historyYear, setHistoryYear] = useState(defaultHistoryYear);
-  // Helper to get all valid (year, month) pairs up to previous month
-  const getValidHistoryMonths = () => {
-    const months = [];
-    const startYear = defaultHistoryYear - 4; // Show up to 5 years
-    for (let y = defaultHistoryYear; y >= startYear; y--) {
-      const maxMonth = (y === defaultHistoryYear) ? defaultHistoryMonth : 12;
-      for (let m = maxMonth; m >= 1; m--) {
-        months.push({ year: y, month: m });
-      }
-    }
-    return months;
-  };
-  const validHistoryMonths = getValidHistoryMonths();
-  const availableYears = Array.from(new Set(validHistoryMonths.map(x => x.year)));
-  const availableMonths = (y: number) => validHistoryMonths.filter(x => x.year === y).map(x => x.month);
 
   // Add new state for contact details panel tabs
   const [contactTab, setContactTab] = useQueryState<string>('subview', 'Overview');
@@ -1639,46 +1649,100 @@ export default function StaffAI() {
       <Header title="Staff Management" subtitle="Manage your team members and their information" />
       <div className="max-w-[120rem] mx-auto">
 
-        {activeTab === "overview" && (
-          <div className="min-h-screen font-sans pb-8">
-            <PageHeader
-              searchPlaceholder="Search contacts..."
-              searchValue={searchQuery}
-              onSearchChange={setSearchQuery}
-              filters={
-                <div className="flex items-center gap-3">
-                  <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                    <SelectTrigger className="w-44 bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
-                      <div className="flex items-center gap-2 truncate">
-                        <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
-                        <SelectValue placeholder="All Departments" />
-                      </div>
+        {/* Top-level Navigation & Filters */}
+        <div className="w-full px-8 pt-8 flex flex-col md:flex-row items-end justify-between gap-4 border-b border-gray-200 bg-white/50 backdrop-blur-md sticky top-0 z-50">
+          <div className="flex items-end gap-2 shrink-0">
+            {([
+              { key: "overview", label: "Employees", icon: Users },
+              { key: "payroll", label: "Payroll", icon: Calculator },
+              { key: "history", label: "Payment History", icon: History },
+            ] as const).map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  className={`relative px-8 py-2.5 text-sm font-bold flex items-center gap-2.5 transition-all duration-300 rounded-t-2xl overflow-hidden group ${isActive
+                    ? "bg-gradient-to-b from-[#643ae5] to-[#552dbf] text-white shadow-[0_-4px_20px_rgba(100,58,229,0.2)] z-20"
+                    : "bg-transparent text-gray-500 hover:text-[#643ae5] hover:bg-gray-100/80 mb-[2px] z-10"
+                    }`}
+                  onClick={() => setActiveTab(tab.key)}
+                >
+                  {/* Inner Glow for active tab */}
+                  {isActive && (
+                    <div className="absolute inset-0 bg-white/10 opacity-50 pointer-events-none" />
+                  )}
+                  <Icon className={`h-4.5 w-4.5 transition-transform duration-300 group-hover:scale-110 ${isActive ? "text-white" : "text-gray-400 group-hover:text-[#643ae5]"}`} />
+                  <span className="relative z-10">{tab.label}</span>
+                  {isActive && (
+                    <div className="absolute inset-x-0 bottom-0 h-1 bg-white/30" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-1 items-center gap-3 w-full md:w-auto justify-end">
+            <SearchInput
+              placeholder={activeTab === 'overview' ? "Search employees..." : "Search by name or ID..."}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              wrapperClassName="w-full md:w-72"
+            />
+            
+            {(activeTab === 'payroll' || activeTab === 'history') && (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-500 whitespace-nowrap">Month:</span>
+                  <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(Number(v))}>
+                    <SelectTrigger className="w-[130px] bg-white border-gray-200">
+                      <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-white border-gray-200 shadow-lg">
-                      <SelectItem value="all">All Departments</SelectItem>
-                      {Array.from(new Set(displayStaff.map(s => s.department).filter(Boolean))).map(dept => (
-                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={roleFilter} onValueChange={setRoleFilter}>
-                    <SelectTrigger className="w-40 bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
-                      <div className="flex items-center gap-2 truncate">
-                        <Briefcase className="h-4 w-4 text-gray-400 shrink-0" />
-                        <SelectValue placeholder="All Roles" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-gray-200 shadow-lg">
-                      <SelectItem value="all">All Roles</SelectItem>
-                      {Array.from(new Set(displayStaff.map(s => s.role).filter(Boolean))).map(role => (
-                        <SelectItem key={role} value={role}>{role}</SelectItem>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                        <SelectItem key={m} value={m.toString()}>
+                          {new Date(2000, m - 1).toLocaleString('default', { month: 'long' })}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              }
-              primaryActions={
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-500 whitespace-nowrap">Year:</span>
+                  <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(Number(v))}>
+                    <SelectTrigger className="w-[100px] bg-white border-gray-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
+                        <SelectItem key={y} value={y.toString()}>
+                          {y}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'overview' && (
+              <div className="flex items-center gap-3">
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-56 bg-white border-gray-200 text-gray-700 shadow-sm hover:border-[#643ae5] transition-colors focus:ring-[#643ae5]/20 h-10">
+                    <div className="flex items-center gap-2 truncate">
+                      <Briefcase className="h-4 w-4 text-gray-400 shrink-0" />
+                      <SelectValue placeholder="All Roles" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-gray-200 shadow-lg">
+                    <SelectItem value="all">All Employee Roles</SelectItem>
+                    {Array.from(new Set(displayStaff.map(s => s.role).filter(Boolean))).map(role => (
+                      <SelectItem key={role} value={role}>{role}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="h-6 w-px bg-gray-200 mx-1"></div>
+                <div className="flex items-center gap-2">
                   <Button
                     onClick={() => setIsAddStaffOpen(true)}
                     className="bg-[#643ae5] hover:bg-[#552dbf] text-white shadow-sm h-10 px-4 rounded-lg flex items-center gap-2 transition-all active:scale-95"
@@ -1686,7 +1750,6 @@ export default function StaffAI() {
                     <UserPlus className="h-4 w-4" />
                     <span>Add Employee</span>
                   </Button>
-                  <div className="h-6 w-px bg-gray-200 mx-1"></div>
                   <Button
                     variant="outline"
                     className="h-10 px-4 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-lg flex items-center gap-2"
@@ -1696,13 +1759,18 @@ export default function StaffAI() {
                     <span>Export</span>
                   </Button>
                 </div>
-              }
-            />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {activeTab === "overview" && (
+          <div className="min-h-screen font-sans pb-8 pt-6">
             {/* Toolbar: Tabs & Pagination */}
-            <div className="w-full px-6 mb-4">
-              <div className="flex flex-col sm:flex-row gap-4 border-b border-gray-200 justify-between items-end sm:items-center pb-2">
-                {/* Tabs */}
-                <div className="flex gap-6 relative top-[1px]">
+            <div className="w-full px-8 mb-6">
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-end sm:items-center">
+                {/* Segmented Control / Pills */}
+                <div className="flex p-1.5 bg-gray-100/80 backdrop-blur-sm rounded-xl border border-gray-200/50">
                   {['All Employees', 'Active', 'Inactive'].map(tab => {
                     let count = 0;
                     if (tab === 'All Employees') count = sortedStaff.length;
@@ -1714,13 +1782,15 @@ export default function StaffAI() {
                     return (
                       <button
                         key={tab}
-                        className={`pb-3 px-1 text-sm font-medium transition-all duration-200 relative ${isActive ? 'text-[#643ae5]' : 'text-gray-500 hover:text-gray-900'}`}
+                        className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-300 flex items-center gap-2 ${isActive 
+                          ? 'bg-white text-[#643ae5] shadow-md ring-1 ring-black/5' 
+                          : 'text-gray-500 hover:text-gray-800 hover:bg-white/40'}`}
                         onClick={() => setSelectedTab(tab)}
                       >
-                        {tab} <span className={`ml-1 text-xs ${isActive ? "text-[#643ae5]/80" : "text-gray-400"}`}>({count})</span>
-                        {isActive && (
-                          <span className="absolute left-0 right-0 -bottom-0.5 h-[2px] bg-[#643ae5] rounded-full transition-all duration-300" />
-                        )}
+                        {tab} 
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] leading-none ${isActive ? "bg-[#643ae5]/10 text-[#643ae5]" : "bg-gray-200 text-gray-500"}`}>
+                          {count}
+                        </span>
                       </button>
                     );
                   })}
@@ -1730,27 +1800,40 @@ export default function StaffAI() {
             {/* Main Content: Two Column Layout */}
             <div className="flex items-start gap-6 px-8 pb-8">
               {/* Sidebar: Contact List */}
-              <aside className="w-[320px] bg-white rounded-2xl border border-gray-200 shadow h-fit sticky top-4 flex flex-col">
+              <aside className="w-[320px] bg-white rounded-2xl border border-gray-200 shadow sticky top-4 flex flex-col max-h-[calc(100vh-120px)] overflow-hidden">
                 <div className="px-6 pt-6 pb-2 text-base font-semibold text-gray-800 border-b shrink-0">
                   {staffTabFiltered.length} contacts
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
                   <ul className="divide-y divide-gray-200">
                     {paginatedStaff.map((member) => (
                       <li
                         key={member.id}
-                        className={`flex items-center gap-3 px-6 py-4 cursor-pointer transition rounded-xl ${selectedStaff?.id === member.id ? 'bg-purple-50 border border-[#643ae5]' : 'hover:bg-gray-50/50'} text-gray-800`}
+                        className={`group cursor-pointer transition-all duration-300 relative ${selectedStaff?.id === member.id
+                            ? "bg-purple-50/80 border-l-4 border-[#643ae5]"
+                            : "hover:bg-gray-50 border-l-4 border-transparent"
+                          }`}
                         onClick={() => setSelectedStaff(member)}
                       >
-                        <div className="relative">
-                          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-purple-100 text-gray-800 font-bold text-sm border-2 border-gray-200">
-                            {member.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                        <div className="p-4 flex items-center gap-4">
+                          <div className="relative">
+                            <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm transition-transform group-hover:scale-105 ${selectedStaff?.id === member.id ? 'bg-[#643ae5] ring-4 ring-purple-100' : 'bg-gray-300 group-hover:bg-[#643ae5]/80'}`}>
+                              {member.name.charAt(0)}
+                            </div>
+                            <span 
+                              className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white shadow-sm" 
+                              style={{ background: member.isActive !== false ? '#52C41A' : '#BFBFBF' }}
+                            ></span>
                           </div>
-                          <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-gray-200" style={{ background: member.isActive !== false ? '#52C41A' : '#BFBFBF' }}></span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-800 truncate mb-1">{member.name}</div>
-                          <div className="text-xs text-gray-500 truncate">{member.department || 'No Dept'}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className={`font-semibold truncate transition-colors ${selectedStaff?.id === member.id ? 'text-[#643ae5]' : 'text-gray-900 group-hover:text-[#643ae5]'}`}>
+                              {member.name}
+                            </div>
+                            <div className="text-xs text-gray-500 font-medium">{member.role || "Staff Member"}</div>
+                          </div>
+                          {selectedStaff?.id === member.id && (
+                            <div className="h-2 w-2 rounded-full bg-[#643ae5] animate-pulse" />
+                          )}
                         </div>
                       </li>
                     ))}
@@ -1843,17 +1926,27 @@ export default function StaffAI() {
                       </div>
                     </div>
                     {/* Tabs */}
-                    <div className="flex gap-4 mb-6 mt-2">
-                      {['Overview', 'Activity', 'Leaves', 'Payroll'].map(tab => (
-                        <button
-                          key={tab}
-                          className={`pb-3 px-3 py-1.5 text-sm font-medium transition-colors duration-200 relative rounded-md ${contactTab === tab ? 'text-white bg-[#643ae5]' : 'text-gray-600 bg-white hover:bg-gray-100'} mx-1`}
-                          onClick={() => setContactTab(tab)}
-                          style={{ minWidth: 90 }}
-                        >
-                          {tab}
-                        </button>
-                      ))}
+                    <div className="flex gap-3 mb-8 mt-2">
+                      {([
+                        { key: 'Overview', icon: FileText },
+                        { key: 'Leaves', icon: Calendar }
+                      ] as const).map(tab => {
+                        const Icon = tab.icon;
+                        const isActive = contactTab === tab.key;
+                        return (
+                          <button
+                            key={tab.key}
+                            className={`px-6 py-2.5 text-sm font-semibold rounded-xl flex items-center gap-2.5 transition-all duration-300 shadow-sm ${isActive
+                              ? "bg-[#643ae5] text-white shadow-[#643ae5]/20 shadow-lg scale-[1.02]"
+                              : "bg-white text-[#643ae5] border border-gray-100 hover:border-[#643ae5]/30 hover:bg-gray-50 hover:shadow-md"
+                              }`}
+                            onClick={() => setContactTab(tab.key)}
+                          >
+                            <Icon className={`h-4 w-4 ${isActive ? "text-white" : "text-[#643ae5]"}`} />
+                            {tab.key}
+                          </button>
+                        );
+                      })}
                     </div>
                     {/* Tab Content */}
                     {contactTab === 'Overview' && (
@@ -1917,211 +2010,7 @@ export default function StaffAI() {
                         </div>
                       </>
                     )}
-                    {contactTab === 'Activity' && selectedStaff && <StaffActivityTab staffId={selectedStaff.id} />}
                     {contactTab === 'Leaves' && selectedStaff && <StaffLeavesTab staffId={selectedStaff.id} />}
-                    {contactTab === 'Payroll' && selectedStaff && (
-                      <div className="w-full glass-card rounded-lg border bg-card text-card-foreground shadow-lg p-6" style={{ minHeight: '200px' }}>
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="font-semibold">Current Month Payroll</div>
-                          <div className="flex gap-2">
-                            <Select
-                              value={selectedMonth.toString()}
-                              onValueChange={(val) => setSelectedMonth(parseInt(val))}
-                            >
-                              <SelectTrigger className="w-[120px] bg-white border-[#643ae5] text-gray-800">
-                                <SelectValue placeholder="Month" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-white border-[#643ae5] text-gray-800">
-                                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                                  <SelectItem key={m} value={m.toString()}>
-                                    {new Date(0, m - 1).toLocaleString('default', { month: 'long' })}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select
-                              value={selectedYear.toString()}
-                              onValueChange={(val) => setSelectedYear(parseInt(val))}
-                            >
-                              <SelectTrigger className="w-[100px] bg-white border-[#643ae5] text-gray-800">
-                                <SelectValue placeholder="Year" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-white border-[#643ae5] text-gray-800">
-                                {[2024, 2025, 2026].map((y) => (
-                                  <SelectItem key={y} value={y.toString()}>
-                                    {y}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <table className="w-full text-card-foreground shadow-lg">
-                          <thead>
-                            <tr>
-                              <th className="table-header px-6 py-3 text-left">Days Worked</th>
-                              <th className="table-header px-6 py-3 text-left">Basic Salary</th>
-                              <th className="table-header px-6 py-3 text-left">Allowances</th>
-                              <th className="table-header px-6 py-3 text-left">Deductions</th>
-                              <th className="table-header px-6 py-3 text-left">Overtime</th>
-                              <th className="table-header px-6 py-3 text-left">Net Salary</th>
-                              <th className="table-header px-6 py-3 text-left">Status</th>
-                              <th className="table-header px-8 py-3 text-left">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(() => {
-                              const member = selectedStaff;
-                              const payrollData = payrollOverview.find(p => p.id === member.id);
-                              const payrollStatus = payrollData ? payrollData.payrollStatus : 'pending';
-                              const payroll = payrollData ? payrollData.payroll : null;
-                              return (
-                                <tr key={member.id}>
-                                  <td className="px-6 py-4">
-                                    {payrollStatus !== 'processed' || editingPayrollStaffId === member.id ? (
-                                      <Input
-                                        type="number"
-                                        min={0}
-                                        max={30}
-                                        value={editablePayrollData[member.id]?.attendedDays ?? (payroll ? payroll.attendedDays : 30)}
-                                        onChange={e => handlePayrollDataChange(member.id, 'attendedDays', e.target.value)}
-                                        className="w-20 text-center"
-                                      />
-                                    ) : (
-                                      payroll ? payroll.attendedDays : '-'
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4">₹{payroll ? Number(payroll.basicSalary).toLocaleString() : Number(member.salary).toLocaleString()}</td>
-                                  <td className="px-6 py-4">
-                                    {payrollStatus !== 'processed' || editingPayrollStaffId === member.id ? (
-                                      <Input
-                                        type="number"
-                                        min={0}
-                                        value={editablePayrollData[member.id]?.allowances ?? (payroll ? payroll.allowances : 0)}
-                                        onChange={e => handlePayrollDataChange(member.id, 'allowances', e.target.value)}
-                                        className="w-24 text-center"
-                                        placeholder="0"
-                                      />
-                                    ) : (
-                                      `₹${payroll ? Number(payroll.allowances).toLocaleString() : '0'}`
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    {payrollStatus !== 'processed' || editingPayrollStaffId === member.id ? (
-                                      <Input
-                                        type="number"
-                                        min={0}
-                                        value={editablePayrollData[member.id]?.deductions ?? (payroll ? payroll.deductions : 0)}
-                                        onChange={e => handlePayrollDataChange(member.id, 'deductions', e.target.value)}
-                                        className="w-24 text-center"
-                                        placeholder="0"
-                                      />
-                                    ) : (
-                                      `₹${payroll ? Number(payroll.deductions).toLocaleString() : '0'}`
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    {payrollStatus !== 'processed' || editingPayrollStaffId === member.id ? (
-                                      <Input
-                                        type="number"
-                                        min={0}
-                                        value={editablePayrollData[member.id]?.overtime ?? (payroll ? payroll.overtime : 0)}
-                                        onChange={e => handlePayrollDataChange(member.id, 'overtime', e.target.value)}
-                                        className="w-24 text-center"
-                                        placeholder="0"
-                                      />
-                                    ) : (
-                                      `₹${payroll ? Number(payroll.overtime || 0).toLocaleString() : '0'}`
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4 font-bold text-green-600">
-                                    ₹
-                                    {(() => {
-                                      if (payrollStatus === 'processed' && payroll) {
-                                        return Number(payroll.netSalary).toLocaleString();
-                                      }
-                                      // Live calculation
-                                      const basic = Number(member.salary);
-                                      const attended = Number(editablePayrollData[member.id]?.attendedDays ?? 30);
-                                      const allowances = Number(editablePayrollData[member.id]?.allowances ?? 0);
-                                      const deductions = Number(editablePayrollData[member.id]?.deductions ?? 0);
-                                      const overtime = Number(editablePayrollData[member.id]?.overtime ?? 0);
-
-                                      const dailyRate = basic / 30;
-                                      const basePay = dailyRate * attended;
-                                      const net = Math.max(0, basePay + allowances + overtime - deductions);
-                                      return net.toLocaleString(undefined, { maximumFractionDigits: 0 });
-                                    })()}
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    <span className={
-                                      payrollStatus === 'processed' ? 'bg-green-100 text-green-800 px-2 py-1 rounded' :
-                                        payrollStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 px-2 py-1 rounded' :
-                                          'bg-red-100 text-red-800 px-2 py-1 rounded'
-                                    }>
-                                      {payrollStatus}
-                                    </span>
-                                  </td>
-                                  <td className="px-8 py-4">
-                                    {payrollStatus !== 'processed' || editingPayrollStaffId === member.id ? (
-                                      <div className="flex gap-2">
-                                        <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => {
-                                          handleGeneratePayroll(member);
-                                          setEditingPayrollStaffId(null);
-                                        }}>
-                                          {editingPayrollStaffId === member.id ? 'Save' : 'Generate'}
-                                        </Button>
-                                        {editingPayrollStaffId === member.id && (
-                                          <Button size="sm" variant="outline" className="px-4 py-2 text-base rounded-md" onClick={() => setEditingPayrollStaffId(null)}>
-                                            Cancel
-                                          </Button>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <div className="flex gap-2">
-                                        <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={e => { e.stopPropagation(); handleDownloadSalarySlip(member); }} disabled={payrollStatus !== 'processed'}>
-                                          Download
-                                        </Button>
-                                        <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => setWhatsappModal({ open: true, staff: member, netSalary: payroll ? payroll.netSalary : 0 })}>
-                                          Notify
-                                        </Button>
-                                        <Button size="sm" variant="outline" className="px-2 py-2 rounded-full border border-gray-300 hover:bg-gray-100 text-gray-600" title="Edit Payroll" onClick={() => {
-                                          if (payroll) {
-                                            // Populate editable data with existing values
-                                            setEditablePayrollData(prev => ({
-                                              ...prev,
-                                              [member.id]: {
-                                                attendedDays: payroll.attendedDays,
-                                                basicSalary: payroll.basicSalary,
-                                                allowances: payroll.allowances || 0,
-                                                deductions: payroll.deductions || 0,
-                                                overtime: payroll.overtime || 0,
-                                                netSalary: payroll.netSalary
-                                              }
-                                            }));
-                                            setEditingPayrollStaffId(member.id);
-                                          }
-                                        }}>
-                                          <Pencil size={16} />
-                                        </Button>
-                                        <Button size="sm" variant="destructive" className="px-2 py-2 rounded-full text-white hover:bg-red-700 bg-red-600" title="Delete Payroll Record" onClick={() => {
-                                          if (payroll && confirm('Are you sure you want to delete this payroll record?')) {
-                                            deletePayrollMutation.mutate(payroll.id);
-                                          }
-                                        }}>
-                                          <Trash2 size={16} />
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })()}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                    {/* Other tabs can be filled similarly */}
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-600 text-lg">Select a contact to view details</div>
@@ -2132,514 +2021,654 @@ export default function StaffAI() {
         )}
         {activeTab === "payroll" && (
           <div className="min-h-screen bg-gray-50">
-            <PageHeader
-              title="Payroll Management"
-              subtitle="Manage employee salaries and payment records"
-              
-              filters={
-                <>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Month:</span>
-                    <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(Number(v))}>
-                      <SelectTrigger className="w-[140px] bg-white border-[#643ae5]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                          <SelectItem key={m} value={m.toString()}>
-                            {new Date(2000, m - 1).toLocaleString('default', { month: 'long' })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Year:</span>
-                    <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(Number(v))}>
-                      <SelectTrigger className="w-[100px] bg-white border-[#643ae5]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
-                          <SelectItem key={y} value={y.toString()}>
-                            {y}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              }
-              primaryActions={
-                <Button
-                  onClick={() => setBulkPayrollOpen(true)}
-                  className="flex items-center gap-2 px-4 h-10 bg-[#643ae5] text-white hover:bg-[#552dbf]"
-                >
-                  <Calculator className="w-4 h-4" />
-                  Generate Bulk Payroll
-                </Button>
-              }
-            />
-            <div className="px-8">
-              <Card>
-                <CardContent className="pt-6">
-                  {/* Payroll Tabs */}
-                  <Tabs defaultValue="current" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="current">Current Month</TabsTrigger>
-                      <TabsTrigger value="history">Payment History</TabsTrigger>
-                      <TabsTrigger value="settings">Settings</TabsTrigger>
-                    </TabsList>
 
-                    <TabsContent value="current" className="space-y-4">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-h3">Current Month Payroll</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          {/* Payroll Controls */}
-                          <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-6">
-                            <div className="flex gap-4 flex-1">
-                              <SearchInput
-                                placeholder="Search staff by name or ID..."
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                wrapperClassName="relative flex-1 max-w-xl"
-                              />
-                            </div>
-                            <div className="flex gap-2 items-center">
-                              <Button
-                                variant="outline"
-                                onClick={clearPayrollLocalStorage}
-                                className="flex items-center gap-2"
-                              >
-                                Clear Data
-                                <Trash2 size={16} />
-                              </Button>
-                              <Button
-                                onClick={handleGenerateSelectedPayroll}
-                                disabled={selectedPayrollStaff.length === 0}
-                                className="flex items-center gap-2"
-                              >
-                                <Calculator className="mr-2 h-4 w-4" />
-                                Generate Selected
-                              </Button>
-                              <Button
-                                onClick={handleDownloadSelectedSalarySlips}
-                                disabled={selectedPayrollStaff.length === 0}
-                                className="flex items-center gap-2"
-                              >
-                                Download Selected
-                              </Button>
-                            </div>
-                          </div>
+            <div className="px-8 py-6">
+              <div className="space-y-4">
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                        <CardTitle className="text-xl font-bold">Current Month Payroll</CardTitle>
+                        <div className="flex gap-2 items-center">
+                          <Button
+                            onClick={handleGenerateSelectedPayroll}
+                            disabled={selectedPayrollStaff.length === 0}
+                            className="flex items-center gap-2"
+                          >
+                            <Calculator className="mr-2 h-4 w-4" />
+                            Generate Selected
+                          </Button>
+                          <Button
+                            onClick={handleDownloadSelectedSalarySlips}
+                            disabled={selectedPayrollStaff.length === 0}
+                            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white"
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download Selected
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={clearPayrollLocalStorage}
+                            className="flex items-center gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          >
+                            Clear Data
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
 
-                          {/* Payroll Summary Cards */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                            <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
-                              <div className="text-center">
-                                <p className="text-sm text-green-600 font-medium">Total Net Payroll</p>
-                                <p className="text-2xl font-bold text-green-700">
-                                  ₹{summaryTotalNetPayroll.toLocaleString()}
-                                </p>
-                              </div>
-                            </div>
 
-                            <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                              <div className="text-center">
-                                <p className="text-sm text-blue-600 font-medium">Active Employees</p>
-                                <p className="text-2xl font-bold text-blue-700">
-                                  {summaryActiveEmployees}
-                                </p>
-                              </div>
-                            </div>
 
-                            <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-                              <div className="text-center">
-                                <p className="text-sm text-purple-600 font-medium">Processed Payrolls</p>
-                                <p className="text-2xl font-bold text-purple-700">
-                                  {summaryProcessedPayrolls}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Payroll Table */}
-                          <Card className="border rounded-lg overflow-hidden">
-                            <CardContent className="p-0">
-                              <div className="overflow-x-auto">
-                                <table className="w-full">
-                                  <thead className="bg-gray-50 sticky top-0 z-10">
-                                    <tr>
-                                      <th className="px-4 py-3">
-                                        <input
-                                          type="checkbox"
-                                          checked={selectedPayrollStaff.length === staffTabFiltered.length && staffTabFiltered.length > 0}
-                                          onChange={e => setSelectedPayrollStaff(e.target.checked ? staffTabFiltered.map(s => s.id) : [])}
-                                        />
-                                      </th>
-                                      <th className="table-header px-6 py-3 text-left">Employee</th>
-                                      <th className="table-header px-6 py-3 text-left">Days Worked</th>
-                                      <th className="table-header px-6 py-3 text-left">Basic Salary</th>
-                                      <th className="table-header px-6 py-3 text-left">Allowances</th>
-                                      <th className="table-header px-6 py-3 text-left">Deductions</th>
-                                      <th className="table-header px-6 py-3 text-left">Overtime</th>
-                                      <th className="table-header px-6 py-3 text-left">Net Salary</th>
-                                      <th className="table-header px-6 py-3 text-left">Status</th>
-                                      <th className="table-header px-8 py-3 text-left">Actions</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="bg-white divide-y divide-gray-100 text-sm font-normal">
-                                    {staffTabFiltered.length === 0 ? (
-                                      <tr>
-                                        <td colSpan={9} className="px-6 py-8 text-center text-gray-400">No staff found</td>
-                                      </tr>
-                                    ) : (
-                                      staffTabFiltered.map((member) => {
-                                        const payrollData = payrollOverview.find(p => p.id === member.id);
-                                        const payrollStatus = payrollData ? payrollData.payrollStatus : 'pending';
-                                        const payroll = payrollData ? payrollData.payroll : null;
-                                        return (
-                                          <tr key={member.id}>
-                                            <td className="px-4 py-2"><input type="checkbox" checked={selectedPayrollStaff.includes(member.id)} onChange={e => handlePayrollCheckboxChange(member.id, e.target.checked)} /></td>
-                                            <td className="px-6 py-4 font-medium">{member.name}<div className="text-xs text-gray-500">{member.employeeId}</div></td>
-                                            <td className="px-6 py-4">
-                                              {payrollStatus !== 'processed' ? (
-                                                <Input
-                                                  type="number"
-                                                  min={0}
-                                                  max={30}
-                                                  value={editablePayrollData[member.id]?.attendedDays ?? (payroll ? payroll.attendedDays : 30)}
-                                                  onChange={e => handlePayrollDataChange(member.id, 'attendedDays', e.target.value)}
-                                                  className="w-20 text-center"
-                                                />
-                                              ) : (
-                                                payroll ? payroll.attendedDays : '-'
-                                              )}
-                                            </td>
-                                            <td className="px-6 py-4">₹{payroll ? Number(payroll.basicSalary).toLocaleString() : Number(member.salary).toLocaleString()}</td>
-                                            <td className="px-6 py-4">
-                                              {payrollStatus !== 'processed' ? (
-                                                <Input
-                                                  type="number"
-                                                  min={0}
-                                                  value={editablePayrollData[member.id]?.allowances ?? (payroll ? payroll.allowances : 0)}
-                                                  onChange={e => handlePayrollDataChange(member.id, 'allowances', e.target.value)}
-                                                  className="w-24 text-center"
-                                                  placeholder="0"
-                                                />
-                                              ) : (
-                                                `₹${payroll ? Number(payroll.allowances).toLocaleString() : '0'}`
-                                              )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                              {payrollStatus !== 'processed' ? (
-                                                <Input
-                                                  type="number"
-                                                  min={0}
-                                                  value={editablePayrollData[member.id]?.deductions ?? (payroll ? payroll.deductions : 0)}
-                                                  onChange={e => handlePayrollDataChange(member.id, 'deductions', e.target.value)}
-                                                  className="w-24 text-center"
-                                                  placeholder="0"
-                                                />
-                                              ) : (
-                                                `₹${payroll ? Number(payroll.deductions).toLocaleString() : '0'}`
-                                              )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                              {payrollStatus !== 'processed' ? (
-                                                <Input
-                                                  type="number"
-                                                  min={0}
-                                                  value={editablePayrollData[member.id]?.overtime ?? (payroll ? payroll.overtime : 0)}
-                                                  onChange={e => handlePayrollDataChange(member.id, 'overtime', e.target.value)}
-                                                  className="w-24 text-center"
-                                                  placeholder="0"
-                                                />
-                                              ) : (
-                                                `₹${payroll ? Number(payroll.overtime || 0).toLocaleString() : '0'}`
-                                              )}
-                                            </td>
-                                            <td className="px-6 py-4 font-bold text-green-600">
-                                              ₹
-                                              {(() => {
-                                                if (payrollStatus === 'processed' && payroll) {
-                                                  return Number(payroll.netSalary).toLocaleString();
-                                                }
-                                                // Live calculation
-                                                const basic = Number(member.salary);
-                                                const attended = Number(editablePayrollData[member.id]?.attendedDays ?? 30);
-                                                const allowances = Number(editablePayrollData[member.id]?.allowances ?? 0);
-                                                const deductions = Number(editablePayrollData[member.id]?.deductions ?? 0);
-                                                const overtime = Number(editablePayrollData[member.id]?.overtime ?? 0);
-
-                                                const dailyRate = basic / 30;
-                                                const basePay = dailyRate * attended;
-                                                const net = Math.max(0, basePay + allowances + overtime - deductions);
-                                                return net.toLocaleString(undefined, { maximumFractionDigits: 0 });
-                                              })()}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                              <span className={
-                                                payrollStatus === 'processed' ? 'bg-green-100 text-green-800 px-2 py-1 rounded' :
-                                                  payrollStatus === 'pending' ? 'bg-yellow-100 text-yellow-800 px-2 py-1 rounded' :
-                                                    'bg-red-100 text-red-800 px-2 py-1 rounded'
-                                              }>
-                                                {payrollStatus}
-                                              </span>
-                                            </td>
-                                            <td className="px-8 py-4">
-                                              {payrollStatus !== 'processed' ? (
-                                                <div className="flex gap-2">
-                                                  <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => handleGeneratePayroll(member)}>
-                                                    Generate
-                                                  </Button>
-                                                </div>
-                                              ) : (
-                                                <div className="flex gap-2">
-                                                  <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={e => { e.stopPropagation(); handleDownloadSalarySlip(member); }} disabled={payrollStatus !== 'processed'}>
-                                                    Download
-                                                  </Button>
-                                                  <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => setWhatsappModal({ open: true, staff: member, netSalary: payroll ? payroll.netSalary : 0 })}>
-                                                    Notify
-                                                  </Button>
-                                                  <Button size="sm" variant="destructive" className="px-2 py-2 rounded-full text-white hover:bg-red-700 bg-red-600" title="Delete Payroll Record" onClick={() => {
-                                                    if (payroll && confirm('Are you sure you want to delete this payroll record?')) {
-                                                      deletePayrollMutation.mutate(payroll.id);
-                                                    }
-                                                  }}>
-                                                    <Trash2 size={16} />
-                                                  </Button>
-                                                </div>
-                                              )}
-                                            </td>
-                                          </tr>
-                                        );
-                                      })
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-
-                    <TabsContent value="history" className="space-y-4">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-h3">Payment History</CardTitle>
-                          <CardDescription>Complete payroll history for all staff members</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          {/* Filter Controls */}
-                          <div className="mb-4 flex gap-4 items-center">
-                            <div className="flex items-center gap-2">
-                              <Label>Month:</Label>
-                              <select
-                                value={historyMonth}
-                                onChange={e => setHistoryMonth(Number(e.target.value))}
-                                className="border rounded px-2 py-1"
-                              >
-                                {availableMonths(historyYear).map(m => (
-                                  <option key={m} value={m}>{new Date(historyYear, m - 1).toLocaleDateString('en-IN', { month: 'long', timeZone: 'Asia/Kolkata' })}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Label>Year:</Label>
-                              <select
-                                value={historyYear}
-                                onChange={e => {
-                                  const newYear = Number(e.target.value);
-                                  setHistoryYear(newYear);
-                                  // If current month is not available in new year, set to max available
-                                  const months = availableMonths(newYear);
-                                  if (!months.includes(historyMonth)) setHistoryMonth(months[0]);
-                                }}
-                                className="border rounded px-2 py-1"
-                              >
-                                {availableYears.map(y => (
-                                  <option key={y} value={y}>{y}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Label>Status:</Label>
-                              <select
-                                value={paymentHistoryStatusFilter}
-                                onChange={e => setPaymentHistoryStatusFilter(e.target.value)}
-                                className="border rounded px-2 py-1"
-                              >
-                                <option value="all">All Status</option>
-                                <option value="processed">Processed</option>
-                                <option value="pending">Pending</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          {/* Summary Statistics */}
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                            <div className="p-4 bg-blue-50 rounded-lg">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-sm font-medium text-blue-600">Total Records</p>
-                                  <p className="text-2xl font-bold text-blue-700">{(payroll as Payroll[]).length}</p>
-                                </div>
-                                <FileText className="h-8 w-8 text-blue-600" />
-                              </div>
-                            </div>
-                            <div className="p-4 bg-green-50 rounded-lg">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-sm font-medium text-green-600">Processed</p>
-                                  <p className="text-2xl font-bold text-green-700">
-                                    {(payroll as Payroll[]).filter(p => p.status === 'processed').length}
-                                  </p>
-                                </div>
-                                <CheckCircle className="h-8 w-8 text-green-600" />
-                              </div>
-                            </div>
-                            <div className="p-4 bg-yellow-50 rounded-lg">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-sm font-medium text-yellow-600">Pending</p>
-                                  <p className="text-2xl font-bold text-yellow-700">
-                                    {(payroll as Payroll[]).filter(p => p.status === 'pending').length}
-                                  </p>
-                                </div>
-                                <Clock className="h-8 w-8 text-yellow-600" />
-                              </div>
-                            </div>
-                            <div className="p-4 bg-purple-50 rounded-lg">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-sm font-medium text-purple-600">Total Amount</p>
-                                  <p className="text-2xl font-bold text-purple-700">
-                                    ₹{(payroll as Payroll[]).reduce((sum, p) => sum + Number(p.netSalary), 0).toLocaleString()}
-                                  </p>
-                                </div>
-                                <IndianRupee className="h-8 w-8 text-purple-600" />
-                              </div>
-                            </div>
-                          </div>
-
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="table-header">Employee</TableHead>
-                                <TableHead className="table-header">Month</TableHead>
-                                <TableHead className="table-header">Basic Salary</TableHead>
-                                <TableHead className="table-header">Allowances</TableHead>
-                                <TableHead className="table-header">Deductions</TableHead>
-                                <TableHead className="table-header">Net Salary</TableHead>
-                                <TableHead className="table-header">Status</TableHead>
-                                <TableHead className="table-header">Payment Date</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {((payroll as Payroll[]).filter(p =>
-                                (historyMonth ? p.month === historyMonth : true) &&
-                                (historyYear ? p.year === historyYear : true) &&
-                                (paymentHistoryStatusFilter === 'all' ? true : p.status === paymentHistoryStatusFilter)
-                              )).map((payrollRecord) => {
-                                const staffMember = (staff as Staff[]).find(s => s.id === payrollRecord.staffId);
-                                if (!staffMember) return null;
+                        {/* Payroll Table */}
+                        <Card className="border rounded-lg overflow-hidden">
+                          <CardContent className="p-0">
+                            <div className="overflow-x-auto">
+                              {(() => {
+                                const payrollStaffList = staffTabFiltered
+                                  .filter(s => s.isActive !== false && Number(s.salary) > 0)
+                                  .sort((a, b) => getRolePriority(a.role) - getRolePriority(b.role));
                                 return (
-                                  <TableRow key={payrollRecord.id}>
-                                    <TableCell>
-                                      <div>
-                                        <div className="font-medium">{staffMember.name}</div>
-                                        <div className="text-sm text-gray-500">{staffMember.employeeId}</div>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="font-medium">
-                                      {new Date(payrollRecord.year, payrollRecord.month - 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
-                                    </TableCell>
-                                    <TableCell>₹{Number(payrollRecord.basicSalary).toLocaleString()}</TableCell>
-                                    <TableCell>₹{Number(payrollRecord.allowances || 0).toLocaleString()}</TableCell>
-                                    <TableCell>₹{Number(payrollRecord.deductions || 0).toLocaleString()}</TableCell>
-                                    <TableCell className="font-semibold text-green-600">
-                                      ₹{Number(payrollRecord.netSalary).toLocaleString()}
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge className={
-                                        payrollRecord.status === 'processed'
-                                          ? 'bg-green-100 text-green-800 border-green-200'
-                                          : payrollRecord.status === 'pending'
-                                            ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                                            : 'bg-red-100 text-red-800 border-red-200'
-                                      }>
-                                        {payrollRecord.status}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      {payrollRecord.status === 'processed'
-                                        ? new Date(payrollRecord.generatedAt || new Date()).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })
-                                        : '-'
-                                      }
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                              {((payroll as Payroll[]).filter(p =>
-                                (historyMonth ? p.month === historyMonth : true) &&
-                                (historyYear ? p.year === historyYear : true) &&
-                                (paymentHistoryStatusFilter === 'all' ? true : p.status === paymentHistoryStatusFilter)
-                              ).length === 0) && (
-                                  <TableRow>
-                                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-                                      <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                      <p>No payroll records found</p>
-                                      <p className="text-sm">Generate payroll for staff members to see payment history</p>
-                                    </TableCell>
-                                  </TableRow>
-                                )}
-                            </TableBody>
-                          </Table>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
+                                  <table className="w-full">
+                                    <thead className="bg-gray-50 sticky top-0 z-10">
+                                      <tr>
+                                        <th className="px-4 py-3">
+                                          <input
+                                            type="checkbox"
+                                            checked={selectedPayrollStaff.length === payrollStaffList.length && payrollStaffList.length > 0}
+                                            onChange={e => setSelectedPayrollStaff(e.target.checked ? payrollStaffList.map(s => s.id) : [])}
+                                          />
+                                        </th>
+                                        <th className="table-header px-6 py-3 text-left">Name of the Employee</th>
+                                        <th className="table-header px-4 py-3 text-center">Total No.Days</th>
+                                        <th className="table-header px-4 py-3 text-center">Absent</th>
+                                        <th className="table-header px-4 py-3 text-center">Total Days Worked</th>
+                                        <th className="table-header px-4 py-3 text-right">Salary</th>
+                                        <th className="table-header px-4 py-3 text-right">Net Salary</th>
+                                        <th className="table-header px-4 py-3 text-right">Deposit</th>
+                                        <th className="table-header px-4 py-3 text-right">Deductions</th>
+                                        <th className="table-header px-4 py-3 text-right">Reimbursment</th>
+                                        <th className="table-header px-4 py-3 text-right bg-green-50">Amount Paid</th>
+                                        <th className="table-header px-4 py-3 text-center">Remark</th>
+                                        <th className="table-header px-4 py-3 text-left">Actions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-100 text-sm font-normal">
+                                      {payrollStaffList.length === 0 ? (
+                                        <tr>
+                                          <td colSpan={12} className="px-6 py-8 text-center text-gray-400">No staff found</td>
+                                        </tr>
+                                      ) : (
+                                        payrollStaffList.map((member) => {
+                                          const payrollData = payrollOverview.find(p => p.id === member.id);
+                                          const payrollStatus = payrollData ? payrollData.payrollStatus : 'pending';
+                                          const payroll = payrollData ? payrollData.payroll : null;
 
-                    <TabsContent value="settings" className="space-y-4">
-                      {/* Remove the grid with Payroll Settings and Allowance Settings cards here */}
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
+                                          const TOTAL_DAYS = 30;
+                                          const absent = Number(editablePayrollData[member.id]?.absent ?? 0);
+                                          const totalDaysWorked = TOTAL_DAYS - absent;
+                                          const salary = Number(member.salary);
+                                          const netSalary = salary * (totalDaysWorked / TOTAL_DAYS);
+                                          const deposit = Number(editablePayrollData[member.id]?.deposit ?? 0);
+                                          const deductions = Number(editablePayrollData[member.id]?.deductions ?? (payroll ? payroll.deductions : 0));
+                                          const reimbursment = Number(editablePayrollData[member.id]?.reimbursment ?? 0);
+                                          const amountPaid = Math.round(netSalary + reimbursment - deductions - deposit);
+
+                                          return (
+                                            <tr key={member.id} className="hover:bg-gray-50/60 transition-colors">
+                                              <td className="px-4 py-2"><input type="checkbox" checked={selectedPayrollStaff.includes(member.id)} onChange={e => handlePayrollCheckboxChange(member.id, e.target.checked)} /></td>
+                                              {/* Name of the Employee */}
+                                              <td className="px-6 py-4 font-medium">{member.name}<div className="text-xs text-gray-500">{member.role}</div></td>
+                                              {/* Total No.Days */}
+                                              <td className="px-4 py-3 text-center text-gray-700">{TOTAL_DAYS}</td>
+                                              {/* Absent – editable */}
+                                              <td className="px-1 py-1 text-center">
+                                                <Input
+                                                  type="number"
+                                                  min={0}
+                                                  max={TOTAL_DAYS}
+                                                  value={editablePayrollData[member.id]?.absent ?? 0}
+                                                  onChange={e => handlePayrollDataChange(member.id, 'absent', e.target.value)}
+                                                  className="w-16 mx-auto text-center h-8"
+                                                />
+                                              </td>
+                                              {/* Total Days Worked – computed */}
+                                              <td className="px-4 py-3 text-center font-medium text-gray-800">{totalDaysWorked}</td>
+                                              {/* Salary */}
+                                              <td className="px-4 py-3 text-right text-gray-700 tabular-nums">₹{salary.toLocaleString('en-IN')}</td>
+                                              {/* Net Salary – computed */}
+                                              <td className="px-4 py-3 text-right text-gray-700 tabular-nums">₹{Math.round(netSalary).toLocaleString('en-IN')}</td>
+                                              {/* Deposit – editable */}
+                                              <td className="px-1 py-1 text-center">
+                                                <Input
+                                                  type="number"
+                                                  min={0}
+                                                  value={editablePayrollData[member.id]?.deposit ?? 0}
+                                                  onChange={e => handlePayrollDataChange(member.id, 'deposit', e.target.value)}
+                                                  className="w-20 mx-auto text-center h-8"
+                                                  placeholder="0"
+                                                />
+                                              </td>
+                                              {/* Deductions – editable */}
+                                              <td className="px-1 py-1 text-center">
+                                                <Input
+                                                  type="number"
+                                                  min={0}
+                                                  value={deductions}
+                                                  onChange={e => handlePayrollDataChange(member.id, 'deductions', e.target.value)}
+                                                  className="w-20 mx-auto text-center h-8"
+                                                  placeholder="0"
+                                                />
+                                              </td>
+                                              {/* Reimbursment – editable */}
+                                              <td className="px-1 py-1 text-center">
+                                                <Input
+                                                  type="number"
+                                                  min={0}
+                                                  value={editablePayrollData[member.id]?.reimbursment ?? 0}
+                                                  onChange={e => handlePayrollDataChange(member.id, 'reimbursment', e.target.value)}
+                                                  className="w-20 mx-auto text-center h-8"
+                                                  placeholder="0"
+                                                />
+                                              </td>
+                                              {/* Amount Paid – computed, highlighted green */}
+                                              <td className="px-4 py-3 text-right font-bold bg-green-50 text-green-800 tabular-nums">₹{amountPaid.toLocaleString('en-IN')}</td>
+                                              {/* Remark – editable */}
+                                              <td className="px-1 py-1 text-center" title={editablePayrollData[member.id]?.remark ?? ''}>
+                                                <Input
+                                                  type="text"
+                                                  value={editablePayrollData[member.id]?.remark ?? ''}
+                                                  onChange={e => handlePayrollDataChange(member.id, 'remark', e.target.value)}
+                                                  className="w-28 mx-auto h-8 text-sm"
+                                                  placeholder="Add note..."
+                                                  title={editablePayrollData[member.id]?.remark ?? ''}
+                                                />
+                                              </td>
+                                              {/* Actions */}
+                                              <td className="px-4 py-4">
+                                                {payrollStatus !== 'processed' ? (
+                                                  <div className="flex gap-2">
+                                                    <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => handleGeneratePayroll(member)}>
+                                                      Generate
+                                                    </Button>
+                                                  </div>
+                                                ) : (
+                                                  <div className="flex gap-2">
+                                                    <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={e => { e.stopPropagation(); handleDownloadSalarySlip(member); }} disabled={payrollStatus !== 'processed'}>
+                                                      Download
+                                                    </Button>
+                                                    <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => setWhatsappModal({ open: true, staff: member, netSalary: payroll ? payroll.netSalary : 0 })}>
+                                                      Notify
+                                                    </Button>
+                                                    <Button size="sm" variant="destructive" className="px-2 py-2 rounded-full text-white hover:bg-red-700 bg-red-600" title="Delete Payroll Record" onClick={() => {
+                                                      if (payroll && confirm('Are you sure you want to delete this payroll record?')) {
+                                                        deletePayrollMutation.mutate(payroll.id);
+                                                      }
+                                                    }}>
+                                                      <Trash2 size={16} />
+                                                    </Button>
+                                                  </div>
+                                                )}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })
+                                      )}
+                                    </tbody>
+                                  </table>
+                                );
+                              })()}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </CardContent>
+                    </Card>
+              </div>
             </div>
           </div>
         )}
 
-        <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
+
+        {activeTab === "history" && (
+          <div className="w-full">
+
+            <div className="px-8 py-6">
+              <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                      <div className="p-5 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-xl bg-blue-50 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Users className="h-6 w-6 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Total Records</p>
+                            <p className="text-2xl font-bold text-gray-900">
+                              {(payroll as Payroll[]).filter(p => p.month === selectedMonth && p.year === selectedYear).length}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-5 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-xl bg-green-50 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <CheckCircle className="h-6 w-6 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Processed</p>
+                            <p className="text-2xl font-bold text-gray-900">
+                              {(payroll as Payroll[]).filter(p => p.month === selectedMonth && p.year === selectedYear && p.status === 'processed').length}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-5 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-xl bg-yellow-50 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Clock className="h-6 w-6 text-yellow-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Pending</p>
+                            <p className="text-2xl font-bold text-gray-900">
+                              {(payroll as Payroll[]).filter(p => p.month === selectedMonth && p.year === selectedYear && p.status === 'pending').length}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-5 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-xl bg-purple-50 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <IndianRupee className="h-6 w-6 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Total Amount</p>
+                            <p className="text-2xl font-bold text-[#643ae5]">
+                              ₹{(payroll as Payroll[]).filter(p => p.month === selectedMonth && p.year === selectedYear).reduce((sum, p) => sum + Number(p.netSalary), 0).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="flex gap-2">
+                        <Badge
+                          variant={paymentHistoryStatusFilter === 'all' ? 'default' : 'outline'}
+                          className="cursor-pointer"
+                          onClick={() => setPaymentHistoryStatusFilter('all')}
+                        >
+                          All Status
+                        </Badge>
+                        <Badge
+                          variant={paymentHistoryStatusFilter === 'processed' ? 'default' : 'outline'}
+                          className="cursor-pointer"
+                          onClick={() => setPaymentHistoryStatusFilter('processed')}
+                        >
+                          Processed
+                        </Badge>
+                        <Badge
+                          variant={paymentHistoryStatusFilter === 'pending' ? 'default' : 'outline'}
+                          className="cursor-pointer"
+                          onClick={() => setPaymentHistoryStatusFilter('pending')}
+                        >
+                          Pending
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="table-header w-8">#</TableHead>
+                          <TableHead className="table-header">Name of the Employee</TableHead>
+                          <TableHead className="table-header text-center">Total No.Days</TableHead>
+                          <TableHead className="table-header text-center">Absent</TableHead>
+                          <TableHead className="table-header text-center">Total Days Worked</TableHead>
+                          <TableHead className="table-header text-right">Salary</TableHead>
+                          <TableHead className="table-header text-right">Net Salary</TableHead>
+                          <TableHead className="table-header text-right">Deposit</TableHead>
+                          <TableHead className="table-header text-right">Deductions</TableHead>
+                          <TableHead className="table-header text-right">Reimbursment</TableHead>
+                          <TableHead className="table-header text-right bg-green-50">Amount Paid</TableHead>
+                          <TableHead className="table-header">Remark</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {((payroll as Payroll[]).filter(p =>
+                          p.month === selectedMonth &&
+                          p.year === selectedYear &&
+                          (paymentHistoryStatusFilter === 'all' ? true : p.status === paymentHistoryStatusFilter)
+                        ).sort((a, b) => {
+                          const staffA = (staff as Staff[]).find(s => s.id === a.staffId);
+                          const staffB = (staff as Staff[]).find(s => s.id === b.staffId);
+                          return getRolePriority(staffA?.role) - getRolePriority(staffB?.role);
+                        })).map((payrollRecord, idx) => {
+                          const staffMember = (staff as Staff[]).find(s => s.id === payrollRecord.staffId);
+                          if (!staffMember) return null;
+                          const TOTAL_DAYS = payrollRecord.workingDays ?? 30;
+                          const attendedDays = payrollRecord.attendedDays ?? TOTAL_DAYS;
+                          const absent = TOTAL_DAYS - attendedDays;
+                          const salary = Number(staffMember.salary);
+                          const netSalary = salary * (attendedDays / TOTAL_DAYS);
+                          const deductions = Number(payrollRecord.deductions || 0);
+                          const reimbursment = Number(payrollRecord.allowances || 0);
+                          const deposit = Number(payrollRecord.deposit || 0);
+                          const amountPaid = Number(payrollRecord.netSalary);
+                          const remark = payrollRecord.remark || "";
+                          return (
+                            <TableRow key={payrollRecord.id}>
+                              <TableCell className="text-center text-gray-500 font-medium">{idx + 1}</TableCell>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{staffMember.name}</div>
+                                  <div className="text-xs text-gray-500">{staffMember.role}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center text-gray-700">{TOTAL_DAYS}</TableCell>
+                              <TableCell className="text-center text-gray-700">{absent}</TableCell>
+                              <TableCell className="text-center font-medium text-gray-800">{attendedDays}</TableCell>
+                              <TableCell className="text-right text-gray-700 tabular-nums">₹{salary.toLocaleString('en-IN')}</TableCell>
+                              <TableCell className="text-right text-gray-700 tabular-nums">₹{Math.round(netSalary).toLocaleString('en-IN')}</TableCell>
+                              <TableCell className="text-right text-gray-700 tabular-nums">₹{deposit.toLocaleString('en-IN')}</TableCell>
+                              <TableCell className="text-right text-gray-700 tabular-nums">₹{deductions.toLocaleString('en-IN')}</TableCell>
+                              <TableCell className="text-right text-gray-700 tabular-nums">₹{reimbursment.toLocaleString('en-IN')}</TableCell>
+                              <TableCell className="text-right font-bold bg-green-50 text-green-800 tabular-nums">₹{amountPaid.toLocaleString('en-IN')}</TableCell>
+                              <TableCell>
+                                {remark ? (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="cursor-help max-w-[150px] truncate block text-left">
+                                          {remark}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="bg-white border shadow-lg p-2 max-w-xs whitespace-normal">
+                                        <p className="text-sm text-gray-700">{remark}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {((payroll as Payroll[]).filter(p =>
+                          p.month === selectedMonth &&
+                          p.year === selectedYear &&
+                          (paymentHistoryStatusFilter === 'all' ? true : p.status === paymentHistoryStatusFilter)
+                        ).length === 0) && (
+                            <TableRow>
+                              <TableCell colSpan={12} className="text-center py-8 text-gray-500">
+                                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                <p>No payroll records found</p>
+                                <p className="text-sm">Generate payroll for staff members to see payment history</p>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                      </TableBody>
+                    </Table>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+
+      <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New Employee</DialogTitle>
+            <DialogDescription>Enter the details for the new Employee below</DialogDescription>
+          </DialogHeader>
+          <Form {...addStaffForm}>
+            <form onSubmit={addStaffForm.handleSubmit(onAddStaffSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <FormField control={addStaffForm.control} name="name" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. John Doe" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={addStaffForm.control} name="phone" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={addStaffForm.control} name="role" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {STAFF_ROLES.map((role) => (
+                            <SelectItem key={role} value={role}>{role}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={addStaffForm.control} name="address" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          value={field.value ?? ''}
+                          placeholder="Enter employee address"
+                          rows={3}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={addStaffForm.control} name="salary" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Salary (₹)</FormLabel>
+                      <FormControl><Input {...field} type="number" value={field.value ?? ''} required min={0} placeholder="e.g. 50000" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={addStaffForm.control} name="bankAccountNumber" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bank Account Number</FormLabel>
+                      <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                <div className="space-y-4">
+                  <FormField control={addStaffForm.control} name="email" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl><Input {...field} type="email" value={field.value ?? ''} placeholder="john.doe@example.com" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={addStaffForm.control} name="dateOfJoining" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date of Joining</FormLabel>
+                      <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={addStaffForm.control} name="department" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a department" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="HR">HR</SelectItem>
+                          <SelectItem value="IT">IT</SelectItem>
+                          <SelectItem value="Finance">Finance</SelectItem>
+                          <SelectItem value="Operations">Operations</SelectItem>
+                          <SelectItem value="Marketing">Marketing</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={addStaffForm.control} name="qualifications" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Qualifications</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          value={field.value ?? ''}
+                          placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
+                          rows={3}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={addStaffForm.control} name="ifscCode" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>IFSC Code</FormLabel>
+                      <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={addStaffForm.control} name="panNumber" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>PAN Number</FormLabel>
+                      <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter PAN number" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="secondary" onClick={() => setIsAddStaffOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={addStaffForm.formState.isSubmitting}>
+                  {addStaffForm.formState.isSubmitting ? "Adding..." : "Add Staff"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp Modal */}
+      <Dialog open={whatsappModal.open} onOpenChange={(open) => setWhatsappModal({ ...whatsappModal, open })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send WhatsApp Notification</DialogTitle>
+            <DialogDescription>
+              Send salary credited notification to {whatsappModal.staff?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-green-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <MessageSquare className="h-5 w-5 text-green-600" />
+                <span className="font-medium text-green-800">Message Preview</span>
+              </div>
+              <div className="text-sm text-green-700 whitespace-pre-line">
+                {whatsappModal.staff && getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary)}
+              </div>
+            </div>
+            <div className="text-sm text-gray-600">
+              <p>Phone: {whatsappModal.staff?.phone || 'No phone number available'}</p>
+              <p>Net Salary: ₹{whatsappModal.netSalary.toLocaleString()}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setWhatsappModal({ open: false, staff: null, netSalary: 0 })}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (whatsappModal.staff?.phone) {
+                  const message = getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary);
+                  const whatsappUrl = `https://wa.me/${whatsappModal.staff.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+                  window.open(whatsappUrl, '_blank');
+                  setWhatsappModal({ open: false, staff: null, netSalary: 0 });
+                  toast({
+                    title: "WhatsApp Opened",
+                    description: "WhatsApp has been opened with the salary notification message.",
+                  });
+                } else {
+                  toast({
+                    title: "No Phone Number",
+                    description: "This employee doesn't have a phone number registered.",
+                    variant: "destructive"
+                  });
+                }
+              }}
+              disabled={!whatsappModal.staff?.phone}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Open WhatsApp
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Modal */}
+      {selectedStaff && (
+        <Dialog open={isEditStaffOpen} onOpenChange={setIsEditStaffOpen}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Add New Employee</DialogTitle>
-              <DialogDescription>Enter the details for the new Employee below</DialogDescription>
+              <DialogTitle>Edit Employee</DialogTitle>
+              <DialogDescription>Edit the details for this employee below</DialogDescription>
             </DialogHeader>
-            <Form {...addStaffForm}>
-              <form onSubmit={addStaffForm.handleSubmit(onAddStaffSubmit)} className="space-y-6">
+            <Form {...editStaffForm}>
+              <form onSubmit={editStaffForm.handleSubmit((data) => {
+                if (!selectedStaff) return;
+                const payload = { ...data, id: selectedStaff.id };
+                editStaffMutation.mutate(payload);
+              })} className="space-y-6">
+                <FormField control={editStaffForm.control} name="isActive" render={({ field }) => (
+                  <div className="flex items-center gap-4 mb-2">
+                    <Label htmlFor="isActive-toggle" className="text-base font-medium">
+                      {field.value ? "Active" : "Inactive"}
+                    </Label>
+                    <Switch
+                      id="isActive-toggle"
+                      checked={field.value || false}
+                      onCheckedChange={field.onChange}
+                    />
+                  </div>
+                )} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <FormField control={addStaffForm.control} name="name" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="name" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
                         <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. John Doe" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="phone" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="phone" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Phone</FormLabel>
                         <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="role" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="role" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Role</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined} value={field.value ?? undefined}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select a role" />
@@ -2654,7 +2683,7 @@ export default function StaffAI() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="address" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="address" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Address</FormLabel>
                         <FormControl>
@@ -2668,14 +2697,14 @@ export default function StaffAI() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="salary" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="salary" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Salary (₹)</FormLabel>
                         <FormControl><Input {...field} type="number" value={field.value ?? ''} required min={0} placeholder="e.g. 50000" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="bankAccountNumber" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="bankAccountNumber" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Bank Account Number</FormLabel>
                         <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
@@ -2684,24 +2713,24 @@ export default function StaffAI() {
                     )} />
                   </div>
                   <div className="space-y-4">
-                    <FormField control={addStaffForm.control} name="email" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="email" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Email</FormLabel>
-                        <FormControl><Input {...field} type="email" value={field.value ?? ''} placeholder="john.doe@example.com" /></FormControl>
+                        <FormControl><Input {...field} type="email" value={field.value ?? ''} required placeholder="e.g. john.doe@example.com" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="dateOfJoining" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="dateOfJoining" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Date of Joining</FormLabel>
                         <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="department" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="department" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Department</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined} value={field.value ?? undefined}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select a department" />
@@ -2718,7 +2747,7 @@ export default function StaffAI() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="qualifications" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="qualifications" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Qualifications</FormLabel>
                         <FormControl>
@@ -2732,14 +2761,14 @@ export default function StaffAI() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="ifscCode" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="ifscCode" render={({ field }) => (
                       <FormItem>
                         <FormLabel>IFSC Code</FormLabel>
                         <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={addStaffForm.control} name="panNumber" render={({ field }) => (
+                    <FormField control={editStaffForm.control} name="panNumber" render={({ field }) => (
                       <FormItem>
                         <FormLabel>PAN Number</FormLabel>
                         <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter PAN number" /></FormControl>
@@ -2748,291 +2777,66 @@ export default function StaffAI() {
                     )} />
                   </div>
                 </div>
-
                 <DialogFooter>
-                  <Button type="button" variant="secondary" onClick={() => setIsAddStaffOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={addStaffForm.formState.isSubmitting}>
-                    {addStaffForm.formState.isSubmitting ? "Adding..." : "Add Staff"}
+                  <Button type="button" variant="secondary" onClick={() => setIsEditStaffOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={editStaffMutation.isPending}>
+                    {editStaffMutation.isPending ? "Saving..." : "Save Changes"}
                   </Button>
                 </DialogFooter>
               </form>
             </Form>
           </DialogContent>
         </Dialog>
+      )}
 
-        {/* WhatsApp Modal */}
-        <Dialog open={whatsappModal.open} onOpenChange={(open) => setWhatsappModal({ ...whatsappModal, open })}>
-          <DialogContent className="max-w-md">
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {staffToDelete?.name}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[#643ae5] text-white hover:bg-[#7a7ca0]"
+              onClick={async () => {
+                if (staffToDelete) {
+                  await deleteStaffMutation.mutateAsync(staffToDelete.id);
+                  setDeleteDialogOpen(false);
+                  setStaffToDelete(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* CSV Import Modal */}
+      {isCSVImportOpen && (
+        <Dialog open={isCSVImportOpen} onOpenChange={setIsCSVImportOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
-              <DialogTitle>Send WhatsApp Notification</DialogTitle>
+              <DialogTitle>Import Staff Data</DialogTitle>
               <DialogDescription>
-                Send salary credited notification to {whatsappModal.staff?.name}
+                Import staff members from a CSV file
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="p-4 bg-green-50 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <MessageSquare className="h-5 w-5 text-green-600" />
-                  <span className="font-medium text-green-800">Message Preview</span>
-                </div>
-                <div className="text-sm text-green-700 whitespace-pre-line">
-                  {whatsappModal.staff && getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary)}
-                </div>
-              </div>
-              <div className="text-sm text-gray-600">
-                <p>Phone: {whatsappModal.staff?.phone || 'No phone number available'}</p>
-                <p>Net Salary: ₹{whatsappModal.netSalary.toLocaleString()}</p>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setWhatsappModal({ open: false, staff: null, netSalary: 0 })}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  if (whatsappModal.staff?.phone) {
-                    const message = getSalaryCreditedMessage(whatsappModal.staff, whatsappModal.netSalary);
-                    const whatsappUrl = `https://wa.me/${whatsappModal.staff.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-                    window.open(whatsappUrl, '_blank');
-                    setWhatsappModal({ open: false, staff: null, netSalary: 0 });
-                    toast({
-                      title: "WhatsApp Opened",
-                      description: "WhatsApp has been opened with the salary notification message.",
-                    });
-                  } else {
-                    toast({
-                      title: "No Phone Number",
-                      description: "This employee doesn't have a phone number registered.",
-                      variant: "destructive"
-                    });
-                  }
-                }}
-                disabled={!whatsappModal.staff?.phone}
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Open WhatsApp
-              </Button>
-            </DialogFooter>
+            <StaffCSVImport
+              onSuccess={() => {
+                setIsCSVImportOpen(false);
+                queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+              }}
+              onClose={() => setIsCSVImportOpen(false)}
+            />
           </DialogContent>
         </Dialog>
-
-        {/* Edit Modal */}
-        {selectedStaff && (
-          <Dialog open={isEditStaffOpen} onOpenChange={setIsEditStaffOpen}>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Edit Employee</DialogTitle>
-                <DialogDescription>Edit the details for this employee below</DialogDescription>
-              </DialogHeader>
-              <Form {...editStaffForm}>
-                <form onSubmit={editStaffForm.handleSubmit((data) => {
-                  if (!selectedStaff) return;
-                  const payload = { ...data, id: selectedStaff.id };
-                  editStaffMutation.mutate(payload);
-                })} className="space-y-6">
-                  <FormField control={editStaffForm.control} name="isActive" render={({ field }) => (
-                    <div className="flex items-center gap-4 mb-2">
-                      <Label htmlFor="isActive-toggle" className="text-base font-medium">
-                        {field.value ? "Active" : "Inactive"}
-                      </Label>
-                      <Switch
-                        id="isActive-toggle"
-                        checked={field.value || false}
-                        onCheckedChange={field.onChange}
-                      />
-                    </div>
-                  )} />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <FormField control={editStaffForm.control} name="name" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Full Name</FormLabel>
-                          <FormControl><Input {...field} value={field.value ?? ''} required placeholder="e.g. John Doe" /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={editStaffForm.control} name="phone" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone</FormLabel>
-                          <FormControl><Input {...field} value={field.value ?? ''} required placeholder="1234567890" /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={editStaffForm.control} name="role" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Role</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined} value={field.value ?? undefined}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a role" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {STAFF_ROLES.map((role) => (
-                                <SelectItem key={role} value={role}>{role}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={editStaffForm.control} name="address" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Address</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              value={field.value ?? ''}
-                              placeholder="Enter employee address"
-                              rows={3}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={editStaffForm.control} name="salary" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Salary (₹)</FormLabel>
-                          <FormControl><Input {...field} type="number" value={field.value ?? ''} required min={0} placeholder="e.g. 50000" /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={editStaffForm.control} name="bankAccountNumber" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Bank Account Number</FormLabel>
-                          <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter bank account number" /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    </div>
-                    <div className="space-y-4">
-                      <FormField control={editStaffForm.control} name="email" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl><Input {...field} type="email" value={field.value ?? ''} required placeholder="e.g. john.doe@example.com" /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={editStaffForm.control} name="dateOfJoining" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Date of Joining</FormLabel>
-                          <FormControl><Input {...field} type="date" value={field.value ?? ''} required /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={editStaffForm.control} name="department" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Department</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined} value={field.value ?? undefined}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a department" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="HR">HR</SelectItem>
-                              <SelectItem value="IT">IT</SelectItem>
-                              <SelectItem value="Finance">Finance</SelectItem>
-                              <SelectItem value="Operations">Operations</SelectItem>
-                              <SelectItem value="Marketing">Marketing</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={editStaffForm.control} name="qualifications" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Qualifications</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              value={field.value ?? ''}
-                              placeholder="Enter employee qualifications (e.g., B.Tech, MBA, etc.)"
-                              rows={3}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={editStaffForm.control} name="ifscCode" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>IFSC Code</FormLabel>
-                          <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter IFSC code" /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={editStaffForm.control} name="panNumber" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>PAN Number</FormLabel>
-                          <FormControl><Input {...field} value={field.value ?? ''} placeholder="Enter PAN number" /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="button" variant="secondary" onClick={() => setIsEditStaffOpen(false)}>Cancel</Button>
-                    <Button type="submit" disabled={editStaffMutation.isPending}>
-                      {editStaffMutation.isPending ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        )}
-
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Employee</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete {staffToDelete?.name}? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-[#643ae5] text-white hover:bg-[#7a7ca0]"
-                onClick={async () => {
-                  if (staffToDelete) {
-                    await deleteStaffMutation.mutateAsync(staffToDelete.id);
-                    setDeleteDialogOpen(false);
-                    setStaffToDelete(null);
-                  }
-                }}
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* CSV Import Modal */}
-        {isCSVImportOpen && (
-          <Dialog open={isCSVImportOpen} onOpenChange={setIsCSVImportOpen}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-              <DialogHeader>
-                <DialogTitle>Import Staff Data</DialogTitle>
-                <DialogDescription>
-                  Import staff members from a CSV file
-                </DialogDescription>
-              </DialogHeader>
-              <StaffCSVImport
-                onSuccess={() => {
-                  setIsCSVImportOpen(false);
-                  queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
-                }}
-                onClose={() => setIsCSVImportOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
+      )}
     </div>
+    </div >
   );
 }

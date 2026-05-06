@@ -139,7 +139,7 @@ function drawReceipt(
     doc.setFontSize(7.5);
     doc.setTextColor(220, 20, 20);
     doc.text(
-        "This is a computer-generated receipt and does not require a signature.",
+        "This is a computer-generated receipt and does not require a signature. Fees is non-refundable.",
         105,
         afterAddressY + 2,
         { align: "center" }

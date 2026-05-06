@@ -131,7 +131,7 @@ function drawReceipt(
     doc.text("Authorized Signatory", 185, sigY, { align: "right" });
 
     doc.setFontSize(7);
-    doc.text(`This is an automatically generated receipt from ${data.organization.name}.`, 105, y + 142, { align: "center" });
+    doc.text(`This is an automatically generated receipt from ${data.organization.name}. Fees is non-refundable.`, 105, y + 142, { align: "center" });
 }
 
 export const generateDaycareReceiptPDF = (data: DaycareReceiptData) => {

@@ -151,296 +151,297 @@ export default function Dashboard() {
 
       <Header title="Dashboard" subtitle="Overview of your school's performance" />
       <DashboardPinGuard>
-      <div className="min-h-screen w-full bg-gray-50 text-gray-900 px-4 pb-8">
+        <div className="min-h-screen w-full bg-gray-50 text-gray-900 px-4 pb-8">
 
-        {/* KPI Cards - 8 Total */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          <KPICard
-            title="Total Leads"
-            value={analytics.kpis.leadManagement.value}
-            subtitle={`(${analytics.kpis.conversionRate.value}% Conv. Rate)`}
-            change={analytics.kpis.leadManagement.change}
-            icon={Users}
-            color="blue"
-            progress={leadProgress}
-            tooltip="Total number of leads captured. Conversion Rate (Conv. Rate) shows the percentage of leads that have successfully enrolled."
-          />
+          {/* KPI Cards - 8 Total */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            <KPICard
+              title="Total Leads"
+              value={analytics.kpis.leadManagement.value}
+              subtitle={`(${analytics.kpis.conversionRate.value}% Conv. Rate)`}
+              change={analytics.kpis.leadManagement.change}
+              icon={Users}
+              color="blue"
+              progress={leadProgress}
+              tooltip="Total number of leads captured. Conversion Rate (Conv. Rate) shows the percentage of leads that have successfully enrolled."
+            />
 
-          <KPICard
-            title="Total Revenue"
-            value={formatAmount(analytics.kpis.studentFee.value)}
-            change={analytics.kpis.studentFee.change}
-            icon={IndianRupee}
-            color="green"
-            progress={collectionProgress}
-            tooltip="Includes: Student Fee Payments (Registration, EMI, Admission Form Fee, Other) + Daycare Revenue. Excludes staff payroll and expenses."
-          />
+            <KPICard
+              title="Total Revenue"
+              value={formatAmount(analytics.kpis.studentFee.value)}
+              change={analytics.kpis.studentFee.change}
+              icon={IndianRupee}
+              color="green"
+              progress={collectionProgress}
+              tooltip="Total cumulative revenue collected from student fees and daycare since inception."
+            />
 
-          <KPICard
-            title="Staff Payroll (Monthly)"
-            value={formatAmount(analytics.kpis.payroll.value)}
-            change={analytics.kpis.payroll.change}
-            icon={Banknote}
-            color="purple"
-            progress={80}
-            tooltip="Total cumulative payroll for the current month."
-          />
+            <KPICard
+              title="Total Staff Payroll"
+              value={formatAmount(analytics.kpis.payroll.value)}
+              change={analytics.kpis.payroll.change}
+              icon={Banknote}
+              color="purple"
+              progress={80}
+              tooltip="Total cumulative payroll processed since inception."
+            />
 
-          <KPICard
-            title="Total Expenses"
-            value={formatAmount(analytics.kpis.expenses.value)}
-            change={analytics.kpis.expenses.change}
-            icon={CreditCard}
-            color="orange"
-            progress={60}
-          />
+            <KPICard
+              title="Total Expenses"
+              value={formatAmount(analytics.kpis.expenses.value)}
+              change={analytics.kpis.expenses.change}
+              icon={CreditCard}
+              color="orange"
+              progress={60}
+              tooltip="Total cumulative expenses incurred since inception."
+            />
 
-          <KPICard
-            title="Total Receivables"
-            value={formatAmount(analytics.kpis.totalReceivables.value)}
-            change={analytics.kpis.totalReceivables.change}
-            icon={IndianRupee}
-            color="orange"
-            progress={100}
-            tooltip="The gross total of all fees currently billable for all enrolled students based on their fee structure."
-          />
+            <KPICard
+              title="Total Receivables"
+              value={formatAmount(analytics.kpis.totalReceivables.value)}
+              change={analytics.kpis.totalReceivables.change}
+              icon={IndianRupee}
+              color="orange"
+              progress={100}
+              tooltip="The gross total of all fees currently billable for all enrolled students based on their fee structure."
+            />
 
-          <KPICard
-            title="Fee Collected"
-            value={formatAmount(analytics.feeAnalytics.totalRevenue)}
-            change={analytics.kpis.avgOrderValue.change}
-            icon={Wallet}
-            color="purple"
-            progress={collectionProgress}
-            tooltip="Total fees collected from all students across all payment types (Registration, EMI, Admission Form Fee, Other)."
-          />
+            <KPICard
+              title="Fee Collected"
+              value={formatAmount(analytics.feeAnalytics.totalRevenue)}
+              change={analytics.kpis.avgOrderValue.change}
+              icon={Wallet}
+              color="purple"
+              progress={collectionProgress}
+              tooltip="Total fees collected from all students across all payment types (Registration, EMI, Admission Form Fee, Other)."
+            />
 
-          <KPICard
-            title="Pending Fees"
-            value={formatAmount(analytics.feeAnalytics.totalPending)}
-            change="Outstanding"
-            icon={AlertCircle}
-            color="red"
-            progress={100 - collectionProgress}
-          />
+            <KPICard
+              title="Pending Fees"
+              value={formatAmount(analytics.feeAnalytics.totalPending)}
+              change="Outstanding"
+              icon={AlertCircle}
+              color="red"
+              progress={100 - collectionProgress}
+            />
 
-          <KPICard
-            title="Total Daycare Revenue (Till Date)"
-            value={formatAmount(analytics.kpis.daycareRevenue.value)}
-            change={analytics.kpis.daycareRevenue.change}
-            icon={IndianRupee}
-            color="amber"
-            progress={50}
-            tooltip="Total cumulative revenue from daycare payments since inception."
-          />
-        </div>
+            <KPICard
+              title="Daycare Revenue"
+              value={formatAmount(analytics.kpis.daycareRevenue.value)}
+              change={analytics.kpis.daycareRevenue.change}
+              icon={IndianRupee}
+              color="amber"
+              progress={50}
+              tooltip="Total cumulative revenue from daycare payments since inception."
+            />
+          </div>
 
 
-        {/* Intelligence Grid - 3 Columns (Moved to Top) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 component-gap mb-6">
-          {/* Lead Funnel Progression */}
-          <Card style={{ borderRadius: 'var(--radius-xl)', padding: 'var(--card-padding)', boxShadow: 'var(--shadow-lg)' }} className="bg-white/90 backdrop-blur-md border border-gray-100/50">
-            <CardHeader className="px-0 pt-0 pb-3">
-              <CardTitle className="text-h3 flex items-center gap-2">
-                <Users className="h-4 w-4 text-blue-600" />
-                Lead Funnel
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 flex flex-col items-center">
-              <div className="h-[180px] w-full">
+          {/* Intelligence Grid - 3 Columns (Moved to Top) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 component-gap mb-6">
+            {/* Lead Funnel Progression */}
+            <Card style={{ borderRadius: 'var(--radius-xl)', padding: 'var(--card-padding)', boxShadow: 'var(--shadow-lg)' }} className="bg-white/90 backdrop-blur-md border border-gray-100/50">
+              <CardHeader className="px-0 pt-0 pb-3">
+                <CardTitle className="text-h3 flex items-center gap-2">
+                  <Users className="h-4 w-4 text-blue-600" />
+                  Lead Funnel
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 flex flex-col items-center">
+                <div className="h-[180px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RCPieChart>
+                      <Pie
+                        data={(() => {
+                          const funnelData = [
+                            { label: 'New', value: analytics.leadAnalytics.statusTotals?.new || 0, color: '#3b82f6' },
+                            { label: 'Contacted', value: analytics.leadAnalytics.statusTotals?.contacted || 0, color: '#6366f1' },
+                            { label: 'Interested', value: analytics.leadAnalytics.statusTotals?.interested || 0, color: '#f59e0b' },
+                            { label: 'Ready for Admission', value: analytics.leadAnalytics.statusTotals?.readyForAdmission || 0, color: '#14b8a6' },
+                            { label: 'Enrolled', value: analytics.leadAnalytics.statusTotals?.enrolled || 0, color: '#10b981' },
+                            { label: 'Dropped', value: analytics.leadAnalytics.statusTotals?.dropped || 0, color: '#ef4444' }
+                          ];
+                          return funnelData.filter(item => item.value > 0);
+                        })()}
+                        dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius="60%" outerRadius="90%" paddingAngle={2}
+                      >
+                        {(() => {
+                          const funnelData = [
+                            { label: 'New', value: analytics.leadAnalytics.statusTotals?.new || 0, color: '#3b82f6' },
+                            { label: 'Contacted', value: analytics.leadAnalytics.statusTotals?.contacted || 0, color: '#6366f1' },
+                            { label: 'Interested', value: analytics.leadAnalytics.statusTotals?.interested || 0, color: '#f59e0b' },
+                            { label: 'Ready for Admission', value: analytics.leadAnalytics.statusTotals?.readyForAdmission || 0, color: '#14b8a6' },
+                            { label: 'Enrolled', value: analytics.leadAnalytics.statusTotals?.enrolled || 0, color: '#10b981' },
+                            { label: 'Dropped', value: analytics.leadAnalytics.statusTotals?.dropped || 0, color: '#ef4444' }
+                          ];
+                          return funnelData.filter(item => item.value > 0).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ));
+                        })()}
+                      </Pie>
+                      <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    </RCPieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-4 w-full">
+                  <div className="text-center py-1.5 bg-blue-50/50 rounded-lg">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">New</p>
+                    <p className="text-sm font-bold text-blue-600">{analytics.leadAnalytics.statusTotals?.new || 0}</p>
+                  </div>
+                  <div className="text-center py-1.5 bg-indigo-50/50 rounded-lg">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Contacted</p>
+                    <p className="text-sm font-bold text-indigo-600">{analytics.leadAnalytics.statusTotals?.contacted || 0}</p>
+                  </div>
+                  <div className="text-center py-1.5 bg-amber-50/50 rounded-lg">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Interested</p>
+                    <p className="text-sm font-bold text-amber-600">{analytics.leadAnalytics.statusTotals?.interested || 0}</p>
+                  </div>
+                  <div className="text-center py-1.5 bg-teal-50/50 rounded-lg">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Ready for Admission</p>
+                    <p className="text-sm font-bold text-teal-600">{analytics.leadAnalytics.statusTotals?.readyForAdmission || 0}</p>
+                  </div>
+                  <div className="text-center py-1.5 bg-green-50/50 rounded-lg">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Enrolled</p>
+                    <p className="text-sm font-bold text-green-600">{analytics.leadAnalytics.statusTotals?.enrolled || 0}</p>
+                  </div>
+                  <div className="text-center py-1.5 bg-red-50/50 rounded-lg">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Dropped</p>
+                    <p className="text-sm font-bold text-red-600">{analytics.leadAnalytics.statusTotals?.dropped || 0}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Lead Source Distribution */}
+            <Card style={{ borderRadius: 'var(--radius-xl)', padding: 'var(--card-padding)', boxShadow: 'var(--shadow-lg)' }} className="bg-white/90 backdrop-blur-md border border-gray-100/50">
+              <CardHeader className="px-0 pt-0 pb-3">
+                <CardTitle className="text-h3 flex items-center gap-2">
+                  <Users className="h-4 w-4 text-purple-600" />
+                  Lead Sources
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 flex flex-col items-center">
+                <div className="h-[180px] w-full">
+                  <DonutChart
+                    title=""
+                    data={analytics.leadAnalytics.sourceDistribution.map(item => ({
+                      ...item,
+                      label: item.label.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+                    }))}
+                    colors={["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#f43f5e", "#06b6d4", "#f97316", "#84cc16", "#eab308", "#64748b", "#0ea5e9"]}
+                  />
+                </div>
+                <div className="mt-4 text-center">
+                  <p className="text-caption uppercase tracking-wider font-bold">Best Source</p>
+                  <p className="text-sm font-bold text-indigo-600">
+                    {(analytics.leadAnalytics.bestPerformingSource || "N/A").split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Expense Category Analysis */}
+            <Card style={{ borderRadius: 'var(--radius-xl)', padding: 'var(--card-padding)', boxShadow: 'var(--shadow-lg)' }} className="bg-white/90 backdrop-blur-md border border-gray-100/50">
+              <CardHeader className="px-0 pt-0 pb-3">
+                <CardTitle className="text-h3 flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-rose-600" />
+                  Expense Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 flex flex-col items-center">
+                <div className="h-[180px] w-full">
+                  <DonutChart
+                    title=""
+                    data={analytics.expenseAnalytics.categoryBreakdown.map(item => ({
+                      ...item,
+                      label: item.label.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+                    }))}
+                    colors={["#f43f5e", "#f97316", "#eab308", "#84cc16", "#06b6d4", "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#0891b2", "#be123c"]}
+                  />
+                </div>
+                <div className="mt-4 text-center">
+                  <p className="text-[12px] text-gray-500 uppercase tracking-wider font-bold">Top Category</p>
+                  <p className="text-sm font-bold text-rose-600">
+                    {(analytics.expenseAnalytics.categoryBreakdown.sort((a, b) => b.value - a.value)[0]?.label || "N/A").split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Charts Section - 2 Columns */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 component-gap mb-6">
+            <Card className="bg-white/90 backdrop-blur-md border border-gray-100/50 shadow-lg rounded-2xl p-4 flex flex-col min-h-[300px]">
+              <CardHeader className="px-0 pt-0 pb-3">
+                <CardTitle className="text-h3 flex items-center gap-2">
+                  <IndianRupee className="h-4 w-4 text-green-600" />
+                  Financial Performance
+                </CardTitle>
+                <p className="text-caption">Total Revenue vs Total Operating Expense</p>
+              </CardHeader>
+              <CardContent className="flex-1 w-full min-h-[220px] px-0">
                 <ResponsiveContainer width="100%" height="100%">
-                  <RCPieChart>
-                    <Pie
-                      data={(() => {
-                        const funnelData = [
-                          { label: 'New', value: analytics.leadAnalytics.statusTotals?.new || 0, color: '#3b82f6' },
-                          { label: 'Contacted', value: analytics.leadAnalytics.statusTotals?.contacted || 0, color: '#6366f1' },
-                          { label: 'Interested', value: analytics.leadAnalytics.statusTotals?.interested || 0, color: '#f59e0b' },
-                          { label: 'Ready for Admission', value: analytics.leadAnalytics.statusTotals?.readyForAdmission || 0, color: '#14b8a6' },
-                          { label: 'Enrolled', value: analytics.leadAnalytics.statusTotals?.enrolled || 0, color: '#10b981' },
-                          { label: 'Dropped', value: analytics.leadAnalytics.statusTotals?.dropped || 0, color: '#ef4444' }
-                        ];
-                        return funnelData.filter(item => item.value > 0);
-                      })()}
-                      dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius="60%" outerRadius="90%" paddingAngle={2}
-                    >
-                      {(() => {
-                        const funnelData = [
-                          { label: 'New', value: analytics.leadAnalytics.statusTotals?.new || 0, color: '#3b82f6' },
-                          { label: 'Contacted', value: analytics.leadAnalytics.statusTotals?.contacted || 0, color: '#6366f1' },
-                          { label: 'Interested', value: analytics.leadAnalytics.statusTotals?.interested || 0, color: '#f59e0b' },
-                          { label: 'Ready for Admission', value: analytics.leadAnalytics.statusTotals?.readyForAdmission || 0, color: '#14b8a6' },
-                          { label: 'Enrolled', value: analytics.leadAnalytics.statusTotals?.enrolled || 0, color: '#10b981' },
-                          { label: 'Dropped', value: analytics.leadAnalytics.statusTotals?.dropped || 0, color: '#ef4444' }
-                        ];
-                        return funnelData.filter(item => item.value > 0).map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ));
-                      })()}
-                    </Pie>
-                    <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                  </RCPieChart>
+                  <RCLineChart
+                    data={analytics.feeAnalytics.monthlyCollection.map(c => {
+                      const expense = analytics.expenseAnalytics.monthlyTrend.find(e => e.month === c.month);
+                      return {
+                        month: c.month,
+                        revenue: c.collected,
+                        expense: expense ? expense.amount : 0,
+                      };
+                    })}
+                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(value) => `${value >= 1000 ? `₹${(value / 1000).toFixed(0)}k` : `₹${value}`}`} />
+                    <RechartsTooltip
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      labelStyle={{ fontSize: '14px', fontWeight: 'bold' }}
+                      itemStyle={{ fontSize: '14px' }}
+                      formatter={(value: number) => [formatAmount(value), undefined]}
+                    />
+                    <Line type="monotone" dataKey="revenue" name="Total Revenue" stroke="#10b981" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#10b981' }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="expense" name="Total Operating Expense" stroke="#ef4444" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#ef4444' }} activeDot={{ r: 6 }} />
+                  </RCLineChart>
                 </ResponsiveContainer>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mt-4 w-full">
-                <div className="text-center py-1.5 bg-blue-50/50 rounded-lg">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">New</p>
-                  <p className="text-sm font-bold text-blue-600">{analytics.leadAnalytics.statusTotals?.new || 0}</p>
-                </div>
-                <div className="text-center py-1.5 bg-indigo-50/50 rounded-lg">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Contacted</p>
-                  <p className="text-sm font-bold text-indigo-600">{analytics.leadAnalytics.statusTotals?.contacted || 0}</p>
-                </div>
-                <div className="text-center py-1.5 bg-amber-50/50 rounded-lg">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Interested</p>
-                  <p className="text-sm font-bold text-amber-600">{analytics.leadAnalytics.statusTotals?.interested || 0}</p>
-                </div>
-                <div className="text-center py-1.5 bg-teal-50/50 rounded-lg">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Ready for Admission</p>
-                  <p className="text-sm font-bold text-teal-600">{analytics.leadAnalytics.statusTotals?.readyForAdmission || 0}</p>
-                </div>
-                <div className="text-center py-1.5 bg-green-50/50 rounded-lg">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Enrolled</p>
-                  <p className="text-sm font-bold text-green-600">{analytics.leadAnalytics.statusTotals?.enrolled || 0}</p>
-                </div>
-                <div className="text-center py-1.5 bg-red-50/50 rounded-lg">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">Dropped</p>
-                  <p className="text-sm font-bold text-red-600">{analytics.leadAnalytics.statusTotals?.dropped || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Lead Source Distribution */}
-          <Card style={{ borderRadius: 'var(--radius-xl)', padding: 'var(--card-padding)', boxShadow: 'var(--shadow-lg)' }} className="bg-white/90 backdrop-blur-md border border-gray-100/50">
-            <CardHeader className="px-0 pt-0 pb-3">
-              <CardTitle className="text-h3 flex items-center gap-2">
-                <Users className="h-4 w-4 text-purple-600" />
-                Lead Sources
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 flex flex-col items-center">
-              <div className="h-[180px] w-full">
-                <DonutChart
-                  title=""
-                  data={analytics.leadAnalytics.sourceDistribution.map(item => ({
-                    ...item,
-                    label: item.label.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
-                  }))}
-                  colors={["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#f43f5e", "#06b6d4", "#f97316", "#84cc16", "#eab308", "#64748b", "#0ea5e9"]}
-                />
-              </div>
-              <div className="mt-4 text-center">
-                <p className="text-caption uppercase tracking-wider font-bold">Best Source</p>
-                <p className="text-sm font-bold text-indigo-600">
-                  {(analytics.leadAnalytics.bestPerformingSource || "N/A").split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+            <Card className="bg-white/90 backdrop-blur-md border border-gray-100/50 shadow-lg rounded-2xl p-4 flex flex-col min-h-[300px]">
+              <CardHeader className="px-0 pt-0 pb-3">
+                <CardTitle className="text-h3 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-orange-600" />
+                  Monthly Expense Trend
+                </CardTitle>
+                <p className="text-caption">Total Monthly Spending Across All Categories</p>
+              </CardHeader>
+              <CardContent className="flex-1 w-full min-h-[220px] px-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RCAreaChart data={analytics.expenseAnalytics.monthlyTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="colorExpenseTrend" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={5} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(value) => `${value >= 1000 ? `₹${(value / 1000).toFixed(0)}k` : `₹${value}`}`} />
+                    <RechartsTooltip
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      labelStyle={{ fontSize: '14px', fontWeight: 'bold' }}
+                      itemStyle={{ fontSize: '14px' }}
+                      formatter={(value: number) => [formatAmount(value), "Total Expense"]}
+                    />
+                    <Area type="monotone" dataKey="amount" stroke="#f97316" strokeWidth={2} fillOpacity={1} fill="url(#colorExpenseTrend)" dot={{ fill: '#f97316', r: 3 }} />
+                  </RCAreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
 
-          {/* Expense Category Analysis */}
-          <Card style={{ borderRadius: 'var(--radius-xl)', padding: 'var(--card-padding)', boxShadow: 'var(--shadow-lg)' }} className="bg-white/90 backdrop-blur-md border border-gray-100/50">
-            <CardHeader className="px-0 pt-0 pb-3">
-              <CardTitle className="text-h3 flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-rose-600" />
-                Expense Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 flex flex-col items-center">
-              <div className="h-[180px] w-full">
-                <DonutChart
-                  title=""
-                  data={analytics.expenseAnalytics.categoryBreakdown.map(item => ({
-                    ...item,
-                    label: item.label.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
-                  }))}
-                  colors={["#f43f5e", "#f97316", "#eab308", "#84cc16", "#06b6d4", "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#0891b2", "#be123c"]}
-                />
-              </div>
-              <div className="mt-4 text-center">
-                <p className="text-[12px] text-gray-500 uppercase tracking-wider font-bold">Top Category</p>
-                <p className="text-sm font-bold text-rose-600">
-                  {(analytics.expenseAnalytics.categoryBreakdown.sort((a, b) => b.value - a.value)[0]?.label || "N/A").split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
         </div>
-
-        {/* Charts Section - 2 Columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 component-gap mb-6">
-          <Card className="bg-white/90 backdrop-blur-md border border-gray-100/50 shadow-lg rounded-2xl p-4 flex flex-col min-h-[300px]">
-            <CardHeader className="px-0 pt-0 pb-3">
-              <CardTitle className="text-h3 flex items-center gap-2">
-                <IndianRupee className="h-4 w-4 text-green-600" />
-                Financial Performance
-              </CardTitle>
-              <p className="text-caption">Total Revenue vs Total Operating Expense</p>
-            </CardHeader>
-            <CardContent className="flex-1 w-full min-h-[220px] px-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <RCLineChart
-                  data={analytics.feeAnalytics.monthlyCollection.map(c => {
-                    const expense = analytics.expenseAnalytics.monthlyTrend.find(e => e.month === c.month);
-                    return {
-                      month: c.month,
-                      revenue: c.collected,
-                      expense: expense ? expense.amount : 0,
-                    };
-                  })}
-                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(value) => `${value >= 1000 ? `₹${(value / 1000).toFixed(0)}k` : `₹${value}`}`} />
-                  <RechartsTooltip
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    labelStyle={{ fontSize: '14px', fontWeight: 'bold' }}
-                    itemStyle={{ fontSize: '14px' }}
-                    formatter={(value: number) => [formatAmount(value), undefined]}
-                  />
-                  <Line type="monotone" dataKey="revenue" name="Total Revenue" stroke="#10b981" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#10b981' }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="expense" name="Total Operating Expense" stroke="#ef4444" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#ef4444' }} activeDot={{ r: 6 }} />
-                </RCLineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/90 backdrop-blur-md border border-gray-100/50 shadow-lg rounded-2xl p-4 flex flex-col min-h-[300px]">
-            <CardHeader className="px-0 pt-0 pb-3">
-              <CardTitle className="text-h3 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-orange-600" />
-                Monthly Expense Trend
-              </CardTitle>
-              <p className="text-caption">Total Monthly Spending Across All Categories</p>
-            </CardHeader>
-            <CardContent className="flex-1 w-full min-h-[220px] px-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <RCAreaChart data={analytics.expenseAnalytics.monthlyTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                  <defs>
-                    <linearGradient id="colorExpenseTrend" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={5} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(value) => `${value >= 1000 ? `₹${(value / 1000).toFixed(0)}k` : `₹${value}`}`} />
-                  <RechartsTooltip
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    labelStyle={{ fontSize: '14px', fontWeight: 'bold' }}
-                    itemStyle={{ fontSize: '14px' }}
-                    formatter={(value: number) => [formatAmount(value), "Total Expense"]}
-                  />
-                  <Area type="monotone" dataKey="amount" stroke="#f97316" strokeWidth={2} fillOpacity={1} fill="url(#colorExpenseTrend)" dot={{ fill: '#f97316', r: 3 }} />
-                </RCAreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-      </div>
       </DashboardPinGuard>
     </>
   );

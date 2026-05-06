@@ -4093,6 +4093,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('Created new payroll record:', JSON.stringify(payroll, null, 2));
       }
 
+      // Invalidate dashboard cache
+      cacheService.delete(cacheService.dashboardKey(organizationId));
+      console.log(`[Cache] Invalidated dashboard cache for org ${organizationId} after payroll update`);
+
       res.status(201).json({
         success: true,
         message: 'Payroll processed successfully',
@@ -4204,6 +4208,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`Bulk payroll generation completed. Success: ${createdPayrolls.length}, Failed: ${failedPayrolls.length}`);
+      // Invalidate dashboard cache
+      cacheService.delete(cacheService.dashboardKey(organizationId));
+      console.log(`[Cache] Invalidated dashboard cache for org ${organizationId} after bulk payroll generation`);
+
       res.status(201).json({
         success: true,
         message: `Successfully processed ${createdPayrolls.length} payroll records`,
@@ -5090,6 +5098,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updated) {
         return res.status(404).json({ message: "Payroll record not found" });
       }
+      // Invalidate dashboard cache
+      const organizationId = await getOrganizationId(req);
+      cacheService.delete(cacheService.dashboardKey(organizationId));
+      console.log(`[Cache] Invalidated dashboard cache for org ${organizationId} after payroll status update`);
+
       res.json({ message: "Payroll status updated successfully", payroll: updated });
     } catch (error) {
       console.error("Error updating payroll status:", error);

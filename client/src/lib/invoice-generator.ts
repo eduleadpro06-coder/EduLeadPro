@@ -376,7 +376,7 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
     // Constrain text width to prevent overlap with signature section (use ~60% of page width)
     const notesMaxWidth = (pageWidth - (2 * margin)) * 0.6;
     const notesText = doc.splitTextToSize(
-        "Payment is due by the date specified above. Late payments may be subject to a fine.",
+        "Payment is due by the date specified above. Late payments may be subject to a fine. Fees is non-refundable.",
         notesMaxWidth
     );
     doc.text(notesText, margin, notesSignatureY + 6);
