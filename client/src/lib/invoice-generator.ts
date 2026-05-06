@@ -89,7 +89,7 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
     doc.setTextColor(100, 58, 229); // Brand Purple #643ae5
     doc.text(invoiceData.organization.name, pageWidth / 2, yPosition + 5, { align: "center" });
 
-    yPosition += 15;
+    yPosition += 12;
 
     // ========== HEADER SECTION ==========
     // Left box - Invoice details
@@ -112,16 +112,16 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
     doc.setTextColor(orangeR, orangeG, orangeB);
     doc.text("INVOICE", pageWidth - 50, yPosition + 14, { align: "center" });
 
-    yPosition += 25;
+    yPosition += 22;
 
     // ========== ORANGE DIVIDER BAR 1 ==========
     doc.setFillColor(orangeR, orangeG, orangeB);
     doc.rect(margin, yPosition, pageWidth - (2 * margin), 4, 'F');
 
-    yPosition += 10;
+    yPosition += 7;
 
     // ========== BILL FROM / BILL TO SECTION ==========
-    const billingSectionHeight = 50;
+    const billingSectionHeight = 45;
     const halfWidth = (pageWidth - (2 * margin)) / 2;
 
     // Outer box
@@ -184,13 +184,13 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
         doc.text(`Phone: ${invoiceData.student.phone}`, rightX, rightY);
     }
 
-    yPosition += billingSectionHeight + 10;
+    yPosition += billingSectionHeight + 7;
 
     // ========== ORANGE DIVIDER BAR 2 ==========
     doc.setFillColor(orangeR, orangeG, orangeB);
     doc.rect(margin, yPosition, pageWidth - (2 * margin), 4, 'F');
 
-    yPosition += 10;
+    yPosition += 7;
 
     // ========== SERVICE/ITEM TABLE ==========
     const tableBody: string[][] = [];
@@ -250,7 +250,7 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
         bodyStyles: {
             fontSize: 10,
             textColor: [darkTextR, darkTextG, darkTextB],
-            cellPadding: 5,
+            cellPadding: 4,
             lineWidth: { top: 0.5, right: 1, bottom: 0.5, left: 1 },
             lineColor: [orangeR, orangeG, orangeB]
         },
@@ -289,7 +289,7 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
     });
 
     // @ts-ignore - accessing jsPDF autoTable property
-    yPosition = doc.lastAutoTable.finalY + 10;
+    yPosition = doc.lastAutoTable.finalY + 8;
 
     // ========== TOTALS SECTION (Right aligned) ==========
     const totalAmount = invoiceData.emiPlan
@@ -306,7 +306,7 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
     const balanceDue = Math.max(0, total - totalPaid);
 
     // Dynamic height: base 40 (Subtotal + Total + Amount Paid + Balance Due), add 7 if discount > 0
-    const totalsBoxHeight = discount > 0 ? 47 : 40;
+    const totalsBoxHeight = discount > 0 ? 45 : 38;
     const totalsX = pageWidth - margin - totalsBoxWidth;
 
     // Draw totals box
@@ -355,12 +355,29 @@ export const generateInvoicePDF = (invoiceData: InvoiceData) => {
     doc.text(`Rs. ${formatCurrency(balanceDue)}`,
         totalsX + totalsBoxWidth - 5, totalY, { align: "right" });
 
-    yPosition += totalsBoxHeight + 2;
+    yPosition += totalsBoxHeight;
+
+    // ========== FOOTER SECTION ==========
+    // Calculate how much space the footer needs (divider bar + notes/signature + bottom bar)
+    const footerHeight = 30; // 4px bar + 9px gap + notes text + 15px gap + 4px bar
+
+    // Check if footer fits on current page; if not, add a new page
+    if (yPosition + footerHeight > pageHeight - margin) {
+        doc.addPage();
+        // Redraw page border on new page
+        doc.setDrawColor(orangeR, orangeG, orangeB);
+        doc.setLineWidth(2);
+        doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
+        yPosition = margin + 10;
+    }
+
+    // Position footer: use remaining page space if there's room to push it down,
+    // otherwise flow right after content
+    const minFooterY = pageHeight - margin - footerHeight - 5;
+    const footerBaseY = Math.max(yPosition, minFooterY);
 
     // ========== ORANGE DIVIDER BAR 3 (Top Footer Bar) ==========
     doc.setFillColor(orangeR, orangeG, orangeB);
-    // Position Notes and Signature near the bottom consistently
-    const footerBaseY = Math.max(yPosition, pageHeight - margin - 150);
     doc.rect(margin, footerBaseY, pageWidth - (2 * margin), 4, 'F');
 
     const notesSignatureY = footerBaseY + 9;
