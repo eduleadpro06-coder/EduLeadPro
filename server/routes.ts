@@ -441,7 +441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from('daily_updates')
         .select(`
           *,
-          leads:leads!daily_updates_lead_id_fkey (
+          leads:leads!daily_updates_lead_id_leads_id_fk (
             id,
             name,
             class
@@ -1432,11 +1432,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = Number(req.params.id);
       const updates = { ...req.body };
-      
+
       // Transform dates if present
       if (updates.expiresAt) updates.expiresAt = new Date(updates.expiresAt);
       if (updates.publishedAt) updates.publishedAt = new Date(updates.publishedAt);
-      
+
       const announcement = await storage.updateAnnouncement(id, updates);
       res.json(announcement);
     } catch (error) {
@@ -2845,15 +2845,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/emi-plans/:id", async (req, res) => {
     try {
       const planId = parseInt(req.params.id);
-      const { 
-        status, 
-        totalAmount, 
-        discount, 
+      const {
+        status,
+        totalAmount,
+        discount,
         registrationFee,
-        numberOfInstallments, 
-        recalculate, 
-        strategy, 
-        newInstallments, 
+        numberOfInstallments,
+        recalculate,
+        strategy,
+        newInstallments,
         numInstallmentsToRemove,
         customInstallments
       } = req.body;
@@ -2870,18 +2870,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               numInstallmentsToRemove: numInstallmentsToRemove || undefined
             }
           );
-          
+
           if (!updatedPlan) {
             return res.status(404).json({ message: "EMI plan not found" });
           }
-          
+
           if (registrationFee !== undefined) {
-             await db.update(schema.feePayments)
-               .set({ amount: registrationFee, totalAmount: registrationFee })
-               .where(and(
-                 eq(schema.feePayments.leadId, updatedPlan.studentId),
-                 eq(schema.feePayments.installmentNumber, 0)
-               ));
+            await db.update(schema.feePayments)
+              .set({ amount: registrationFee, totalAmount: registrationFee })
+              .where(and(
+                eq(schema.feePayments.leadId, updatedPlan.studentId),
+                eq(schema.feePayments.installmentNumber, 0)
+              ));
           }
 
           return res.json(updatedPlan);
@@ -2907,14 +2907,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updatedPlan) {
         return res.status(404).json({ message: "EMI plan not found" });
       }
-      
+
       if (registrationFee !== undefined) {
-         await db.update(schema.feePayments)
-           .set({ amount: registrationFee, totalAmount: registrationFee })
-           .where(and(
-             eq(schema.feePayments.leadId, updatedPlan.studentId),
-             eq(schema.feePayments.installmentNumber, 0)
-           ));
+        await db.update(schema.feePayments)
+          .set({ amount: registrationFee, totalAmount: registrationFee })
+          .where(and(
+            eq(schema.feePayments.leadId, updatedPlan.studentId),
+            eq(schema.feePayments.installmentNumber, 0)
+          ));
       }
 
       res.json(updatedPlan);

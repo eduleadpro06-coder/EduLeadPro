@@ -38,14 +38,24 @@ export async function getOrganizationId(req: express.Request): Promise<number | 
     let user = await storage.getUserByUsername(cleanIdentifier);
     console.log(`[Auth Debug] Lookup by username "${cleanIdentifier}": ${user ? 'Found (ID: ' + user.id + ')' : 'Not Found'}`);
 
-    // Fallback: try lookup by email if username lookup failed
+    // Fallback 1: try lookup by email in users table
     if (!user) {
         user = await storage.getUserByEmail(cleanIdentifier);
         console.log(`[Auth Debug] Lookup by email "${cleanIdentifier}": ${user ? 'Found (ID: ' + user.id + ')' : 'Not Found'}`);
     }
 
+    // Fallback 2: try lookup by email in staff table
     if (!user) {
-        console.warn(`[Auth Debug] No user found for identifier: "${cleanIdentifier}"`);
+        const staff = await storage.getStaffByEmail(cleanIdentifier);
+        if (staff) {
+            console.log(`[Auth Debug] Found staff member for "${cleanIdentifier}" (ID: ${staff.id}), Org: ${staff.organizationId}`);
+            return staff.organizationId || undefined;
+        }
+        console.log(`[Auth Debug] Lookup by staff email "${cleanIdentifier}": Not Found`);
+    }
+
+    if (!user) {
+        console.warn(`[Auth Debug] No user or staff found for identifier: "${cleanIdentifier}"`);
         return undefined;
     }
 

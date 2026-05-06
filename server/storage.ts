@@ -149,7 +149,8 @@ export interface IStorage {
 
   // Staff Management
   getStaff(id: number): Promise<Staff | undefined>;
-  getAllStaff(): Promise<StaffWithDetails[]>;
+  getStaffByEmail(email: string): Promise<Staff | undefined>;
+  getAllStaff(organizationId?: number): Promise<StaffWithDetails[]>;
   getStaffByRole(role: string): Promise<Staff[]>;
   createStaff(staff: InsertStaff): Promise<Staff>;
   updateStaff(id: number, updates: Partial<Staff>): Promise<Staff | undefined>;
@@ -1746,28 +1747,28 @@ export class DatabaseStorage implements IStorage {
     const [currentDaycareRevenueResult, prevDaycareRevenueResult, totalDaycareResult] = await Promise.all([
       db.select({ total: sql<number>`cast(coalesce(sum(${schema.daycarePayments.totalAmount}), 0) as integer)` })
         .from(schema.daycarePayments)
+        .innerJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id))
         .where(
           and(
             organizationId ? eq(schema.daycareChildren.organizationId, organizationId) : sql`1=1`,
             gte(schema.daycarePayments.paymentDate, currentMonthStartStr),
             lte(schema.daycarePayments.paymentDate, currentMonthEndStr)
           )
-        )
-        .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id)),
+        ),
       db.select({ total: sql<number>`cast(coalesce(sum(${schema.daycarePayments.totalAmount}), 0) as integer)` })
         .from(schema.daycarePayments)
+        .innerJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id))
         .where(
           and(
             organizationId ? eq(schema.daycareChildren.organizationId, organizationId) : sql`1=1`,
             gte(schema.daycarePayments.paymentDate, prevMonthStartStr),
             lte(schema.daycarePayments.paymentDate, prevMonthEndStr)
           )
-        )
-        .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id)),
+        ),
       db.select({ total: sql<number>`cast(coalesce(sum(${schema.daycarePayments.totalAmount}), 0) as integer)` })
         .from(schema.daycarePayments)
+        .innerJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id))
         .where(organizationId ? eq(schema.daycareChildren.organizationId, organizationId) : sql`1=1`)
-        .leftJoin(schema.daycareChildren, eq(schema.daycarePayments.childId, schema.daycareChildren.id))
     ]);
 
     const monthlyDaycareRevenue = currentDaycareRevenueResult[0]?.total || 0;
@@ -1960,6 +1961,11 @@ export class DatabaseStorage implements IStorage {
   // Staff operations - simplified implementations to avoid errors
   async getStaff(id: number): Promise<Staff | undefined> {
     const result = await db.select().from(schema.staff).where(eq(schema.staff.id, id));
+    return result[0];
+  }
+
+  async getStaffByEmail(email: string): Promise<Staff | undefined> {
+    const result = await db.select().from(schema.staff).where(ilike(schema.staff.email, email));
     return result[0];
   }
 
