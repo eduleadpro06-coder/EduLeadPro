@@ -55,6 +55,8 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:8081', // Expo dev
   'https://eduleadconnect.vercel.app',
+  'https://bloomdalepreschool.in',     // Bloomdale landing page
+  'https://www.bloomdalepreschool.in',  // Bloomdale landing page (www)
   process.env.FRONTEND_URL
 ].filter(Boolean) as string[];
 
