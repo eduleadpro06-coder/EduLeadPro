@@ -174,42 +174,66 @@ export default function StaffPayrollSheetTab({ month, year }: { month: number; y
   // ── Generate payroll mutation (reuses existing endpoint) ───────────────────
   const generatePayrollMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/payroll/generate", data);
+      const res = await apiRequest("POST", "/api/payroll", data);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
       queryClient.invalidateQueries({
-        queryKey: ["/api/payroll/overview", selectedMonth, selectedYear],
+        queryKey: ["/api/payroll/overview"],
+      });
+      toast({ title: "Payroll Generated Successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const generateBulkPayrollMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/payroll/bulk-generate", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/payroll/overview"],
+      });
+      toast({
+        title: "Bulk Payroll Saved",
+        description: `Successfully processed ${data.summary?.successful || 0} payroll records.`,
       });
     },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
   });
 
   const handleSaveAll = () => {
-    let count = 0;
-    filteredStaff.forEach((member) => {
+    const payrollDataArray = filteredStaff.map((member) => {
       const row = getRowData(member);
-      const payrollData = {
+      return {
         staffId: member.id,
         month: selectedMonth,
         year: selectedYear,
-        basicSalary: row.netSalary,
+        basicSalary: row.salary, // Send original basic salary
         allowances: row.reimbursment,
-        deductions: Number(row.deductions) + Number(row.deposit),
+        deductions: row.deductions,
+        deposit: row.deposit,
         overtime: 0,
-        netSalary: row.amountPaid,
         attendedDays: row.totalDaysWorked,
         status: "processed",
         workingDays: TOTAL_DAYS,
-        overtimeHours: 0,
         employeeName: member.name,
+        remark: row.remarks
       };
-      generatePayrollMutation.mutate(payrollData);
-      count++;
     });
-    toast({
-      title: "Payroll Saved",
-      description: `Generated payroll for ${count} employees.`,
+
+    generateBulkPayrollMutation.mutate({
+      month: selectedMonth,
+      year: selectedYear,
+      staffIds: filteredStaff.map(s => s.id),
+      payrollData: payrollDataArray
     });
   };
 

@@ -214,12 +214,12 @@ export function StaffLeavesTab({ staffId }: StaffLeavesTabProps) {
                                     <TableCell className="font-medium">
                                         <div className="flex items-center gap-2">
                                             <Calendar className="h-4 w-4 text-slate-400" />
-                                            {format(new Date(leave.startDate), "MMM d")} - {format(new Date(leave.endDate), "MMM d, yyyy")}
+                                            {format(new Date(leave.startDate || (leave as any).start_date), "MMM d")} - {format(new Date(leave.endDate || (leave as any).end_date), "MMM d, yyyy")}
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <Badge variant="secondary" className="font-normal bg-slate-100 text-slate-600 hover:bg-slate-200">
-                                            {differenceInCalendarDays(new Date(leave.endDate), new Date(leave.startDate)) + 1} Days
+                                            {differenceInCalendarDays(new Date(leave.endDate || (leave as any).end_date), new Date(leave.startDate || (leave as any).start_date)) + 1} Days
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
@@ -233,7 +233,7 @@ export function StaffLeavesTab({ staffId }: StaffLeavesTabProps) {
                                             <div className="text-xs text-red-500 mt-1 font-medium bg-red-50 p-1 rounded inline-block">Note: {leave.rejectionReason}</div>
                                         )}
                                     </TableCell>
-                                    <TableCell className="text-muted-foreground">{format(new Date(leave.appliedAt), "MMM d, yyyy")}</TableCell>
+                                    <TableCell className="text-muted-foreground">{format(new Date(leave.appliedAt || (leave as any).applied_at), "MMM d, yyyy")}</TableCell>
                                     <TableCell>{statusBadge(leave.status)}</TableCell>
                                     <TableCell className="text-right space-x-2">
                                         {leave.status === 'pending' && (

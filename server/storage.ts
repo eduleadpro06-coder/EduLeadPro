@@ -170,12 +170,13 @@ export interface IStorage {
   // Payroll
   getPayroll(id: number): Promise<Payroll | undefined>;
   getPayrollByStaff(staffId: number): Promise<Payroll[]>;
-  getPayrollByMonth(month: number, year: number): Promise<Payroll[]>;
-  getAllPayroll(): Promise<Payroll[]>;
+  getPayrollByMonth(month: number, year: number, organizationId?: number): Promise<Payroll[]>;
+  getMonthlyPayrollForAllStaff(month: number, year: number, organizationId?: number): Promise<Payroll[]>;
+  getAllPayroll(organizationId?: number): Promise<Payroll[]>;
   createPayroll(payroll: InsertPayroll): Promise<Payroll>;
   updatePayroll(id: number, updates: Partial<Payroll>): Promise<Payroll | undefined>;
   deletePayroll(id: number): Promise<boolean>;
-  getPayrollStats(month: number, year: number): Promise<{
+  getPayrollStats(month: number, year: number, organizationId?: number): Promise<{
     totalSalaries: number;
     totalDeductions: number;
     totalAllowances: number;
@@ -2846,6 +2847,51 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error fetching payroll by staff/month/year:", error);
       return undefined;
+    }
+  }
+
+  async getMonthlyPayrollForAllStaff(month: number, year: number, organizationId?: number): Promise<Payroll[]> {
+    return this.getPayrollByMonth(month, year, organizationId);
+  }
+
+  async generateMonthlyPayrollForAllStaff(month: number, year: number): Promise<{ created: number; skipped: number; errors: any[] }> {
+    try {
+      const allStaff = await this.getAllStaff();
+      let created = 0;
+      let skipped = 0;
+      const errors = [];
+
+      for (const staff of allStaff) {
+        try {
+          const existing = await this.getPayrollByStaffMonthYear(staff.id, month, year);
+          if (existing) {
+            skipped++;
+            continue;
+          }
+
+          await this.createPayroll({
+            staffId: staff.id,
+            month,
+            year,
+            basicSalary: String(staff.salary || 0),
+            allowances: "0",
+            deductions: "0",
+            overtime: "0",
+            netSalary: String(staff.salary || 0),
+            attendedDays: 30,
+            status: "pending",
+            organizationId: staff.organizationId
+          });
+          created++;
+        } catch (err) {
+          errors.push({ staffId: staff.id, error: err instanceof Error ? err.message : String(err) });
+        }
+      }
+
+      return { created, skipped, errors };
+    } catch (error) {
+      console.error("Error in generateMonthlyPayrollForAllStaff:", error);
+      throw error;
     }
   }
 

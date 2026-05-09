@@ -51,6 +51,7 @@ import {
   Building,
   Pencil,
   History,
+  Save,
 } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import { format } from "date-fns";
@@ -178,6 +179,7 @@ interface PayrollGeneration {
   basicSalary: number;
   allowances: number;
   deductions: number;
+  deposit: number; // Added deposit
   netSalary: number;
   employeeName: string;
   status: string;
@@ -289,6 +291,7 @@ export default function StaffAI() {
   // Track previous month/year to detect actual changes
   const [prevMonth, setPrevMonth] = useState(selectedMonth);
   const [prevYear, setPrevYear] = useState(selectedYear);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
 
   // Get user role for permissions
   const userRole = localStorage.getItem('userRole') || 'counselor';
@@ -311,72 +314,155 @@ export default function StaffAI() {
 
   // Save payroll state to localStorage whenever it changes
   useEffect(() => {
-    const key = 'editablePayrollData_' + selectedMonth + '_' + selectedYear;
-    console.log('Saving editablePayrollData to localStorage with key:', key, 'data:', editablePayrollData);
-    localStorage.setItem(key, JSON.stringify(editablePayrollData));
-  }, [editablePayrollData, selectedMonth, selectedYear]);
-
-  useEffect(() => {
-    const key = 'manualPayrollInputs_' + selectedMonth + '_' + selectedYear;
-    console.log('Saving manualPayrollInputs to localStorage with key:', key, 'data:', manualPayrollInputs);
-    localStorage.setItem(key, JSON.stringify(manualPayrollInputs));
-  }, [manualPayrollInputs, selectedMonth, selectedYear]);
-
-  // Clear localStorage only when month/year actually changes (not on initial mount)
-  useEffect(() => {
-    if ((prevMonth !== selectedMonth || prevYear !== selectedYear) &&
-      (prevMonth !== 0 && prevYear !== 0)) { // Skip initial mount
-      console.log('Month/Year changed, clearing localStorage');
-      const oldKey1 = 'editablePayrollData_' + prevMonth + '_' + prevYear;
-      const oldKey2 = 'manualPayrollInputs_' + prevMonth + '_' + prevYear;
-      localStorage.removeItem(oldKey1);
-      localStorage.removeItem(oldKey2);
-      setEditablePayrollData({});
-      setManualPayrollInputs({});
+    // Only save if the data corresponds to the current selected month/year
+    // and we are not in the middle of a month switch
+    if (selectedMonth === prevMonth && selectedYear === prevYear && Object.keys(editablePayrollData).length > 0) {
+      const key = 'editablePayrollData_' + selectedMonth + '_' + selectedYear;
+      localStorage.setItem(key, JSON.stringify(editablePayrollData));
     }
-    setPrevMonth(selectedMonth);
-    setPrevYear(selectedYear);
-  }, [selectedMonth, selectedYear, prevMonth, prevYear]);
+  }, [editablePayrollData, selectedMonth, selectedYear, prevMonth, prevYear]);
 
-  // Load existing payroll data from database when month/year changes
   useEffect(() => {
-    if (payroll && Array.isArray(payroll) && staff && Array.isArray(staff)) {
-      const existingPayrollData: {
-        [key: number]: {
-          attendedDays: number | '';
-          basicSalary: number | '';
-          allowances: number | '';
-          deductions: number | '';
-          overtime: number | '';
-          netSalary: number
+    if (selectedMonth === prevMonth && selectedYear === prevYear && Object.keys(manualPayrollInputs).length > 0) {
+      const key = 'manualPayrollInputs_' + selectedMonth + '_' + selectedYear;
+      localStorage.setItem(key, JSON.stringify(manualPayrollInputs));
+    }
+  }, [manualPayrollInputs, selectedMonth, selectedYear, prevMonth, prevYear]);
+
+  // Combined Payroll Data Initialization & Synchronization
+  useEffect(() => {
+    if (!staff || !Array.isArray(staff) || staff.length === 0) return;
+
+    const initializeData = () => {
+      console.log(`Synchronizing payroll data for ${selectedMonth}/${selectedYear}`);
+      
+      // 1. Load from localStorage (recent unsaved changes on this device)
+      const storageKey = 'editablePayrollData_' + selectedMonth + '_' + selectedYear;
+      const saved = localStorage.getItem(storageKey);
+      let localData = saved ? JSON.parse(saved) : {};
+
+      const inputKey = 'manualPayrollInputs_' + selectedMonth + '_' + selectedYear;
+      const savedInputs = localStorage.getItem(inputKey);
+      let localInputs = savedInputs ? JSON.parse(savedInputs) : {};
+
+      // 2. Load from Database (source of truth for drafts/processed)
+      const dbRecords = (payroll as Payroll[]).filter(
+        p => p.month === selectedMonth && p.year === selectedYear
+      );
+
+      const dbData: any = {};
+      if (dbRecords.length > 0) {
+        dbRecords.forEach(record => {
+          const attDays = record.attendedDays || 30;
+          dbData[record.staffId] = {
+            attendedDays: attDays,
+            absent: 30 - attDays,
+            basicSalary: Number(record.basicSalary),
+            allowances: Number(record.allowances) || 0,
+            deductions: Number(record.deductions) || 0,
+            overtime: Number(record.overtime) || 0,
+            netSalary: Number(record.netSalary),
+            deposit: Number(record.deposit) || 0,
+            reimbursment: 0,
+            remark: record.remark || ''
+          };
+        });
+      }
+
+      // 3. Merge & Default Seeding
+      const finalizedData: any = { ...localData };
+      const finalizedInputs: any = { ...localInputs };
+
+      (staff as Staff[]).forEach(member => {
+        // DB takes precedence if it exists and local is empty or we just switched
+        if (dbData[member.id] && (!finalizedData[member.id] || selectedMonth !== prevMonth || selectedYear !== prevYear)) {
+          finalizedData[member.id] = dbData[member.id];
         }
-      } = {};
-      const existingManualInputs: { [key: number]: { daysWorked: string | number; basicSalary: number | ''; isManual: boolean } } = {};
 
-      (staff as Staff[]).forEach((member: Staff) => {
-        const existingPayroll = (payroll as Payroll[]).find(
-          p => p.staffId === member.id && p.month === selectedMonth && p.year === selectedYear
-        );
-
-        if (existingPayroll) {
-          existingPayrollData[member.id] = {
-            attendedDays: existingPayroll.attendedDays || 30,
-            basicSalary: existingPayroll.basicSalary,
-            allowances: existingPayroll.allowances || 0,
-            deductions: existingPayroll.deductions || 0,
-            overtime: existingPayroll.overtime || 0,
-            netSalary: existingPayroll.netSalary
+        // Final fallback to defaults
+        if (!finalizedData[member.id]) {
+          finalizedData[member.id] = {
+            attendedDays: 30,
+            basicSalary: member.salary,
+            allowances: 0,
+            deductions: 0,
+            overtime: 0,
+            netSalary: member.salary,
+            absent: 0,
+            deposit: 0,
+            reimbursment: 0,
+            remark: ''
           };
         }
       });
 
-      if (Object.keys(existingPayrollData).length > 0) {
-        setEditablePayrollData(existingPayrollData);
-        const key = 'editablePayrollData_' + selectedMonth + '_' + selectedYear;
-        localStorage.setItem(key, JSON.stringify(existingPayrollData));
-      }
+      setEditablePayrollData(finalizedData);
+      setManualPayrollInputs(finalizedInputs);
+      setPrevMonth(selectedMonth);
+      setPrevYear(selectedYear);
+    };
+
+    initializeData();
+  }, [staff, payroll, selectedMonth, selectedYear]);
+
+
+
+  const handleAutoSaveDraft = async (dataToSave = editablePayrollData, month = selectedMonth, year = selectedYear) => {
+    if (Object.keys(dataToSave).length === 0) return;
+
+    try {
+      setIsAutoSaving(true);
+      const payrollDataArray = Object.entries(dataToSave).map(([id, data]) => {
+        const staffId = Number(id);
+        const staffMember = (staff as Staff[]).find(s => s.id === staffId);
+        if (!staffMember) return null;
+
+        return {
+          staffId,
+          month,
+          year,
+          basicSalary: Number(data.basicSalary || staffMember.salary),
+          allowances: Number(data.allowances || 0) + Number(data.reimbursment || 0),
+          deductions: Number(data.deductions || 0),
+          deposit: Number(data.deposit || 0),
+          netSalary: Number(data.netSalary),
+          attendedDays: Number(data.attendedDays ?? (30 - Number(data.absent || 0))),
+          remark: data.remark || '',
+          status: 'pending', // Save as draft
+        };
+      }).filter(Boolean);
+
+      if (payrollDataArray.length === 0) return;
+
+      await fetch('/api/payroll/bulk-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          month,
+          year,
+          staffIds: payrollDataArray.map(p => p?.staffId),
+          payrollData: payrollDataArray
+        })
+      });
+      console.log(`Payroll draft auto-saved for ${month}/${year}`);
+      // Invalidate queries to ensure UI sees the new records
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
+      
+      toast({
+        title: "Progress Saved",
+        description: `Payroll draft for ${month}/${year} has been saved to the server.`,
+      });
+    } catch (error) {
+      console.error('Save failed:', error);
+      toast({
+        title: "Save Failed",
+        description: "Could not save progress to the server. Please check your connection.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAutoSaving(false);
     }
-  }, [payroll, staff, selectedMonth, selectedYear]);
+  };
 
   // AI Analysis mutation
   const aiAnalysisMutation = useMutation({
@@ -609,44 +695,6 @@ export default function StaffAI() {
 
 
 
-  // Only initialize editable data when staff changes and editablePayrollData is empty
-  useEffect(() => {
-    if (
-      staff && Array.isArray(staff) && staff.length > 0 &&
-      Object.keys(editablePayrollData).length === 0
-    ) {
-      // Check if there's existing payroll data for this month/year
-      const hasExistingPayroll = payroll && Array.isArray(payroll) &&
-        (payroll as Payroll[]).some(p => p.month === selectedMonth && p.year === selectedYear);
-
-      // Only initialize if no existing payroll data
-      if (!hasExistingPayroll) {
-        console.log('Initializing editablePayrollData');
-        const initialData: {
-          [key: number]: {
-            attendedDays: number | '';
-            basicSalary: number | '';
-            allowances: number | '';
-            deductions: number | '';
-            overtime: number | '';
-            netSalary: number
-          }
-        } = {};
-        (staff as Staff[]).forEach((member: Staff) => {
-          const details = calculatePayrollDetails(member);
-          initialData[member.id] = {
-            attendedDays: typeof details.attendedDays === 'number' ? details.attendedDays : 30,
-            basicSalary: typeof details.basicSalary === 'number' ? details.basicSalary : member.salary,
-            allowances: 0,
-            deductions: 0,
-            overtime: 0,
-            netSalary: typeof details.netSalary === 'number' ? details.netSalary : member.salary
-          };
-        });
-        setEditablePayrollData(initialData);
-      }
-    }
-  }, [staff, payroll, selectedMonth, selectedYear]);
 
   const getStaffAttendanceRate = (staffId: number) => {
     const staffAttendance = (attendance as Attendance[]).filter(a => a.staffId === staffId);
@@ -695,10 +743,17 @@ export default function StaffAI() {
       basicSalary = staffMember.salary;
     }
 
-    // Net Salary = basic salary / 30 * attended days
-    const netSalary = (basicSalary / 30) * attendedDays;
-    // Deductions = Basic Salary - Net Salary
-    const deductions = basicSalary - netSalary;
+    // Use our helper for consistent calculation
+    const netSalary = calculateNetSalary(
+      staffMember,
+      attendedDays,
+      basicSalary,
+      0, // allowances
+      0, // deductions
+      0, // overtime
+      0, // deposit
+      0  // reimbursement
+    );
 
     return {
       workingDays,
@@ -710,8 +765,8 @@ export default function StaffAI() {
       basicSalary: Math.round(basicSalary * 100) / 100,
       allowances: 0,
       totalAllowances: 0,
-      deductions: { absent: Math.round(deductions * 100) / 100 },
-      totalDeductions: Math.round(deductions * 100) / 100,
+      deductions: { absent: Math.round((basicSalary - netSalary) * 100) / 100 },
+      totalDeductions: Math.round((basicSalary - netSalary) * 100) / 100,
       grossSalary: Math.round(basicSalary * 100) / 100,
       netSalary: Math.round(netSalary * 100) / 100
     };
@@ -732,17 +787,33 @@ export default function StaffAI() {
   };
 
   // Add new function to calculate net salary
-  const calculateNetSalary = (staffMember: Staff, attendedDays: number | '', basicSalary: number | '', allowances: number | '', deductions: number | '', overtime: number | '') => {
-    const nAttendedDays = Number(attendedDays) || 30;
+  const calculateNetSalary = (
+    staffMember: Staff,
+    attendedDays: number | '',
+    basicSalary: number | '',
+    allowances: number | '',
+    deductions: number | '',
+    overtime: number | '',
+    deposit: number | '' = 0,
+    reimbursment: number | '' = 0
+  ) => {
+    const nAttendedDays = Number(attendedDays) || 0;
     const nBasicSalary = Number(basicSalary) || staffMember.salary;
     const nAllowances = Number(allowances) || 0;
     const nDeductions = Number(deductions) || 0;
     const nOvertime = Number(overtime) || 0;
+    const nDeposit = Number(deposit) || 0;
+    const nReimbursment = Number(reimbursment) || 0;
 
-    // Net Salary = ((Basic / 30) * Attended) + Allowances + Overtime - Deductions
+    // Formula: Net = ((Basic / 30) * Attended) + Allowances + Overtime + Reimbursment - Deductions - Deposit
     const dailyRate = nBasicSalary / 30;
     const basePay = dailyRate * nAttendedDays;
-    const net = Math.max(0, basePay + nAllowances + nOvertime - nDeductions);
+    // Allowances and Reimbursment both add up
+    const totalAdditions = nAllowances + nOvertime + nReimbursment;
+    // Deductions and Deposit both subtract
+    const totalSubtractions = nDeductions + nDeposit;
+
+    const net = Math.max(0, basePay + totalAdditions - totalSubtractions);
     return Math.round(net);
   };
 
@@ -780,14 +851,23 @@ export default function StaffAI() {
       [field]: finalValue
     };
 
-    // Calculate new net salary, always using numbers
+    // Keep absent and attendedDays in sync
+    if (field === 'absent') {
+      newData.attendedDays = 30 - Number(finalValue || 0);
+    } else if (field === 'attendedDays') {
+      newData.absent = 30 - Number(finalValue || 0);
+    }
+
+    // Calculate new net salary, passing all fields
     const netSalary = calculateNetSalary(
       staffMember,
-      Number(newData.attendedDays) || 0, // treating empty/0 as 0 for calculation safety, though logic handles it
-      Number(newData.basicSalary) || staffMember.salary,
-      Number(newData.allowances) || 0,
-      Number(newData.deductions) || 0,
-      Number(newData.overtime) || 0
+      newData.attendedDays,
+      newData.basicSalary,
+      newData.allowances,
+      newData.deductions,
+      newData.overtime,
+      newData.deposit,
+      newData.reimbursment
     );
 
     setEditablePayrollData(prev => {
@@ -839,36 +919,40 @@ export default function StaffAI() {
   const handleGeneratePayroll = (staffMember: Staff) => {
     // Use editablePayrollData for attendedDays and basicSalary if available
     const payrollEdit = editablePayrollData[staffMember.id] || {};
-    const attendedDays = payrollEdit.attendedDays !== undefined ? payrollEdit.attendedDays : 30;
-    const basicSalary = payrollEdit.basicSalary !== undefined ? payrollEdit.basicSalary : staffMember.salary;
+    const attendedDays = payrollEdit.attendedDays !== undefined && payrollEdit.attendedDays !== '' ? Number(payrollEdit.attendedDays) : 30;
+    const basicSalary = payrollEdit.basicSalary !== undefined && payrollEdit.basicSalary !== '' ? Number(payrollEdit.basicSalary) : staffMember.salary;
     const allowances = payrollEdit.allowances !== undefined && payrollEdit.allowances !== '' ? Number(payrollEdit.allowances) : 0;
     const deductions = payrollEdit.deductions !== undefined && payrollEdit.deductions !== '' ? Number(payrollEdit.deductions) : 0;
     const overtime = payrollEdit.overtime !== undefined && payrollEdit.overtime !== '' ? Number(payrollEdit.overtime) : 0;
+    const deposit = payrollEdit.deposit !== undefined && payrollEdit.deposit !== '' ? Number(payrollEdit.deposit) : 0;
+    const reimbursment = payrollEdit.reimbursment !== undefined && payrollEdit.reimbursment !== '' ? Number(payrollEdit.reimbursment) : 0;
 
-    // Calculate locally for immediate visual feedback (server will re-calculate)
+    // Calculate locally for immediate visual feedback
     const netSalary = calculateNetSalary(
       staffMember,
       attendedDays,
       basicSalary,
       allowances,
       deductions,
-      overtime
+      overtime,
+      deposit,
+      reimbursment
     );
 
     // Ensure all required fields are present and correct
-    const payrollData = {
+    const payrollData: PayrollGeneration = {
       staffId: staffMember.id,
       month: selectedMonth,
       year: selectedYear,
       basicSalary: Number(basicSalary),
-      allowances: allowances,
+      allowances: allowances + reimbursment, // Combine reimbursement into allowances for backend schema
       deductions: deductions,
-      overtime: overtime,
+      deposit: deposit,
       netSalary: netSalary,
       attendedDays: Number(attendedDays),
       status: 'processed',
-      workingDays: 30, // Default constant
-      overtimeHours: 0, // Not explicitly tracked yet in UI input, distinct from amount
+      workingDays: 30,
+      overtimeHours: 0,
       employeeName: staffMember.name,
     };
 
@@ -888,43 +972,65 @@ export default function StaffAI() {
 
   const handleBulkPayrollGeneration = () => {
     const payrollDataArray = filteredStaff.map(staffMember => {
-      const manualInput = manualPayrollInputs[staffMember.id];
+      // Use editablePayrollData if available, otherwise fallback to calculation
+      const payrollEdit = editablePayrollData[staffMember.id] || {};
+      
       let attendedDays: number;
       let basicSalary: number;
-      let absentDays: number = 0;
+      let allowances: number;
+      let deductions: number;
+      let overtime: number;
+      let deposit: number;
+      let reimbursment: number;
 
-      if (manualInput && manualInput.isManual && manualInput.daysWorked !== '') {
-        attendedDays = Number(manualInput.daysWorked);
-        absentDays = 30 - attendedDays;
-        const dailyRate = Number(staffMember.salary) / 30;
-        basicSalary = dailyRate * attendedDays;
+      if (Object.keys(payrollEdit).length > 0) {
+        attendedDays = payrollEdit.attendedDays !== undefined && payrollEdit.attendedDays !== '' ? Number(payrollEdit.attendedDays) : 30;
+        basicSalary = payrollEdit.basicSalary !== undefined && payrollEdit.basicSalary !== '' ? Number(payrollEdit.basicSalary) : staffMember.salary;
+        allowances = payrollEdit.allowances !== undefined && payrollEdit.allowances !== '' ? Number(payrollEdit.allowances) : 0;
+        deductions = payrollEdit.deductions !== undefined && payrollEdit.deductions !== '' ? Number(payrollEdit.deductions) : 0;
+        overtime = payrollEdit.overtime !== undefined && payrollEdit.overtime !== '' ? Number(payrollEdit.overtime) : 0;
+        deposit = payrollEdit.deposit !== undefined && payrollEdit.deposit !== '' ? Number(payrollEdit.deposit) : 0;
+        reimbursment = payrollEdit.reimbursment !== undefined && payrollEdit.reimbursment !== '' ? Number(payrollEdit.reimbursment) : 0;
       } else {
-        const staffAttendance = (attendance as Attendance[]).filter(
-          a => a.staffId === staffMember.id &&
-            a.date && !isNaN(new Date(a.date).getTime()) &&
-            new Date(a.date).getMonth() + 1 === selectedMonth &&
-            new Date(a.date).getFullYear() === selectedYear
-        );
-        attendedDays = staffAttendance.filter(a => a.status === 'present').length;
-        absentDays = 30 - attendedDays;
-        const dailyRate = Number(staffMember.salary) / 30;
-        basicSalary = dailyRate * attendedDays;
+        const manualInput = manualPayrollInputs[staffMember.id];
+        if (manualInput && manualInput.isManual && manualInput.daysWorked !== '') {
+          attendedDays = Number(manualInput.daysWorked);
+        } else {
+          const staffAttendance = (attendance as Attendance[]).filter(
+            a => a.staffId === staffMember.id &&
+              a.date && !isNaN(new Date(a.date).getTime()) &&
+              new Date(a.date).getMonth() + 1 === selectedMonth &&
+              new Date(a.date).getFullYear() === selectedYear
+          );
+          attendedDays = staffAttendance.filter(a => a.status === 'present').length || 30;
+        }
+        basicSalary = staffMember.salary;
+        allowances = 0;
+        deductions = 0;
+        overtime = 0;
+        deposit = 0;
+        reimbursment = 0;
       }
 
-      const totalAllowances = 0;
-      const dailyRate = Number(staffMember.salary) / 30;
-      const absentDeduction = absentDays * dailyRate;
-      const totalDeductions = absentDeduction;
-      const netSalary = basicSalary - totalDeductions;
+      const netSalary = calculateNetSalary(
+        staffMember,
+        attendedDays,
+        basicSalary,
+        allowances,
+        deductions,
+        overtime,
+        deposit,
+        reimbursment
+      );
 
       return {
         staffId: staffMember.id,
         month: selectedMonth,
         year: selectedYear,
         basicSalary: Number(basicSalary),
-        allowances: Number(totalAllowances),
-        deductions: Number(totalDeductions),
-        overtime: 0,
+        allowances: allowances + reimbursment,
+        deductions: deductions,
+        deposit: deposit,
         netSalary: Number(netSalary),
         attendedDays: Number(attendedDays),
         status: 'processed',
@@ -1129,36 +1235,63 @@ export default function StaffAI() {
 
   // Function to manually clear payroll localStorage data
   const clearPayrollLocalStorage = async () => {
-    const key1 = `editablePayrollData_${selectedMonth}_${selectedYear}`;
-    const key2 = `manualPayrollInputs_${selectedMonth}_${selectedYear}`;
-    localStorage.removeItem(key1);
-    localStorage.removeItem(key2);
-    setEditablePayrollData({});
-    setManualPayrollInputs({});
+    if (!confirm('Are you sure you want to clear all payroll data for this month? This will remove all unsaved progress.')) return;
 
-    // If any selected employees have status 'processed', set them to 'pending' in the backend
-    if (selectedPayrollStaff.length > 0) {
-      await Promise.all(selectedPayrollStaff.map(async (staffId) => {
-        // Find the payroll record for this staff for the current month/year
-        const payrollRecord = (payroll as Payroll[]).find(
-          p => p.staffId === staffId && p.month === selectedMonth && p.year === selectedYear && p.status === 'processed'
-        );
-        if (payrollRecord) {
-          // Update the payroll status to 'pending' via API
-          await fetch(`/api/payroll/${payrollRecord.id}/status`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'pending' })
-          });
-        }
-      }));
-      await fetchPayrollOverview();
+    try {
+      setIsAutoSaving(true);
+      const key1 = `editablePayrollData_${selectedMonth}_${selectedYear}`;
+      const key2 = `manualPayrollInputs_${selectedMonth}_${selectedYear}`;
+      localStorage.removeItem(key1);
+      localStorage.removeItem(key2);
+      setEditablePayrollData({});
+      setManualPayrollInputs({});
+
+      // Also clear pending payroll records from the database for this month/year
+      const pendingRecords = (payroll as Payroll[]).filter(
+        p => p.month === selectedMonth && p.year === selectedYear && p.status === 'pending'
+      );
+
+      if (pendingRecords.length > 0) {
+        await Promise.all(pendingRecords.map(record => 
+          fetch(`/api/payroll/${record.id}`, { method: 'DELETE' })
+        ));
+        await fetchPayrollOverview();
+        queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
+      }
+
+      // If any selected employees have status 'processed', set them to 'pending' in the backend
+      if (selectedPayrollStaff.length > 0) {
+        await Promise.all(selectedPayrollStaff.map(async (staffId) => {
+          // Find the payroll record for this staff for the current month/year
+          const payrollRecord = (payroll as Payroll[]).find(
+            p => p.staffId === staffId && p.month === selectedMonth && p.year === selectedYear && p.status === 'processed'
+          );
+          if (payrollRecord) {
+            // Update the payroll status to 'pending' via API
+            await fetch(`/api/payroll/${payrollRecord.id}/status`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'pending' })
+            });
+          }
+        }));
+        await fetchPayrollOverview();
+      }
+      setSelectedPayrollStaff([]);
+      toast({
+        title: "Payroll Data Cleared",
+        description: "Drafts and selected records have been reset.",
+      });
+    } catch (error) {
+      console.error('Failed to clear payroll data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear some data. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAutoSaving(false);
     }
-    setSelectedPayrollStaff([]);
-    toast({
-      title: "Payroll Data Cleared",
-      description: "Local payroll data and selected processed employees have been reset to pending.",
-    });
   };
 
   // Function to manually save current state to localStorage
@@ -1457,8 +1590,8 @@ export default function StaffAI() {
     selectedStaffMembers.forEach(staffMember => handleDownloadSalarySlip(staffMember));
   };
 
-  // Set default paymentHistoryStatusFilter to all
-  const [paymentHistoryStatusFilter, setPaymentHistoryStatusFilter] = useState('all');
+  // Set default paymentHistoryStatusFilter to processed for Payment History tab
+  const [paymentHistoryStatusFilter, setPaymentHistoryStatusFilter] = useState('processed');
 
   // 1. Compute summary card values from payrollOverview (all active staff for selected month/year)
   const summaryActiveStaff = payrollOverview.filter(s => s.isActive !== false);
@@ -2026,8 +2159,23 @@ export default function StaffAI() {
               <div className="space-y-4">
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                        <CardTitle className="text-xl font-bold">Current Month Payroll</CardTitle>
+                        <div className="flex flex-col">
+                          <CardTitle className="text-xl font-bold">Current Month Payroll</CardTitle>
+                        </div>
                         <div className="flex gap-2 items-center">
+                          <Button
+                            variant="default"
+                            onClick={() => handleAutoSaveDraft()}
+                            disabled={isAutoSaving || Object.keys(editablePayrollData).length === 0}
+                            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            {isAutoSaving ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Save className="mr-2 h-4 w-4" />
+                            )}
+                            Save Progress
+                          </Button>
                           <Button
                             onClick={handleGenerateSelectedPayroll}
                             disabled={selectedPayrollStaff.length === 0}
@@ -2241,7 +2389,7 @@ export default function StaffAI() {
                           <div>
                             <p className="text-sm font-medium text-gray-500">Total Records</p>
                             <p className="text-2xl font-bold text-gray-900">
-                              {(payroll as Payroll[]).filter(p => p.month === selectedMonth && p.year === selectedYear).length}
+                              {(payroll as Payroll[]).filter(p => p.month === selectedMonth && p.year === selectedYear && p.status === 'processed').length}
                             </p>
                           </div>
                         </div>
@@ -2283,7 +2431,7 @@ export default function StaffAI() {
                           <div>
                             <p className="text-sm font-medium text-gray-500">Total Amount</p>
                             <p className="text-2xl font-bold text-[#643ae5]">
-                              ₹{(payroll as Payroll[]).filter(p => p.month === selectedMonth && p.year === selectedYear).reduce((sum, p) => sum + Number(p.netSalary), 0).toLocaleString()}
+                              ₹{(payroll as Payroll[]).filter(p => p.month === selectedMonth && p.year === selectedYear && p.status === 'processed').reduce((sum, p) => sum + Number(p.netSalary), 0).toLocaleString()}
                             </p>
                           </div>
                         </div>

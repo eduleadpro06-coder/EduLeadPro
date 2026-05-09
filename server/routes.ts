@@ -428,10 +428,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/daily-updates", async (req, res) => {
     try {
       const { status } = req.query; // e.g., 'pending', 'approved'
-      let organizationId = await getOrganizationId(req);
+      const organizationId = await getOrganizationId(req);
       if (!organizationId) {
-        console.warn('[Admin] No organization ID found in session, defaulting to 1 for dev/testing');
-        organizationId = 1;
+        console.warn('[Admin] No organization ID found — denying access to daily-updates');
+        return res.status(403).json({ message: "No organization assigned" });
       }
 
       // Use shared supabase client
@@ -918,9 +918,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("User created successfully:", user);
 
-      // Set session
+      // Set session (including organizationId for getOrganizationId() resolution)
       (req.session as any).userId = user.id;
       (req.session as any).username = user.username;
+      (req.session as any).organizationId = organization.id;
 
       res.status(201).json({
         success: true,
@@ -1138,9 +1139,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // User exists with organization
         const organizationId: number = user.organizationId;
         const org = await storage.getOrganization(organizationId);
-        // Set session
+        // Set session (including organizationId for getOrganizationId() resolution)
         (req.session as any).userId = user.id;
         (req.session as any).username = user.username;
+        (req.session as any).organizationId = organizationId;
 
         return res.json({
           userId: user.id,
@@ -1191,9 +1193,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Set session
+      // Set session (including organizationId for getOrganizationId() resolution)
       (req.session as any).userId = user.id;
       (req.session as any).username = user.username;
+      (req.session as any).organizationId = newOrg.id;
 
       res.json({
         userId: user.id,
@@ -4027,14 +4030,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Helper function for centralized payroll calculation
-  const calculatePayroll = (basicSalary: number, allowances: number, overtime: number, deductions: number, attendedDays: number, workingDays: number = 30) => {
+  const calculatePayroll = (basicSalary: number, allowances: number, overtime: number, deductions: number, attendedDays: number, deposit: number = 0, workingDays: number = 30) => {
     // Loss of Pay (LOP) calculation for absent days
     const dailyRate = basicSalary / workingDays;
-    // Ensure we don't deduct more than the basic salary if attendedDays is 0 (though simplified here)
-    // Formula: Net = ((Basic / 30) * Attended) + Allowances + Overtime - Deductions
+    // Formula: Net = ((Basic / 30) * Attended) + Allowances + Overtime - Deductions - Deposit
     const basePay = dailyRate * attendedDays;
-    const netSalary = basePay + allowances + overtime - deductions;
-    return Math.max(0, netSalary); // Prevent negative salary
+    const netSalary = basePay + allowances + overtime - deductions - deposit;
+    return Math.round(Math.max(0, netSalary)); // Prevent negative salary and round
   };
 
   app.post("/api/payroll", async (req, res) => {
@@ -4060,12 +4062,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const basicSalary = parseFloat(String(payrollData.basicSalary));
       const allowances = parseFloat(String(payrollData.allowances || 0));
       const deductions = parseFloat(String(payrollData.deductions || 0));
+      const deposit = parseFloat(String(payrollData.deposit || 0));
       const overtime = parseFloat(String(payrollData.overtime || 0));
       const attendedDays = parseInt(String(payrollData.attendedDays || 30));
       const workingDays = 30; // Default working days
 
       // Server-side calculation
-      const netSalary = calculatePayroll(basicSalary, allowances, overtime, deductions, attendedDays, workingDays);
+      const netSalary = calculatePayroll(basicSalary, allowances, overtime, deductions, attendedDays, deposit, workingDays);
 
       const sanitizedData = {
         ...payrollData,
@@ -4075,6 +4078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         basicSalary,
         allowances,
         deductions,
+        deposit,
         overtime,
         netSalary, // Use calculated value
         attendedDays,
@@ -4166,12 +4170,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const basicSalary = parseFloat(String(payrollItem.basicSalary));
           const allowances = parseFloat(String(payrollItem.allowances || 0));
           const deductions = parseFloat(String(payrollItem.deductions || 0));
+          const deposit = parseFloat(String(payrollItem.deposit || 0));
           const overtime = parseFloat(String(payrollItem.overtime || 0));
           const attendedDays = parseInt(String(payrollItem.attendedDays || 30));
           const workingDays = 30;
 
           // Server-side calculation
-          const netSalary = calculatePayroll(basicSalary, allowances, overtime, deductions, attendedDays, workingDays);
+          const netSalary = calculatePayroll(basicSalary, allowances, overtime, deductions, attendedDays, deposit, workingDays);
 
           // Sanitize data for each payroll item
           const sanitizedItem = {
@@ -4182,6 +4187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             basicSalary,
             allowances,
             deductions,
+            deposit,
             overtime,
             netSalary, // Use calculated value
             attendedDays,
@@ -4230,6 +4236,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Failed to process bulk payroll",
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+    }
+  });
+
+  app.get("/api/payroll/overview", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const month = parseInt(req.query.month as string);
+      const year = parseInt(req.query.year as string);
+
+      if (isNaN(month) || isNaN(year)) {
+        return res.status(400).json({ message: "Valid month and year are required" });
+      }
+
+      const staffMembers = await storage.getAllStaff(organizationId);
+      const payrollRecords = await storage.getMonthlyPayrollForAllStaff(month, year, organizationId);
+
+      const overview = staffMembers.map(staff => {
+        const payroll = payrollRecords.find(p => p.staffId === staff.id);
+        return {
+          id: staff.id,
+          name: staff.name,
+          role: staff.role,
+          isActive: staff.isActive,
+          payrollStatus: payroll ? (payroll.status === 'paid' || payroll.status === 'processed' ? 'processed' : 'pending') : 'pending',
+          payroll: payroll || null
+        };
+      });
+
+      res.json(overview);
+    } catch (error) {
+      console.error("Payroll overview error:", error);
+      res.status(500).json({ message: "Failed to fetch payroll overview" });
     }
   });
 
