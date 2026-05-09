@@ -375,12 +375,16 @@ router.get("/students/search", async (req, res) => {
 
         // Search enrolled leads (students)
         const leads = await storage.getAllLeads(false, organizationId);
-        const enrolledStudents = leads
-            .filter(lead => lead.isEnrolled)
-            .filter(lead =>
+        let enrolledStudents = leads.filter(lead => lead.isEnrolled);
+
+        if (searchTerm) {
+            enrolledStudents = enrolledStudents.filter(lead =>
                 lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (lead.phone && lead.phone.includes(searchTerm))
-            )
+            );
+        }
+
+        const mappedStudents = enrolledStudents
             .slice(0, 20) // Limit to 20 results
             .map(lead => ({
                 id: lead.id,
@@ -395,7 +399,7 @@ router.get("/students/search", async (req, res) => {
                         : 'N/A'
             }));
 
-        res.json(enrolledStudents);
+        res.json(mappedStudents);
     } catch (error) {
         console.error("Failed to search students:", error);
         res.status(500).json({ message: "Failed to search students" });

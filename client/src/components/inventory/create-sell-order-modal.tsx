@@ -39,11 +39,13 @@ export function CreateSellOrderModal({ open, onOpenChange }: CreateSellOrderModa
     const { data: students = [] } = useQuery({
         queryKey: ['/api/inventory/students/search', studentSearch],
         queryFn: async () => {
-            if (studentSearch.length < 2) return [];
-            const response = await apiRequest('GET', `/api/inventory/students/search?search=${encodeURIComponent(studentSearch)}`);
+            const url = studentSearch 
+                ? `/api/inventory/students/search?search=${encodeURIComponent(studentSearch)}` 
+                : '/api/inventory/students/search';
+            const response = await apiRequest('GET', url);
             return await response.json();
         },
-        enabled: studentSearch.length >= 2,
+        enabled: open, // Run when modal is open
     });
 
     // Fetch inventory items
@@ -305,6 +307,8 @@ export function CreateSellOrderModal({ open, onOpenChange }: CreateSellOrderModa
                                                     type="number"
                                                     step="0.01"
                                                     value={item.unitPrice}
+                                                    readOnly
+                                                    className="bg-gray-50 cursor-not-allowed"
                                                     onChange={(e) => updateItem(index, 'unitPrice', e.target.value)}
                                                 />
                                             </div>
