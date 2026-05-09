@@ -1524,10 +1524,24 @@ export default function StaffAI() {
   // 2. Fetch payroll overview data when month/year changes or on mount
   const fetchPayrollOverview = async () => {
     try {
-      const response = await fetch(`/api/payroll/overview?month=${selectedMonth}&year=${selectedYear}`);
+      const response = await apiRequest("GET", `/api/payroll/overview?month=${selectedMonth}&year=${selectedYear}`);
+      
+      if (!response.ok) {
+        console.error('Failed to fetch payroll overview:', response.status);
+        setPayrollOverview([]);
+        return;
+      }
+
       const data = await response.json();
-      setPayrollOverview(data);
+      // Ensure data is an array to prevent crashes
+      if (Array.isArray(data)) {
+        setPayrollOverview(data);
+      } else {
+        console.error('Payroll overview data is not an array:', data);
+        setPayrollOverview([]);
+      }
     } catch (error) {
+      console.error('Error fetching payroll overview:', error);
       setPayrollOverview([]);
     }
   };

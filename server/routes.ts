@@ -4241,8 +4241,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/payroll/overview", async (req, res) => {
     try {
+      console.log(`[Payroll Debug] Fetching overview. Session:`, req.session);
       const organizationId = await getOrganizationId(req);
+      console.log(`[Payroll Debug] Resolved organizationId: ${organizationId}`);
       if (!organizationId) {
+        console.warn(`[Payroll Debug] 403 Forbidden: No organization assigned for session ${JSON.stringify(req.session)}`);
         return res.status(403).json({ message: "No organization assigned" });
       }
 
@@ -5098,35 +5101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payroll Overview: All staff with payroll status for selected month/year
-  app.get("/api/payroll/overview", async (req, res) => {
-    try {
-      const { month, year } = req.query;
-      const selectedMonth = month ? parseInt(month as string) : (new Date().getMonth() + 1);
-      const selectedYear = year ? parseInt(year as string) : (new Date().getFullYear());
-      const staffList = await storage.getAllStaff();
-      const payrollList = await storage.getPayrollByMonth(selectedMonth, selectedYear);
-      const result = staffList.map(staff => {
-        const payroll = payrollList.find(p => p.staffId === staff.id);
-        if (payroll) {
-          return {
-            ...staff,
-            payrollStatus: payroll.status,
-            payroll
-          };
-        } else {
-          return {
-            ...staff,
-            payrollStatus: 'pending',
-            payroll: null
-          };
-        }
-      });
-      res.json(result);
-    } catch (error) {
-      console.error("Payroll overview error:", error);
-      res.status(500).json({ message: "Failed to fetch payroll overview" });
-    }
-  });
+
 
   // PATCH endpoint to update only the status of a payroll record
   app.patch("/api/payroll/:id/status", async (req, res) => {

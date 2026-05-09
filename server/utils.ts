@@ -16,18 +16,31 @@ export async function getOrganizationId(req: express.Request): Promise<number | 
     console.log(`[Auth Debug] session.organizationId: ${sessionOrgId}`);
     if (sessionOrgId) return Number(sessionOrgId);
 
-    // 2. Fallback to username/userName in session
-    let identifier = (req.session as any)?.username || (req.session as any)?.userName;
-    console.log(`[Auth Debug] Session identifier (username/userName): ${identifier}`);
+    // 2. Fallback to req.user (Passport.js style)
+    const reqUser = (req as any).user;
+    if (reqUser && (reqUser.organizationId || reqUser.organization_id)) {
+        const orgId = reqUser.organizationId || reqUser.organization_id;
+        console.log(`[Auth Debug] Found organizationId in req.user: ${orgId}`);
+        return Number(orgId);
+    }
 
-    // 3. Fallback to header (for mobile app / legacy)
+    // 3. Fallback to username/userName/email in session
+    let identifier = (req.session as any)?.username || 
+                     (req.session as any)?.userName || 
+                     (req.session as any)?.email ||
+                     reqUser?.username ||
+                     reqUser?.email;
+    
+    console.log(`[Auth Debug] Identifier found: ${identifier}`);
+
+    // 4. Fallback to header (for mobile app / legacy)
     if (!identifier) {
         identifier = req.headers['x-user-name'] as string;
         console.log(`[Auth Debug] Header x-user-name fallback: ${identifier}`);
     }
 
     if (!identifier) {
-        console.warn(`[Auth Debug] No identifier (session or header) found for request to ${req.path}`);
+        console.warn(`[Auth Debug] No identifier (session, user, or header) found for request to ${req.path}`);
         return undefined;
     }
 
@@ -59,13 +72,10 @@ export async function getOrganizationId(req: express.Request): Promise<number | 
         return undefined;
     }
 
-    if (!user.organizationId) {
-        console.warn(`[Auth Debug] User "${cleanIdentifier}" found (ID: ${user.id}) but has no organizationId assigned.`);
-    }
-
-    console.log(`[Auth Debug] Final organizationId for ${cleanIdentifier}: ${user.organizationId}`);
+    console.log(`[Auth Debug] Resolved Organization ID: ${user.organizationId}`);
     return user.organizationId || undefined;
 }
+
 
 /**
  * Calculate distance between two GPS coordinates using Haversine formula
