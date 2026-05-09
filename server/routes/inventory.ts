@@ -375,7 +375,7 @@ router.get("/students/search", async (req, res) => {
 
         // Search enrolled leads (students)
         const leads = await storage.getAllLeads(false, organizationId);
-        let enrolledStudents = leads.filter(lead => lead.isEnrolled);
+        let enrolledStudents = leads.filter(lead => lead.isEnrolled || lead.status === 'enrolled');
 
         if (searchTerm) {
             enrolledStudents = enrolledStudents.filter(lead =>

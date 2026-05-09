@@ -1029,6 +1029,7 @@ export const inventoryItems = pgTable("inventory_items", {
   // Pricing
   costPrice: decimal("cost_price", { precision: 10, scale: 2 }), // Purchase/cost price
   sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }), // Optional selling price
+  gstPercent: integer("gst_percent").default(0), // Applicable GST percentage
 
   // Supplier
   supplierId: integer("supplier_id").references(() => inventorySuppliers.id),

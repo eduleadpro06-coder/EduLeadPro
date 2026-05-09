@@ -460,6 +460,7 @@ export class DatabaseStorage implements IStorage {
         deletedAt: schema.leads.deletedAt,
         organizationId: schema.leads.organizationId,
         isAppActive: schema.leads.isAppActive,
+        isEnrolled: schema.leads.isEnrolled,
         counselor: schema.staff
       })
       .from(schema.leads)
@@ -504,6 +505,7 @@ export class DatabaseStorage implements IStorage {
         deletedAt: schema.leads.deletedAt,
         organizationId: schema.leads.organizationId,
         isAppActive: schema.leads.isAppActive,
+        isEnrolled: schema.leads.isEnrolled,
         counselor: schema.staff
       })
       .from(schema.leads)
@@ -2691,6 +2693,10 @@ export class DatabaseStorage implements IStorage {
       console.error("Error fetching payroll by month:", error);
       return [];
     }
+  }
+
+  async getMonthlyPayrollForAllStaff(month: number, year: number, organizationId?: number): Promise<Payroll[]> {
+    return this.getPayrollByMonth(month, year, organizationId);
   }
 
   async getAllPayroll(organizationId?: number): Promise<Payroll[]> {

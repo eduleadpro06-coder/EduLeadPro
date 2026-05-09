@@ -29,6 +29,7 @@ export function EditItemModal({ open, onOpenChange, item }: EditItemModalProps) 
         unit: "pieces",
         costPrice: "",
         sellingPrice: "",
+        gstPercent: "0",
         location: "",
     });
 
@@ -46,6 +47,7 @@ export function EditItemModal({ open, onOpenChange, item }: EditItemModalProps) 
                 unit: item.unit || "pieces",
                 costPrice: item.costPrice || "",
                 sellingPrice: item.sellingPrice || "",
+                gstPercent: item.gstPercent?.toString() || "0",
                 location: item.location || "",
             });
         }
@@ -94,6 +96,7 @@ export function EditItemModal({ open, onOpenChange, item }: EditItemModalProps) 
             minimumStock: Number(formData.minimumStock),
             costPrice: formData.costPrice || null,
             sellingPrice: formData.sellingPrice || null,
+            gstPercent: Number(formData.gstPercent),
         });
     };
 
@@ -210,7 +213,7 @@ export function EditItemModal({ open, onOpenChange, item }: EditItemModalProps) 
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="costPrice">Cost Price (₹)</Label>
                                 <Input
@@ -233,6 +236,18 @@ export function EditItemModal({ open, onOpenChange, item }: EditItemModalProps) 
                                     onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
                                     min="0"
                                     placeholder="0.00"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="gstPercent">GST (%)</Label>
+                                <Input
+                                    id="gstPercent"
+                                    type="number"
+                                    value={formData.gstPercent}
+                                    onChange={(e) => setFormData({ ...formData, gstPercent: e.target.value })}
+                                    min="0"
+                                    max="100"
+                                    placeholder="0"
                                 />
                             </div>
                         </div>

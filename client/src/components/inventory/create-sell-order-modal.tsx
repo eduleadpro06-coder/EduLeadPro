@@ -112,11 +112,15 @@ export function CreateSellOrderModal({ open, onOpenChange }: CreateSellOrderModa
         if (field === 'inventoryItemId') {
             const item = inventoryItems.find((i: any) => i.id === parseInt(value));
             if (item) {
+                const basePrice = parseFloat(item.sellingPrice || item.costPrice || "0");
+                const gstPercent = item.gstPercent || 0;
+                const priceWithGst = basePrice + (basePrice * gstPercent / 100);
+
                 updated[index] = {
                     ...updated[index],
                     inventoryItemId: item.id,
                     itemName: item.name,
-                    unitPrice: item.sellingPrice || item.costPrice || "0",
+                    unitPrice: priceWithGst.toFixed(2),
                     availableStock: item.currentStock || 0
                 };
             }
@@ -133,10 +137,7 @@ export function CreateSellOrderModal({ open, onOpenChange }: CreateSellOrderModa
             return sum + (parseFloat(item.unitPrice) * item.quantity);
         }, 0);
 
-        const gstAmount = subtotal * 0.18; // 18% GST
-        const total = subtotal + gstAmount;
-
-        return { subtotal, gstAmount, total };
+        return { subtotal, total: subtotal };
     };
 
     const handleSubmit = () => {
@@ -188,7 +189,7 @@ export function CreateSellOrderModal({ open, onOpenChange }: CreateSellOrderModa
         createOrderMutation.mutate(orderData);
     };
 
-    const { subtotal, gstAmount, total } = calculateTotals();
+    const { subtotal, total } = calculateTotals();
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -341,15 +342,7 @@ export function CreateSellOrderModal({ open, onOpenChange }: CreateSellOrderModa
                     {orderItems.length > 0 && (
                         <Card className="p-4 bg-gray-50">
                             <div className="space-y-2">
-                                <div className="flex justify-between">
-                                    <span>Subtotal:</span>
-                                    <span className="font-semibold">₹{subtotal.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-blue-600">
-                                    <span>GST (18%):</span>
-                                    <span className="font-semibold">₹{gstAmount.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-lg border-t pt-2">
+                                <div className="flex justify-between text-lg">
                                     <span className="font-bold">Grand Total:</span>
                                     <span className="font-bold">₹{total.toFixed(2)}</span>
                                 </div>

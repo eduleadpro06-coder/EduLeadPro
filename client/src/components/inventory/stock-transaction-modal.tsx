@@ -175,7 +175,7 @@ export function StockTransactionModal({ open, onOpenChange, item }: StockTransac
                             <Label htmlFor="reason">Reason</Label>
                             <Select value={formData.reason} onValueChange={(value) => setFormData({ ...formData, reason: value })}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder={transactionType === 'in' ? "Purchase" : "Sale"} />
+                                    <SelectValue placeholder={transactionType === 'in' ? "Purchase" : "Distribution"} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {transactionType === 'in' ? (
@@ -187,10 +187,10 @@ export function StockTransactionModal({ open, onOpenChange, item }: StockTransac
                                         </>
                                     ) : (
                                         <>
-                                            <SelectItem value="Sale">Sale</SelectItem>
                                             <SelectItem value="Damage">Damage</SelectItem>
                                             <SelectItem value="Loss">Loss</SelectItem>
                                             <SelectItem value="Distribution">Distribution</SelectItem>
+                                            <SelectItem value="Internal Use">Internal Use</SelectItem>
                                         </>
                                     )}
                                 </SelectContent>
@@ -251,78 +251,7 @@ export function StockTransactionModal({ open, onOpenChange, item }: StockTransac
                             </>
                         )}
 
-                        {transactionType === 'out' && (
-                            <div className="space-y-2">
-                                <Label>Customer/Parent (Optional)</Label>
-                                <Popover open={leadPopoverOpen} onOpenChange={setLeadPopoverOpen}>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            role="combobox"
-                                            aria-expanded={leadPopoverOpen}
-                                            className="w-full justify-between"
-                                        >
-                                            {formData.leadId && formData.leadId !== 'none'
-                                                ? (() => {
-                                                    const selectedLead = leads.find((lead: any) => lead.id.toString() === formData.leadId);
-                                                    if (selectedLead) {
-                                                        const parts = [selectedLead.studentName, selectedLead.parentName].filter(Boolean);
-                                                        return parts.join(' - ') || 'Select customer...';
-                                                    }
-                                                    return "Select customer...";
-                                                })()
-                                                : "Select customer or parent..."}
-                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[400px] p-0">
-                                        <Command>
-                                            <CommandInput placeholder="Search by name or phone..." />
-                                            <CommandEmpty>No lead found.</CommandEmpty>
-                                            <CommandGroup className="max-h-[300px] overflow-auto">
-                                                <CommandItem
-                                                    value="none"
-                                                    onSelect={() => {
-                                                        setFormData({ ...formData, leadId: 'none' });
-                                                        setLeadPopoverOpen(false);
-                                                    }}
-                                                >
-                                                    <Check
-                                                        className={cn(
-                                                            "mr-2 h-4 w-4",
-                                                            formData.leadId === 'none' ? "opacity-100" : "opacity-0"
-                                                        )}
-                                                    />
-                                                    No Customer
-                                                </CommandItem>
-                                                {leads.map((lead: any) => (
-                                                    <CommandItem
-                                                        key={lead.id}
-                                                        value={`${lead.studentName} ${lead.parentName} ${lead.phone}`}
-                                                        onSelect={() => {
-                                                            setFormData({ ...formData, leadId: lead.id.toString() });
-                                                            setLeadPopoverOpen(false);
-                                                        }}
-                                                    >
-                                                        <Check
-                                                            className={cn(
-                                                                "mr-2 h-4 w-4",
-                                                                formData.leadId === lead.id.toString() ? "opacity-100" : "opacity-0"
-                                                            )}
-                                                        />
-                                                        <div className="flex flex-col">
-                                                            <span>{[lead.studentName, lead.parentName].filter(Boolean).join(' - ')}</span>
-                                                            <span className="text-xs text-gray-500">{lead.phone}</span>
-                                                        </div>
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
-                                <p className="text-xs text-gray-500">Link sale to a specific customer (optional)</p>
-                            </div>
-                        )}
+
 
                         <div className="space-y-2">
                             <Label htmlFor="notes">Notes</Label>
