@@ -5503,6 +5503,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // RECURRING EXPENSES MANAGEMENT ROUTES
+  // ============================================
+
+  app.get("/api/recurring-expenses", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const expenses = await storage.getAllRecurringExpenses(organizationId);
+      res.json(expenses);
+    } catch (error) {
+      console.error("Failed to fetch recurring expenses:", error);
+      res.status(500).json({ message: "Failed to fetch recurring expenses" });
+    }
+  });
+
+  app.post("/api/recurring-expenses", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const { description, amount, category, interval, startDate, type, deductFromBudget } = req.body;
+
+      if (!description || !amount || !category || !interval || !startDate) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Automatically determine the next processing date
+      const nextProcessingDate = startDate;
+
+      const expense = await storage.createRecurringExpense({
+        description,
+        amount: String(amount),
+        category,
+        interval,
+        startDate,
+        nextProcessingDate,
+        type: type || "outward",
+        deductFromBudget: deductFromBudget || false,
+        organizationId,
+        isActive: true
+      });
+
+      res.status(201).json(expense);
+    } catch (error) {
+      console.error("Failed to create recurring expense:", error);
+      res.status(500).json({ message: "Failed to create recurring expense" });
+    }
+  });
+
+  app.put("/api/recurring-expenses/:id", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const id = parseInt(req.params.id);
+      const updates = req.body;
+
+      const existingExpense = await storage.getRecurringExpense(id);
+      if (!existingExpense || existingExpense.organizationId !== organizationId) {
+        return res.status(404).json({ message: "Recurring expense not found" });
+      }
+
+      const expense = await storage.updateRecurringExpense(id, updates);
+      res.json(expense);
+    } catch (error) {
+      console.error("Failed to update recurring expense:", error);
+      res.status(500).json({ message: "Failed to update recurring expense" });
+    }
+  });
+
+  app.delete("/api/recurring-expenses/:id", async (req, res) => {
+    try {
+      const organizationId = await getOrganizationId(req);
+      if (!organizationId) {
+        return res.status(403).json({ message: "No organization assigned" });
+      }
+
+      const id = parseInt(req.params.id);
+      const existingExpense = await storage.getRecurringExpense(id);
+      if (!existingExpense || existingExpense.organizationId !== organizationId) {
+        return res.status(404).json({ message: "Recurring expense not found" });
+      }
+
+      const success = await storage.deleteRecurringExpense(id);
+      if (success) {
+        res.json({ message: "Recurring expense deleted successfully" });
+      } else {
+        res.status(404).json({ message: "Recurring expense not found" });
+      }
+    } catch (error) {
+      console.error("Failed to delete recurring expense:", error);
+      res.status(500).json({ message: "Failed to delete recurring expense" });
+    }
+  });
+
+  // ============================================
   // INVENTORY/STOCK MANAGEMENT ROUTES
   // ============================================
 

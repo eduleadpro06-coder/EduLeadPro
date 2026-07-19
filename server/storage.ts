@@ -5,7 +5,7 @@ import { cacheService } from "./cache-service.js";
 import type {
   User, InsertUser, Lead, InsertLead, FollowUp, InsertFollowUp,
   LeadSource, InsertLeadSource, Staff, InsertStaff, Attendance, InsertAttendance,
-  Payroll, InsertPayroll, Expense, InsertExpense, Student, InsertStudent,
+  Payroll, InsertPayroll, Expense, InsertExpense, RecurringExpense, InsertRecurringExpense, Student, InsertStudent,
   FeeStructure, InsertFeeStructure, FeePayment, InsertFeePayment,
   EMandate, InsertEMandate, EmiSchedule, InsertEmiSchedule,
   GlobalClassFee, InsertGlobalClassFee, EmiPlan, InsertEmiPlan,
@@ -197,6 +197,13 @@ export interface IStorage {
     monthlyTrend: Array<{ month: string; amount: number }>;
   }>;
   deleteExpense(id: number): Promise<boolean>;
+
+  // Recurring Expenses
+  getRecurringExpense(id: number): Promise<RecurringExpense | undefined>;
+  getAllRecurringExpenses(organizationId?: number): Promise<RecurringExpense[]>;
+  createRecurringExpense(expense: InsertRecurringExpense): Promise<RecurringExpense>;
+  updateRecurringExpense(id: number, updates: Partial<RecurringExpense>): Promise<RecurringExpense | undefined>;
+  deleteRecurringExpense(id: number): Promise<boolean>;
 
   // Students
   getStudent(id: number): Promise<StudentWithFees | undefined>;
@@ -3225,6 +3232,36 @@ export class DatabaseStorage implements IStorage {
     );
 
     return true;
+  }
+
+  async getRecurringExpense(id: number): Promise<RecurringExpense | undefined> {
+    const result = await db.select().from(schema.recurringExpenses).where(eq(schema.recurringExpenses.id, id));
+    return result[0];
+  }
+
+  async getAllRecurringExpenses(organizationId?: number): Promise<RecurringExpense[]> {
+    if (organizationId) {
+      return await db.select().from(schema.recurringExpenses).where(eq(schema.recurringExpenses.organizationId, organizationId));
+    }
+    return await db.select().from(schema.recurringExpenses);
+  }
+
+  async createRecurringExpense(insertExpense: InsertRecurringExpense): Promise<RecurringExpense> {
+    const result = await db.insert(schema.recurringExpenses).values(insertExpense).returning();
+    return result[0];
+  }
+
+  async updateRecurringExpense(id: number, updates: Partial<RecurringExpense>): Promise<RecurringExpense | undefined> {
+    const result = await db.update(schema.recurringExpenses).set({
+      ...updates,
+      updatedAt: new Date()
+    }).where(eq(schema.recurringExpenses.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteRecurringExpense(id: number): Promise<boolean> {
+    const result = await db.delete(schema.recurringExpenses).where(eq(schema.recurringExpenses.id, id)).returning();
+    return result.length > 0;
   }
 
   // Student operations

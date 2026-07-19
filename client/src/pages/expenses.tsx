@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Pencil, Trash2, Plus, Wallet, TrendingUp, TrendingDown, ArrowDownCircle, ArrowUpCircle, Calendar, BookOpen, PieChart as PieChartIcon, Settings } from "lucide-react";
+import { Pencil, Trash2, Plus, Wallet, TrendingUp, TrendingDown, ArrowDownCircle, ArrowUpCircle, Calendar, BookOpen, PieChart as PieChartIcon, Settings, Repeat } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import Header from "@/components/layout/header";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -67,8 +68,10 @@ export default function Expenses() {
     type: "outward" as "inward" | "outward" | "transfer",
     receiptNumber: "",
     date: new Date(),
+    isRecurring: false,
+    interval: "monthly",
   });
-  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editingExpense, setEditingExpense] = useState<any>(null);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
 
@@ -112,6 +115,15 @@ export default function Expenses() {
     queryKey: ['/api/expenses'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/expenses');
+      return await response.json();
+    },
+  });
+
+  // Fetch all recurring expenses
+  const { data: recurringExpenses = [] } = useQuery({
+    queryKey: ['/api/recurring-expenses'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/recurring-expenses');
       return await response.json();
     },
   });
@@ -180,6 +192,49 @@ export default function Expenses() {
     },
   });
 
+  const createRecurringExpenseMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("POST", "/api/recurring-expenses", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/recurring-expenses'] });
+      toast({ title: "Success", description: "Recurring expense schedule created" });
+      resetForm();
+      setIsAddExpenseOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create schedule", variant: "destructive" });
+    },
+  });
+
+  const deleteRecurringExpenseMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/recurring-expenses/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/recurring-expenses'] });
+      toast({ title: "Success", description: "Recurring schedule cancelled" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to cancel schedule", variant: "destructive" });
+    },
+  });
+
+  const updateRecurringExpenseMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("PUT", `/api/recurring-expenses/${data.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/recurring-expenses'] });
+      toast({ title: "Success", description: "Recurring schedule updated" });
+      resetForm();
+      setIsAddExpenseOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update schedule", variant: "destructive" });
+    },
+  });
+
   // Update expense mutation
   const updateExpenseMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -228,6 +283,8 @@ export default function Expenses() {
       type: "outward",
       receiptNumber: "",
       date: getDefaultDate(),
+      isRecurring: false,
+      interval: "monthly",
     });
     setEditingExpense(null);
   };
@@ -247,11 +304,41 @@ export default function Expenses() {
       receiptNumber: form.receiptNumber || null,
     };
 
+    if (form.isRecurring && !editingExpense) {
+      createRecurringExpenseMutation.mutate({
+        ...payload,
+        interval: form.interval,
+        startDate: dateStr,
+      });
+      return;
+    }
+
     if (editingExpense) {
-      updateExpenseMutation.mutate({ id: editingExpense.id, ...payload });
+      if (form.isRecurring) {
+        updateRecurringExpenseMutation.mutate({ id: editingExpense.id, ...payload, interval: form.interval, startDate: dateStr });
+      } else {
+        updateExpenseMutation.mutate({ id: editingExpense.id, ...payload });
+      }
     } else {
       createExpenseMutation.mutate(payload);
     }
+  };
+
+  const handleEditRecurring = (expense: any) => {
+    const expType = (expense.type ?? "outward") as "inward" | "outward" | "transfer";
+    setEditingExpense(expense);
+    setForm({
+      description: expense.description,
+      amount: expense.amount.toString(),
+      category: expense.category,
+      deductFromBudget: expense.deductFromBudget ?? false,
+      type: expType,
+      receiptNumber: "",
+      date: new Date(expense.startDate),
+      isRecurring: true,
+      interval: expense.interval,
+    });
+    setIsAddExpenseOpen(true);
   };
 
   const handleEdit = (expense: Expense) => {
@@ -436,12 +523,87 @@ export default function Expenses() {
                   <TabsTrigger value="inward" className="data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm text-sm">Inward</TabsTrigger>
                   <TabsTrigger value="transfer" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm text-sm">Transfers</TabsTrigger>
                   <TabsTrigger value="outward" className="data-[state=active]:bg-red-50 data-[state=active]:text-red-700 data-[state=active]:shadow-sm text-sm">Outward</TabsTrigger>
+                  <TabsTrigger value="recurring" className="data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:shadow-sm text-sm">Recurring</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
 
-            <div className="overflow-x-auto mt-4">
-              <table className="w-full text-sm text-left">
+            {activeTab === "recurring" ? (
+              <div className="overflow-x-auto mt-4">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50/50">
+                    <tr>
+                      <th className="table-header px-6 py-4 text-left text-xs font-bold text-gray-800 uppercase tracking-wider">Start Date</th>
+                      <th className="table-header px-6 py-4 text-left text-xs font-bold text-gray-800 uppercase tracking-wider">Interval</th>
+                      <th className="table-header px-6 py-4 text-left text-xs font-bold text-gray-800 uppercase tracking-wider">Description</th>
+                      <th className="table-header px-6 py-4 text-left text-xs font-bold text-gray-800 uppercase tracking-wider">Category</th>
+                      <th className="table-header px-6 py-4 text-left text-xs font-bold text-gray-800 uppercase tracking-wider">Amount</th>
+                      <th className="table-header px-6 py-4 text-right text-xs font-bold text-gray-800 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {recurringExpenses.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <Repeat className="h-8 w-8 text-gray-300" />
+                            <p>No active recurring expenses.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      recurringExpenses.map((exp: any) => (
+                        <tr key={exp.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
+                            <div className="flex flex-col">
+                              <span>{format(new Date(exp.startDate), "MMM d, yyyy")}</span>
+                              <span className="text-xs text-purple-600 mt-0.5">Next: {format(new Date(exp.nextProcessingDate), "MMM d, yyyy")}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 capitalize font-medium text-purple-700">
+                            {exp.interval}
+                          </td>
+                          <td className="px-6 py-4 font-medium text-gray-900">
+                            {exp.description}
+                          </td>
+                          <td className="px-6 py-4">
+                            <Badge variant="secondary" className="bg-gray-100 text-gray-700 border-0 font-normal">
+                              {exp.category}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-red-600">
+                            {formatAmount(Number(exp.amount))}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-purple-500 hover:text-purple-700 hover:bg-purple-50 h-8 w-8 p-0 rounded-full"
+                                onClick={() => handleEditRecurring(exp)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0 rounded-full"
+                                onClick={() => deleteRecurringExpenseMutation.mutate(exp.id)}
+                                disabled={deleteRecurringExpenseMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="overflow-x-auto mt-4">
+                <table className="w-full text-sm text-left">
                 <thead className="bg-gray-50/50">
                   <tr>
                     <th className="table-header px-6 py-4 text-left text-xs font-bold text-gray-800 uppercase tracking-wider">Date</th>
@@ -542,6 +704,7 @@ export default function Expenses() {
                 </tbody>
               </table>
             </div>
+            )}
           </CardContent>
         </Card>
 
@@ -698,8 +861,45 @@ export default function Expenses() {
                 </div>
               )}
 
+              {/* Recurring Switch */}
+              {form.type !== "transfer" && !editingExpense && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100/50 shadow-sm transition-all duration-200 hover:shadow-md">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 space-y-1">
+                      <label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                        <Repeat className="h-4 w-4 text-blue-600" />
+                        Recurring Expense
+                      </label>
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        Automatically log this expense periodically.
+                      </p>
+                    </div>
+                    <Switch 
+                      checked={form.isRecurring} 
+                      onCheckedChange={(checked) => setForm({ ...form, isRecurring: checked })}
+                    />
+                  </div>
+                  {form.isRecurring && (
+                    <div className="mt-4 pt-4 border-t border-blue-100/50">
+                      <Label className="text-xs font-semibold text-gray-700 mb-2 block">Interval</Label>
+                      <Select value={form.interval} onValueChange={(val) => setForm({...form, interval: val})}>
+                        <SelectTrigger className="w-full h-10 bg-white border-blue-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="yearly">Yearly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-2.5">
-                <Label className="text-sm font-semibold text-gray-700">Date</Label>
+                <Label className="text-sm font-semibold text-gray-700">Date {form.isRecurring ? '(Start Date)' : ''}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button

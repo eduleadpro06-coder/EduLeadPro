@@ -215,5 +215,69 @@ export function initializeCronJobs() {
         timezone: "Asia/Kolkata"
     });
 
-    logger.info('[CRON] Cron jobs initialized - Daily checks scheduled (Daycare & Payments: 9:00 AM IST, Backup: 2:00 AM IST, Cleanup: 3:00 AM IST)');
+    // 5. Recurring Expenses Cron
+    // Run daily at 4:00 AM IST
+    cron.schedule('0 4 * * *', async () => {
+        try {
+            logger.info('[CRON] Starting recurring expenses processing...');
+            const todayStr = new Date().toISOString().split('T')[0];
+            
+            // Get all active recurring expenses due today or earlier
+            const dueExpenses = await db.select()
+                .from(schema.recurringExpenses)
+                .where(and(
+                    eq(schema.recurringExpenses.isActive, true),
+                    lte(schema.recurringExpenses.nextProcessingDate, todayStr)
+                ));
+
+            let processedCount = 0;
+            for (const re of dueExpenses) {
+                // Double check end date if exists
+                if (re.endDate && re.endDate < todayStr) {
+                    await db.update(schema.recurringExpenses)
+                        .set({ isActive: false })
+                        .where(eq(schema.recurringExpenses.id, re.id));
+                    continue;
+                }
+
+                // Create the expense record
+                await storage.createExpense({
+                    description: re.description,
+                    amount: re.amount,
+                    category: re.category,
+                    date: re.nextProcessingDate,
+                    deductFromBudget: re.deductFromBudget,
+                    type: re.type,
+                    organizationId: re.organizationId
+                });
+
+                // Calculate next date based on interval
+                const currentDateObj = new Date(re.nextProcessingDate);
+                let nextDateObj = new Date(currentDateObj);
+                
+                switch (re.interval) {
+                    case 'daily': nextDateObj.setDate(currentDateObj.getDate() + 1); break;
+                    case 'weekly': nextDateObj.setDate(currentDateObj.getDate() + 7); break;
+                    case 'monthly': nextDateObj.setMonth(currentDateObj.getMonth() + 1); break;
+                    case 'yearly': nextDateObj.setFullYear(currentDateObj.getFullYear() + 1); break;
+                    default: nextDateObj.setMonth(currentDateObj.getMonth() + 1); break;
+                }
+                const nextProcessingDate = nextDateObj.toISOString().split('T')[0];
+
+                await db.update(schema.recurringExpenses).set({
+                    lastProcessedDate: todayStr,
+                    nextProcessingDate: nextProcessingDate
+                }).where(eq(schema.recurringExpenses.id, re.id));
+                
+                processedCount++;
+            }
+            logger.info(`[CRON] Processed ${processedCount} recurring expenses.`);
+        } catch (error) {
+            logger.error('[CRON] Error processing recurring expenses:', error);
+        }
+    }, {
+        timezone: "Asia/Kolkata"
+    });
+
+    logger.info('[CRON] Cron jobs initialized - Daily checks scheduled (Daycare & Payments: 9:00 AM IST, Backup: 2:00 AM IST, Cleanup: 3:00 AM IST, Recurring Expenses: 4:00 AM IST)');
 }
