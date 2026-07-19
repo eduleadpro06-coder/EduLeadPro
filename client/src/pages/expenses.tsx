@@ -382,40 +382,6 @@ export default function Expenses() {
       <Header title="Expenses & Cash Ledger" subtitle="Track your school's inward and outward cash flow." />
 
       <main className="w-full px-6 py-8 space-y-8">
-        {/* Date Filter */}
-        <div className="flex flex-col md:flex-row md:items-center justify-end gap-4">
-          <div className="flex items-center gap-3 bg-white p-1.5 rounded-lg border shadow-sm">
-            <div className="flex items-center gap-2 px-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-[130px] border-0 bg-transparent h-8 focus:ring-0">
-                  <SelectValue placeholder="Select Month" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <SelectItem key={i} value={i.toString()}>
-                      {format(new Date(2025, i, 1), "MMMM")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="w-px h-4 bg-gray-200 mx-1" />
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="w-[90px] border-0 bg-transparent h-8 focus:ring-0">
-                  <SelectValue placeholder="Select Year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {[2024, 2025, 2026, 2027].map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Total Inward */}
@@ -500,6 +466,38 @@ export default function Expenses() {
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-3">
+              {/* Date Filter */}
+              <div className="flex items-center gap-3 bg-white p-1.5 rounded-lg border shadow-sm mr-2">
+                <div className="flex items-center gap-2 px-2">
+                  <Calendar className="h-4 w-4 text-gray-500" />
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger className="w-[130px] border-0 bg-transparent h-8 focus:ring-0">
+                      <SelectValue placeholder="Select Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <SelectItem key={i} value={i.toString()}>
+                          {format(new Date(2025, i, 1), "MMMM")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="w-px h-4 bg-gray-200 mx-1" />
+                  <Select value={selectedYear} onValueChange={setSelectedYear}>
+                    <SelectTrigger className="w-[90px] border-0 bg-transparent h-8 focus:ring-0">
+                      <SelectValue placeholder="Select Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[2024, 2025, 2026, 2027].map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <Button onClick={() => openAddModal("inward")} variant="outline" className="rounded-full border-emerald-300 text-emerald-700 hover:bg-emerald-50 gap-2 font-medium px-4">
                 <ArrowDownCircle className="h-4 w-4" />
                 Add Inward

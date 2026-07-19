@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Filter, Download, FileText, ArrowUpDown } from "lucide-react";
@@ -11,6 +12,7 @@ import { Filter, Download, FileText, ArrowUpDown } from "lucide-react";
 export default function Reports() {
   const [paymentProgram, setPaymentProgram] = useState<string>("all");
   const [paymentStatus, setPaymentStatus] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const paymentDueUrl = `/api/reports/payment-due?${new URLSearchParams({
     ...(paymentProgram !== "all" && { program: paymentProgram }),
@@ -35,6 +37,17 @@ export default function Reports() {
 
   const sortedData = useMemo(() => {
     let sortableData = [...(paymentDueData || [])];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      sortableData = sortableData.filter(row => 
+        (row.studentName && row.studentName.toLowerCase().includes(q)) ||
+        (row.studentPhone && row.studentPhone.toLowerCase().includes(q)) ||
+        (row.fatherName && row.fatherName.toLowerCase().includes(q)) ||
+        (row.parentPhone && row.parentPhone.toLowerCase().includes(q))
+      );
+    }
+
     if (sortConfig !== null) {
       sortableData.sort((a, b) => {
         let aValue = a[sortConfig.key];
@@ -53,7 +66,7 @@ export default function Reports() {
       });
     }
     return sortableData;
-  }, [paymentDueData, sortConfig]);
+  }, [paymentDueData, sortConfig, searchQuery]);
 
   const requestSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -103,6 +116,14 @@ export default function Reports() {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      placeholder="Search student, parent, phone..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-64 h-9"
+                    />
+                  </div>
                   <div className="flex items-center gap-2">
                     <Filter size={16} className="text-gray-500" />
                     <label className="text-sm font-medium text-gray-700">Program:</label>
