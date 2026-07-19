@@ -7,13 +7,15 @@ import { Pencil, Trash2, Plus, Wallet, TrendingUp, TrendingDown, ArrowDownCircle
 import Header from "@/components/layout/header";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequest, invalidateNotifications, formatAmount } from "@/lib/utils";
+import { apiRequest, invalidateNotifications, formatAmount, cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { NotificationManager } from "@/lib/notificationManager";
 import { useOrganization } from "@/hooks/use-organization";
 import { useEffect } from "react";
@@ -64,6 +66,7 @@ export default function Expenses() {
     deductFromBudget: false,
     type: "outward" as "inward" | "outward" | "transfer",
     receiptNumber: "",
+    date: new Date(),
   });
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
@@ -209,6 +212,13 @@ export default function Expenses() {
     },
   });
 
+  const getDefaultDate = () => {
+    const now = new Date();
+    const isCurrentMonth = parseInt(selectedMonth) === now.getMonth() && parseInt(selectedYear) === now.getFullYear();
+    const effectiveDay = isCurrentMonth ? now.getDate() : 1;
+    return new Date(parseInt(selectedYear), parseInt(selectedMonth), effectiveDay);
+  };
+
   const resetForm = () => {
     setForm({
       description: "",
@@ -217,6 +227,7 @@ export default function Expenses() {
       deductFromBudget: false,
       type: "outward",
       receiptNumber: "",
+      date: getDefaultDate(),
     });
     setEditingExpense(null);
   };
@@ -224,11 +235,7 @@ export default function Expenses() {
   const handleAddExpense = () => {
     if (!form.description || !form.amount) return;
 
-    const now = new Date();
-    const isCurrentMonth = parseInt(selectedMonth) === now.getMonth() && parseInt(selectedYear) === now.getFullYear();
-    const effectiveDay = isCurrentMonth ? now.getDate() : 1;
-    const effectiveDate = new Date(parseInt(selectedYear), parseInt(selectedMonth), effectiveDay);
-    const dateStr = format(effectiveDate, 'yyyy-MM-dd');
+    const dateStr = format(form.date || getDefaultDate(), 'yyyy-MM-dd');
 
     const payload = {
       description: form.description,
@@ -257,6 +264,7 @@ export default function Expenses() {
       deductFromBudget: expense.deductFromBudget ?? false,
       type: expType,
       receiptNumber: expense.receiptNumber || "",
+      date: new Date(expense.date),
     });
     setIsAddExpenseOpen(true);
   };
@@ -275,6 +283,7 @@ export default function Expenses() {
       deductFromBudget: false,
       type,
       receiptNumber: "",
+      date: getDefaultDate(),
     });
     setIsAddExpenseOpen(true);
   };
@@ -689,21 +698,30 @@ export default function Expenses() {
                 </div>
               )}
 
-              <div className={`p-3.5 rounded-lg flex gap-2.5 items-start text-xs border ${
-                form.type === "inward"
-                  ? "bg-emerald-50/50 text-emerald-700 border-emerald-100/50"
-                  : "bg-blue-50/50 text-blue-700 border-blue-100/50"
-              }`}>
-                <Calendar className={`h-4 w-4 mt-0.5 shrink-0 ${form.type === "inward" ? "text-emerald-600" : "text-blue-600"}`} />
-                <span className="leading-relaxed">
-                  {(() => {
-                    const now = new Date();
-                    const isCurrentMonth = parseInt(selectedMonth) === now.getMonth() && parseInt(selectedYear) === now.getFullYear();
-                    const effectiveDay = isCurrentMonth ? now.getDate() : 1;
-                    const effectiveDate = new Date(parseInt(selectedYear), parseInt(selectedMonth), effectiveDay);
-                    return <>This entry will be recorded for <strong className="font-semibold">{format(effectiveDate, "MMMM d, yyyy")}</strong>.</>;
-                  })()}
-                </span>
+              <div className="space-y-2.5">
+                <Label className="text-sm font-semibold text-gray-700">Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal h-11 border-gray-200",
+                        !form.date && "text-muted-foreground"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {form.date ? format(form.date, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={form.date}
+                      onSelect={(date) => date && setForm({ ...form, date })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <DialogFooter className="pt-4 border-t border-purple-100/50 gap-2">

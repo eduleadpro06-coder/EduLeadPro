@@ -175,6 +175,24 @@ export const expenses = pgTable("expenses", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const recurringExpenses = pgTable("recurring_expenses", {
+  id: serial("id").primaryKey(),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  category: varchar("category", { length: 100 }).notNull(),
+  interval: varchar("interval", { length: 20 }).notNull(), // 'daily', 'weekly', 'monthly', 'yearly'
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  lastProcessedDate: date("last_processed_date"),
+  nextProcessingDate: date("next_processing_date").notNull(),
+  deductFromBudget: boolean("deduct_from_budget").default(false),
+  type: varchar("type", { length: 20 }).default("outward"),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Student Management
 export const students = pgTable("students", {
   id: serial("id").primaryKey(),
@@ -588,6 +606,7 @@ export const insertStaffSchema = createInsertSchema(staff)
 export const insertAttendanceSchema = createInsertSchema(attendance).omit({ id: true, createdAt: true });
 export const insertPayrollSchema = createInsertSchema(payroll).omit({ id: true, createdAt: true });
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
+export const insertRecurringExpenseSchema = createInsertSchema(recurringExpenses).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertStudentSchema = createInsertSchema(students).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertFeeStructureSchema = createInsertSchema(feeStructure).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertGlobalClassFeeSchema = createInsertSchema(globalClassFees).omit({ id: true, createdAt: true, updatedAt: true });
@@ -622,6 +641,7 @@ export type Staff = typeof staff.$inferSelect;
 export type Attendance = typeof attendance.$inferSelect;
 export type Payroll = typeof payroll.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
+export type RecurringExpense = typeof recurringExpenses.$inferSelect;
 export type Student = typeof students.$inferSelect;
 export type FeeStructure = typeof feeStructure.$inferSelect;
 export type GlobalClassFee = typeof globalClassFees.$inferSelect;
@@ -655,6 +675,7 @@ export type InsertStaff = z.infer<typeof insertStaffSchema>;
 export type InsertAttendance = z.infer<typeof insertAttendanceSchema>;
 export type InsertPayroll = z.infer<typeof insertPayrollSchema>;
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+export type InsertRecurringExpense = z.infer<typeof insertRecurringExpenseSchema>;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
 export type InsertFeeStructure = z.infer<typeof insertFeeStructureSchema>;
 export type InsertGlobalClassFee = z.infer<typeof insertGlobalClassFeeSchema>;
