@@ -385,7 +385,6 @@ router.get("/students/search", async (req, res) => {
         }
 
         const mappedStudents = enrolledStudents
-            .slice(0, 20) // Limit to 20 results
             .map(lead => ({
                 id: lead.id,
                 name: lead.name,
