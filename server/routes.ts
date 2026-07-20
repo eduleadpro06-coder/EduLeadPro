@@ -467,6 +467,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch updates" });
     }
   });
+  // PATCH /api/admin/daily-updates/bulk-remove-media - Remove a specific photo from multiple updates
+  app.patch("/api/admin/daily-updates/bulk-remove-media", async (req, res) => {
+    try {
+      const { ids, mediaUrlToRemove } = req.body;
+      
+      if (!ids || !Array.isArray(ids) || ids.length === 0 || !mediaUrlToRemove) {
+        return res.status(400).json({ error: "Invalid request payload" });
+      }
+
+      // Fetch the updates to get their current media_urls
+      const { data: updates, error: fetchError } = await supabase
+        .from('daily_updates')
+        .select('id, media_urls')
+        .in('id', ids);
+        
+      if (fetchError) throw fetchError;
+      
+      // Update each record by removing the specified mediaUrl
+      for (const update of updates) {
+        if (update.media_urls && Array.isArray(update.media_urls)) {
+          const newMediaUrls = update.media_urls.filter((url: string) => url !== mediaUrlToRemove);
+          await supabase
+            .from('daily_updates')
+            .update({ media_urls: newMediaUrls })
+            .eq('id', update.id);
+        }
+      }
+      
+      res.json({ success: true, message: "Media removed successfully" });
+    } catch (error) {
+      console.error('Error removing media from daily updates:', error);
+      res.status(500).json({ error: "Failed to remove media" });
+    }
+  });
 
   // PATCH /api/admin/daily-updates/:id/status - Approve or Reject update
   app.patch("/api/admin/daily-updates/:id/status", async (req, res) => {

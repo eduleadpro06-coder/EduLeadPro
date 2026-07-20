@@ -57,6 +57,30 @@ export default function ActivityApproval() {
         }
     });
 
+    const removeMediaMutation = useMutation({
+        mutationFn: async ({ ids, mediaUrlToRemove }: { ids: number[], mediaUrlToRemove: string }) => {
+            const res = await apiRequest("PATCH", `/api/admin/daily-updates/bulk-remove-media`, {
+                ids,
+                mediaUrlToRemove
+            });
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['/api/admin/daily-updates'] });
+            toast({
+                title: "Photo Removed",
+                description: "The photo has been removed from this update.",
+            });
+        },
+        onError: (error) => {
+            toast({
+                title: "Error",
+                description: "Failed to remove photo. Please try again.",
+                variant: "destructive"
+            });
+        }
+    });
+
     const handleApprove = (id: number) => {
         updateStatusMutation.mutate({ id, status: 'approved' });
     };
@@ -190,13 +214,31 @@ export default function ActivityApproval() {
                                             'grid-cols-3 md:grid-cols-4'
                                         }`}>
                                         {group.media_urls.map((url: string, idx: number) => (
-                                            <div key={idx} className={`relative rounded-lg overflow-hidden bg-muted border ${group.media_urls.length === 1 ? 'aspect-video max-h-[300px]' : 'aspect-square'}`}>
+                                            <div key={idx} className={`relative group/image rounded-lg overflow-hidden bg-muted border ${group.media_urls.length === 1 ? 'aspect-video max-h-[300px]' : 'aspect-square'}`}>
                                                 <img
                                                     src={url}
                                                     alt={`Attachment ${idx + 1}`}
                                                     className="object-cover w-full h-full hover:scale-105 transition-transform duration-300 cursor-zoom-in"
                                                     onClick={() => window.open(url, '_blank')}
                                                 />
+                                                {group.media_urls.length > 1 && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="destructive"
+                                                        size="icon"
+                                                        className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover/image:opacity-100 transition-opacity rounded-full shadow-md"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (window.confirm("Are you sure you want to reject and remove this photo?")) {
+                                                                removeMediaMutation.mutate({ ids: group.ids, mediaUrlToRemove: url });
+                                                            }
+                                                        }}
+                                                        disabled={removeMediaMutation.isPending}
+                                                        title="Reject Photo"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
