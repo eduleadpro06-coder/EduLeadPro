@@ -215,12 +215,18 @@ export default function ActivityApproval() {
                                         }`}>
                                         {group.media_urls.map((url: string, idx: number) => (
                                             <div key={idx} className={`relative group/image rounded-lg overflow-hidden bg-muted border ${group.media_urls.length === 1 ? 'aspect-video max-h-[300px]' : 'aspect-square'}`}>
-                                                <img
-                                                    src={url}
-                                                    alt={`Attachment ${idx + 1}`}
-                                                    className="object-cover w-full h-full hover:scale-105 transition-transform duration-300 cursor-zoom-in"
-                                                    onClick={() => window.open(url, '_blank')}
-                                                />
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <img
+                                                            src={url}
+                                                            alt={`Attachment ${idx + 1}`}
+                                                            className="object-cover w-full h-full hover:scale-105 transition-transform duration-300 cursor-zoom-in"
+                                                        />
+                                                    </DialogTrigger>
+                                                    <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none [&>button]:text-white [&>button]:bg-black/50 hover:[&>button]:bg-black/70 [&>button]:rounded-full [&>button]:p-1.5 [&>button]:top-2 [&>button]:right-2">
+                                                        <img src={url} alt={`Attachment ${idx + 1} Enlarge`} className="w-full h-auto max-h-[85vh] object-contain rounded-md" />
+                                                    </DialogContent>
+                                                </Dialog>
                                                 {group.media_urls.length > 1 && (
                                                     <Button
                                                         type="button"
