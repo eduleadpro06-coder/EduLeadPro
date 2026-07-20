@@ -44,18 +44,24 @@ const LeaveApplicationScreen = () => {
     const fetchLeaves = async () => {
         setLoading(true);
         try {
-            const [leavesData, balanceData] = await Promise.all([
-                teacherAPI.getLeaves(),
-                teacherAPI.getLeaveBalance()
-            ]);
-            setLeaves(leavesData);
-            setBalance(balanceData);
+            // Fetch leaves first — this is the primary data
+            const leavesData = await teacherAPI.getLeaves();
+            setLeaves(leavesData ?? []);
         } catch (error) {
             console.error('Failed to fetch leaves:', error);
             Alert.alert('Error', 'Failed to load leave history');
         } finally {
             setLoading(false);
             setRefreshing(false);
+        }
+
+        // Fetch balance separately — a failure here shouldn't block the list
+        try {
+            const balanceData = await teacherAPI.getLeaveBalance();
+            setBalance(balanceData);
+        } catch (error) {
+            console.error('Failed to fetch leave balance (non-fatal):', error);
+            // Don't show an alert — balance is supplementary info
         }
     };
 

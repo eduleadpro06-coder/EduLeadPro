@@ -622,14 +622,16 @@ router.get('/leaves/balance', async (req: Request, res: Response) => {
 
         const { supabase } = await import('../../supabase.js');
 
-        // Get Staff Limits
+        // Get Staff Limits (only cl_limit and total_leaves exist in schema; el_limit was never added)
         const { data: staff, error: staffError } = await supabase
             .from('staff')
-            .select('cl_limit, el_limit, total_leaves')
+            .select('cl_limit, total_leaves')
             .eq('id', staffId)
             .single();
 
-        if (staffError) throw staffError;
+        if (staffError) {
+            console.warn('[Mobile Balance] Could not fetch staff limits, using defaults:', staffError.message);
+        }
 
         // Get Used Leaves
         const { data: usedLeaves, error: leavesError } = await supabase
