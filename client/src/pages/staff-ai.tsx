@@ -427,57 +427,89 @@ export default function StaffAI() {
 
 
 
-  const handleAutoSaveDraft = async (dataToSave = editablePayrollData, month = selectedMonth, year = selectedYear) => {
-    if (Object.keys(dataToSave).length === 0) return;
+  const handleAutoSaveDraft = async (
+    dataToSave = editablePayrollData,
+    month = selectedMonth,
+    year = selectedYear
+  ) => {
+    const staffList = staff as Staff[];
+    if (!staffList || staffList.length === 0) {
+      toast({ title: "No Staff", description: "No staff data to save.", variant: "destructive" });
+      return;
+    }
 
     try {
       setIsAutoSaving(true);
-      const payrollDataArray = Object.entries(dataToSave).map(([id, data]) => {
-        const staffId = Number(id);
-        const staffMember = (staff as Staff[]).find(s => s.id === staffId);
-        if (!staffMember) return null;
 
-        return {
-          staffId,
-          month,
-          year,
-          basicSalary: Number(data.basicSalary || staffMember.salary),
-          allowances: Number(data.allowances || 0) + Number(data.reimbursment || 0),
-          deductions: Number(data.deductions || 0),
-          deposit: Number(data.deposit || 0),
-          netSalary: Number(data.netSalary),
-          attendedDays: Number(data.attendedDays ?? (30 - Number(data.absent || 0))),
-          remark: data.remark || '',
-          status: 'pending', // Save as draft
-        };
-      }).filter(Boolean);
+      // Build payroll records for every active staff member using current
+      // editable data. Falls back to staff defaults for fields not yet edited.
+      const payrollDataArray = staffList
+        .filter(m => m.isActive !== false)
+        .map(staffMember => {
+          const data = dataToSave[staffMember.id] || {};
+          const attendedDays = Number(
+            data.attendedDays ?? (30 - Number(data.absent || 0))
+          );
+          const basicSalary = Number(data.basicSalary || staffMember.salary || 0);
+          const allowances = Number(data.allowances || 0) + Number(data.reimbursment || 0);
+          const deductions = Number(data.deductions || 0);
+          const deposit = Number(data.deposit || 0);
+          const overtime = Number(data.overtime || 0);
+          const netSalary = Math.max(
+            0,
+            Math.round((basicSalary / 30) * attendedDays + allowances + overtime - deductions - deposit)
+          );
 
-      if (payrollDataArray.length === 0) return;
+          return {
+            staffId: staffMember.id,
+            month,
+            year,
+            basicSalary,
+            allowances,
+            deductions,
+            deposit,
+            overtime,
+            netSalary,
+            attendedDays,
+            remark: data.remark || '',
+            status: 'pending', // Save as draft — visible to all devices immediately
+          };
+        });
 
-      await fetch('/api/payroll/bulk-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          month,
-          year,
-          staffIds: payrollDataArray.map(p => p?.staffId),
-          payrollData: payrollDataArray
-        })
+      if (payrollDataArray.length === 0) {
+        toast({ title: "Nothing to Save", description: "No active staff found.", variant: "destructive" });
+        return;
+      }
+
+      // Use apiRequest so auth cookies + x-user-name header are sent correctly.
+      // apiRequest already throws on non-2xx responses, so errors are caught below.
+      await apiRequest('POST', '/api/payroll/bulk-generate', {
+        month,
+        year,
+        staffIds: payrollDataArray.map(p => p.staffId),
+        payrollData: payrollDataArray,
       });
-      console.log(`Payroll draft auto-saved for ${month}/${year}`);
-      // Invalidate queries to ensure UI sees the new records
+
+      console.log(`[SaveProgress] Payroll draft saved to DB for ${month}/${year}`);
+
+      // Invalidate BOTH queries so every device gets fresh data on next mount
       queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
-      
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/overview"] });
+
+      // Remove stale localStorage draft — DB is now the source of truth
+      localStorage.removeItem('editablePayrollData_' + month + '_' + year);
+      localStorage.removeItem('manualPayrollInputs_' + month + '_' + year);
+
       toast({
         title: "Progress Saved",
-        description: `Payroll draft for ${month}/${year} has been saved to the server.`,
+        description: `Payroll draft saved to database. Other devices will see these values on refresh.`,
       });
-    } catch (error) {
-      console.error('Save failed:', error);
+    } catch (error: any) {
+      console.error('[SaveProgress] Save failed:', error);
       toast({
         title: "Save Failed",
-        description: "Could not save progress to the server. Please check your connection.",
-        variant: "destructive"
+        description: error.message || "Could not save to server. Please check your connection.",
+        variant: "destructive",
       });
     } finally {
       setIsAutoSaving(false);
@@ -2202,7 +2234,7 @@ export default function StaffAI() {
                           <Button
                             variant="default"
                             onClick={() => handleAutoSaveDraft()}
-                            disabled={isAutoSaving || Object.keys(editablePayrollData).length === 0}
+                            disabled={isAutoSaving}
                             className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
                           >
                             {isAutoSaving ? (
