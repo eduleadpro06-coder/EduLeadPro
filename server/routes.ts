@@ -5024,7 +5024,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/notifications", async (req, res) => {
     try {
       const { userId, type, limit } = req.query;
-      const userIdNum = userId ? parseInt(userId as string) : 1; // Default to user 1 for now
+      const parsedUserId = userId ? parseInt(userId as string) : NaN;
+      const userIdNum = !isNaN(parsedUserId) ? parsedUserId : (req.session as any).userId || 1;
       const limitNum = limit ? parseInt(limit as string) : 50;
 
       let notifications;
@@ -5044,7 +5045,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/notifications/unread", async (req, res) => {
     try {
       const { userId } = req.query;
-      const userIdNum = userId ? parseInt(userId as string) : 1; // Default to user 1 for now
+      const parsedUserId = userId ? parseInt(userId as string) : NaN;
+      const userIdNum = !isNaN(parsedUserId) ? parsedUserId : (req.session as any).userId || 1;
 
       const notifications = await storage.getUnreadNotificationsByUser(userIdNum);
       res.json(notifications);
@@ -5057,7 +5059,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/notifications/stats", async (req, res) => {
     try {
       const { userId } = req.query;
-      const userIdNum = userId ? parseInt(userId as string) : 1; // Default to user 1 for now
+      const parsedUserId = userId ? parseInt(userId as string) : NaN;
+      const userIdNum = !isNaN(parsedUserId) ? parsedUserId : (req.session as any).userId || 1;
 
       const stats = await storage.getNotificationStats(userIdNum);
       res.json(stats);

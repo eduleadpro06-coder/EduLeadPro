@@ -158,9 +158,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const userData = await checkResponse.json();
                 console.log('User data from backend:', userData);
 
-                // User exists with organization
+                 // User exists with organization
                 setUser({
-                  id: sessionUser.id,
+                  id: userData.userId.toString(),
                   email: sessionUser.email ?? null,
                   displayName: sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || sessionUser.user_metadata?.display_name || sessionUser.user_metadata?.preferred_username || null,
                   avatarUrl: sessionUser.user_metadata?.avatar_url || null,
@@ -171,7 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 // Store in localStorage
                 localStorage.setItem('auth_user', JSON.stringify({
-                  id: sessionUser.id,
+                  id: userData.userId.toString(),
                   email: sessionUser.email,
                   displayName: sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name,
                   organizationId: userData.organizationId,

@@ -8,7 +8,8 @@ const router = Router();
 // GET /api/notifications?userId=1&limit=50
 router.get("/", async (req, res) => {
   try {
-    const userId = parseInt(req.query.userId as string) || 1;
+    const queryUserId = parseInt(req.query.userId as string);
+    const userId = !isNaN(queryUserId) ? queryUserId : (req.session as any).userId || 1;
     const limit = parseInt(req.query.limit as string) || 50;
     
     const notifications = await storage.getNotificationsByUser(userId, limit);
@@ -22,7 +23,8 @@ router.get("/", async (req, res) => {
 // GET /api/notifications/unread?userId=1
 router.get("/unread", async (req, res) => {
   try {
-    const userId = parseInt(req.query.userId as string) || 1;
+    const queryUserId = parseInt(req.query.userId as string);
+    const userId = !isNaN(queryUserId) ? queryUserId : (req.session as any).userId || 1;
     const notifications = await storage.getUnreadNotificationsByUser(userId);
     res.json(notifications);
   } catch (error) {
@@ -34,7 +36,8 @@ router.get("/unread", async (req, res) => {
 // GET /api/notifications/stats?userId=1
 router.get("/stats", async (req, res) => {
   try {
-    const userId = parseInt(req.query.userId as string) || 1;
+    const queryUserId = parseInt(req.query.userId as string);
+    const userId = !isNaN(queryUserId) ? queryUserId : (req.session as any).userId || 1;
     const stats = await storage.getNotificationStats(userId);
     res.json(stats);
   } catch (error) {
