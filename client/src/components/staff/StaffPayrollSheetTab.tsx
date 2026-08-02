@@ -79,6 +79,10 @@ export default function StaffPayrollSheetTab({ month, year }: { month: number; y
       const res = await fetch(`/api/payroll/overview?month=${selectedMonth}&year=${selectedYear}`);
       return res.json();
     },
+    // Fix 1: Always fetch fresh data from server so a different device always
+    // sees the latest saved values instead of a stale in-memory cache.
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   // Only active staff
@@ -98,23 +102,36 @@ export default function StaffPayrollSheetTab({ month, year }: { month: number; y
     ).sort((a, b) => getRolePriority(a.role) - getRolePriority(b.role));
   }, [activeStaff, searchQuery]);
 
+  // Fix 4: Reset sheetData whenever the viewed month/year changes so stale
+  // values from a previous month never bleed into the new month's view.
+  useEffect(() => {
+    setSheetData({});
+  }, [selectedMonth, selectedYear]);
+
   // ── Seed sheet data from payroll overview when it loads ─────────────────────
   useEffect(() => {
     if (!payrollOverview || payrollOverview.length === 0) return;
     setSheetData((prev) => {
       const next = { ...prev };
       payrollOverview.forEach((po: any) => {
-        // Only seed if not already edited by user
-        if (!next[po.id] && po.payroll && po.payrollStatus === "processed") {
+        // Fix 3: Seed for ANY saved payroll record (not just 'processed') so
+        // values saved with other statuses are also shown on re-load.
+        // Fix 2: Correctly map every field from the DB record instead of
+        // hardcoding deposit/reimbursment/remarks to 0/"".
+        //   DB column mapping:
+        //     po.payroll.deposit    → deposit
+        //     po.payroll.allowances → reimbursment (UI calls it reimbursment)
+        //     po.payroll.remark     → remarks      (DB field is singular)
+        if (!next[po.id] && po.payroll) {
           const totalNoDays = 30;
           const attendedDays = po.payroll.attendedDays ?? 30;
           const absent = totalNoDays - attendedDays;
           next[po.id] = {
             absent,
-            deposit: 0,
-            deductions: po.payroll.deductions ?? 0,
-            reimbursment: 0,
-            remarks: "",
+            deposit: parseFloat(String(po.payroll.deposit ?? 0)),
+            deductions: parseFloat(String(po.payroll.deductions ?? 0)),
+            reimbursment: parseFloat(String(po.payroll.allowances ?? 0)),
+            remarks: po.payroll.remark ?? "",
           };
         }
       });
