@@ -78,6 +78,7 @@ export const leads = pgTable("leads", {
   isAppActive: boolean("is_app_active").default(false),
   isEnrolled: boolean("is_enrolled").default(false), // Enrollment status flag
   metaLeadId: text("meta_lead_id"), // Meta Lead ID for CAPI tracking
+  dateOfBirth: date("date_of_birth"), // Student date of birth for birthday notifications
 });
 
 export const followUps = pgTable("follow_ups", {
@@ -563,6 +564,8 @@ export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, creat
       .email({ message: "Please enter a valid email address" })
       .optional()
       .or(z.literal("")),
+    dateOfBirth: z.string()
+      .min(1, { message: "Date of Birth is required" }),
   });
 
 // Extended schema for client-side validation (Add/Edit forms)

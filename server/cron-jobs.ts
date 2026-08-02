@@ -4,7 +4,7 @@ import logger from './config/logger.js';
 import { db } from './db.js';
 import * as schema from '../shared/schema.js';
 import { eq, and } from 'drizzle-orm';
-import { checkPaymentDuesAndNotify } from './cron-utils.js';
+import { checkPaymentDuesAndNotify, checkBirthdaysAndNotify } from './cron-utils.js';
 
 /**
  * Cron Jobs
@@ -90,7 +90,21 @@ export function initializeCronJobs() {
         timezone: "Asia/Kolkata"
     });
 
-    // 3. Automated Payment Backup Cron
+    // 3. Birthday Notification Cron
+    // Run daily at 8:00 AM IST — notifies teacher + principals + directors on web & mobile
+    cron.schedule('0 8 * * *', async () => {
+        try {
+            logger.info('[CRON] Running daily birthday checks...');
+            const count = await checkBirthdaysAndNotify(db, schema, storage, logger);
+            logger.info(`[CRON] Sent ${count} birthday notification(s)`);
+        } catch (error) {
+            logger.error('[CRON] Error checking birthdays:', error);
+        }
+    }, {
+        timezone: "Asia/Kolkata"
+    });
+
+
     // Run daily at 2:00 AM IST to backup all financial records
     cron.schedule('0 2 * * *', async () => {
         try {

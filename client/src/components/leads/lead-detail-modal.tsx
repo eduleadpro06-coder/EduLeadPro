@@ -116,6 +116,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
       motherLastName: "",
       motherPhone: "",
       address: "",
+      dateOfBirth: "",
       lastContactedAt: undefined, // Add default value
     },
   });
@@ -140,6 +141,7 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
         motherLastName: lead.motherLastName || "",
         motherPhone: lead.motherPhone || "",
         address: lead.address || "",
+        dateOfBirth: lead.dateOfBirth || "",
         lastContactedAt: lead.lastContactedAt ? new Date(lead.lastContactedAt) : undefined, // Map to Date object or keep undefined
       });
     }
@@ -704,6 +706,26 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                             )}
                           />
 
+                          {/* Date of Birth */}
+                          <FormField
+                            control={form.control}
+                            name="dateOfBirth"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Date of Birth *</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="date"
+                                    {...field}
+                                    value={field.value ?? ""}
+                                    max={new Date().toISOString().split("T")[0]}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
                           {/* Address */}
                           <FormField
                             control={form.control}
@@ -959,12 +981,33 @@ export default function LeadDetailModal({ lead, open, onOpenChange, onLeadDelete
                           </div>
                         </div>
                         <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                          <div className="flex items-center gap-2">
+                            <Calendar size={16} className="text-gray-500" />
+                            {lead.dateOfBirth ? (
+                              <span>
+                                {new Date(lead.dateOfBirth + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                {(() => {
+                                  const today = new Date();
+                                  const dob = new Date(lead.dateOfBirth + 'T00:00:00');
+                                  return today.getDate() === dob.getDate() && today.getMonth() === dob.getMonth()
+                                    ? <span className="ml-2 text-pink-500 font-semibold">🎂 Birthday Today!</span>
+                                    : null;
+                                })()}
+                              </span>
+                            ) : (
+                              <span>Not provided</span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
                           <div className="flex items-center gap-2">
                             <MapPin size={16} className="text-gray-500" />
                             <span>{lead.address || "Not provided"}</span>
                           </div>
                         </div>
+
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Last Contact</label>
                           <div className="flex items-center gap-2">

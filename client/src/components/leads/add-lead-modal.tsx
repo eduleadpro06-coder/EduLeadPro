@@ -43,6 +43,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
       motherPhone: "",
       phone: "", // Keep for backward compatibility
       address: "",
+      dateOfBirth: "",
     },
   });
 
@@ -369,6 +370,26 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
               )}
             />
 
+            {/* Date of Birth */}
+            <FormField
+              control={form.control}
+              name="dateOfBirth"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date of Birth *</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="date"
+                      {...field}
+                      value={field.value ?? ""}
+                      max={new Date().toISOString().split("T")[0]}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className={`grid ${showStream ? "grid-cols-2" : "grid-cols-1"} gap-4`}>
               <FormField
                 control={form.control}
@@ -422,6 +443,7 @@ export default function AddLeadModal({ open, onOpenChange }: AddLeadModalProps) 
                 />
               )}
             </div>
+
 
             <div className="grid grid-cols-2 gap-4">
               <FormField

@@ -94,13 +94,17 @@ export default function TeacherNotificationsScreen() {
                                 {/* Left Side Icon / Logo */}
                                 <View style={[
                                     styles.iconContainer,
-                                    { backgroundColor: notif.notification_type === 'salary' ? '#E6F4EA' : '#F0F4F9' }
+                                    { backgroundColor: notif.notification_type === 'salary' ? '#E6F4EA' : notif.notification_type === 'birthday' ? '#FFF0F5' : '#F0F4F9' }
                                 ]}>
-                                    <Ionicons 
-                                        name={notif.notification_type === 'salary' ? "cash" : "notifications"} 
-                                        size={24} 
-                                        color={notif.notification_type === 'salary' ? '#137333' : '#1A73E8'} 
-                                    />
+                                    {notif.notification_type === 'birthday' ? (
+                                        <Text style={{ fontSize: 24 }}>🎂</Text>
+                                    ) : (
+                                        <Ionicons 
+                                            name={notif.notification_type === 'salary' ? "cash" : "notifications"} 
+                                            size={24} 
+                                            color={notif.notification_type === 'salary' ? '#137333' : '#1A73E8'} 
+                                        />
+                                    )}
                                 </View>
 
                                 {/* Right Side Content */}
@@ -108,13 +112,13 @@ export default function TeacherNotificationsScreen() {
                                     <View style={styles.cardHeaderRow}>
                                         <View style={[
                                             styles.priorityBadge,
-                                            { backgroundColor: notif.notification_type === 'salary' ? '#E6F4EA' : '#F0F4F9' }
+                                            { backgroundColor: notif.notification_type === 'salary' ? '#E6F4EA' : notif.notification_type === 'birthday' ? '#FFF0F5' : '#F0F4F9' }
                                         ]}>
                                             <Text style={[
                                                 styles.priorityText,
-                                                { color: notif.notification_type === 'salary' ? '#137333' : '#1A73E8' }
+                                                { color: notif.notification_type === 'salary' ? '#137333' : notif.notification_type === 'birthday' ? '#D4004D' : '#1A73E8' }
                                             ]}>
-                                                {notif.notification_type === 'salary' ? 'SALARY' : 'UPDATE'}
+                                                {notif.notification_type === 'salary' ? 'SALARY' : notif.notification_type === 'birthday' ? 'BIRTHDAY' : 'UPDATE'}
                                             </Text>
                                         </View>
                                         <Text style={styles.dateText}>
@@ -126,6 +130,7 @@ export default function TeacherNotificationsScreen() {
                                 </View>
                             </View>
                         </PremiumCard>
+
                     ))
                 )}
                 <View style={{ height: 40 }} />
