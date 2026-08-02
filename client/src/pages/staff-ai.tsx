@@ -310,7 +310,13 @@ export default function StaffAI() {
   const displayStaff: Staff[] = (staff as Staff[]).filter(member => member.role !== 'Driver');
   // Note: Attendance endpoint not available - using empty array
   const attendance: Attendance[] = [];
-  const { data: payroll = [] } = useQuery<any, any, any>({ queryKey: ["/api/payroll"] });
+  const { data: payroll = [] } = useQuery<any, any, any>({
+    queryKey: ["/api/payroll"],
+    // Fix: Always re-fetch on mount so a different device always gets the
+    // latest saved values from the database, not a stale in-memory cache.
+    staleTime: 0,
+    refetchOnMount: true,
+  });
 
   // Save payroll state to localStorage whenever it changes
   useEffect(() => {
@@ -335,17 +341,10 @@ export default function StaffAI() {
 
     const initializeData = () => {
       console.log(`Synchronizing payroll data for ${selectedMonth}/${selectedYear}`);
-      
-      // 1. Load from localStorage (recent unsaved changes on this device)
-      const storageKey = 'editablePayrollData_' + selectedMonth + '_' + selectedYear;
-      const saved = localStorage.getItem(storageKey);
-      let localData = saved ? JSON.parse(saved) : {};
 
-      const inputKey = 'manualPayrollInputs_' + selectedMonth + '_' + selectedYear;
-      const savedInputs = localStorage.getItem(inputKey);
-      let localInputs = savedInputs ? JSON.parse(savedInputs) : {};
-
-      // 2. Load from Database (source of truth for drafts/processed)
+      // 1. Load from Database — DB is ALWAYS the source of truth.
+      //    A different device will never have the same localStorage, so DB
+      //    data must take priority over any locally cached draft.
       const dbRecords = (payroll as Payroll[]).filter(
         p => p.month === selectedMonth && p.year === selectedYear
       );
@@ -363,24 +362,45 @@ export default function StaffAI() {
             overtime: Number(record.overtime) || 0,
             netSalary: Number(record.netSalary),
             deposit: Number(record.deposit) || 0,
-            reimbursment: 0,
+            // Fix: reimbursment maps to allowances in the DB (not always 0).
+            reimbursment: Number(record.allowances) || 0,
             remark: record.remark || ''
           };
         });
       }
 
-      // 3. Merge & Default Seeding
-      const finalizedData: any = { ...localData };
+      // 2. Load from localStorage — only used as a short-term draft on THIS
+      //    device for unsaved in-progress edits. Never overrides a DB record.
+      const storageKey = 'editablePayrollData_' + selectedMonth + '_' + selectedYear;
+      const saved = localStorage.getItem(storageKey);
+      const localData = saved ? JSON.parse(saved) : {};
+
+      const inputKey = 'manualPayrollInputs_' + selectedMonth + '_' + selectedYear;
+      const savedInputs = localStorage.getItem(inputKey);
+      const localInputs = savedInputs ? JSON.parse(savedInputs) : {};
+
+      // 3. Merge: DB takes full priority on fresh mounts and month switches.
+      //    localStorage draft only applies when on the SAME device & same
+      //    month/year (i.e. the user is mid-edit and hasn't saved yet).
+      const isSameMonthYear = selectedMonth === prevMonth && selectedYear === prevYear;
+      const finalizedData: any = {};
       const finalizedInputs: any = { ...localInputs };
 
       (staff as Staff[]).forEach(member => {
-        // DB takes precedence if it exists and local is empty or we just switched
-        if (dbData[member.id] && (!finalizedData[member.id] || selectedMonth !== prevMonth || selectedYear !== prevYear)) {
-          finalizedData[member.id] = dbData[member.id];
-        }
-
-        // Final fallback to defaults
-        if (!finalizedData[member.id]) {
+        if (dbData[member.id]) {
+          // DB record exists: use it as the base.
+          // On same device & same month, allow a localStorage draft to
+          // overlay ONLY if the user has unsaved edits (localData has entry).
+          if (isSameMonthYear && localData[member.id]) {
+            finalizedData[member.id] = { ...dbData[member.id], ...localData[member.id] };
+          } else {
+            finalizedData[member.id] = dbData[member.id];
+          }
+        } else if (isSameMonthYear && localData[member.id]) {
+          // No DB record yet, but this device has an unsaved draft.
+          finalizedData[member.id] = localData[member.id];
+        } else {
+          // Final fallback to defaults.
           finalizedData[member.id] = {
             attendedDays: 30,
             basicSalary: member.salary,
@@ -511,13 +531,14 @@ export default function StaffAI() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
       fetchPayrollOverview();
-      // Clear localStorage after successful generation
+      // Clear localStorage draft — data is now safely stored in DB.
+      // Do NOT clear editablePayrollData state: the query invalidation above
+      // will trigger a re-fetch and the useEffect will repopulate from DB,
+      // keeping the values visible in the UI.
       const key1 = 'editablePayrollData_' + selectedMonth + '_' + selectedYear;
       const key2 = 'manualPayrollInputs_' + selectedMonth + '_' + selectedYear;
       localStorage.removeItem(key1);
       localStorage.removeItem(key2);
-      setEditablePayrollData({});
-      setManualPayrollInputs({});
       toast({
         title: "Payroll Generated Successfully",
         description: "Payroll for " + selectedMonth + "/" + selectedYear + " has been generated and saved.",
@@ -542,13 +563,14 @@ export default function StaffAI() {
       queryClient.invalidateQueries({ queryKey: ["/api/payroll"] });
       fetchPayrollOverview();
       setBulkPayrollOpen(false);
-      // Clear localStorage after successful generation
+      // Clear localStorage draft — data is now safely stored in DB.
+      // Do NOT clear editablePayrollData state: the query invalidation above
+      // will trigger a re-fetch and the useEffect will repopulate from DB,
+      // keeping the values visible in the UI.
       const key1 = 'editablePayrollData_' + selectedMonth + '_' + selectedYear;
       const key2 = 'manualPayrollInputs_' + selectedMonth + '_' + selectedYear;
       localStorage.removeItem(key1);
       localStorage.removeItem(key2);
-      setEditablePayrollData({});
-      setManualPayrollInputs({});
       toast({
         title: "Bulk Payroll Generated",
         description: "Payroll has been generated for all selected staff members",
