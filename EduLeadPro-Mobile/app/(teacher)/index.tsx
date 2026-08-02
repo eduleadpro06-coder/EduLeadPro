@@ -238,7 +238,7 @@ export default function TeacherHomeScreen() {
                             }} 
                             activeOpacity={0.7}
                         >
-                            <Ionicons name="bell-outline" size={22} color="#fff" />
+                            <Ionicons name="notifications-outline" size={22} color="#fff" />
                             {hasUnread && <View style={styles.badgeFixed} />}
                         </TouchableOpacity>
                         <View style={styles.avatarContainerFixed}>
