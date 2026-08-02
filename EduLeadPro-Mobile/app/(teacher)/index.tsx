@@ -22,6 +22,7 @@ import { api } from '../../services/api';
 import { useAuthStore } from '../../src/store/authStore';
 import { colors, spacing, shadows } from '../../src/theme';
 import PremiumDrawer from '../../src/components/ui/PremiumDrawer';
+import teacherAPI from '../../src/services/api/teacher.api';
 import PremiumCard from '../../src/components/ui/PremiumCard';
 
 export default function TeacherHomeScreen() {
@@ -31,9 +32,20 @@ export default function TeacherHomeScreen() {
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [dashboardData, setDashboardData] = useState<any>(null);
+    const [hasUnread, setHasUnread] = useState(false);
 
     // Determine if this is an admin-type role
     const isAdmin = ['counselor', 'staff', 'director', 'admin', 'principal'].includes(user?.role || '');
+
+    const checkUnreadNotifications = async () => {
+        try {
+            const data = await teacherAPI.getNotifications();
+            const unread = data.some((n: any) => !n.read_at);
+            setHasUnread(unread);
+        } catch (e) {
+            console.error('Error checking unread notifications:', e);
+        }
+    };
 
     const loadDashboard = async () => {
         setLoading(true);
@@ -54,11 +66,12 @@ export default function TeacherHomeScreen() {
 
     useEffect(() => {
         loadDashboard();
+        checkUnreadNotifications();
     }, []);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await loadDashboard();
+        await Promise.all([loadDashboard(), checkUnreadNotifications()]);
         setRefreshing(false);
     };
 
@@ -219,10 +232,14 @@ export default function TeacherHomeScreen() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                         <TouchableOpacity 
                             style={styles.menuBtnFixed} 
-                            onPress={() => router.push('/(teacher)/notifications')} 
+                            onPress={() => {
+                                setHasUnread(false);
+                                router.push('/(teacher)/notifications');
+                            }} 
                             activeOpacity={0.7}
                         >
                             <Ionicons name="bell-outline" size={22} color="#fff" />
+                            {hasUnread && <View style={styles.badgeFixed} />}
                         </TouchableOpacity>
                         <View style={styles.avatarContainerFixed}>
                             <Text style={styles.avatarTextFixed}>{(user as any)?.name?.charAt(0) || 'T'}</Text>
@@ -446,4 +463,15 @@ const styles = StyleSheet.create({
     },
     activityTitle: { fontSize: 14, fontFamily: 'Lexend_Medium', color: colors.textPrimary },
     activityTime: { fontSize: 11, fontFamily: 'Lexend_Regular', color: colors.textSecondary },
+    badgeFixed: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#EF4444',
+        borderWidth: 1.5,
+        borderColor: colors.primary,
+    },
 });

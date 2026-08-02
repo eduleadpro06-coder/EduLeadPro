@@ -12,7 +12,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
-import { colors, spacing, typography, shadows } from '../../src/theme';
+import { colors, spacing, shadows } from '../../src/theme';
 import PremiumCard from '../../src/components/ui/PremiumCard';
 import teacherAPI from '../../src/services/api/teacher.api';
 
@@ -28,6 +28,11 @@ export default function TeacherNotificationsScreen() {
         try {
             const data = await teacherAPI.getNotifications();
             setNotifications(data);
+
+            // Mark notifications as read
+            if (data.some((n: any) => !n.read_at)) {
+                await teacherAPI.markNotificationsAsRead();
+            }
         } catch (error) {
             console.error('Fetch teacher notifications error:', error);
         } finally {
@@ -85,28 +90,41 @@ export default function TeacherNotificationsScreen() {
                 ) : (
                     notifications.map((notif) => (
                         <PremiumCard key={notif.id} style={styles.noticeCard}>
-                            <View style={styles.noticeHeader}>
+                            <View style={styles.cardRow}>
+                                {/* Left Side Icon / Logo */}
                                 <View style={[
-                                    styles.priorityBadge,
-                                    { backgroundColor: notif.notification_type === 'salary' ? colors.success + '20' : colors.primary + '20' }
+                                    styles.iconContainer,
+                                    { backgroundColor: notif.notification_type === 'salary' ? '#E6F4EA' : '#F0F4F9' }
                                 ]}>
-                                    <View style={[
-                                        styles.priorityDot,
-                                        { backgroundColor: notif.notification_type === 'salary' ? colors.success : colors.primary }
-                                    ]} />
-                                    <Text style={[
-                                        styles.priorityText,
-                                        { color: notif.notification_type === 'salary' ? colors.success : colors.primary }
-                                    ]}>
-                                        {notif.notification_type ? notif.notification_type.toUpperCase() : 'NOTIFICATION'}
-                                    </Text>
+                                    <Ionicons 
+                                        name={notif.notification_type === 'salary' ? "cash" : "notifications"} 
+                                        size={24} 
+                                        color={notif.notification_type === 'salary' ? '#137333' : '#1A73E8'} 
+                                    />
                                 </View>
-                                <Text style={styles.dateText}>
-                                    {new Date(notif.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </Text>
+
+                                {/* Right Side Content */}
+                                <View style={styles.cardContent}>
+                                    <View style={styles.cardHeaderRow}>
+                                        <View style={[
+                                            styles.priorityBadge,
+                                            { backgroundColor: notif.notification_type === 'salary' ? '#E6F4EA' : '#F0F4F9' }
+                                        ]}>
+                                            <Text style={[
+                                                styles.priorityText,
+                                                { color: notif.notification_type === 'salary' ? '#137333' : '#1A73E8' }
+                                            ]}>
+                                                {notif.notification_type === 'salary' ? 'SALARY' : 'UPDATE'}
+                                            </Text>
+                                        </View>
+                                        <Text style={styles.dateText}>
+                                            {new Date(notif.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.noticeTitle}>{notif.title}</Text>
+                                    <Text style={styles.noticeContent}>{notif.body}</Text>
+                                </View>
                             </View>
-                            <Text style={styles.noticeTitle}>{notif.title}</Text>
-                            <Text style={styles.noticeContent}>{notif.body}</Text>
                         </PremiumCard>
                     ))
                 )}
@@ -188,27 +206,36 @@ const styles = StyleSheet.create({
     },
     noticeCard: {
         marginBottom: spacing.md,
-        padding: spacing.lg,
+        padding: spacing.md,
         borderRadius: 16,
+        ...shadows.sm,
     },
-    noticeHeader: {
+    cardRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+    },
+    iconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4,
+    },
+    cardContent: {
+        flex: 1,
+    },
+    cardHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.md,
+        marginBottom: 6,
     },
     priorityBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingVertical: 4,
-        borderRadius: 12,
-        gap: 6,
-    },
-    priorityDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
     },
     priorityText: {
         fontSize: 10,
@@ -221,15 +248,15 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
     },
     noticeTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontFamily: 'Outfit_Bold',
         color: '#1F2937',
-        marginBottom: 8,
+        marginBottom: 4,
     },
     noticeContent: {
-        fontSize: 14,
+        fontSize: 13,
         fontFamily: 'Inter_Regular',
         color: '#4B5563',
-        lineHeight: 20,
+        lineHeight: 18,
     },
 });

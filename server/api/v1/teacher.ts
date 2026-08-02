@@ -161,39 +161,54 @@ router.get('/students', async (req: Request, res: Response) => {
 
         const { supabase } = await import('../../supabase.js');
 
-        // First check if this teacher has any assignments
-        const { data: assignments, error: assignmentError } = await supabase
-            .from('teacher_student_assignments')
-            .select('student_lead_id')
-            .eq('teacher_staff_id', staffId)
-            .eq('organization_id', organizationId);
-
-        if (assignmentError) {
-            console.error('[Teacher API] Error checking assignments:', assignmentError);
-        }
+        const userRole = req.user!.role || '';
+        const isAdminRole = ['principal', 'director', 'admin'].includes(userRole.toLowerCase());
 
         let query;
+        let isFiltered = false;
 
-        if (assignments && assignments.length > 0) {
-            // Teacher has assignments - only show assigned students
-            const assignedStudentIds = assignments.map(a => a.student_lead_id);
-
+        if (isAdminRole) {
+            // Admin-type roles can see all students in the organization
             query = supabase
                 .from('leads')
                 .select('id, name, class, section')
                 .eq('organization_id', organizationId)
                 .eq('status', 'enrolled')
-                .in('id', assignedStudentIds)
                 .order('class', { ascending: true });
         } else {
-            // No assignments - return empty list (per user request: "teacher no student is assigned still teacher able to see all students")
-            return res.json({
-                success: true,
-                data: {
-                    students: [],
-                    filteredByAssignments: true
-                }
-            });
+            // First check if this teacher has any assignments
+            const { data: assignments, error: assignmentError } = await supabase
+                .from('teacher_student_assignments')
+                .select('student_lead_id')
+                .eq('teacher_staff_id', staffId)
+                .eq('organization_id', organizationId);
+
+            if (assignmentError) {
+                console.error('[Teacher API] Error checking assignments:', assignmentError);
+            }
+
+            if (assignments && assignments.length > 0) {
+                // Teacher has assignments - only show assigned students
+                const assignedStudentIds = assignments.map(a => a.student_lead_id);
+                isFiltered = true;
+
+                query = supabase
+                    .from('leads')
+                    .select('id, name, class, section')
+                    .eq('organization_id', organizationId)
+                    .eq('status', 'enrolled')
+                    .in('id', assignedStudentIds)
+                    .order('class', { ascending: true });
+            } else {
+                // No assignments - return empty list (per user request)
+                return res.json({
+                    success: true,
+                    data: {
+                        students: [],
+                        filteredByAssignments: true
+                    }
+                });
+            }
         }
 
         if (classFilter) {
@@ -208,7 +223,7 @@ router.get('/students', async (req: Request, res: Response) => {
             success: true,
             data: {
                 students: students || [],
-                filteredByAssignments: !!(assignments && assignments.length > 0)
+                filteredByAssignments: isFiltered
             }
         });
     } catch (error) {
@@ -487,7 +502,7 @@ router.get('/daily-updates', async (req: Request, res: Response) => {
             .from('daily_updates')
             .select(`
                 *,
-                student:leads!daily_updates_lead_id_fkey (
+                student:leads (
                     id, 
                     name, 
                     class, 
@@ -1083,6 +1098,59 @@ router.get('/notifications', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('[Mobile API] Get teacher notifications error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch notifications' });
+    }
+});
+
+/**
+ * POST /api/v1/mobile/teacher/notifications/read
+ * Mark all notifications as read for the logged in teacher
+ */
+router.post('/notifications/read', async (req: Request, res: Response) => {
+    try {
+        const staffId = req.user!.userId;
+        const { supabase } = await import('../../supabase.js');
+
+        // Look up user id associated with this staff's email or phone in users table
+        const { data: staffRecord } = await supabase
+            .from('staff')
+            .select('email, phone')
+            .eq('id', staffId)
+            .single();
+
+        let userId: number | null = null;
+        if (staffRecord?.email) {
+            const { data: userRecord } = await supabase
+                .from('users')
+                .select('id')
+                .eq('email', staffRecord.email.trim())
+                .single();
+            if (userRecord) userId = userRecord.id;
+        }
+
+        if (!userId && staffRecord?.phone) {
+            const { data: userRecord } = await supabase
+                .from('users')
+                .select('id')
+                .eq('username', staffRecord.phone)
+                .single();
+            if (userRecord) userId = userRecord.id;
+        }
+
+        if (userId) {
+            // Update read_at for all unread notifications of this user
+            const { error } = await supabase
+                .from('mobile_notifications')
+                .update({ read_at: new Date().toISOString() })
+                .eq('user_id', userId)
+                .is('read_at', null);
+
+            if (error) throw error;
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Mobile API] Mark notifications read error:', error);
+        res.status(500).json({ success: false, error: 'Failed to mark notifications as read' });
     }
 });
 

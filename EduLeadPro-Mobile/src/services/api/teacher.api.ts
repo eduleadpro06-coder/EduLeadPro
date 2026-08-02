@@ -268,6 +268,14 @@ export const teacherAPI = {
         const response = await apiClient.get('/teacher/notifications');
         return response.data || [];
     },
+
+    /**
+     * Mark all notifications as read for teacher
+     */
+    async markNotificationsAsRead(): Promise<any> {
+        const response = await apiClient.post('/teacher/notifications/read');
+        return response.data;
+    },
 };
 
 

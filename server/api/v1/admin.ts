@@ -179,7 +179,7 @@ router.get('/daily-updates', async (req: Request, res: Response) => {
             .from('daily_updates')
             .select(`
                 *,
-                student:leads!daily_updates_lead_id_fkey (
+                student:leads (
                     id, name, class, section
                 )
             `)
