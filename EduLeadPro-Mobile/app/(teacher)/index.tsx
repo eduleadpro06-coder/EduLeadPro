@@ -216,8 +216,17 @@ export default function TeacherHomeScreen() {
                             <Text style={styles.teacherNameTextFixed}>{(user as any)?.name || 'Teacher'}</Text>
                         </View>
                     </View>
-                    <View style={styles.avatarContainerFixed}>
-                        <Text style={styles.avatarTextFixed}>{(user as any)?.name?.charAt(0) || 'T'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <TouchableOpacity 
+                            style={styles.menuBtnFixed} 
+                            onPress={() => router.push('/(teacher)/notifications')} 
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="bell-outline" size={22} color="#fff" />
+                        </TouchableOpacity>
+                        <View style={styles.avatarContainerFixed}>
+                            <Text style={styles.avatarTextFixed}>{(user as any)?.name?.charAt(0) || 'T'}</Text>
+                        </View>
                     </View>
                 </View>
             </View>

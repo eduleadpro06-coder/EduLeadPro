@@ -45,6 +45,7 @@ export default function TeacherLayout() {
             <Stack.Screen name="post-update" />
             <Stack.Screen name="attendance-monitor" />
             <Stack.Screen name="approve-updates" />
+            <Stack.Screen name="notifications" options={{ presentation: 'modal', headerShown: true, title: 'Notifications' }} />
             <Stack.Screen name="menu" options={{ presentation: 'modal', headerShown: true, title: 'Menu' }} />
         </Stack>
     );

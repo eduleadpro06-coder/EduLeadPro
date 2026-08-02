@@ -654,10 +654,11 @@ router.get('/leaves/balance', async (req: Request, res: Response) => {
             if (type === 'CL') clUsed += 1;
         });
 
+        const clLimit = staff?.cl_limit ?? 10;
         res.json({
             success: true,
             data: {
-                cl: { limit: staff.cl_limit || 10, used: clUsed, balance: (staff.cl_limit || 10) - clUsed }
+                cl: { limit: clLimit, used: clUsed, balance: clLimit - clUsed }
             }
         });
     } catch (error) {
@@ -1021,6 +1022,67 @@ router.get('/templates', async (req: Request, res: Response) => {
                 message: 'Failed to fetch message templates'
             }
         });
+    }
+});
+
+/**
+ * GET /api/v1/mobile/teacher/notifications
+ * Fetch recent notifications for the logged in teacher/staff member
+ */
+router.get('/notifications', async (req: Request, res: Response) => {
+    try {
+        const staffId = req.user!.userId;
+        const organizationId = req.user!.organizationId;
+
+        const { supabase } = await import('../../supabase.js');
+
+        // Look up the staff record to get email/phone
+        const { data: staffRecord } = await supabase
+            .from('staff')
+            .select('email, phone')
+            .eq('id', staffId)
+            .single();
+
+        let userId: number | null = null;
+        if (staffRecord?.email) {
+            const { data: userRecord } = await supabase
+                .from('users')
+                .select('id')
+                .eq('email', staffRecord.email.trim())
+                .single();
+            if (userRecord) userId = userRecord.id;
+        }
+
+        if (!userId && staffRecord?.phone) {
+            const { data: userRecord } = await supabase
+                .from('users')
+                .select('id')
+                .eq('username', staffRecord.phone)
+                .single();
+            if (userRecord) userId = userRecord.id;
+        }
+
+        if (!userId) {
+            return res.json({ success: true, data: [] });
+        }
+
+        // Fetch notifications
+        const { data: notifications, error } = await supabase
+            .from('mobile_notifications')
+            .select('*')
+            .eq('user_id', userId)
+            .order('sent_at', { ascending: false })
+            .limit(20);
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            data: notifications || []
+        });
+    } catch (error) {
+        console.error('[Mobile API] Get teacher notifications error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch notifications' });
     }
 });
 

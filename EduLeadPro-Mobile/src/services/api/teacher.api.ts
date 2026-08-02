@@ -260,6 +260,14 @@ export const teacherAPI = {
         const response = await apiClient.get('/teacher/templates');
         return response.data || [];
     },
+
+    /**
+     * Get notifications for teacher
+     */
+    async getNotifications(): Promise<any[]> {
+        const response = await apiClient.get('/teacher/notifications');
+        return response.data || [];
+    },
 };
 
 
