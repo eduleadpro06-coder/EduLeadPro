@@ -633,6 +633,38 @@ export default function StaffAI() {
     }
   });
 
+  // Notify teacher via mobile app mutation
+  const notifySalaryMutation = useMutation({
+    mutationFn: async (notifyData: {
+      staffId: number;
+      netSalary: number;
+      month: number;
+      year: number;
+      staffName: string;
+      staffEmail: string;
+    }) => {
+      const response = await apiRequest("POST", "/api/payroll/notify-salary", notifyData);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      const msg = data.message || "Notification sent to teacher's mobile app successfully.";
+      toast({
+        title: "Notification Sent",
+        description: msg,
+      });
+      alert(msg);
+    },
+    onError: (error: any) => {
+      const errMsg = error.message || "Ensure the teacher has registered their mobile app account with the same email.";
+      toast({
+        title: "Failed to Send Notification",
+        description: errMsg,
+        variant: "destructive",
+      });
+      alert(`Error: ${errMsg}`);
+    }
+  });
+
   // PDF generation mutation
   const generateSalarySlipMutation = useMutation({
     mutationFn: async (payrollData: PayrollGeneration & { employeeName: string }) => {
@@ -2411,9 +2443,27 @@ export default function StaffAI() {
                                                     <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={e => { e.stopPropagation(); handleDownloadSalarySlip(member); }} disabled={payrollStatus !== 'processed'}>
                                                       Download
                                                     </Button>
-                                                    <Button size="sm" className="px-4 py-2 text-base rounded-md" onClick={() => setWhatsappModal({ open: true, staff: member, netSalary: payroll ? payroll.netSalary : 0 })}>
-                                                      Notify
-                                                    </Button>
+                                                    {(() => {
+                                                      const isNotifying = notifySalaryMutation.isPending && notifySalaryMutation.variables?.staffId === member.id;
+                                                      return (
+                                                        <Button
+                                                          size="sm"
+                                                          className="px-4 py-2 text-base rounded-md flex items-center gap-2"
+                                                          onClick={() => notifySalaryMutation.mutate({
+                                                            staffId: member.id,
+                                                            netSalary: payroll ? Number(payroll.netSalary) : 0,
+                                                            month: selectedMonth,
+                                                            year: selectedYear,
+                                                            staffName: member.name,
+                                                            staffEmail: member.email || '',
+                                                          })}
+                                                          disabled={notifySalaryMutation.isPending}
+                                                        >
+                                                          {isNotifying && <Loader2 className="h-4 w-4 animate-spin" />}
+                                                          Notify
+                                                        </Button>
+                                                      );
+                                                    })()}
                                                     <Button size="sm" variant="destructive" className="px-2 py-2 rounded-full text-white hover:bg-red-700 bg-red-600" title="Delete Payroll Record" onClick={() => {
                                                       if (payroll && confirm('Are you sure you want to delete this payroll record?')) {
                                                         deletePayrollMutation.mutate(payroll.id);

@@ -4312,6 +4312,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/payroll/notify-salary
+  // Sends an in-app notification to the teacher's mobile app when their salary is credited.
+  // Looks up the staff member's email in the users table to get their userId,
+  // then inserts a record in mobile_notifications which the teacher app polls.
+  app.post("/api/payroll/notify-salary", async (req, res) => {
+    try {
+      const { staffId, netSalary, month, year, staffName, staffEmail } = req.body;
+
+      if (!staffId || !netSalary || !month || !year) {
+        return res.status(400).json({ message: "staffId, netSalary, month, and year are required" });
+      }
+
+      // Month name for display
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const monthName = monthNames[(month - 1)] || `Month ${month}`;
+
+      // Find the user account linked to this staff email
+      // Staff logs into the teacher app with their email — same as users.email
+      let userId: number | null = null;
+      let emailToUse = staffEmail ? staffEmail.trim() : null;
+      let nameToUse = staffName || "Teacher";
+      let orgIdToUse = 1;
+      let phoneToUse = "";
+      let appPasswordToUse = "1234";
+
+      // Look up staff record first to get the correct details
+      const staffRecord = await storage.getStaff(Number(staffId));
+      if (staffRecord) {
+        if (!emailToUse && staffRecord.email) {
+          emailToUse = staffRecord.email.trim();
+        }
+        nameToUse = staffRecord.name;
+        orgIdToUse = staffRecord.organizationId || 1;
+        phoneToUse = staffRecord.phone;
+        appPasswordToUse = staffRecord.appPassword || "1234";
+      }
+
+      if (emailToUse) {
+        const user = await storage.getUserByEmail(emailToUse);
+        if (user) {
+          userId = user.id;
+        }
+      }
+
+      // If still not found by email, try looking up by phone (username)
+      if (!userId && phoneToUse) {
+        const user = await storage.getUserByUsername(phoneToUse);
+        if (user) {
+          userId = user.id;
+        }
+      }
+
+      // If user still does not exist, auto-create a user record so they can receive in-app notifications!
+      if (!userId) {
+        try {
+          console.log(`[Payroll Notify] Auto-creating user record for staff member ${nameToUse} (email: ${emailToUse || 'none'}, phone: ${phoneToUse})`);
+          const newUser = await storage.createUser({
+            username: emailToUse || phoneToUse || `staff_${staffId}`,
+            password: appPasswordToUse,
+            email: emailToUse || null,
+            name: nameToUse,
+            role: "teacher", // Default role for teacher app access
+            organizationId: orgIdToUse,
+          });
+          userId = newUser.id;
+        } catch (createErr) {
+          console.error("[Payroll Notify] Failed to auto-create user:", createErr);
+        }
+      }
+
+      if (!userId) {
+        return res.status(404).json({
+          message: `No teacher app account found for this staff member, and was unable to auto-create one.`,
+          staffId
+        });
+      }
+
+      // Insert into mobile_notifications — polled by the teacher mobile app
+      const { createClient } = await import("@supabase/supabase-js");
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) {
+        return res.status(500).json({ message: "Supabase configuration missing" });
+      }
+
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      const { error } = await supabase.from("mobile_notifications").insert({
+        user_id: userId,
+        title: "Salary Credited 💰",
+        body: `Your salary of ₹${Number(netSalary).toLocaleString("en-IN")} for ${monthName} ${year} has been credited to your account.`,
+        notification_type: "salary",
+        sent_at: new Date().toISOString(),
+        read_at: null,
+      });
+
+      if (error) {
+        console.error("[Payroll Notify] Supabase insert error:", error);
+        return res.status(500).json({ message: "Failed to send notification", error: error.message });
+      }
+
+      console.log(`[Payroll Notify] In-app notification sent to userId=${userId} (staff: ${staffName || staffId}) for ${monthName} ${year}`);
+      res.json({ success: true, message: `Notification sent to ${staffName || "teacher"}'s mobile app` });
+    } catch (error) {
+      console.error("[Payroll Notify] Error:", error);
+      res.status(500).json({ message: "Failed to send salary notification" });
+    }
+  });
+
   // DELETE endpoint for payroll records
   app.delete("/api/payroll/:id", async (req, res) => {
     try {
