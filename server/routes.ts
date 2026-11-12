@@ -2933,6 +2933,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid status. Must be: active, completed, or cancelled" });
       }
 
+      // If attempting to mark as completed, ensure there is no unpaid balance or pending installments
+      if (status === 'completed') {
+        const schedule = await storage.getEmiPlanSchedule(planId);
+        const hasUnpaid = schedule.some((s: any) => s.status !== 'paid');
+        if (hasUnpaid) {
+          return res.status(400).json({ message: "Cannot mark plan as completed while installments are still pending." });
+        }
+      }
+
+      // If numberOfInstallments is updated, validate that it is not less than already paid installments
+      if (numberOfInstallments) {
+        const schedule = await storage.getEmiPlanSchedule(planId);
+        const paidCount = schedule.filter((s: any) => s.status === 'paid').length;
+        const requestedCount = parseInt(numberOfInstallments);
+        if (requestedCount < paidCount) {
+          return res.status(400).json({
+            message: `Number of EMIs cannot be less than already paid installments (${paidCount}).`
+          });
+        }
+      }
+
       // Update the plan
       const updates: any = {};
       if (status) updates.status = status;
@@ -3015,7 +3036,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let message = "Payment recorded successfully.";
       if (result.shortfall > 0) {
-        message = `Payment recorded. ₹${result.shortfall.toFixed(2)} shortfall carried over.`;
+        if (result.createdNewInstallment) {
+          message = `Payment recorded. ₹${result.shortfall.toFixed(2)} shortfall carried over to new installment #${result.nextScheduleItem?.installmentNumber}. Total installments increased to ${result.newTotalInstallments}.`;
+        } else {
+          message = `Payment recorded. ₹${result.shortfall.toFixed(2)} shortfall carried over.`;
+        }
       } else if (result.shortfall < 0) {
         message = `Payment recorded. ₹${Math.abs(result.shortfall).toFixed(2)} excess deducted from next EMI.`;
       }
@@ -3028,6 +3053,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Partial EMI payment error:", error);
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to record payment" });
+    }
+  });
+
+  // POST: Sync and heal an EMI plan (recalculates count, carries over shortfall, reconciles status)
+  app.post("/api/emi-plans/:id/sync", async (req, res) => {
+    try {
+      const planId = parseInt(req.params.id);
+      if (isNaN(planId)) return res.status(400).json({ message: "Invalid plan ID" });
+
+      const healedPlan = await storage.syncAndHealEmiPlan(planId);
+      if (!healedPlan) return res.status(404).json({ message: "EMI plan not found" });
+
+      res.json({ success: true, data: healedPlan, message: "EMI plan synchronized successfully" });
+    } catch (error) {
+      console.error("EMI plan sync error:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to sync EMI plan" });
     }
   });
 
@@ -3459,6 +3500,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Student not found" });
       }
 
+      // Invalidate dashboard cache
+      const organizationId = await getOrganizationId(req);
+      if (organizationId) {
+        cacheService.delete(cacheService.dashboardKey(organizationId));
+      }
+
       console.log("Returning student data:", student);
       res.json(student);
     } catch (error) {
@@ -3501,6 +3548,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const student = await storage.updateStudent(parseInt(id), updates);
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
+      }
+
+      // Invalidate dashboard cache
+      const organizationId = await getOrganizationId(req);
+      if (organizationId) {
+        cacheService.delete(cacheService.dashboardKey(organizationId));
       }
 
       console.log("Returning student data:", student);
@@ -6045,9 +6098,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId
       });
       res.status(201).json(transaction);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create transaction:", error);
-      res.status(500).json({ message: "Failed to create transaction" });
+      res.status(500).json({ message: error?.message || "Failed to create transaction" });
     }
   });
 

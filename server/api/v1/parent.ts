@@ -904,5 +904,98 @@ router.post('/proxy/directions', async (req: Request, res: Response) => {
     }
 });
 
+
+// =====================================================
+// STUDENT LEAVES - Parent-applied leave for children
+// =====================================================
+
+/**
+ * GET /api/v1/mobile/parent/child/:childId/leaves
+ * Get leave history for a specific child
+ */
+router.get('/child/:childId/leaves', async (req: Request, res: Response) => {
+    try {
+        const childId = parseInt(req.params.childId);
+        const organizationId = req.user!.organizationId;
+
+        if (isNaN(childId)) {
+            return res.status(400).json({ success: false, error: { code: 'INVALID_CHILD_ID', message: 'Invalid child ID' } });
+        }
+
+        // Verify child belongs to the parent's organization
+        const { supabase } = await import('../../supabase.js');
+        const { data: child } = await supabase
+            .from('leads')
+            .select('id, organization_id')
+            .eq('id', childId)
+            .eq('organization_id', organizationId)
+            .single();
+
+        if (!child) {
+            return res.status(404).json({ success: false, error: { code: 'CHILD_NOT_FOUND', message: 'Child not found' } });
+        }
+
+        const leaves = await storage.getStudentLeaves(organizationId, { studentId: childId });
+
+        res.json({
+            success: true,
+            data: { leaves }
+        });
+    } catch (error) {
+        console.error('[Mobile API] Get student leaves error:', error);
+        res.status(500).json({ success: false, error: { code: 'FETCH_LEAVES_ERROR', message: 'Failed to fetch leaves' } });
+    }
+});
+
+/**
+ * POST /api/v1/mobile/parent/child/:childId/leaves
+ * Apply a leave for a child
+ */
+router.post('/child/:childId/leaves', async (req: Request, res: Response) => {
+    try {
+        const childId = parseInt(req.params.childId);
+        const organizationId = req.user!.organizationId;
+        const { startDate, endDate, reason } = req.body;
+
+        if (isNaN(childId)) {
+            return res.status(400).json({ success: false, error: { code: 'INVALID_CHILD_ID', message: 'Invalid child ID' } });
+        }
+        if (!startDate || !endDate || !reason) {
+            return res.status(400).json({ success: false, error: { code: 'MISSING_FIELDS', message: 'startDate, endDate, and reason are required' } });
+        }
+
+        // Verify child belongs to the parent's organization
+        const { supabase } = await import('../../supabase.js');
+        const { data: child } = await supabase
+            .from('leads')
+            .select('id, organization_id')
+            .eq('id', childId)
+            .eq('organization_id', organizationId)
+            .single();
+
+        if (!child) {
+            return res.status(404).json({ success: false, error: { code: 'CHILD_NOT_FOUND', message: 'Child not found' } });
+        }
+
+        const leave = await storage.createStudentLeave({
+            studentId: childId,
+            organizationId,
+            startDate,
+            endDate,
+            reason,
+            status: 'pending'
+        });
+
+        res.status(201).json({
+            success: true,
+            data: { leave },
+            message: 'Leave application submitted successfully'
+        });
+    } catch (error) {
+        console.error('[Mobile API] Create student leave error:', error);
+        res.status(500).json({ success: false, error: { code: 'CREATE_LEAVE_ERROR', message: 'Failed to apply leave' } });
+    }
+});
+
 export default router;
 

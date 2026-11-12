@@ -276,6 +276,22 @@ export const teacherAPI = {
         const response = await apiClient.post('/teacher/notifications/read');
         return response.data;
     },
+
+    /**
+     * Get all student leave requests for the organization (teacher view)
+     */
+    async getStudentLeaves(status?: string): Promise<any[]> {
+        const url = status ? `/teacher/student-leaves?status=${status}` : '/teacher/student-leaves';
+        const response = await apiClient.get(url);
+        return response?.leaves ?? [];
+    },
+
+    /**
+     * Approve or reject a student leave request
+     */
+    async updateStudentLeaveStatus(leaveId: number, status: 'approved' | 'rejected', rejectionReason?: string): Promise<any> {
+        return await apiClient.patch(`/teacher/student-leaves/${leaveId}`, { status, rejectionReason });
+    },
 };
 
 

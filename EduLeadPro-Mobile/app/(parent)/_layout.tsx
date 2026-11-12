@@ -31,6 +31,7 @@ export default function ParentLayout() {
             <Stack.Screen name="activity-details" options={{ headerShown: false }} />
             <Stack.Screen name="notifications" options={{ headerShown: false }} />
             <Stack.Screen name="support" options={{ headerShown: false }} />
+            <Stack.Screen name="leaves" options={{ headerShown: false }} />
             <Stack.Screen name="menu" options={{ presentation: 'transparentModal', animation: 'fade' }} />
         </Stack>
     );

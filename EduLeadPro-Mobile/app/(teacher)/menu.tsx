@@ -22,11 +22,13 @@ export default function MenuScreen() {
         { icon: 'eye-outline', label: 'Attendance Monitor', route: '/(teacher)/attendance-monitor' },
         { icon: 'checkbox-outline', label: 'Approve Updates', route: '/(teacher)/approve-updates' },
         { icon: 'people-outline', label: 'All Students', route: '/(teacher)/my-students' },
+        { icon: 'calendar-outline', label: 'Student Leaves', route: '/(teacher)/student-leaves' },
     ] : [
         { icon: 'grid-outline', label: 'Dashboard', route: '/(teacher)' },
         { icon: 'calendar-outline', label: 'Mark Attendance', route: '/(teacher)/mark-attendance' },
         { icon: 'create-outline', label: 'Post Update', route: '/(teacher)/post-update' },
         { icon: 'people-outline', label: 'My Students', route: '/(teacher)/my-students' },
+        { icon: 'document-text-outline', label: 'Student Leaves', route: '/(teacher)/student-leaves' },
     ];
 
     return (

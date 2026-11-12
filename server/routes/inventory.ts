@@ -203,6 +203,7 @@ router.get("/transactions", async (req, res) => {
 
         const filters: any = {};
         if (req.query.itemId) filters.itemId = parseInt(req.query.itemId as string);
+        if (req.query.leadId) filters.leadId = parseInt(req.query.leadId as string);
         if (req.query.transactionType) filters.transactionType = req.query.transactionType;
         if (req.query.startDate) filters.startDate = new Date(req.query.startDate as string);
         if (req.query.endDate) filters.endDate = new Date(req.query.endDate as string);
@@ -217,15 +218,23 @@ router.get("/transactions", async (req, res) => {
 
 router.post("/transactions", async (req, res) => {
     try {
-        const userId = (req.user as any)?.id || (req.user as any)?.userId;
+        let userId = (req.user as any)?.id || (req.user as any)?.userId;
+        if (!userId) {
+            const username = req.headers['x-user-name'] as string || (req.session as any)?.username;
+            if (username) {
+                const user = await storage.getUserByUsername(username) || await storage.getUserByEmail(username);
+                userId = user?.id;
+            }
+        }
+
         const transaction = await storage.createInventoryTransaction({
             ...req.body,
             userId
         });
         res.json(transaction);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to create transaction:", error);
-        res.status(500).json({ message: "Failed to create transaction" });
+        res.status(500).json({ message: error?.message || "Failed to create transaction" });
     }
 });
 

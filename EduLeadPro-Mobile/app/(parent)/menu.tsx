@@ -25,6 +25,7 @@ export default function MenuScreen() {
         { icon: 'bus-outline', label: 'Bus Tracking', route: '/(parent)/bus-tracking' },
         { icon: 'wallet-outline', label: 'Pay Fees', route: '/(parent)/fees' },
         { icon: 'list-outline', label: 'School Activities', route: '/(parent)/activities' },
+        { icon: 'calendar-outline', label: 'Apply Leave', route: '/(parent)/leaves' },
         { icon: 'chatbubbles-outline', label: 'Chat with Teacher', route: '/(parent)/chat' },
     ];
 

@@ -41,7 +41,8 @@ import {
   Printer,
   GraduationCap,
   ListFilter,
-  BookOpenCheck
+  BookOpenCheck,
+  Package
 } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import { generateFeeReceipt, type FeeReceiptData } from "@/lib/receipt-generator";
@@ -235,20 +236,22 @@ function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, stat
 
   // Calculate paid count simply by counting schedule items with status = paid
   const paidCount = schedule?.filter((item: any) => item.status === 'paid').length || 0;
-  const progress = (paidCount / totalInstallments) * 100;
-  
+  const effectiveTotalInstallments = Math.max(totalInstallments || 0, schedule?.length || 0);
+  const progress = effectiveTotalInstallments > 0 ? (paidCount / effectiveTotalInstallments) * 100 : 0;
+
   // Find the next pending installment to show the dynamic amount
   const nextPending = schedule?.find((item: any) => item.status !== 'paid');
   const currentAmount = nextPending ? parseFloat(nextPending.amount) : parseFloat(installmentAmount || "0");
 
   useEffect(() => {
-    // Check if fully paid
-    const isFullyPaid = schedule && schedule.length > 0 && schedule.every((item: any) => item.status === 'paid');
-    
+    // Check if fully paid: all schedule items paid AND remaining balance <= 0
+    const totalSchedulePaid = schedule?.filter((item: any) => item.status === 'paid').reduce((sum: number, item: any) => sum + parseFloat(item.amount || '0'), 0) || 0;
+    const isFullyPaid = schedule && schedule.length > 0 && schedule.every((item: any) => item.status === 'paid') && (!totalAmount || (parseFloat(totalAmount) - totalSchedulePaid) <= 0.01);
+
     if (!isLoading && isFullyPaid && status !== 'completed') {
       updateStatusMutation.mutate();
     }
-  }, [isLoading, schedule, status, updateStatusMutation]);
+  }, [isLoading, schedule, status, totalAmount, updateStatusMutation]);
 
   if (isLoading) {
     return <div className="text-sm text-gray-500">Loading...</div>;
@@ -260,7 +263,7 @@ function EMIPaymentProgress({ planId, totalInstallments, installmentAmount, stat
         <span className="text-gray-500">EMI Amount:</span> {formatAmount(Math.round(currentAmount))}
       </div>
       <div className="text-sm">
-        <span className="text-gray-500">Progress:</span> {paidCount}/{totalInstallments} installments
+        <span className="text-gray-500">Progress:</span> {paidCount}/{effectiveTotalInstallments} installments
       </div>
       <div className="w-full bg-gray-200 rounded-full h-2">
         <div
@@ -345,7 +348,7 @@ export default function StudentFees() {
     registrationFee: '0',
     discount: '0',
     emiPeriod: '2',
-    installments: [] as { installmentNumber: number, amount: string, dueDate: string }[],
+    installments: [] as { installmentNumber: number, amount: string, dueDate: string, status?: string }[],
     recalculate: false,
     strategy: 'distribute' as 'distribute' | 'add_installments' | 'remove_installments',
     numNewInstallments: 1,
@@ -353,9 +356,83 @@ export default function StudentFees() {
     numInstallmentsToRemove: 1
   });
 
+  // Recomputes installments for Edit EMI Plan while strictly keeping paid installments intact
+  const recomputeEditInstallments = (
+    prevInstallments: any[],
+    targetCount: number,
+    totalAmount: number,
+    regFee: number,
+    discount: number
+  ) => {
+    const paidInstallments = prevInstallments.filter(i => i.status === 'paid');
+    const paidCount = paidInstallments.length;
+    const totalPaid = paidInstallments.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+    const payable = Math.max(0, totalAmount - regFee - discount);
+    const remainingPayable = Math.max(0, payable - totalPaid);
+
+    const effectiveCount = Math.max(targetCount, paidCount);
+    const unpaidCount = Math.max(0, effectiveCount - paidCount);
+
+    if (unpaidCount === 0) {
+      return [...paidInstallments];
+    }
+
+    const existingUnpaid = prevInstallments.filter(i => i.status !== 'paid');
+    const basePerInstallment = Math.floor(remainingPayable / unpaidCount);
+    const remainder = Math.round(remainingPayable - basePerInstallment * unpaidCount);
+
+    let lastDueDate = prevInstallments.length > 0 && prevInstallments[prevInstallments.length - 1]?.dueDate
+      ? new Date(prevInstallments[prevInstallments.length - 1].dueDate)
+      : new Date();
+
+    const newUnpaid = Array.from({ length: unpaidCount }, (_, j) => {
+      const instNum = paidCount + j + 1;
+      const isLastUnpaid = j === unpaidCount - 1;
+      const amount = isLastUnpaid ? Math.max(0, basePerInstallment + remainder).toString() : basePerInstallment.toString();
+
+      let dueDate = existingUnpaid[j]?.dueDate;
+      if (!dueDate) {
+        const d = new Date(lastDueDate);
+        d.setMonth(d.getMonth() + (j + 1));
+        dueDate = d.toISOString().split('T')[0];
+      }
+
+      return {
+        installmentNumber: instNum,
+        amount,
+        dueDate,
+        status: 'pending'
+      };
+    });
+
+    return [...paidInstallments, ...newUnpaid];
+  };
+
   const handleUpdateEmiPlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEmiPlanForEdit) return;
+
+    const paidCount = editEmiFormData.installments.filter(i => i.status === 'paid').length;
+    const requestedCount = parseInt(editEmiFormData.emiPeriod) || 0;
+    if (requestedCount < paidCount) {
+      toast({
+        title: "Validation Error",
+        description: `Number of EMIs cannot be less than already paid installments (${paidCount}). Selection reset to ${paidCount}.`,
+        variant: "destructive"
+      });
+      setEditEmiFormData(prev => ({
+        ...prev,
+        emiPeriod: String(paidCount),
+        installments: recomputeEditInstallments(
+          prev.installments,
+          paidCount,
+          parseFloat(prev.totalAmount) || 0,
+          parseFloat(prev.registrationFee) || 0,
+          parseFloat(prev.discount) || 0
+        )
+      }));
+      return;
+    }
 
     try {
       const payload: any = {
@@ -409,7 +486,7 @@ export default function StudentFees() {
       await queryClient.invalidateQueries({ queryKey: ["/api/fee-stats"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/emi-progress"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/pending-emis"] });
-      
+
       if (selectedStudent) {
         await queryClient.invalidateQueries({ queryKey: [`/api/emi-plans/${selectedEmiPlanForEdit.id}/schedule`] });
         await queryClient.invalidateQueries({ queryKey: [`/api/emi-plans/${selectedEmiPlanForEdit.id}/payments`] });
@@ -607,7 +684,7 @@ export default function StudentFees() {
       await queryClient.invalidateQueries({ queryKey: ["/api/fee-stats"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/emi-progress"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/pending-emis"] });
-      
+
       toast({
         title: "Success",
         description: "EMI plan deleted successfully",
@@ -743,7 +820,7 @@ export default function StudentFees() {
     // Handle deep linking from notification/URL
     const searchParams = new URLSearchParams(searchString);
     const studentId = searchParams.get('id');
-    
+
     if (studentId && students.length > 0) {
       const id = parseInt(studentId);
       const student = students.find(s => s.id === id);
@@ -779,7 +856,8 @@ export default function StudentFees() {
         } catch (e) { console.error("Error parsing auth", e); }
       }
 
-      const response = await fetch("/api/leads?status=enrolled", { headers });
+      const response = await fetch("/api/leads?status=enrolled,dropped,dropped_out,defaulter", { headers });
+      const response = await fetch("/api/leads?status=enrolled,defaulter", { headers });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data : [];
@@ -1096,11 +1174,14 @@ export default function StudentFees() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "enrolled": return "bg-green-100 text-green-800";
+      case "enrolled":
+      case "active": return "bg-green-100 text-green-800";
       case "interested": return "bg-yellow-100 text-yellow-800";
       case "contacted": return "bg-purple-100 text-purple-800";
       case "new": return "bg-blue-100 text-blue-800";
-      case "dropped": return "bg-red-100 text-red-800";
+      case "dropped":
+      case "dropped_out": return "bg-rose-100 text-rose-800";
+      case "defaulter": return "bg-amber-100 text-amber-800";
       default: return "bg-gray-100 text-gray-800";
     }
   };
@@ -1214,14 +1295,16 @@ export default function StudentFees() {
         })
         .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
-      const totalExpected = allStudents.reduce((sum, student) => {
-        const classFees = globalClassFees.filter(fee =>
-          fee.className === student.class &&
-          fee.academicYear === academicYear &&
-          fee.isActive
-        );
-        return sum + classFees.reduce((classSum, fee) => classSum + parseFloat(fee.amount), 0);
-      }, 0);
+      const totalExpected = allStudents
+        .filter(student => student.status !== 'dropped' && student.status !== 'dropped_out' && student.status !== 'defaulter')
+        .reduce((sum, student) => {
+          const classFees = globalClassFees.filter(fee =>
+            fee.className === student.class &&
+            fee.academicYear === academicYear &&
+            fee.isActive
+          );
+          return sum + classFees.reduce((classSum, fee) => classSum + parseFloat(fee.amount), 0);
+        }, 0);
 
       const collectionRate = totalExpected > 0 ? (totalCollected / totalExpected) * 100 : 0;
 
@@ -1391,10 +1474,14 @@ export default function StudentFees() {
       queryClient.invalidateQueries({ queryKey: [`/api/emi-plans/${selectedEmiPlan.id}/schedule`] });
 
       const shortfall = result.data?.shortfall || 0;
+      const createdNew = result.data?.createdNewInstallment;
+      const newTotal = result.data?.newTotalInstallments;
       toast({
         title: "Payment Recorded",
         description: shortfall > 0
-          ? `${formatAmount(actualAmount)} received. ${formatAmount(shortfall)} carried over to next EMI.`
+          ? createdNew
+            ? `${formatAmount(actualAmount)} received. ${formatAmount(shortfall)} carried over to new installment #${result.data?.nextScheduleItem?.installmentNumber} (total ${newTotal} installments).`
+            : `${formatAmount(actualAmount)} received. ${formatAmount(shortfall)} carried over to next EMI.`
           : shortfall < 0
             ? `${formatAmount(actualAmount)} received. ${formatAmount(Math.abs(shortfall))} excess deducted from next EMI.`
             : `${formatAmount(actualAmount)} recorded successfully.`
@@ -1578,6 +1665,14 @@ export default function StudentFees() {
         queryClient.invalidateQueries({ queryKey: [`/api/emi-progress/${selectedStudent.id}`] });
         queryClient.invalidateQueries({ queryKey: [`/api/pending-emis/${selectedStudent.id}`] });
       }
+      if (selectedEmiPlan) {
+        queryClient.invalidateQueries({ queryKey: ["/api/emi-plans", selectedEmiPlan.id, "pending-emis"] });
+        queryClient.invalidateQueries({ queryKey: [`/api/emi-plans/${selectedEmiPlan.id}/schedule`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/emi-plans/${selectedEmiPlan.id}/payment-progress`] });
+      }
+      refetchPendingEmis();
+      refetchEmiPlans();
+      refetchEmiProgress();
       toast({
         title: "Success",
         description: "Payment deleted successfully",
@@ -1593,7 +1688,65 @@ export default function StudentFees() {
   });
 
   // Add state for student details tab
-  const [studentDetailsTab, setStudentDetailsTab] = useState<'Overview' | 'Payments' | 'Mandates' | 'EMI'>('Overview');
+  const [studentDetailsTab, setStudentDetailsTab] = useState<'Overview' | 'Payments' | 'Mandates' | 'EMI' | 'Kit Assignment'>('Overview');
+
+  // Kit Assignment state
+  const [kitAssignModalOpen, setKitAssignModalOpen] = useState(false);
+  const [kitSelectedItemId, setKitSelectedItemId] = useState<string>('');
+  const [kitQty, setKitQty] = useState<number>(1);
+  const [kitNotes, setKitNotes] = useState<string>('');
+  const [kitAssigning, setKitAssigning] = useState(false);
+
+  const { data: inventoryItems = [] } = useQuery<any[]>({
+    queryKey: ['/api/inventory/items'],
+    select: (data: any) => data || [],
+  });
+
+  const { data: studentKitTransactions = [], refetch: refetchKitTransactions } = useQuery<any[]>({
+    queryKey: ['/api/inventory/transactions', selectedStudent?.id],
+    queryFn: async () => {
+      if (!selectedStudent?.id) return [];
+      const res = await apiRequest('GET', `/api/inventory/transactions?leadId=${selectedStudent.id}&transactionType=out`);
+      return res.json();
+    },
+    enabled: !!selectedStudent?.id && studentDetailsTab === 'Kit Assignment',
+  });
+
+  const handleAssignKit = async () => {
+    if (!kitSelectedItemId || !selectedStudent) return;
+    const item = inventoryItems.find((i: any) => i.id === parseInt(kitSelectedItemId));
+    if (!item) return;
+    if (kitQty < 1 || kitQty > (item.currentStock ?? 0)) {
+      toast({ title: 'Invalid Quantity', description: `Available stock: ${item.currentStock ?? 0}`, variant: 'destructive' });
+      return;
+    }
+    setKitAssigning(true);
+    try {
+      await apiRequest('POST', '/api/inventory/transactions', {
+        itemId: parseInt(kitSelectedItemId),
+        transactionType: 'out',
+        quantity: kitQty,
+        stockBefore: item.currentStock,
+        stockAfter: (item.currentStock ?? 0) - kitQty,
+        reason: 'student_distribution',
+        notes: kitNotes || `Kit assigned to ${selectedStudent.name}`,
+        leadId: selectedStudent.id,
+        transactionDate: new Date(),
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/items'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/transactions'] });
+      refetchKitTransactions();
+      setKitAssignModalOpen(false);
+      setKitSelectedItemId('');
+      setKitQty(1);
+      setKitNotes('');
+      toast({ title: 'Kit Assigned', description: `${item.name} assigned to ${selectedStudent.name}` });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message || 'Failed to assign kit', variant: 'destructive' });
+    } finally {
+      setKitAssigning(false);
+    }
+  };
 
   // Calculate filtered and paginated students for sidebar using allStudents
   const filteredStudents = allStudents.filter(student => {
@@ -1606,9 +1759,14 @@ export default function StudentFees() {
 
     // Payment Status Logic
     const matchesPaymentStatus = studentPaymentStatusFilter === 'all' || (() => {
-      const outstanding = calculateOutstanding(student);
-      if (studentPaymentStatusFilter === 'pending') return outstanding > 0;
-      if (studentPaymentStatusFilter === 'completed') return outstanding <= 0;
+      const isInactive = student.status === 'dropped_out' || student.status === 'dropped' || student.status === 'defaulter';
+      if (studentPaymentStatusFilter === 'dropped_out') return isInactive;
+      if (studentPaymentStatusFilter === 'pending') return !isInactive && calculateOutstanding(student) > 0;
+      if (studentPaymentStatusFilter === 'completed') return !isInactive && calculateOutstanding(student) <= 0;
+      const isDefaulter = student.status === 'defaulter';
+      if (studentPaymentStatusFilter === 'defaulter') return isDefaulter;
+      if (studentPaymentStatusFilter === 'pending') return !isDefaulter && calculateOutstanding(student) > 0;
+      if (studentPaymentStatusFilter === 'completed') return !isDefaulter && calculateOutstanding(student) <= 0;
       return true;
     })();
 
@@ -1720,6 +1878,46 @@ export default function StudentFees() {
       }
     }
   });
+
+  const handleStudentStatusChange = async (newStatus: string) => {
+    if (!selectedStudent) return;
+    try {
+      if (selectedStudent.type === 'enrolled_lead') {
+        await apiRequest("PATCH", `/api/leads/${selectedStudent.id}`, { status: newStatus });
+      } else {
+        await apiRequest("PUT", `/api/students/${selectedStudent.id}`, { status: newStatus });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fee-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics"] });
+      refetchLeads();
+
+      setSelectedStudent(prev => prev ? ({ ...prev, status: newStatus } as any) : null);
+
+      const statusLabels: Record<string, string> = {
+        enrolled: "Enrolled (Active)",
+        dropped_out: "Dropped Out",
+        defaulter: "Fee Defaulter",
+      };
+
+      toast({
+        title: "Status Updated",
+        description: `${selectedStudent.name} is now marked as ${statusLabels[newStatus] || newStatus}. Fee calculations updated.`,
+        title: newStatus === 'defaulter' ? "Marked as Fee Defaulter" : "Status Restored",
+        description: newStatus === 'defaulter'
+          ? `${selectedStudent.name} is marked as Fee Defaulter. Remaining unpaid fees are excluded from receivables.`
+          : `${selectedStudent.name} is restored to Enrolled (Active).`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to update status",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleDownloadInvoice = async () => {
     if (!selectedStudent) return;
@@ -1840,6 +2038,8 @@ export default function StudentFees() {
                 <SelectItem value="all">All Payment Statuses</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="dropped_out">Dropped Out / Defaulter</SelectItem>
+                <SelectItem value="defaulter">Fee Defaulters</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1865,1495 +2065,1763 @@ export default function StudentFees() {
           {/* Remove old search, class, status, and pagination controls from sidebar */}
           <div className="flex-1 overflow-y-auto border-t border-gray-200">
             <ul className="divide-y divide-gray-200">
-              {paginatedStudents.map((student) => (
-                <li
-                  key={`${student.type}-${student.id}`}
-                  className={`flex items-center gap-3 px-6 py-4 cursor-pointer transition rounded-xl ${selectedStudent?.id === student.id && selectedStudent?.type === student.type ? 'bg-purple-50 border border-[#643ae5]' : 'hover:bg-white'} text-gray-800`}
-                  onClick={() => setSelectedStudent(student as Student)}
-                >
-                  <div className="relative">
-                    <div className="h-10 w-10 rounded-full flex items-center justify-center bg-purple-100 text-gray-800 font-bold text-sm border-2 border-gray-200">
+              {paginatedStudents.map((student) => {
+                const isDefaulter = student.status === 'defaulter';
+                const isDropped = student.status === 'dropped_out' || student.status === 'dropped';
+                const isInactive = isDefaulter || isDropped;
+                return (
+                  <li
+                    key={`${student.type}-${student.id}`}
+                    className={`flex items-center gap-3 px-6 py-4 cursor-pointer transition rounded-xl ${selectedStudent?.id === student.id && selectedStudent?.type === student.type ? 'bg-purple-50 border border-[#643ae5]' : 'hover:bg-white'} ${isInactive ? 'bg-rose-50/20' : ''} text-gray-800`}
+                    className={`flex items-center gap-3 px-6 py-4 cursor-pointer transition rounded-xl ${selectedStudent?.id === student.id && selectedStudent?.type === student.type ? 'bg-purple-50 border border-[#643ae5]' : 'hover:bg-white'} ${isDefaulter ? 'bg-amber-50/30' : ''} text-gray-800`}
+                    onClick={() => setSelectedStudent(student as Student)}
+                  >
+                    <div className="relative">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm border-2 ${isDefaulter
+                          ? 'bg-amber-100 text-amber-800 border-amber-300'
+                          : isDropped
+                            ? 'bg-rose-100 text-rose-800 border-rose-300'
+                            : 'bg-purple-100 text-gray-800 border-gray-200'
+                          : 'bg-purple-100 text-gray-800 border-gray-200'
+                      }`}>
                       {student.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                     </div>
-                    <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-gray-200 ${((student as any).status === 'active' || (student as any).status === 'enrolled') ? 'bg-green-500' : 'bg-gray-500'}`}></span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-800 truncate mb-1">{student.name}</div>
-                    <div className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold border border-slate-200">
-                      {student.class || 'No Class'}
+                    <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${isDefaulter
+                        ? 'bg-amber-500'
+                        : isDropped
+                          ? 'bg-rose-500'
+                          : ((student as any).status === 'active' || (student as any).status === 'enrolled')
+                            ? 'bg-green-500'
+                            : 'bg-gray-400'
+                          : 'bg-green-500'
+                      }`}></span>
                     </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-          {/* Pagination Controls */}
-          {/* Pagination Controls */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-white rounded-b-2xl">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 px-4 text-xs font-medium text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700 rounded-lg transition-colors"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </Button>
-
-            <div className="flex items-center gap-2">
-              <Select
-                value={currentPage.toString()}
-                onValueChange={(value) => setCurrentPage(parseInt(value))}
-              >
-                <SelectTrigger className="h-9 w-[70px] border-gray-200 text-xs font-medium focus:ring-purple-500/20">
-                  <SelectValue placeholder={currentPage.toString()} />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: totalStudentPages }, (_, i) => i + 1).map((page) => (
-                    <SelectItem key={page} value={page.toString()} className="text-xs">
-                      {page}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
-                of {totalStudentPages}
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-gray-800 truncate mb-1">{student.name}</div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold border border-slate-200">
+                {student.class || 'No Class'}
               </span>
+              {isDefaulter && (
+                <span className="inline-block px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-semibold border border-amber-200">
+                  Defaulter
+                  <span className="inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-semibold border border-amber-300">
+                    Fee Defaulter
+                  </span>
+                        )}
+                  {isDropped && (
+                    <span className="inline-block px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-semibold border border-rose-200">
+                      Dropped Out
+                    </span>
+                  )}
+                </div>
+                    </div>
+          </li>
+          );
+              })}
+        </ul>
+      </div>
+      {/* Pagination Controls */}
+      {/* Pagination Controls */}
+      <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-white rounded-b-2xl">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 px-4 text-xs font-medium text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700 rounded-lg transition-colors"
+          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          disabled={currentPage === 1}
+        >
+          Previous
+        </Button>
+
+        <div className="flex items-center gap-2">
+          <Select
+            value={currentPage.toString()}
+            onValueChange={(value) => setCurrentPage(parseInt(value))}
+          >
+            <SelectTrigger className="h-9 w-[70px] border-gray-200 text-xs font-medium focus:ring-purple-500/20">
+              <SelectValue placeholder={currentPage.toString()} />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: totalStudentPages }, (_, i) => i + 1).map((page) => (
+                <SelectItem key={page} value={page.toString()} className="text-xs">
+                  {page}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
+            of {totalStudentPages}
+          </span>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 px-4 text-xs font-medium text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700 rounded-lg transition-colors"
+          onClick={() => setCurrentPage((p) => Math.min(totalStudentPages, p + 1))}
+          disabled={currentPage === totalStudentPages}
+        >
+          Next
+        </Button>
+      </div>
+    </aside >
+      {/* Details Panel */ }
+      < main className = "flex-1" >
+      {
+        selectedStudent?(
+            <div className = "bg-white rounded-2xl shadow border border-gray-200 p-8 min-h-[400px] text-gray-800" >
+            <div className="flex items-center gap-6 mb-6">
+              <div className="relative">
+                <div className="h-16 w-16 rounded-full flex items-center justify-center bg-purple-100 text-gray-800 font-bold text-2xl border-2 border-gray-200">
+                  {selectedStudent.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+              </div>
+              <div className="flex-1 min-w-0 flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="text-2xl font-bold text-gray-800">{selectedStudent.name}</span>
+                    <span className="text-sm text-gray-500 font-medium px-2.5 py-0.5 rounded-full bg-gray-100">{selectedStudent.class}</span>
+                    {selectedStudent.status === 'defaulter' ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                        <AlertCircle size={12} className="text-amber-600" /> Fee Defaulter
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        Enrolled
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-gray-500">Status:</span>
+                  <Select
+                    value={selectedStudent.status || 'enrolled'}
+                    onValueChange={(val) => handleStudentStatusChange(val)}
+                  >
+                    <SelectTrigger className={`h-8 min-w-[155px] rounded-lg text-xs font-semibold border ${(selectedStudent.status === 'enrolled' || selectedStudent.status === 'active')
+                        ? 'bg-green-50 text-green-700 border-green-200'
+                        : selectedStudent.status === 'defaulter'
+                          ? 'bg-amber-50 text-amber-800 border-amber-300'
+                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                      }`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`h-2 w-2 rounded-full ${(selectedStudent.status === 'enrolled' || selectedStudent.status === 'active')
+                            ? 'bg-green-500'
+                            : selectedStudent.status === 'defaulter'
+                              ? 'bg-amber-500'
+                              : 'bg-rose-500'
+                          }`} />
+                        <SelectValue />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-gray-200 shadow-lg">
+                      <SelectItem value="enrolled">Enrolled (Active)</SelectItem>
+                      <SelectItem value="dropped_out">Dropped Out</SelectItem>
+                      <SelectItem value="defaulter">Fee Defaulter</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {selectedStudent.status === 'defaulter' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs font-semibold rounded-lg flex items-center gap-1.5"
+                      onClick={() => handleStudentStatusChange('enrolled')}
+                    >
+                      ✓ Remove Defaulter (Set Enrolled)
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 border-amber-300 text-amber-800 hover:bg-amber-50 text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm"
+                      onClick={() => handleStudentStatusChange('defaulter')}
+                    >
+                      <AlertCircle size={13} className="text-amber-600" />
+                      Set as Fee Defaulter
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+              {/* Tabs for student details */ }
+              <div className = "border-b border-gray-200 mb-4" >
+            <div className="flex gap-4">
+              {['Overview', 'Payments', 'EMI', 'Mandates', 'Kit Assignment'].map(tab => (
+                <button
+                  key={tab}
+                  className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${studentDetailsTab === tab ? 'bg-[#643ae5] text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                  onClick={() => setStudentDetailsTab(tab as 'Overview' | 'Payments' | 'EMI' | 'Mandates' | 'Kit Assignment')}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+              </div>
+        {/* Tab Content */ }
+        <div>
+  {
+    studentDetailsTab === 'Overview' && (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Contact Information Card */}
+        <Card className="bg-white text-gray-800 border border-gray-200 rounded-2xl">
+          <CardHeader>
+            <CardTitle>Contact Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div><span className="font-semibold">Full Name:</span> {selectedStudent.name}</div>
+              <div><span className="font-semibold">Email:</span> {(selectedStudent as any).email || freshContactData?.email || '-'}</div>
+              <div><span className="font-semibold">Class:</span> {selectedStudent.class}</div>
+              {(() => {
+                const contact = freshContactData || selectedStudent;
+                const fatherContact = getParentContact(contact, 'father');
+                return (
+                  <>
+                    <div><span className="font-semibold">Father:</span> {fatherContact.name}</div>
+                    <div className="text-sm text-gray-600 ml-4">Phone: {fatherContact.phone}</div>
+                  </>
+                );
+              })()}
+              {(() => {
+                const contact = freshContactData || selectedStudent;
+                const motherContact = getParentContact(contact, 'mother');
+                return (
+                  <>
+                    <div><span className="font-semibold">Mother:</span> {motherContact.name}</div>
+                    <div className="text-sm text-gray-600 ml-4">Phone: {motherContact.phone}</div>
+                  </>
+                );
+              })()}
+              <div><span className="font-semibold">Address:</span> {(selectedStudent as any).address || freshContactData?.address || '-'}</div>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 px-4 text-xs font-medium text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700 rounded-lg transition-colors"
-              onClick={() => setCurrentPage((p) => Math.min(totalStudentPages, p + 1))}
-              disabled={currentPage === totalStudentPages}
-            >
-              Next
-            </Button>
-          </div>
-        </aside>
-        {/* Details Panel */}
-        <main className="flex-1">
-          {selectedStudent ? (
-            <div className="bg-white rounded-2xl shadow border border-gray-200 p-8 min-h-[400px] text-gray-800">
-              <div className="flex items-center gap-6 mb-6">
-                <div className="relative">
-                  <div className="h-16 w-16 rounded-full flex items-center justify-center bg-purple-100 text-gray-800 font-bold text-2xl border-2 border-gray-200">
-                    {selectedStudent.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xl font-bold text-gray-800">{selectedStudent.name}</span>
-                    <span className="text-sm text-gray-500 font-medium">{selectedStudent.class}</span>
-                  </div>
-                </div>
-              </div>
-              {/* Tabs for student details */}
-              <div className="border-b border-gray-200 mb-4">
-                <div className="flex gap-4">
-                  {['Overview', 'Payments', 'EMI', 'Mandates'].map(tab => (
-                    <button
-                      key={tab}
-                      className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${studentDetailsTab === tab ? 'bg-[#643ae5] text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
-                      onClick={() => setStudentDetailsTab(tab as 'Overview' | 'Payments' | 'EMI' | 'Mandates')}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* Tab Content */}
-              <div>
-                {studentDetailsTab === 'Overview' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Contact Information Card */}
-                    <Card className="bg-white text-gray-800 border border-gray-200 rounded-2xl">
-                      <CardHeader>
-                        <CardTitle>Contact Information</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <div><span className="font-semibold">Full Name:</span> {selectedStudent.name}</div>
-                          <div><span className="font-semibold">Email:</span> {(selectedStudent as any).email || freshContactData?.email || '-'}</div>
-                          <div><span className="font-semibold">Class:</span> {selectedStudent.class}</div>
-                          {(() => {
-                            const contact = freshContactData || selectedStudent;
-                            const fatherContact = getParentContact(contact, 'father');
-                            return (
-                              <>
-                                <div><span className="font-semibold">Father:</span> {fatherContact.name}</div>
-                                <div className="text-sm text-gray-600 ml-4">Phone: {fatherContact.phone}</div>
-                              </>
-                            );
-                          })()}
-                          {(() => {
-                            const contact = freshContactData || selectedStudent;
-                            const motherContact = getParentContact(contact, 'mother');
-                            return (
-                              <>
-                                <div><span className="font-semibold">Mother:</span> {motherContact.name}</div>
-                                <div className="text-sm text-gray-600 ml-4">Phone: {motherContact.phone}</div>
-                              </>
-                            );
-                          })()}
-                          <div><span className="font-semibold">Address:</span> {(selectedStudent as any).address || freshContactData?.address || '-'}</div>
-                        </div>
+          </CardContent>
+        </Card>
+        {/* Fee Information Card */}
+        <Card className="bg-white text-gray-800 border border-gray-200 rounded-2xl">
+          <CardHeader>
+            <CardTitle>Fee Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {(() => {
+                const totalFees = calculateTotalFees(getStudentFeesWithGlobal(selectedStudent));
+                const totalDiscounts = calculateTotalDiscounts(selectedStudent);
+                const netFees = Math.max(0, totalFees - totalDiscounts);
+                const tuitionPaid = calculateTuitionPaidAmount(getStudentPayments(selectedStudent.id));
+                const outstanding = calculateOutstanding(selectedStudent);
 
-                      </CardContent>
+                return (
+                  <>
+                    <div><span className="font-semibold text-gray-700">Tuition Fees:</span> {formatAmount(totalFees)}</div>
+                    {totalDiscounts > 0 && (
+                      <div><span className="font-semibold text-gray-700">Discount:</span> <span className="text-green-600">-{formatAmount(totalDiscounts)}</span></div>
+                    )}
+                    {totalDiscounts > 0 && (
+                      <div><span className="font-semibold text-gray-700">Net Tuition Payable:</span> {formatAmount(netFees)}</div>
+                    )}
+                    <div><span className="font-semibold text-gray-700">Tuition Paid:</span> <span className="text-green-600 font-medium">{formatAmount(tuitionPaid)}</span></div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-gray-700">Outstanding:</span>{' '}
+                      <span className={(selectedStudent.status === 'dropped_out' || selectedStudent.status === 'dropped' || selectedStudent.status === 'defaulter') ? "text-gray-400 line-through font-medium" : "text-red-500 font-semibold"}>
+                        <span className={selectedStudent.status === 'defaulter' ? "text-gray-400 line-through font-medium" : "text-red-500 font-semibold"}>
+                          {formatAmount(outstanding)}
+                        </span>
+                        {(selectedStudent.status === 'dropped_out' || selectedStudent.status === 'dropped' || selectedStudent.status === 'defaulter') && (
+                          <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                            {selectedStudent.status === 'defaulter' ? 'Defaulter - Excluded from Receivables' : 'Dropped Out - Excluded from Receivables'}
+                            {selectedStudent.status === 'defaulter' && (
+                              <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-300">
+                                Fee Defaulter - Excluded from Receivables
+                              </span>
+                            )}
+                          </div>
+                              </>
+                      );
+                          })()}
+
+                      <div className="my-2 border-t border-gray-100"></div>
+
+                      <div><span className="font-semibold text-gray-700">Additional Paid:</span> <span className="text-amber-600">{formatAmount(calculateAdditionalPaidAmount(getStudentPayments(selectedStudent.id)))}</span></div>
+
+                      <div className="my-2 border-t border-gray-100"></div>
+
+                      <div><span className="font-semibold text-gray-700">Mandates:</span> {(() => {
+                        const mandates = getStudentMandate(selectedStudent.id);
+                        if (!mandates) return 'None';
+                        if (Array.isArray(mandates)) return mandates.length;
+                        return 1;
+                      })()}</div>
+                      <div><span className="font-semibold text-gray-700">EMI Plans:</span> {emiPlans.filter(p => p.studentId === selectedStudent.id).length}</div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 border-[#643ae5] text-[#643ae5] hover:bg-purple-50"
+                        onClick={handleDownloadInvoice}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download Invoice
+                      </Button>
+                    </div>
+                  </CardContent >
                     </Card>
-                    {/* Fee Information Card */}
-                    <Card className="bg-white text-gray-800 border border-gray-200 rounded-2xl">
-                      <CardHeader>
-                        <CardTitle>Fee Information</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {(() => {
-                            const totalFees = calculateTotalFees(getStudentFeesWithGlobal(selectedStudent));
-                            const totalDiscounts = calculateTotalDiscounts(selectedStudent);
-                            const netFees = Math.max(0, totalFees - totalDiscounts);
-                            const tuitionPaid = calculateTuitionPaidAmount(getStudentPayments(selectedStudent.id));
-                            const outstanding = calculateOutstanding(selectedStudent);
-
+          </div>
+                )}
+          {studentDetailsTab === 'Payments' && (
+            <div>
+              {/* Payments content: list, add, delete payments for selectedStudent */}
+              <div className="mb-4 flex justify-between items-center">
+                <div className="font-semibold">Payments</div>
+                <Button
+                  className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none"
+                  onClick={() => {
+                    setPaymentFormData(prev => ({ ...prev, studentSelect: selectedStudent.id.toString() }));
+                    setAddPaymentOpen(true);
+                  }}
+                >
+                  Add Payment
+                </Button>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="table-header">Date</TableHead>
+                    <TableHead className="table-header">Amount</TableHead>
+                    <TableHead className="table-header">Mode</TableHead>
+                    <TableHead className="table-header">Status</TableHead>
+                    <TableHead className="table-header">Payment Type</TableHead>
+                    <TableHead className="table-header w-auto">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {getStudentPayments(selectedStudent.id).map(payment => (
+                    <TableRow key={payment.id}>
+                      <TableCell>{formatDate(payment.paymentDate)}</TableCell>
+                      <TableCell>{formatAmount(parseFloat(payment.amount))}</TableCell>
+                      <TableCell>{payment.paymentMode.charAt(0).toUpperCase() + payment.paymentMode.slice(1)}</TableCell>
+                      <TableCell>{payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          // EMI Installments
+                          if (payment.installmentNumber && payment.installmentNumber > 0) {
                             return (
-                              <>
-                                <div><span className="font-semibold text-gray-700">Tuition Fees:</span> {formatAmount(totalFees)}</div>
-                                {totalDiscounts > 0 && (
-                                  <div><span className="font-semibold text-gray-700">Discount:</span> <span className="text-green-600">-{formatAmount(totalDiscounts)}</span></div>
-                                )}
-                                {totalDiscounts > 0 && (
-                                  <div><span className="font-semibold text-gray-700">Net Tuition Payable:</span> {formatAmount(netFees)}</div>
-                                )}
-                                {totalDiscounts === 0 && (
-                                  <div><span className="font-semibold text-gray-700">Tuition Paid:</span> <span className="text-green-600">{formatAmount(tuitionPaid)}</span></div>
-                                )}
-                                <div><span className="font-semibold text-gray-700">Outstanding:</span> <span className="text-red-500">{formatAmount(outstanding)}</span></div>
-                              </>
+                              <Badge className="bg-blue-100 text-blue-800 border-none hover:bg-blue-100 font-normal">
+                                EMI Installment #{payment.installmentNumber}
+                              </Badge>
                             );
-                          })()}
-
-                          <div className="my-2 border-t border-gray-100"></div>
-
-                          <div><span className="font-semibold text-gray-700">Additional Paid:</span> <span className="text-amber-600">{formatAmount(calculateAdditionalPaidAmount(getStudentPayments(selectedStudent.id)))}</span></div>
-
-                          <div className="my-2 border-t border-gray-100"></div>
-
-                          <div><span className="font-semibold text-gray-700">Mandates:</span> {(() => {
-                            const mandates = getStudentMandate(selectedStudent.id);
-                            if (!mandates) return 'None';
-                            if (Array.isArray(mandates)) return mandates.length;
-                            return 1;
-                          })()}</div>
-                          <div><span className="font-semibold text-gray-700">EMI Plans:</span> {emiPlans.filter(p => p.studentId === selectedStudent.id).length}</div>
-                        </div>
-
-                        <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+                          }
+                          // Registration Fee (Installment 0)
+                          if (payment.installmentNumber === 0) {
+                            return (
+                              <Badge className="bg-green-100 text-green-800 border-none hover:bg-green-100 font-normal">
+                                Registration Fee
+                              </Badge>
+                            );
+                          }
+                          // Additional Charges
+                          if (payment.paymentCategory === 'additional_charge') {
+                            return (
+                              <Badge className="bg-amber-100 text-amber-800 border-none hover:bg-amber-100 font-normal">
+                                {payment.chargeType?.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || 'Additional Charge'}
+                              </Badge>
+                            );
+                          }
+                          // Standard Tuition Fee
+                          return <span className="text-gray-600">Tuition Fee</span>;
+                        })()}
+                      </TableCell>
+                      <TableCell className="w-auto">
+                        <div className="flex gap-2 items-center">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-9 border-[#643ae5] text-[#643ae5] hover:bg-purple-50"
-                            onClick={handleDownloadInvoice}
+                            onClick={() => {
+                              setSelectedPaymentForDetails(payment);
+                              setPaymentDetailsOpen(true);
+                            }}
                           >
-                            <Download className="mr-2 h-4 w-4" />
-                            Download Invoice
+                            <Eye className="mr-1 h-3 w-3" />
+                            View Details
+                          </Button>
+                          {(() => {
+                            const buildReceiptData = (): FeeReceiptData => ({
+                              studentName: selectedStudent.name,
+                              className: selectedStudent.class,
+                              paymentMode: payment.paymentMode,
+                              amount: payment.amount,
+                              date: format(new Date(payment.paymentDate), "dd-MM-yyyy"),
+                              organizationName: hookOrgName,
+                              organizationPhone: hookOrgPhone,
+                              organizationAddress: (() => {
+                                const addr = hookOrgAddress || hookOrgData?.address;
+                                if (!addr) return undefined;
+                                const parts = [addr];
+                                const locationParts = [];
+                                if (hookOrgData?.city) locationParts.push(hookOrgData.city);
+                                if (hookOrgData?.state) locationParts.push(hookOrgData.state);
+                                if (hookOrgData?.pincode) locationParts.push(hookOrgData.pincode);
+                                if (locationParts.length > 0) parts.push(locationParts.join(' '));
+                                return parts.filter(Boolean).join(', ');
+                              })(),
+                              academicYear: academicYear
+                            });
+                            return (
+                              <>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => generateFeeReceipt(buildReceiptData(), payment.receiptNumber, { mode: 'download', copyType: 'parent' })}
+                                      >
+                                        <Download className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Download Parent Copy</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => generateFeeReceipt(buildReceiptData(), payment.receiptNumber, { mode: 'print', copyType: 'both' })}
+                                      >
+                                        <Printer className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Print Receipt</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </>
+                            );
+                          })()}
+
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="bg-red-600 text-white rounded-lg"
+                            onClick={() => {
+                              setItemToDelete({
+                                id: payment.id,
+                                type: 'payment',
+                                details: `${formatAmount(parseFloat(payment.amount))} on ${formatDate(payment.paymentDate)}`
+                              });
+                              setDeleteConfirmOpen(true);
+                            }}
+                          >
+                            Delete
                           </Button>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-                {studentDetailsTab === 'Payments' && (
-                  <div>
-                    {/* Payments content: list, add, delete payments for selectedStudent */}
-                    <div className="mb-4 flex justify-between items-center">
-                      <div className="font-semibold">Payments</div>
-                      <Button
-                        className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none"
-                        onClick={() => {
-                          setPaymentFormData(prev => ({ ...prev, studentSelect: selectedStudent.id.toString() }));
-                          setAddPaymentOpen(true);
-                        }}
-                      >
-                        Add Payment
-                      </Button>
-                    </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="table-header">Date</TableHead>
-                          <TableHead className="table-header">Amount</TableHead>
-                          <TableHead className="table-header">Mode</TableHead>
-                          <TableHead className="table-header">Status</TableHead>
-                          <TableHead className="table-header">Payment Type</TableHead>
-                          <TableHead className="table-header w-auto">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {getStudentPayments(selectedStudent.id).map(payment => (
-                          <TableRow key={payment.id}>
-                            <TableCell>{formatDate(payment.paymentDate)}</TableCell>
-                            <TableCell>{formatAmount(parseFloat(payment.amount))}</TableCell>
-                            <TableCell>{payment.paymentMode.charAt(0).toUpperCase() + payment.paymentMode.slice(1)}</TableCell>
-                            <TableCell>{payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}</TableCell>
-                            <TableCell>
-                              {(() => {
-                                // EMI Installments
-                                if (payment.installmentNumber && payment.installmentNumber > 0) {
-                                  return (
-                                    <Badge className="bg-blue-100 text-blue-800 border-none hover:bg-blue-100 font-normal">
-                                      EMI Installment #{payment.installmentNumber}
-                                    </Badge>
-                                  );
-                                }
-                                // Registration Fee (Installment 0)
-                                if (payment.installmentNumber === 0) {
-                                  return (
-                                    <Badge className="bg-green-100 text-green-800 border-none hover:bg-green-100 font-normal">
-                                      Registration Fee
-                                    </Badge>
-                                  );
-                                }
-                                // Additional Charges
-                                if (payment.paymentCategory === 'additional_charge') {
-                                  return (
-                                    <Badge className="bg-amber-100 text-amber-800 border-none hover:bg-amber-100 font-normal">
-                                      {payment.chargeType?.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || 'Additional Charge'}
-                                    </Badge>
-                                  );
-                                }
-                                // Standard Tuition Fee
-                                return <span className="text-gray-600">Tuition Fee</span>;
-                              })()}
-                            </TableCell>
-                            <TableCell className="w-auto">
-                              <div className="flex gap-2 items-center">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedPaymentForDetails(payment);
-                                    setPaymentDetailsOpen(true);
-                                  }}
-                                >
-                                  <Eye className="mr-1 h-3 w-3" />
-                                  View Details
-                                </Button>
-                                {(() => {
-                                  const buildReceiptData = (): FeeReceiptData => ({
-                                    studentName: selectedStudent.name,
-                                    className: selectedStudent.class,
-                                    paymentMode: payment.paymentMode,
-                                    amount: payment.amount,
-                                    date: format(new Date(payment.paymentDate), "dd-MM-yyyy"),
-                                    organizationName: hookOrgName,
-                                    organizationPhone: hookOrgPhone,
-                                    organizationAddress: (() => {
-                                      const addr = hookOrgAddress || hookOrgData?.address;
-                                      if (!addr) return undefined;
-                                      const parts = [addr];
-                                      const locationParts = [];
-                                      if (hookOrgData?.city) locationParts.push(hookOrgData.city);
-                                      if (hookOrgData?.state) locationParts.push(hookOrgData.state);
-                                      if (hookOrgData?.pincode) locationParts.push(hookOrgData.pincode);
-                                      if (locationParts.length > 0) parts.push(locationParts.join(' '));
-                                      return parts.filter(Boolean).join(', ');
-                                    })(),
-                                    academicYear: academicYear
-                                  });
-                                  return (
-                                    <>
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() => generateFeeReceipt(buildReceiptData(), payment.receiptNumber, { mode: 'download', copyType: 'parent' })}
-                                            >
-                                              <Download className="h-4 w-4" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>Download Parent Copy</TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() => generateFeeReceipt(buildReceiptData(), payment.receiptNumber, { mode: 'print', copyType: 'both' })}
-                                            >
-                                              <Printer className="h-4 w-4" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>Print Receipt</TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    </>
-                                  );
-                                })()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {addPaymentOpen && (
+                <Dialog open={addPaymentOpen} onOpenChange={setAddPaymentOpen}>
+                  <DialogContent>
+                    <DialogHeader>Add Payment</DialogHeader>
+                    <form onSubmit={handleAddPayment} className="space-y-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="amount">Amount</Label>
+                        <Input
+                          id="amount"
+                          name="amount"
+                          type="number"
+                          required
+                          value={paymentFormData.amount}
+                          onChange={e => setPaymentFormData(prev => ({ ...prev, amount: e.target.value }))}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="paymentDate">Payment Date</Label>
+                        <Input
+                          id="paymentDate"
+                          name="paymentDate"
+                          type="date"
+                          required
+                          value={paymentFormData.paymentDate}
+                          onChange={e => setPaymentFormData(prev => ({ ...prev, paymentDate: e.target.value }))}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="paymentMode">Payment Mode</Label>
+                        <Select
+                          value={paymentFormData.paymentMode}
+                          onValueChange={(value) => setPaymentFormData(prev => ({ ...prev, paymentMode: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select mode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="UPI">UPI</SelectItem>
+                            <SelectItem value="Cash">Cash</SelectItem>
+                            <SelectItem value="Card">Card</SelectItem>
+                            <SelectItem value="Cheque">Cheque</SelectItem>
+                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="chargeType">Charge Type</Label>
+                        <Select value={paymentFormData.chargeType || 'annual_function'} onValueChange={value => setPaymentFormData(prev => ({ ...prev, chargeType: value, paymentCategory: 'additional_charge' }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select charge type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="annual_function">Annual Function Fee</SelectItem>
+                            <SelectItem value="sports_day">Sports Day Fee</SelectItem>
+                            <SelectItem value="picnic">Picnic/Field Trip Fee</SelectItem>
+                            <SelectItem value="uniform">Uniform Fee</SelectItem>
+                            <SelectItem value="winter_wear">Winter Wear</SelectItem>
+                            <SelectItem value="books">Books/Study Materials</SelectItem>
+                            <SelectItem value="exam_fee">Examination Fee</SelectItem>
+                            <SelectItem value="transport">Transportation Fee</SelectItem>
+                            <SelectItem value="late_fee">Late Payment Fee</SelectItem>
+                            <SelectItem value="security_deposit">Security Deposit</SelectItem>
+                            <SelectItem value="admission_form_fee">Admission Form Fee</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-sm text-gray-500">
+                          Additional charges are tracked separately and don't count toward regular tuition fees.
+                        </p>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="transactionId">Transaction ID</Label>
+                        <Input
+                          id="transactionId"
+                          value={paymentFormData.transactionId || ''}
+                          onChange={e => setPaymentFormData(prev => ({ ...prev, transactionId: e.target.value }))}
+                          placeholder="Optional"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="discount">Discount (₹)</Label>
+                        <Input
+                          id="discount"
+                          type="number"
+                          value={paymentFormData.discount || ''}
+                          onChange={e => setPaymentFormData(prev => ({ ...prev, discount: e.target.value }))}
+                          placeholder="0"
+                        />
+                      </div>
+                      {/* Add more fields as needed */}
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" variant="outline" className="border-[#643ae5] text-[#643ae5] hover:bg-slate-50" onClick={() => setAddPaymentOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none">Add Payment</Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+          )}
+          {studentDetailsTab === 'Mandates' && (
+            <div>
+              {/* Mandates content: list, add, delete mandates for selectedStudent */}
+              <div className="mb-4 flex justify-between items-center">
+                <div className="font-semibold">E-Mandates</div>
+                <Button className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none" onClick={() => setAddMandateOpen(true)}>Add Mandate</Button>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="table-header">Mandate ID</TableHead>
+                    <TableHead className="table-header">Status</TableHead>
+                    <TableHead className="table-header">Bank</TableHead>
+                    <TableHead className="table-header">Max Amount</TableHead>
+                    <TableHead className="table-header">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(() => {
+                    const mandates = getStudentMandate(selectedStudent.id);
+                    if (!mandates) return [];
+                    if (Array.isArray(mandates)) return mandates;
+                    return [mandates];
+                  })().map((mandate: EMandate) => (
+                    <TableRow key={mandate.id}>
+                      <TableCell>{mandate.mandateId}</TableCell>
+                      <TableCell>{mandate.status}</TableCell>
+                      <TableCell>{mandate.bankName}</TableCell>
+                      <TableCell>{formatAmount(parseFloat(mandate.maxAmount || "0"))}</TableCell>
+                      <TableCell>
+                        <Button variant="destructive" size="sm" className="bg-red-600 text-white rounded-lg" onClick={() => handleDeleteMandate(mandate.id)}>Delete</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {addMandateOpen && (
+                <Dialog open={addMandateOpen} onOpenChange={setAddMandateOpen}>
+                  <DialogContent>
+                    <DialogHeader>Setup E-Mandate for {selectedStudent?.name}</DialogHeader>
+                    <form onSubmit={handleAddEMandate} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="bankName">Bank Name</Label>
+                          <Input name="bankName" required />
+                        </div>
+                        <div>
+                          <Label htmlFor="ifscCode">IFSC Code</Label>
+                          <Input name="ifscCode" required maxLength={11} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="accountNumber">Account Number</Label>
+                          <Input name="accountNumber" required />
+                        </div>
+                        <div>
+                          <Label htmlFor="accountHolderName">Account Holder Name</Label>
+                          <Input name="accountHolderName" required />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <Label htmlFor="maxAmount">Max Amount</Label>
+                          <Input name="maxAmount" type="number" required />
+                        </div>
+                        <div>
+                          <Label htmlFor="startDate">Start Date</Label>
+                          <Input name="startDate" type="date" required />
+                        </div>
+                        <div>
+                          <Label htmlFor="endDate">End Date</Label>
+                          <Input name="endDate" type="date" required />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="frequency">Frequency</Label>
+                        <Select name="frequency" required value={mandateFrequency} onValueChange={setMandateFrequency}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                            <SelectItem value="quarterly">Quarterly</SelectItem>
+                            <SelectItem value="yearly">Yearly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" variant="outline" className="border-[#643ae5] text-white" onClick={() => setAddMandateOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none">Add Mandate</Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+          )}
+          {studentDetailsTab === 'Kit Assignment' && selectedStudent && (
+            <div>
+              <div className="mb-4 flex justify-between items-center">
+                <div className="font-semibold flex items-center gap-2">
+                  <Package size={18} className="text-[#643ae5]" />
+                  Kit Assignment History
+                </div>
+                <Button
+                  className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none"
+                  onClick={() => setKitAssignModalOpen(true)}
+                >
+                  <Plus size={16} className="mr-1" /> Assign Kit/Stock
+                </Button>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Qty</TableHead>
+                    <TableHead>Stock Before</TableHead>
+                    <TableHead>Stock After</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(studentKitTransactions as any[]).length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-gray-400 py-8">
+                        No kit assignments yet for this student
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    (studentKitTransactions as any[]).map((tx: any) => (
+                      <TableRow key={tx.id}>
+                        <TableCell className="font-medium">{tx.item?.name ?? '-'}</TableCell>
+                        <TableCell>{tx.quantity}</TableCell>
+                        <TableCell>{tx.stockBefore ?? '-'}</TableCell>
+                        <TableCell>{tx.stockAfter ?? '-'}</TableCell>
+                        <TableCell className="text-gray-500 text-xs max-w-[200px] truncate">{tx.notes ?? '-'}</TableCell>
+                        <TableCell className="text-xs">{tx.transactionDate ? format(new Date(tx.transactionDate), 'dd MMM yyyy') : '-'}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
 
-                                <Button 
-                                  variant="destructive" 
-                                  size="sm" 
-                                  className="bg-red-600 text-white rounded-lg" 
-                                  onClick={() => {
-                                    setItemToDelete({ 
-                                      id: payment.id, 
-                                      type: 'payment', 
-                                      details: `${formatAmount(parseFloat(payment.amount))} on ${formatDate(payment.paymentDate)}`
-                                    });
-                                    setDeleteConfirmOpen(true);
-                                  }}
-                                >
-                                  Delete
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    {addPaymentOpen && (
-                      <Dialog open={addPaymentOpen} onOpenChange={setAddPaymentOpen}>
-                        <DialogContent>
-                          <DialogHeader>Add Payment</DialogHeader>
-                          <form onSubmit={handleAddPayment} className="space-y-4">
-                            <div className="grid gap-2">
-                              <Label htmlFor="amount">Amount</Label>
-                              <Input
-                                id="amount"
-                                name="amount"
-                                type="number"
-                                required
-                                value={paymentFormData.amount}
-                                onChange={e => setPaymentFormData(prev => ({ ...prev, amount: e.target.value }))}
-                              />
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="paymentDate">Payment Date</Label>
-                              <Input
-                                id="paymentDate"
-                                name="paymentDate"
-                                type="date"
-                                required
-                                value={paymentFormData.paymentDate}
-                                onChange={e => setPaymentFormData(prev => ({ ...prev, paymentDate: e.target.value }))}
-                              />
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="paymentMode">Payment Mode</Label>
-                              <Select
-                                value={paymentFormData.paymentMode}
-                                onValueChange={(value) => setPaymentFormData(prev => ({ ...prev, paymentMode: value }))}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select mode" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="UPI">UPI</SelectItem>
-                                  <SelectItem value="Cash">Cash</SelectItem>
-                                  <SelectItem value="Card">Card</SelectItem>
-                                  <SelectItem value="Cheque">Cheque</SelectItem>
-                                  <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="chargeType">Charge Type</Label>
-                              <Select value={paymentFormData.chargeType || 'annual_function'} onValueChange={value => setPaymentFormData(prev => ({ ...prev, chargeType: value, paymentCategory: 'additional_charge' }))}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select charge type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="annual_function">Annual Function Fee</SelectItem>
-                                  <SelectItem value="sports_day">Sports Day Fee</SelectItem>
-                                  <SelectItem value="picnic">Picnic/Field Trip Fee</SelectItem>
-                                  <SelectItem value="uniform">Uniform Fee</SelectItem>
-                                  <SelectItem value="books">Books/Study Materials</SelectItem>
-                                  <SelectItem value="exam_fee">Examination Fee</SelectItem>
-                                  <SelectItem value="transport">Transportation Fee</SelectItem>
-                                  <SelectItem value="late_fee">Late Payment Fee</SelectItem>
-                                  <SelectItem value="security_deposit">Security Deposit</SelectItem>
-                                  <SelectItem value="admission_form_fee">Admission Form Fee</SelectItem>
-                                  <SelectItem value="other">Other</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <p className="text-sm text-gray-500">
-                                Additional charges are tracked separately and don't count toward regular tuition fees.
-                              </p>
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="transactionId">Transaction ID</Label>
-                              <Input
-                                id="transactionId"
-                                value={paymentFormData.transactionId || ''}
-                                onChange={e => setPaymentFormData(prev => ({ ...prev, transactionId: e.target.value }))}
-                                placeholder="Optional"
-                              />
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="discount">Discount (₹)</Label>
-                              <Input
-                                id="discount"
-                                type="number"
-                                value={paymentFormData.discount || ''}
-                                onChange={e => setPaymentFormData(prev => ({ ...prev, discount: e.target.value }))}
-                                placeholder="0"
-                              />
-                            </div>
-                            {/* Add more fields as needed */}
-                            <div className="flex justify-end gap-2">
-                              <Button type="button" variant="outline" className="border-[#643ae5] text-[#643ae5] hover:bg-slate-50" onClick={() => setAddPaymentOpen(false)}>
-                                Cancel
-                              </Button>
-                              <Button type="submit" className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none">Add Payment</Button>
-                            </div>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                  </div>
-                )}
-                {studentDetailsTab === 'Mandates' && (
-                  <div>
-                    {/* Mandates content: list, add, delete mandates for selectedStudent */}
-                    <div className="mb-4 flex justify-between items-center">
-                      <div className="font-semibold">E-Mandates</div>
-                      <Button className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none" onClick={() => setAddMandateOpen(true)}>Add Mandate</Button>
+              {/* Assign Kit Dialog */}
+              <Dialog open={kitAssignModalOpen} onOpenChange={setKitAssignModalOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Assign Kit / Stock Item</DialogTitle>
+                    <DialogDescription>Assign an inventory item to {selectedStudent.name}</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Select Item</Label>
+                      <Select value={kitSelectedItemId} onValueChange={setKitSelectedItemId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose inventory item..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(inventoryItems as any[]).filter((i: any) => i.isActive !== false && (i.currentStock ?? 0) > 0).map((item: any) => (
+                            <SelectItem key={item.id} value={item.id.toString()}>
+                              {item.name} — Stock: {item.currentStock ?? 0}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="table-header">Mandate ID</TableHead>
-                          <TableHead className="table-header">Status</TableHead>
-                          <TableHead className="table-header">Bank</TableHead>
-                          <TableHead className="table-header">Max Amount</TableHead>
-                          <TableHead className="table-header">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(() => {
-                          const mandates = getStudentMandate(selectedStudent.id);
-                          if (!mandates) return [];
-                          if (Array.isArray(mandates)) return mandates;
-                          return [mandates];
-                        })().map((mandate: EMandate) => (
-                          <TableRow key={mandate.id}>
-                            <TableCell>{mandate.mandateId}</TableCell>
-                            <TableCell>{mandate.status}</TableCell>
-                            <TableCell>{mandate.bankName}</TableCell>
-                            <TableCell>{formatAmount(parseFloat(mandate.maxAmount || "0"))}</TableCell>
-                            <TableCell>
-                              <Button variant="destructive" size="sm" className="bg-red-600 text-white rounded-lg" onClick={() => handleDeleteMandate(mandate.id)}>Delete</Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    {addMandateOpen && (
-                      <Dialog open={addMandateOpen} onOpenChange={setAddMandateOpen}>
-                        <DialogContent>
-                          <DialogHeader>Setup E-Mandate for {selectedStudent?.name}</DialogHeader>
-                          <form onSubmit={handleAddEMandate} className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <Label htmlFor="bankName">Bank Name</Label>
-                                <Input name="bankName" required />
-                              </div>
-                              <div>
-                                <Label htmlFor="ifscCode">IFSC Code</Label>
-                                <Input name="ifscCode" required maxLength={11} />
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <Label htmlFor="accountNumber">Account Number</Label>
-                                <Input name="accountNumber" required />
-                              </div>
-                              <div>
-                                <Label htmlFor="accountHolderName">Account Holder Name</Label>
-                                <Input name="accountHolderName" required />
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-4">
-                              <div>
-                                <Label htmlFor="maxAmount">Max Amount</Label>
-                                <Input name="maxAmount" type="number" required />
-                              </div>
-                              <div>
-                                <Label htmlFor="startDate">Start Date</Label>
-                                <Input name="startDate" type="date" required />
-                              </div>
-                              <div>
-                                <Label htmlFor="endDate">End Date</Label>
-                                <Input name="endDate" type="date" required />
-                              </div>
-                            </div>
-                            <div>
-                              <Label htmlFor="frequency">Frequency</Label>
-                              <Select name="frequency" required value={mandateFrequency} onValueChange={setMandateFrequency}>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="monthly">Monthly</SelectItem>
-                                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                                  <SelectItem value="yearly">Yearly</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="flex justify-end gap-2">
-                              <Button type="button" variant="outline" className="border-[#643ae5] text-white" onClick={() => setAddMandateOpen(false)}>
-                                Cancel
-                              </Button>
-                              <Button type="submit" className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none">Add Mandate</Button>
-                            </div>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                  </div>
-                )}
-                {studentDetailsTab === 'EMI' && selectedStudent && (
-                  <div>
-                    {/* EMI content: list, add, edit EMI plans for selectedStudent */}
-                    <div className="mb-4 flex justify-between items-center">
-                      <div className="font-semibold">EMI Plans</div>
-                      <button
-                        className={`px-6 py-2 rounded-lg font-semibold shadow transition ${emiPlans.filter(plan => plan.studentId === selectedStudent.id && plan.status === 'active').length > 0 ||
-                          feePayments.filter(payment => payment.leadId === selectedStudent.id && payment.installmentNumber === null && (payment.paymentCategory === 'fee_payment' || !payment.paymentCategory)).length > 0
-                          ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
-                          : 'bg-[#643ae5] text-white hover:bg-[#7c4dff]'
-                          }`}
-                        onClick={() => {
-                          setEmiModalOpen(true);
-                          setSelectedStudentForEMI(selectedStudent as CombinedStudent);
-                        }}
-                        disabled={
-                          emiPlans.filter(plan => plan.studentId === selectedStudent.id && plan.status === 'active').length > 0 ||
-                          feePayments.filter(payment => payment.leadId === selectedStudent.id && payment.installmentNumber === null && (payment.paymentCategory === 'fee_payment' || !payment.paymentCategory)).length > 0
-                        }
-                      >
-                        Add EMI Plan
-                      </button>
+                    <div>
+                      <Label>Quantity</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={(inventoryItems as any[]).find((i: any) => i.id === parseInt(kitSelectedItemId))?.currentStock ?? 1}
+                        value={kitQty}
+                        onChange={e => setKitQty(parseInt(e.target.value) || 1)}
+                      />
                     </div>
+                    <div>
+                      <Label>Notes (optional)</Label>
+                      <Input
+                        placeholder="e.g. Standard kit given on admission"
+                        value={kitNotes}
+                        onChange={e => setKitNotes(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setKitAssignModalOpen(false)}>Cancel</Button>
+                    <Button
+                      className="bg-[#643ae5] text-white hover:bg-[#7c4dff]"
+                      onClick={handleAssignKit}
+                      disabled={kitAssigning || !kitSelectedItemId}
+                    >
+                      {kitAssigning ? 'Assigning...' : 'Assign'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
+          {studentDetailsTab === 'EMI' && selectedStudent && (
+            <div>
+              {/* EMI content: list, add, edit EMI plans for selectedStudent */}
+              {(selectedStudent.status === 'dropped_out' || selectedStudent.status === 'dropped' || selectedStudent.status === 'defaulter') && (
+                {
+                  selectedStudent.status === 'defaulter' && (
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span>Student is marked as <strong>{selectedStudent.status === 'defaulter' ? 'Fee Defaulter' : 'Dropped Out'}</strong>. Any remaining unpaid installments are excluded from active school receivables and pending fees.</span>
+                      <span>Student is marked as <strong>Fee Defaulter</strong>. Any remaining unpaid installments are excluded from active school receivables and pending fees.</span>
+                    </div>
+                  )
+                }
+                < div className="mb-4 flex justify-between items-center">
+              <div className="font-semibold">EMI Plans</div>
+              <button
+                className={`px-6 py-2 rounded-lg font-semibold shadow transition ${emiPlans.filter(plan => plan.studentId === selectedStudent.id && plan.status === 'active').length > 0 ||
+                  feePayments.filter(payment => payment.leadId === selectedStudent.id && payment.installmentNumber === null && (payment.paymentCategory === 'fee_payment' || !payment.paymentCategory)).length > 0
+                  ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                  : 'bg-[#643ae5] text-white hover:bg-[#7c4dff]'
+                  }`}
+                onClick={() => {
+                  setEmiModalOpen(true);
+                  setSelectedStudentForEMI(selectedStudent as CombinedStudent);
+                }}
+                disabled={
+                  emiPlans.filter(plan => plan.studentId === selectedStudent.id && plan.status === 'active').length > 0 ||
+                  feePayments.filter(payment => payment.leadId === selectedStudent.id && payment.installmentNumber === null && (payment.paymentCategory === 'fee_payment' || !payment.paymentCategory)).length > 0
+                }
+              >
+                Add EMI Plan
+              </button>
+            </div>
                     {/* EMI Plans Management Table for selected student */}
-                    <Card className="bg-[#23242a] text-white border border-[#23272f] rounded-2xl">
-                      <CardHeader>
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                          <div className="flex flex-col gap-1">
-                            <CardTitle>EMI Plans Management</CardTitle>
-                            <CardDescription>
-                              Track and manage EMI plans for this student
-                            </CardDescription>
+          <Card className="bg-[#23242a] text-white border border-[#23272f] rounded-2xl">
+            <CardHeader>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <CardTitle>EMI Plans Management</CardTitle>
+                  <CardDescription>
+                    Track and manage EMI plans for this student
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="table-header">Plan Type</TableHead>
+                    <TableHead className="table-header">Total Amount</TableHead>
+                    <TableHead className="table-header">EMI Details</TableHead>
+                    <TableHead className="table-header">Start Date</TableHead>
+                    <TableHead className="table-header">Status</TableHead>
+                    <TableHead className="table-header">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {emiPlans.filter(plan => plan.studentId === selectedStudent.id).map((plan) => (
+                    <TableRow key={plan.id} className="hover:bg-gray-50">
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={
+                            plan.numberOfInstallments > 1
+                              ? "bg-blue-100 text-blue-800 border-blue-200 whitespace-nowrap px-2"
+                              : "bg-green-100 text-green-800 border-green-200 whitespace-nowrap px-2"
+                          }
+                        >
+                          {plan.numberOfInstallments > 1 ? 'EMI Payment' : 'Full Payment'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium text-gray-900">
+                          {formatAmount(parseFloat(plan.totalAmount || "0"))}
+                        </div>
+                        {parseFloat(plan.discount || "0") > 0 && (
+                          <div className="text-sm text-green-600">
+                            -{formatAmount(parseFloat(plan.discount || "0"))} discount
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {plan.numberOfInstallments > 1 ? (
+                          <EMIPaymentProgress planId={plan.id} totalInstallments={plan.numberOfInstallments} installmentAmount={plan.installmentAmount} status={plan.status} totalAmount={plan.totalAmount} />
+                        ) : (
+                          <div className="text-sm text-gray-500">Full payment</div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-gray-900">
+                          {format(new Date(plan.startDate), "MMM dd, yyyy")}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            plan.status === "active"
+                              ? "bg-green-500 text-white rounded-full px-3 py-1"
+                              : plan.status === "completed"
+                                ? "bg-blue-500 text-white rounded-full px-3 py-1"
+                                : "bg-gray-500 text-white rounded-full px-3 py-1"
+                          }
+                        >
+                          {plan.status.charAt(0).toUpperCase() + plan.status.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          {plan.status !== 'cancelled' && (
+                            <RecordPaymentButton
+                              plan={plan}
+                              onClick={() => {
+                                setSelectedEmiPlan(plan);
+                                setEmiPaymentModalOpen(true);
+                              }}
+                            />
+                          )}
+                          {plan.status === 'active' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                              onClick={() => {
+                                setSelectedEmiPlanForEdit(plan);
+                                const regFeePayment = feePayments.find(p => p.leadId === plan.studentId && p.installmentNumber === 0);
+                                const actualRegFee = regFeePayment ? regFeePayment.amount : '0';
+
+                                // Fetch schedule details
+                                apiRequest("GET", `/api/emi-plans/${plan.id}/schedule`)
+                                  .then(res => res.json())
+                                  .then(schedule => {
+                                    setEditEmiFormData({
+                                      totalAmount: plan.totalAmount || "0",
+                                      registrationFee: actualRegFee,
+                                      discount: plan.discount || '0',
+                                      emiPeriod: String(plan.numberOfInstallments || '2'),
+                                      installments: Array.isArray(schedule) ? schedule.map((s: any) => ({
+                                        installmentNumber: s.installmentNumber,
+                                        amount: s.amount,
+                                        dueDate: s.dueDate ? new Date(s.dueDate).toISOString().split('T')[0] : '',
+                                        status: s.status
+                                      })) : [],
+                                      recalculate: false,
+                                      strategy: 'distribute',
+                                      numNewInstallments: 1,
+                                      newInstallmentDates: [],
+                                      numInstallmentsToRemove: 0
+                                    });
+                                    setEditEmiModalOpen(true);
+                                  })
+                                  .catch(err => {
+                                    console.error("Failed to fetch EMI schedule", err);
+                                    setEditEmiFormData({
+                                      totalAmount: plan.totalAmount || "0",
+                                      registrationFee: actualRegFee,
+                                      discount: plan.discount || '0',
+                                      emiPeriod: String(plan.numberOfInstallments || '2'),
+                                      installments: [],
+                                      recalculate: false,
+                                      strategy: 'distribute',
+                                      numNewInstallments: 1,
+                                      newInstallmentDates: [],
+                                      numInstallmentsToRemove: 0
+                                    });
+                                    setEditEmiModalOpen(true);
+                                  });
+                              }}
+                            >
+                              <Edit className="mr-1 h-3 w-3" />
+                              Edit
+                            </Button>
+                          )}
+                          {plan.status !== 'cancelled' && plan.status !== 'completed' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                              onClick={() => {
+                                setItemToDelete({
+                                  id: plan.id,
+                                  type: 'emi_cancel',
+                                  details: `EMI Plan: ${formatAmount(parseFloat(plan.totalAmount))}`
+                                });
+                                setDeleteConfirmOpen(true);
+                              }}
+                            >
+                              Cancel Plan
+                            </Button>
+                          )}
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="bg-red-600 text-white rounded-lg"
+                            onClick={() => {
+                              setItemToDelete({
+                                id: plan.id,
+                                type: 'emi_plan',
+                                details: `EMI Plan: ${formatAmount(parseFloat(plan.totalAmount))}`
+                              });
+                              setDeleteConfirmOpen(true);
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {emiPlans.filter(plan => plan.studentId === selectedStudent.id).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                        <CreditCard className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                        <p>No EMI plans configured for this student</p>
+                        <p className="text-sm">Configure EMI plans for this student to see them here</p>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+          {/* Full EMI Plan Modal restored */}
+          {emiModalOpen && (
+            <Dialog open={emiModalOpen} onOpenChange={open => {
+              setEmiModalOpen(open);
+              if (!open) setSelectedStudentForEMI(null);
+            }}>
+              <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    Payment Configuration for {selectedStudentForEMI?.name}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Configure payment plan and EMI details for {selectedStudentForEMI?.studentId} ({selectedStudentForEMI?.class})
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={e => {
+                  e.preventDefault();
+                  if (!selectedStudentForEMI) return;
+
+                  // Check payment type and handle accordingly
+                  if (paymentType === 'full') {
+                    // For full payment, record as a single payment
+                    const totalAmount = parseFloat(emiFormData.totalAmount);
+                    const discount = parseFloat(emiFormData.discount || '0');
+                    const finalAmount = totalAmount - discount;
+
+                    addPaymentMutation.mutate({
+                      leadId: selectedStudentForEMI.id,
+                      amount: finalAmount.toString(),
+                      discount: discount.toString(),
+                      paymentDate: emiFormData.startDate,
+                      paymentMode: 'cash', // Default, can be modified if needed
+                      receiptNumber: null, // System-generated
+                      transactionId: emiFormData.transactionId || null,
+                      status: 'completed',
+                      installmentNumber: null,
+                      paymentCategory: 'fee_payment',
+                    });
+                  } else {
+                    // For EMI payment, create EMI plan
+                    const numberOfInstallments = parseInt(emiFormData.emiPeriod);
+                    const installmentAmount = emiFormData.emiAmount;
+                    const startDate = emiFormData.startDate;
+                    const endDateObj = new Date(startDate);
+                    endDateObj.setMonth(endDateObj.getMonth() + numberOfInstallments);
+                    const endDate = endDateObj.toISOString().split('T')[0];
+                    addEmiPlanMutation.mutate({
+                      studentId: selectedStudentForEMI.id,
+                      totalAmount: emiFormData.totalAmount,
+                      numberOfInstallments,
+                      installmentAmount,
+                      startDate,
+                      endDate,
+                      status: 'active',
+                      registrationFee: emiFormData.registrationFee,
+                      paymentMode: emiFormData.paymentMode,
+                      transactionId: emiFormData.transactionId,
+                      discount: emiFormData.discount,
+                      installments: emiFormData.installments
+                    });
+                  }
+                }} className="space-y-6">
+                  {/* Payment Type Selection */}
+                  <div className="space-y-4">
+                    <Label className="text-base font-medium">Payment Type</Label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentType === 'emi' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setPaymentType('emi')}>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="paymentType"
+                            value="emi"
+                            checked={paymentType === 'emi'}
+                            onChange={() => setPaymentType('emi')}
+                            className="text-primary"
+                          />
+                          <div>
+                            <div className="font-medium flex items-center gap-2">
+                              EMI Payment
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Pay in installments over time
+                            </div>
                           </div>
                         </div>
-                      </CardHeader>
-                      <CardContent>
+                      </div>
+                      <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentType === 'full' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setPaymentType('full')}>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="paymentType"
+                            value="full"
+                            checked={paymentType === 'full'}
+                            onChange={() => setPaymentType('full')}
+                            className="text-primary"
+                          />
+                          <div>
+                            <div className="font-medium flex items-center gap-2">
+                              Full Payment
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Pay the entire amount at once
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Basic Payment Information */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="totalAmount">Total Amount (₹)</Label>
+                      <Input
+                        id="totalAmount"
+                        name="totalAmount"
+                        type="number"
+                        required
+                        placeholder="Enter total fee amount"
+                        min="0"
+                        step="0.01"
+                        value={emiFormData.totalAmount}
+                        readOnly
+                        className="bg-gray-100 cursor-not-allowed"
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="discount">Discount (₹)</Label>
+                      <Input
+                        id="discount"
+                        name="discount"
+                        type="number"
+                        placeholder="0"
+                        min="0"
+                        step="0.01"
+                        value={emiFormData.discount || ''}
+                        onChange={(e) => {
+                          const discount = e.target.value;
+                          setEmiFormData(prev => ({
+                            ...prev,
+                            discount,
+                            emiAmount: prev.totalAmount && prev.emiPeriod
+                              ? Math.round((parseFloat(prev.totalAmount) - (parseFloat(prev.registrationFee) || 0) - (parseFloat(discount) || 0)) / parseInt(prev.emiPeriod)).toString()
+                              : ''
+                          }));
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {/* EMI Specific Options */}
+                  {paymentType === 'emi' && (
+                    <>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="registrationFee">Registration Fee (₹)</Label>
+                          <Input
+                            id="registrationFee"
+                            name="registrationFee"
+                            type="number"
+                            placeholder="0"
+                            min="0"
+                            step="0.01"
+                            value={emiFormData.registrationFee}
+                            onChange={(e) => {
+                              const registrationFee = e.target.value;
+                              setEmiFormData(prev => ({
+                                ...prev,
+                                registrationFee,
+                                emiAmount: prev.totalAmount && prev.emiPeriod
+                                  ? Math.round((parseFloat(prev.totalAmount) - (parseFloat(registrationFee) || 0) - (parseFloat(prev.discount) || 0)) / parseInt(prev.emiPeriod)).toString()
+                                  : ''
+                              }));
+                            }}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="paymentMode">Payment Mode</Label>
+                          <Select
+                            value={emiFormData.paymentMode}
+                            onValueChange={(value) => setEmiFormData(prev => ({ ...prev, paymentMode: value }))}
+                            disabled={!parseFloat(emiFormData.registrationFee || "0")}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select mode" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="UPI">UPI</SelectItem>
+                              <SelectItem value="Cash">Cash</SelectItem>
+                              <SelectItem value="Card">Card</SelectItem>
+                              <SelectItem value="Cheque">Cheque</SelectItem>
+                              <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="emiPeriod">Number of EMIs</Label>
+                          <Select
+                            value={emiFormData.emiPeriod}
+                            onValueChange={(value) => {
+                              setEmiFormData(prev => ({
+                                ...prev,
+                                emiPeriod: value,
+                                emiAmount: emiFormData.totalAmount && value
+                                  ? Math.round((parseFloat(emiFormData.totalAmount) - (parseFloat(emiFormData.registrationFee) || 0) - (parseFloat(emiFormData.discount) || 0)) / parseInt(value)).toString()
+                                  : ''
+                              }));
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select period" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="2">2</SelectItem>
+                              <SelectItem value="3">3</SelectItem>
+                              <SelectItem value="4">4</SelectItem>
+                              <SelectItem value="5">5</SelectItem>
+                              <SelectItem value="6">6</SelectItem>
+                              <SelectItem value="9">9</SelectItem>
+                              <SelectItem value="12">12</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                      </div>
+                    </>
+                  )}
+                  {/* Transaction ID Field */}
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="startDate">Transaction Date</Label>
+                      <Input
+                        id="startDate"
+                        name="startDate"
+                        type="date"
+                        required
+                        // min={new Date().toISOString().split('T')[0]}
+                        value={emiFormData.startDate}
+                        onChange={(e) => setEmiFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="transactionId">Transaction ID (Optional)</Label>
+                      <Input
+                        id="transactionId"
+                        name="transactionId"
+                        type="text"
+                        placeholder="Enter transaction ID"
+                        value={emiFormData.transactionId || ''}
+                        onChange={e => setEmiFormData(prev => ({ ...prev, transactionId: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  {paymentType === 'emi' && emiFormData.installments.length > 0 && (
+                    <div className="mt-4">
+                      <Label className="block mb-2 text-base font-medium">Installment Schedule</Label>
+                      <p className="text-xs text-muted-foreground mb-2">You can manually adjust individual installment amounts below. The last installment auto-balances to maintain the total.</p>
+                      <div className="border rounded-md overflow-hidden bg-white">
                         <Table>
                           <TableHeader>
-                            <TableRow>
-                              <TableHead className="table-header">Plan Type</TableHead>
-                              <TableHead className="table-header">Total Amount</TableHead>
-                              <TableHead className="table-header">EMI Details</TableHead>
-                              <TableHead className="table-header">Start Date</TableHead>
-                              <TableHead className="table-header">Status</TableHead>
-                              <TableHead className="table-header">Actions</TableHead>
+                            <TableRow className="bg-gray-50">
+                              <TableHead className="w-[80px]">#</TableHead>
+                              <TableHead>Expected Date</TableHead>
+                              <TableHead className="text-right">Amount (₹)</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {emiPlans.filter(plan => plan.studentId === selectedStudent.id).map((plan) => (
-                              <TableRow key={plan.id} className="hover:bg-gray-50">
-                                <TableCell>
-                                  <Badge
-                                    variant="outline"
-                                    className={
-                                      plan.numberOfInstallments > 1
-                                        ? "bg-blue-100 text-blue-800 border-blue-200 whitespace-nowrap px-2"
-                                        : "bg-green-100 text-green-800 border-green-200 whitespace-nowrap px-2"
-                                    }
-                                  >
-                                    {plan.numberOfInstallments > 1 ? 'EMI Payment' : 'Full Payment'}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="font-medium text-gray-900">
-                                    {formatAmount(parseFloat(plan.totalAmount || "0"))}
-                                  </div>
-                                  {parseFloat(plan.discount || "0") > 0 && (
-                                    <div className="text-sm text-green-600">
-                                      -{formatAmount(parseFloat(plan.discount || "0"))} discount
-                                    </div>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {plan.numberOfInstallments > 1 ? (
-                                    <EMIPaymentProgress planId={plan.id} totalInstallments={plan.numberOfInstallments} installmentAmount={plan.installmentAmount} status={plan.status} totalAmount={plan.totalAmount} />
-                                  ) : (
-                                    <div className="text-sm text-gray-500">Full payment</div>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-gray-900">
-                                    {format(new Date(plan.startDate), "MMM dd, yyyy")}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge
-                                    className={
-                                      plan.status === "active"
-                                        ? "bg-green-500 text-white rounded-full px-3 py-1"
-                                        : plan.status === "completed"
-                                          ? "bg-blue-500 text-white rounded-full px-3 py-1"
-                                          : "bg-gray-500 text-white rounded-full px-3 py-1"
-                                    }
-                                  >
-                                    {plan.status.charAt(0).toUpperCase() + plan.status.slice(1)}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex space-x-2">
-                                    {plan.status !== 'cancelled' && (
-                                      <RecordPaymentButton
-                                        plan={plan}
-                                        onClick={() => {
-                                          setSelectedEmiPlan(plan);
-                                          setEmiPaymentModalOpen(true);
-                                        }}
-                                      />
-                                    )}
-                                    {plan.status === 'active' && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="border-orange-500 text-orange-600 hover:bg-orange-50"
-                                        onClick={() => {
-                                          setSelectedEmiPlanForEdit(plan);
-                                          const regFeePayment = feePayments.find(p => p.leadId === plan.studentId && p.installmentNumber === 0);
-                                          const actualRegFee = regFeePayment ? regFeePayment.amount : '0';
-
-                                          // Fetch schedule details
-                                          apiRequest("GET", `/api/emi-plans/${plan.id}/schedule`)
-                                            .then(res => res.json())
-                                            .then(schedule => {
-                                              setEditEmiFormData({
-                                                totalAmount: plan.totalAmount || "0",
-                                                registrationFee: actualRegFee,
-                                                discount: plan.discount || '0',
-                                                emiPeriod: String(plan.numberOfInstallments || '2'),
-                                                installments: Array.isArray(schedule) ? schedule.map((s: any) => ({
-                                                  installmentNumber: s.installmentNumber,
-                                                  amount: s.amount,
-                                                  dueDate: s.dueDate ? new Date(s.dueDate).toISOString().split('T')[0] : '',
-                                                  status: s.status
-                                                })) : [],
-                                                recalculate: false,
-                                                strategy: 'distribute',
-                                                numNewInstallments: 1,
-                                                newInstallmentDates: [],
-                                                numInstallmentsToRemove: 0
-                                              });
-                                              setEditEmiModalOpen(true);
-                                            })
-                                            .catch(err => {
-                                              console.error("Failed to fetch EMI schedule", err);
-                                              setEditEmiFormData({
-                                                totalAmount: plan.totalAmount || "0",
-                                                registrationFee: actualRegFee,
-                                                discount: plan.discount || '0',
-                                                emiPeriod: String(plan.numberOfInstallments || '2'),
-                                                installments: [],
-                                                recalculate: false,
-                                                strategy: 'distribute',
-                                                numNewInstallments: 1,
-                                                newInstallmentDates: [],
-                                                numInstallmentsToRemove: 0
-                                              });
-                                              setEditEmiModalOpen(true);
-                                            });
-                                        }}
-                                      >
-                                        <Edit className="mr-1 h-3 w-3" />
-                                        Edit
-                                      </Button>
-                                    )}
-                                    {plan.status !== 'cancelled' && plan.status !== 'completed' && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="border-orange-500 text-orange-600 hover:bg-orange-50"
-                                        onClick={() => {
-                                          setItemToDelete({
-                                            id: plan.id,
-                                            type: 'emi_cancel',
-                                            details: `EMI Plan: ${formatAmount(parseFloat(plan.totalAmount))}`
-                                          });
-                                          setDeleteConfirmOpen(true);
-                                        }}
-                                      >
-                                        Cancel Plan
-                                      </Button>
-                                    )}
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      className="bg-red-600 text-white rounded-lg"
-                                      onClick={() => {
-                                        setItemToDelete({
-                                          id: plan.id,
-                                          type: 'emi_plan',
-                                          details: `EMI Plan: ${formatAmount(parseFloat(plan.totalAmount))}`
+                            {emiFormData.installments.map((inst, idx) => {
+                              const isLast = idx === emiFormData.installments.length - 1;
+                              return (
+                                <TableRow key={idx}>
+                                  <TableCell>{idx + 1}</TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="date"
+                                      value={inst.dueDate}
+                                      onChange={(e) => {
+                                        const newDate = e.target.value;
+                                        setEmiFormData(prev => {
+                                          const newInstallments = [...prev.installments];
+                                          newInstallments[idx] = { ...newInstallments[idx], dueDate: newDate };
+                                          return { ...prev, installments: newInstallments };
                                         });
-                                        setDeleteConfirmOpen(true);
                                       }}
-                                    >
-                                      Delete
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                            {emiPlans.filter(plan => plan.studentId === selectedStudent.id).length === 0 && (
-                              <TableRow>
-                                <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                                  <CreditCard className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                                  <p>No EMI plans configured for this student</p>
-                                  <p className="text-sm">Configure EMI plans for this student to see them here</p>
-                                </TableCell>
-                              </TableRow>
-                            )}
+                                      className="h-8 w-full"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="1"
+                                      value={inst.amount}
+                                      readOnly={isLast}
+                                      className={`h-8 w-32 ml-auto text-right ${isLast ? 'bg-gray-50 cursor-not-allowed font-semibold text-purple-700' : ''}`}
+                                      title={isLast ? 'Auto-calculated to balance total' : 'Edit this installment amount'}
+                                      onChange={(e) => {
+                                        if (isLast) return; // Last is auto-calculated
+                                        const newAmount = e.target.value;
+                                        setEmiFormData(prev => {
+                                          const newInstallments = [...prev.installments];
+                                          newInstallments[idx] = { ...newInstallments[idx], amount: newAmount };
+                                          // Recompute last installment to balance total
+                                          const total = parseFloat(prev.totalAmount) || 0;
+                                          const regFee = parseFloat(prev.registrationFee) || 0;
+                                          const disc = parseFloat(prev.discount) || 0;
+                                          const payable = Math.max(0, total - regFee - disc);
+                                          const sumExcludingLast = newInstallments
+                                            .slice(0, newInstallments.length - 1)
+                                            .reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+                                          const lastAmount = Math.max(0, payable - sumExcludingLast);
+                                          newInstallments[newInstallments.length - 1] = {
+                                            ...newInstallments[newInstallments.length - 1],
+                                            amount: Math.round(lastAmount).toString()
+                                          };
+                                          return { ...prev, installments: newInstallments };
+                                        });
+                                      }}
+                                    />
+                                    {isLast && <div className="text-[10px] text-purple-500 text-right mt-0.5">auto-balanced</div>}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </Table>
-                      </CardContent>
-                    </Card>
-                    {/* Full EMI Plan Modal restored */}
-                    {emiModalOpen && (
-                      <Dialog open={emiModalOpen} onOpenChange={open => {
-                        setEmiModalOpen(open);
-                        if (!open) setSelectedStudentForEMI(null);
-                      }}>
-                        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                              Payment Configuration for {selectedStudentForEMI?.name}
-                            </DialogTitle>
-                            <DialogDescription>
-                              Configure payment plan and EMI details for {selectedStudentForEMI?.studentId} ({selectedStudentForEMI?.class})
-                            </DialogDescription>
-                          </DialogHeader>
-                          <form onSubmit={e => {
-                            e.preventDefault();
-                            if (!selectedStudentForEMI) return;
+                      </div>
+                    </div>
+                  )}
 
-                            // Check payment type and handle accordingly
-                            if (paymentType === 'full') {
-                              // For full payment, record as a single payment
-                              const totalAmount = parseFloat(emiFormData.totalAmount);
-                              const discount = parseFloat(emiFormData.discount || '0');
-                              const finalAmount = totalAmount - discount;
-
-                              addPaymentMutation.mutate({
-                                leadId: selectedStudentForEMI.id,
-                                amount: finalAmount.toString(),
-                                discount: discount.toString(),
-                                paymentDate: emiFormData.startDate,
-                                paymentMode: 'cash', // Default, can be modified if needed
-                                receiptNumber: null, // System-generated
-                                transactionId: emiFormData.transactionId || null,
-                                status: 'completed',
-                                installmentNumber: null,
-                                paymentCategory: 'fee_payment',
-                              });
-                            } else {
-                              // For EMI payment, create EMI plan
-                              const numberOfInstallments = parseInt(emiFormData.emiPeriod);
-                              const installmentAmount = emiFormData.emiAmount;
-                              const startDate = emiFormData.startDate;
-                              const endDateObj = new Date(startDate);
-                              endDateObj.setMonth(endDateObj.getMonth() + numberOfInstallments);
-                              const endDate = endDateObj.toISOString().split('T')[0];
-                              addEmiPlanMutation.mutate({
-                                studentId: selectedStudentForEMI.id,
-                                totalAmount: emiFormData.totalAmount,
-                                numberOfInstallments,
-                                installmentAmount,
-                                startDate,
-                                endDate,
-                                status: 'active',
-                                registrationFee: emiFormData.registrationFee,
-                                paymentMode: emiFormData.paymentMode,
-                                transactionId: emiFormData.transactionId,
-                                discount: emiFormData.discount,
-                                installments: emiFormData.installments
-                              });
-                            }
-                          }} className="space-y-6">
-                            {/* Payment Type Selection */}
-                            <div className="space-y-4">
-                              <Label className="text-base font-medium">Payment Type</Label>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentType === 'emi' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setPaymentType('emi')}>
-                                  <div className="flex items-center gap-3">
-                                    <input
-                                      type="radio"
-                                      name="paymentType"
-                                      value="emi"
-                                      checked={paymentType === 'emi'}
-                                      onChange={() => setPaymentType('emi')}
-                                      className="text-primary"
-                                    />
-                                    <div>
-                                      <div className="font-medium flex items-center gap-2">
-                                        EMI Payment
-                                      </div>
-                                      <div className="text-sm text-muted-foreground">
-                                        Pay in installments over time
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentType === 'full' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setPaymentType('full')}>
-                                  <div className="flex items-center gap-3">
-                                    <input
-                                      type="radio"
-                                      name="paymentType"
-                                      value="full"
-                                      checked={paymentType === 'full'}
-                                      onChange={() => setPaymentType('full')}
-                                      className="text-primary"
-                                    />
-                                    <div>
-                                      <div className="font-medium flex items-center gap-2">
-                                        Full Payment
-                                      </div>
-                                      <div className="text-sm text-muted-foreground">
-                                        Pay the entire amount at once
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
+                  {/* Payment Summary */}
+                  <Card className="bg-gray-50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-h3 flex items-center gap-2">
+                        Payment Summary
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Total Amount:</span>
+                          <span className="font-medium text-gray-900">{formatAmount(parseFloat(emiFormData.totalAmount || '0'))}</span>
+                        </div>
+                        {paymentType === 'emi' && (
+                          <>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Registration Fee:</span>
+                              <span className="font-medium text-gray-900">{formatAmount(parseFloat(emiFormData.registrationFee || '0'))}</span>
                             </div>
-                            {/* Basic Payment Information */}
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="grid gap-2">
-                                <Label htmlFor="totalAmount">Total Amount (₹)</Label>
-                                <Input
-                                  id="totalAmount"
-                                  name="totalAmount"
-                                  type="number"
-                                  required
-                                  placeholder="Enter total fee amount"
-                                  min="0"
-                                  step="0.01"
-                                  value={emiFormData.totalAmount}
-                                  readOnly
-                                  className="bg-gray-100 cursor-not-allowed"
-                                />
-                              </div>
-
-                              <div className="grid gap-2">
-                                <Label htmlFor="discount">Discount (₹)</Label>
-                                <Input
-                                  id="discount"
-                                  name="discount"
-                                  type="number"
-                                  placeholder="0"
-                                  min="0"
-                                  step="0.01"
-                                  value={emiFormData.discount || ''}
-                                  onChange={(e) => {
-                                    const discount = e.target.value;
-                                    setEmiFormData(prev => ({
-                                      ...prev,
-                                      discount,
-                                      emiAmount: prev.totalAmount && prev.emiPeriod
-                                        ? Math.round((parseFloat(prev.totalAmount) - (parseFloat(prev.registrationFee) || 0) - (parseFloat(discount) || 0)) / parseInt(prev.emiPeriod)).toString()
-                                        : ''
-                                    }));
-                                  }}
-                                />
-                              </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Discount:</span>
+                              <span className="font-medium text-gray-900">{formatAmount(parseFloat(emiFormData.discount || '0'))}</span>
                             </div>
-                            {/* EMI Specific Options */}
-                            {paymentType === 'emi' && (
-                              <>
-                                <div className="grid grid-cols-3 gap-4">
-                                  <div className="grid gap-2">
-                                    <Label htmlFor="registrationFee">Registration Fee (₹)</Label>
-                                    <Input
-                                      id="registrationFee"
-                                      name="registrationFee"
-                                      type="number"
-                                      placeholder="0"
-                                      min="0"
-                                      step="0.01"
-                                      value={emiFormData.registrationFee}
-                                      onChange={(e) => {
-                                        const registrationFee = e.target.value;
-                                        setEmiFormData(prev => ({
-                                          ...prev,
-                                          registrationFee,
-                                          emiAmount: prev.totalAmount && prev.emiPeriod
-                                            ? Math.round((parseFloat(prev.totalAmount) - (parseFloat(registrationFee) || 0) - (parseFloat(prev.discount) || 0)) / parseInt(prev.emiPeriod)).toString()
-                                            : ''
-                                        }));
-                                      }}
-                                    />
-                                  </div>
-                                  <div className="grid gap-2">
-                                    <Label htmlFor="paymentMode">Payment Mode</Label>
-                                    <Select
-                                      value={emiFormData.paymentMode}
-                                      onValueChange={(value) => setEmiFormData(prev => ({ ...prev, paymentMode: value }))}
-                                      disabled={!parseFloat(emiFormData.registrationFee || "0")}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select mode" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="UPI">UPI</SelectItem>
-                                        <SelectItem value="Cash">Cash</SelectItem>
-                                        <SelectItem value="Card">Card</SelectItem>
-                                        <SelectItem value="Cheque">Cheque</SelectItem>
-                                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="grid gap-2">
-                                    <Label htmlFor="emiPeriod">Number of EMIs</Label>
-                                    <Select
-                                      value={emiFormData.emiPeriod}
-                                      onValueChange={(value) => {
-                                        setEmiFormData(prev => ({
-                                          ...prev,
-                                          emiPeriod: value,
-                                          emiAmount: emiFormData.totalAmount && value
-                                            ? Math.round((parseFloat(emiFormData.totalAmount) - (parseFloat(emiFormData.registrationFee) || 0) - (parseFloat(emiFormData.discount) || 0)) / parseInt(value)).toString()
-                                            : ''
-                                        }));
-                                      }}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select period" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="2">2</SelectItem>
-                                        <SelectItem value="3">3</SelectItem>
-                                        <SelectItem value="4">4</SelectItem>
-                                        <SelectItem value="5">5</SelectItem>
-                                        <SelectItem value="6">6</SelectItem>
-                                        <SelectItem value="9">9</SelectItem>
-                                        <SelectItem value="12">12</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-
-                                </div>
-                              </>
-                            )}
-                            {/* Transaction ID Field */}
-                            <div className="grid grid-cols-2 gap-4 mt-4">
-                              <div className="grid gap-2">
-                                <Label htmlFor="startDate">Transaction Date</Label>
-                                <Input
-                                  id="startDate"
-                                  name="startDate"
-                                  type="date"
-                                  required
-                                  // min={new Date().toISOString().split('T')[0]}
-                                  value={emiFormData.startDate}
-                                  onChange={(e) => setEmiFormData(prev => ({ ...prev, startDate: e.target.value }))}
-                                />
-                              </div>
-                              <div className="grid gap-2">
-                                <Label htmlFor="transactionId">Transaction ID (Optional)</Label>
-                                <Input
-                                  id="transactionId"
-                                  name="transactionId"
-                                  type="text"
-                                  placeholder="Enter transaction ID"
-                                  value={emiFormData.transactionId || ''}
-                                  onChange={e => setEmiFormData(prev => ({ ...prev, transactionId: e.target.value }))}
-                                />
-                              </div>
+                            <div className="flex justify-between items-center py-2 px-2 rounded bg-primary/10 border border-primary/20 my-2">
+                              <span className="text-muted-foreground text-base font-medium">EMI Amount:</span>
+                              <span className="font-bold text-2xl text-primary">
+                                ₹{(() => {
+                                  const total = parseFloat(emiFormData.totalAmount) || 0;
+                                  const fee = parseFloat(emiFormData.registrationFee) || 0;
+                                  const discount = parseFloat(emiFormData.discount) || 0;
+                                  const months = parseInt(emiFormData.emiPeriod) || 0;
+                                  if (months > 0 && total - fee - discount > 0) {
+                                    return Math.round((total - fee - discount) / months).toString();
+                                  }
+                                  return '0';
+                                })()}
+                              </span>
                             </div>
-
-                              {paymentType === 'emi' && emiFormData.installments.length > 0 && (
-                              <div className="mt-4">
-                                <Label className="block mb-2 text-base font-medium">Installment Schedule</Label>
-                                <p className="text-xs text-muted-foreground mb-2">You can manually adjust individual installment amounts below. The last installment auto-balances to maintain the total.</p>
-                                <div className="border rounded-md overflow-hidden bg-white">
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow className="bg-gray-50">
-                                        <TableHead className="w-[80px]">#</TableHead>
-                                        <TableHead>Expected Date</TableHead>
-                                        <TableHead className="text-right">Amount (₹)</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {emiFormData.installments.map((inst, idx) => {
-                                        const isLast = idx === emiFormData.installments.length - 1;
-                                        return (
-                                          <TableRow key={idx}>
-                                            <TableCell>{idx + 1}</TableCell>
-                                            <TableCell>
-                                              <Input
-                                                type="date"
-                                                value={inst.dueDate}
-                                                onChange={(e) => {
-                                                  const newDate = e.target.value;
-                                                  setEmiFormData(prev => {
-                                                    const newInstallments = [...prev.installments];
-                                                    newInstallments[idx] = { ...newInstallments[idx], dueDate: newDate };
-                                                    return { ...prev, installments: newInstallments };
-                                                  });
-                                                }}
-                                                className="h-8 w-full"
-                                              />
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                              <Input
-                                                type="number"
-                                                min="0"
-                                                step="1"
-                                                value={inst.amount}
-                                                readOnly={isLast}
-                                                className={`h-8 w-32 ml-auto text-right ${isLast ? 'bg-gray-50 cursor-not-allowed font-semibold text-purple-700' : ''}`}
-                                                title={isLast ? 'Auto-calculated to balance total' : 'Edit this installment amount'}
-                                                onChange={(e) => {
-                                                  if (isLast) return; // Last is auto-calculated
-                                                  const newAmount = e.target.value;
-                                                  setEmiFormData(prev => {
-                                                    const newInstallments = [...prev.installments];
-                                                    newInstallments[idx] = { ...newInstallments[idx], amount: newAmount };
-                                                    // Recompute last installment to balance total
-                                                    const total = parseFloat(prev.totalAmount) || 0;
-                                                    const regFee = parseFloat(prev.registrationFee) || 0;
-                                                    const disc = parseFloat(prev.discount) || 0;
-                                                    const payable = Math.max(0, total - regFee - disc);
-                                                    const sumExcludingLast = newInstallments
-                                                      .slice(0, newInstallments.length - 1)
-                                                      .reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
-                                                    const lastAmount = Math.max(0, payable - sumExcludingLast);
-                                                    newInstallments[newInstallments.length - 1] = {
-                                                      ...newInstallments[newInstallments.length - 1],
-                                                      amount: Math.round(lastAmount).toString()
-                                                    };
-                                                    return { ...prev, installments: newInstallments };
-                                                  });
-                                                }}
-                                              />
-                                              {isLast && <div className="text-[10px] text-purple-500 text-right mt-0.5">auto-balanced</div>}
-                                            </TableCell>
-                                          </TableRow>
-                                        );
-                                      })}
-                                    </TableBody>
-                                  </Table>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Payment Summary */}
-                            <Card className="bg-gray-50">
-                              <CardHeader className="pb-3">
-                                <CardTitle className="text-h3 flex items-center gap-2">
-                                  Payment Summary
-                                </CardTitle>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="space-y-3">
-                                  <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Total Amount:</span>
-                                    <span className="font-medium text-gray-900">{formatAmount(parseFloat(emiFormData.totalAmount || '0'))}</span>
-                                  </div>
-                                  {paymentType === 'emi' && (
-                                    <>
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Registration Fee:</span>
-                                        <span className="font-medium text-gray-900">{formatAmount(parseFloat(emiFormData.registrationFee || '0'))}</span>
-                                      </div>
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Discount:</span>
-                                        <span className="font-medium text-gray-900">{formatAmount(parseFloat(emiFormData.discount || '0'))}</span>
-                                      </div>
-                                      <div className="flex justify-between items-center py-2 px-2 rounded bg-primary/10 border border-primary/20 my-2">
-                                        <span className="text-muted-foreground text-base font-medium">EMI Amount:</span>
-                                        <span className="font-bold text-2xl text-primary">
-                                          ₹{(() => {
-                                            const total = parseFloat(emiFormData.totalAmount) || 0;
-                                            const fee = parseFloat(emiFormData.registrationFee) || 0;
-                                            const discount = parseFloat(emiFormData.discount) || 0;
-                                            const months = parseInt(emiFormData.emiPeriod) || 0;
-                                            if (months > 0 && total - fee - discount > 0) {
-                                              return Math.round((total - fee - discount) / months).toString();
-                                            }
-                                            return '0';
-                                          })()}
-                                        </span>
-                                      </div>
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Number of EMIs:</span>
-                                        <span className="font-medium">{emiFormData.emiPeriod || '0'}</span>
-                                      </div>
-                                      <div className="border-t pt-3 flex justify-between font-semibold">
-                                        <span>Total Payable EMI:</span>
-                                        <span className="text-primary">
-                                          ₹{(() => {
-                                            const total = parseFloat(emiFormData.totalAmount) || 0;
-                                            const fee = parseFloat(emiFormData.registrationFee) || 0;
-                                            const discount = parseFloat(emiFormData.discount) || 0;
-                                            const months = parseInt(emiFormData.emiPeriod) || 0;
-                                            if (months > 0 && total - fee - discount > 0) {
-                                              return Math.round(total - fee - discount).toString();
-                                            }
-                                            return '0.00';
-                                          })()}
-                                        </span>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
-                            <div className="flex justify-end gap-3">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="border-[#643ae5] text-[#643ae5] hover:bg-slate-50"
-                                onClick={() => {
-                                  setEmiModalOpen(false);
-                                  setSelectedStudentForEMI(null);
-                                  setPaymentType('emi');
-                                  setEmiFormData({
-                                    totalAmount: '',
-                                    emiPeriod: '2',
-                                    emiAmount: '',
-                                    registrationFee: '0',
-                                    interestRate: '0',
-                                    startDate: format(new Date(), 'yyyy-MM-dd'),
-                                    frequency: 'monthly',
-                                    processingFee: '0',
-                                    lateFee: '0',
-                                    receiptNumber: '',
-                                    discount: '',
-                                    paymentMode: '',
-                                    transactionId: '',
-                                    installments: []
-                                  });
-                                }}
-                              >
-                                Cancel
-                              </Button>
-                              <Button type="submit" className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none">
-                                {paymentType === 'full' ? 'Record Payment' : 'Add EMI Plan'}
-                              </Button>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Number of EMIs:</span>
+                              <span className="font-medium">{emiFormData.emiPeriod || '0'}</span>
                             </div>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
-                    )}
+                            <div className="border-t pt-3 flex justify-between font-semibold">
+                              <span>Total Payable EMI:</span>
+                              <span className="text-primary">
+                                ₹{(() => {
+                                  const total = parseFloat(emiFormData.totalAmount) || 0;
+                                  const fee = parseFloat(emiFormData.registrationFee) || 0;
+                                  const discount = parseFloat(emiFormData.discount) || 0;
+                                  const months = parseInt(emiFormData.emiPeriod) || 0;
+                                  if (months > 0 && total - fee - discount > 0) {
+                                    return Math.round(total - fee - discount).toString();
+                                  }
+                                  return '0.00';
+                                })()}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <div className="flex justify-end gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-[#643ae5] text-[#643ae5] hover:bg-slate-50"
+                      onClick={() => {
+                        setEmiModalOpen(false);
+                        setSelectedStudentForEMI(null);
+                        setPaymentType('emi');
+                        setEmiFormData({
+                          totalAmount: '',
+                          emiPeriod: '2',
+                          emiAmount: '',
+                          registrationFee: '0',
+                          interestRate: '0',
+                          startDate: format(new Date(), 'yyyy-MM-dd'),
+                          frequency: 'monthly',
+                          processingFee: '0',
+                          lateFee: '0',
+                          receiptNumber: '',
+                          discount: '',
+                          paymentMode: '',
+                          transactionId: '',
+                          installments: []
+                        });
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="bg-[#643ae5] text-white rounded-lg font-semibold hover:bg-[#7c4dff] border-none">
+                      {paymentType === 'full' ? 'Record Payment' : 'Add EMI Plan'}
+                    </Button>
                   </div>
-                )}
-              </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+      </div>
+    )
+  }
+              </div >
             </div >
           ) : (
-            <div className="flex items-center justify-center h-full text-[#b0b3b8]">Select a student to view details</div>
-          )
-          }
+    <div className="flex items-center justify-center h-full text-[#b0b3b8]">Select a student to view details</div>
+  )
+}
         </main >
       </div >
 
 
-      {/* Edit EMI Plan Dialog */}
-      <Dialog open={editEmiModalOpen} onOpenChange={setEditEmiModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit EMI Plan</DialogTitle>
-            <DialogDescription>
-              Update total amount and recalculate installments if needed.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleUpdateEmiPlan} className="space-y-4">
-            {/* Current & New Amount Row */}
-            <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-500 space-y-1">
-              <p><span className="font-medium">Current Total:</span> {formatAmount(parseFloat(selectedEmiPlanForEdit?.totalAmount || "0"))}</p>
-              <p><span className="font-medium">Current EMIs:</span> {selectedEmiPlanForEdit?.numberOfInstallments}</p>
+  {/* Edit EMI Plan Dialog */ }
+  < Dialog open = { editEmiModalOpen } onOpenChange = { setEditEmiModalOpen } >
+    <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>Edit EMI Plan</DialogTitle>
+        <DialogDescription>
+          Update total amount and recalculate installments if needed.
+        </DialogDescription>
+      </DialogHeader>
+      <form onSubmit={handleUpdateEmiPlan} className="space-y-4">
+        {/* Current & New Amount Row */}
+        <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-500 space-y-1">
+          <p><span className="font-medium">Current Total:</span> {formatAmount(parseFloat(selectedEmiPlanForEdit?.totalAmount || "0"))}</p>
+          <p><span className="font-medium">Current EMIs:</span> {selectedEmiPlanForEdit?.numberOfInstallments}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Total Amount */}
+          <div className="space-y-1.5">
+            <Label htmlFor="editTotalAmount">Total Amount (₹)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="editTotalAmount"
+                type="number"
+                required
+                readOnly
+                className="bg-gray-50 text-gray-500 cursor-not-allowed"
+                title="Total amount is fetched from the backend or class fee. It cannot be edited manually."
+                value={editEmiFormData.totalAmount}
+              />
+              {selectedStudent && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  title="Apply standard class fee"
+                  onClick={() => {
+                    const standardFee = globalClassFees.find(gcf =>
+                      gcf.className === selectedStudent.class &&
+                      gcf.academicYear === academicYear
+                    );
+                    if (standardFee) {
+                      const classFeeAmount = parseFloat(standardFee.amount);
+                      const tuitionPaid = calculateTuitionPaidAmount(getStudentPayments(selectedStudent.id));
+                      const outstanding = Math.max(0, classFeeAmount - tuitionPaid);
+                      setEditEmiFormData(prev => {
+                        const count = parseInt(prev.emiPeriod) || 0;
+                        const total = outstanding;
+                        const reg = parseFloat(prev.registrationFee) || 0;
+                        const disc = parseFloat(prev.discount) || 0;
+                        const newInst = recomputeEditInstallments(prev.installments, count, total, reg, disc);
+                        return { ...prev, totalAmount: outstanding.toString(), installments: newInst };
+                      });
+                      toast({
+                        title: "Applied Class Fee",
+                        description: `Outstanding: ₹${outstanding.toLocaleString()}`
+                      });
+                    } else {
+                      toast({ title: "Fee Not Found", description: `No standard fee for Class: ${selectedStudent.class}`, variant: "destructive" });
+                    }
+                  }}
+                >
+                  <BookOpenCheck className="h-4 w-4" />
+                </Button>
+              )}
             </div>
+            {selectedStudent && (
+              <p className="text-xs text-muted-foreground">Class: {selectedStudent.class}</p>
+            )}
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {/* Total Amount */}
-              <div className="space-y-1.5">
-                <Label htmlFor="editTotalAmount">Total Amount (₹)</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="editTotalAmount"
-                    type="number"
-                    required
-                    readOnly
-                    className="bg-gray-50 text-gray-500 cursor-not-allowed"
-                    title="Total amount is fetched from the backend or class fee. It cannot be edited manually."
-                    value={editEmiFormData.totalAmount}
-                  />
-                  {selectedStudent && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      title="Apply standard class fee"
-                      onClick={() => {
-                        const standardFee = globalClassFees.find(gcf =>
-                          gcf.className === selectedStudent.class &&
-                          gcf.academicYear === academicYear
-                        );
-                        if (standardFee) {
-                          const classFeeAmount = parseFloat(standardFee.amount);
-                          const tuitionPaid = calculateTuitionPaidAmount(getStudentPayments(selectedStudent.id));
-                          const outstanding = Math.max(0, classFeeAmount - tuitionPaid);
-                          setEditEmiFormData(prev => {
-                            const count = parseInt(prev.emiPeriod) || 0;
-                            const total = outstanding;
-                            const reg = parseFloat(prev.registrationFee) || 0;
-                            const disc = parseFloat(prev.discount) || 0;
-                            const payable = Math.max(0, total - reg - disc);
-                            const newInst = count > 0 && payable > 0
-                              ? Array.from({ length: count }, (_, i) => ({
-                                  installmentNumber: i + 1,
-                                  amount: Math.round(payable / count).toString(),
-                                  dueDate: prev.installments[i]?.dueDate || new Date().toISOString().split('T')[0],
-                                  status: prev.installments[i]?.status || 'pending'
-                                }))
-                              : prev.installments;
-                            return { ...prev, totalAmount: outstanding.toString(), installments: newInst };
-                          });
-                          toast({
-                            title: "Applied Class Fee",
-                            description: `Outstanding: ₹${outstanding.toLocaleString()}`
-                          });
-                        } else {
-                          toast({ title: "Fee Not Found", description: `No standard fee for Class: ${selectedStudent.class}`, variant: "destructive" });
-                        }
-                      }}
-                    >
-                      <BookOpenCheck className="h-4 w-4" />
-                    </Button>
-                  )}
+          {/* Number of EMIs */}
+          <div className="space-y-1.5">
+            <Label htmlFor="editEmiPeriod">Number of EMIs</Label>
+            <Select
+              value={editEmiFormData.emiPeriod}
+              onValueChange={(value) => {
+                const count = parseInt(value) || 0;
+                const paidCount = editEmiFormData.installments.filter(i => i.status === 'paid').length;
+
+                if (count < paidCount) {
+                  toast({
+                    title: "Validation Error",
+                    description: `Number of EMIs cannot be less than already paid installments (${paidCount}). Selection reset to ${editEmiFormData.emiPeriod}.`,
+                    variant: "destructive"
+                  });
+                  return;
+                }
+
+                setEditEmiFormData(prev => {
+                  const total = parseFloat(prev.totalAmount) || 0;
+                  const reg = parseFloat(prev.registrationFee) || 0;
+                  const disc = parseFloat(prev.discount) || 0;
+                  const newInst = recomputeEditInstallments(prev.installments, count, total, reg, disc);
+                  return { ...prev, emiPeriod: value, installments: newInst };
+                });
+              }}
+            >
+              <SelectTrigger id="editEmiPeriod">
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
+              <SelectContent>
+                {['2', '3', '4', '5', '6', '7', '8', '9', '10', '12'].map(v => {
+                  const num = parseInt(v);
+                  const paidCount = editEmiFormData.installments.filter(i => i.status === 'paid').length;
+                  const isBelowPaid = num < paidCount;
+                  return (
+                    <SelectItem key={v} value={v} disabled={isBelowPaid}>
+                      {v} {isBelowPaid ? `(Min ${paidCount} paid)` : ''}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Registration Fee */}
+          <div className="space-y-1.5">
+            <Label htmlFor="editRegFee">Registration Fee (₹)</Label>
+            <Input
+              id="editRegFee"
+              type="number"
+              min="0"
+              value={editEmiFormData.registrationFee}
+              onChange={e => {
+                const registrationFee = e.target.value;
+                setEditEmiFormData(prev => {
+                  const count = parseInt(prev.emiPeriod) || 0;
+                  const total = parseFloat(prev.totalAmount) || 0;
+                  const reg = parseFloat(registrationFee) || 0;
+                  const disc = parseFloat(prev.discount) || 0;
+                  const newInst = recomputeEditInstallments(prev.installments, count, total, reg, disc);
+                  return { ...prev, registrationFee, installments: newInst };
+                });
+              }}
+            />
+          </div>
+
+          {/* Discount */}
+          <div className="space-y-1.5">
+            <Label htmlFor="editDiscount">Discount (₹)</Label>
+            <Input
+              id="editDiscount"
+              type="number"
+              min="0"
+              value={editEmiFormData.discount}
+              onChange={e => {
+                const discount = e.target.value;
+                setEditEmiFormData(prev => {
+                  const count = parseInt(prev.emiPeriod) || 0;
+                  const total = parseFloat(prev.totalAmount) || 0;
+                  const reg = parseFloat(prev.registrationFee) || 0;
+                  const disc = parseFloat(discount) || 0;
+                  const newInst = recomputeEditInstallments(prev.installments, count, total, reg, disc);
+                  return { ...prev, discount, installments: newInst };
+                });
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Editable Installments Table */}
+        {editEmiFormData.installments.length > 0 && (
+          <div className="space-y-2">
+            <Label className="text-base font-medium">Installment Schedule</Label>
+            <p className="text-xs text-muted-foreground">Paid installment amounts are locked. Adjust unpaid installments; the last unpaid installment auto-balances.</p>
+            <div className="border rounded-md overflow-hidden bg-white">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="w-[60px]">#</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead className="text-right">Amount (₹)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(() => {
+                    const unpaidIndices = editEmiFormData.installments
+                      .map((inst, idx) => inst.status !== 'paid' ? idx : -1)
+                      .filter(idx => idx !== -1);
+                    const lastUnpaidIdx = unpaidIndices.length > 0 ? unpaidIndices[unpaidIndices.length - 1] : -1;
+
+                    return editEmiFormData.installments.map((inst, idx) => {
+                      const isPaid = inst.status === 'paid';
+                      const isLastUnpaid = idx === lastUnpaidIdx;
+                      const isReadOnly = isPaid || isLastUnpaid;
+
+                      return (
+                        <TableRow key={idx}>
+                          <TableCell>{idx + 1}</TableCell>
+                          <TableCell>
+                            <Input
+                              type="date"
+                              value={inst.dueDate}
+                              readOnly={isPaid}
+                              disabled={isPaid}
+                              onChange={(e) => {
+                                if (isPaid) return;
+                                const newDate = e.target.value;
+                                setEditEmiFormData(prev => {
+                                  const newInst = [...prev.installments];
+                                  newInst[idx] = { ...newInst[idx], dueDate: newDate };
+                                  return { ...prev, installments: newInst };
+                                });
+                              }}
+                              className={`h-8 w-full ${isPaid ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={inst.amount}
+                              readOnly={isReadOnly}
+                              className={`h-8 w-32 ml-auto text-right ${isPaid
+                                  ? 'bg-green-50 text-green-700 font-semibold cursor-not-allowed border-green-200'
+                                  : isLastUnpaid
+                                    ? 'bg-gray-50 cursor-not-allowed font-semibold text-purple-700'
+                                    : ''
+                                }`}
+                              title={
+                                isPaid
+                                  ? 'Already paid — amount cannot be changed'
+                                  : isLastUnpaid
+                                    ? 'Auto-calculated to balance remaining total'
+                                    : 'Edit this installment amount'
+                              }
+                              onChange={(e) => {
+                                if (isReadOnly) return;
+                                const newAmount = e.target.value;
+                                setEditEmiFormData(prev => {
+                                  const newInst = [...prev.installments];
+                                  newInst[idx] = { ...newInst[idx], amount: newAmount };
+                                  const total = parseFloat(prev.totalAmount) || 0;
+                                  const reg = parseFloat(prev.registrationFee) || 0;
+                                  const disc = parseFloat(prev.discount) || 0;
+                                  const payable = Math.max(0, total - reg - disc);
+
+                                  if (lastUnpaidIdx !== -1) {
+                                    const sumExcludingLastUnpaid = newInst
+                                      .filter((_, i) => i !== lastUnpaidIdx)
+                                      .reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+                                    newInst[lastUnpaidIdx] = {
+                                      ...newInst[lastUnpaidIdx],
+                                      amount: Math.max(0, Math.round(payable - sumExcludingLastUnpaid)).toString()
+                                    };
+                                  }
+                                  return { ...prev, installments: newInst };
+                                });
+                              }}
+                            />
+                            {isPaid && <div className="text-[10px] text-green-600 font-medium text-right mt-0.5">PAID</div>}
+                            {!isPaid && isLastUnpaid && <div className="text-[10px] text-purple-500 text-right mt-0.5">auto-balanced</div>}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            id="recalculate"
+            className="h-4 w-4 rounded border-gray-300 text-[#643ae5] focus:ring-[#643ae5]"
+            checked={editEmiFormData.recalculate}
+            onChange={e => setEditEmiFormData({ ...editEmiFormData, recalculate: e.target.checked })}
+          />
+          <Label htmlFor="recalculate" className="font-normal cursor-pointer">
+            Recalculate remaining installments?
+          </Label>
+        </div>
+        {editEmiFormData.recalculate && (
+          <>
+            <div className="space-y-2 border-t pt-3">
+              <Label>Recalculation Method</Label>
+              <div className="grid grid-cols-1 gap-2">
+                <div
+                  className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${editEmiFormData.strategy === 'distribute' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  onClick={() => setEditEmiFormData(prev => ({ ...prev, strategy: 'distribute' }))}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="strategy"
+                      value="distribute"
+                      checked={editEmiFormData.strategy === 'distribute'}
+                      onChange={() => setEditEmiFormData(prev => ({ ...prev, strategy: 'distribute' }))}
+                      className="text-primary"
+                    />
+                    <div>
+                      <div className="font-medium">Distribute over existing</div>
+                      <div className="text-xs text-muted-foreground">Increase amount of unpaid installments</div>
+                    </div>
+                  </div>
                 </div>
-                {selectedStudent && (
-                  <p className="text-xs text-muted-foreground">Class: {selectedStudent.class}</p>
-                )}
-              </div>
-
-              {/* Number of EMIs */}
-              <div className="space-y-1.5">
-                <Label htmlFor="editEmiPeriod">Number of EMIs</Label>
-                <Select
-                  value={editEmiFormData.emiPeriod}
-                  onValueChange={(value) => {
+                <div
+                  className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${editEmiFormData.strategy === 'add_installments' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  onClick={() => {
                     setEditEmiFormData(prev => {
-                      const count = parseInt(value) || 0;
-                      const total = parseFloat(prev.totalAmount) || 0;
-                      const reg = parseFloat(prev.registrationFee) || 0;
-                      const disc = parseFloat(prev.discount) || 0;
-                      const payable = Math.max(0, total - reg - disc);
-                      const newInst = count > 0 && payable > 0
-                        ? Array.from({ length: count }, (_, i) => ({
-                            installmentNumber: i + 1,
-                            amount: Math.round(payable / count).toString(),
-                            dueDate: prev.installments[i]?.dueDate || new Date().toISOString().split('T')[0]
-                          }))
-                        : [];
-                      return { ...prev, emiPeriod: value, installments: newInst };
+                      // Initialize dates if switching to add_installments
+                      if (prev.strategy !== 'add_installments' && prev.newInstallmentDates.length === 0) {
+                        const date = new Date();
+                        date.setMonth(date.getMonth() + 1);
+                        return {
+                          ...prev,
+                          strategy: 'add_installments',
+                          newInstallmentDates: [date.toISOString().split('T')[0]]
+                        };
+                      }
+                      return { ...prev, strategy: 'add_installments' };
                     });
                   }}
                 >
-                  <SelectTrigger id="editEmiPeriod">
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {['2','3','4','5','6','9','12'].map(v => (
-                      <SelectItem key={v} value={v}>{v}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Registration Fee */}
-              <div className="space-y-1.5">
-                <Label htmlFor="editRegFee">Registration Fee (₹)</Label>
-                <Input
-                  id="editRegFee"
-                  type="number"
-                  min="0"
-                  value={editEmiFormData.registrationFee}
-                  onChange={e => {
-                    const registrationFee = e.target.value;
-                    setEditEmiFormData(prev => {
-                      const count = parseInt(prev.emiPeriod) || 0;
-                      const total = parseFloat(prev.totalAmount) || 0;
-                      const reg = parseFloat(registrationFee) || 0;
-                      const disc = parseFloat(prev.discount) || 0;
-                      const payable = Math.max(0, total - reg - disc);
-                      const newInst = count > 0 && payable > 0 && prev.installments.length === count
-                        ? prev.installments.map((inst, i) => ({
-                            ...inst,
-                            amount: Math.round(payable / count).toString()
-                          }))
-                        : prev.installments;
-                      return { ...prev, registrationFee, installments: newInst };
-                    });
-                  }}
-                />
-              </div>
-
-              {/* Discount */}
-              <div className="space-y-1.5">
-                <Label htmlFor="editDiscount">Discount (₹)</Label>
-                <Input
-                  id="editDiscount"
-                  type="number"
-                  min="0"
-                  value={editEmiFormData.discount}
-                  onChange={e => {
-                    const discount = e.target.value;
-                    setEditEmiFormData(prev => {
-                      const count = parseInt(prev.emiPeriod) || 0;
-                      const total = parseFloat(prev.totalAmount) || 0;
-                      const reg = parseFloat(prev.registrationFee) || 0;
-                      const disc = parseFloat(discount) || 0;
-                      const payable = Math.max(0, total - reg - disc);
-                      const newInst = count > 0 && payable > 0 && prev.installments.length === count
-                        ? prev.installments.map(inst => ({
-                            ...inst,
-                            amount: Math.round(payable / count).toString()
-                          }))
-                        : prev.installments;
-                      return { ...prev, discount, installments: newInst };
-                    });
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Editable Installments Table */}
-            {editEmiFormData.installments.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-base font-medium">Installment Schedule</Label>
-                <p className="text-xs text-muted-foreground">Manually adjust individual installment amounts. The last installment auto-balances.</p>
-                <div className="border rounded-md overflow-hidden bg-white">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50">
-                        <TableHead className="w-[60px]">#</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead className="text-right">Amount (₹)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {editEmiFormData.installments.map((inst, idx) => {
-                        const isLast = idx === editEmiFormData.installments.length - 1;
-                        return (
-                          <TableRow key={idx}>
-                            <TableCell>{idx + 1}</TableCell>
-                            <TableCell>
-                              <Input
-                                type="date"
-                                value={inst.dueDate}
-                                onChange={(e) => {
-                                  const newDate = e.target.value;
-                                  setEditEmiFormData(prev => {
-                                    const newInst = [...prev.installments];
-                                    newInst[idx] = { ...newInst[idx], dueDate: newDate };
-                                    return { ...prev, installments: newInst };
-                                  });
-                                }}
-                                className="h-8 w-full"
-                              />
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Input
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={inst.amount}
-                                readOnly={isLast}
-                                className={`h-8 w-32 ml-auto text-right ${isLast ? 'bg-gray-50 cursor-not-allowed font-semibold text-purple-700' : ''}`}
-                                title={isLast ? 'Auto-calculated to balance total' : 'Edit this installment amount'}
-                                onChange={(e) => {
-                                  if (isLast) return;
-                                  const newAmount = e.target.value;
-                                  setEditEmiFormData(prev => {
-                                    const newInst = [...prev.installments];
-                                    newInst[idx] = { ...newInst[idx], amount: newAmount };
-                                    const total = parseFloat(prev.totalAmount) || 0;
-                                    const reg = parseFloat(prev.registrationFee) || 0;
-                                    const disc = parseFloat(prev.discount) || 0;
-                                    const payable = Math.max(0, total - reg - disc);
-                                    const sumExcludingLast = newInst.slice(0, newInst.length - 1).reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
-                                    newInst[newInst.length - 1] = { ...newInst[newInst.length - 1], amount: Math.max(0, Math.round(payable - sumExcludingLast)).toString() };
-                                    return { ...prev, installments: newInst };
-                                  });
-                                }}
-                              />
-                              {isLast && <div className="text-[10px] text-purple-500 text-right mt-0.5">auto-balanced</div>}
-                              {inst.status === 'paid' && <div className="text-[10px] text-green-600 font-medium text-right mt-0.5">PAID</div>}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="recalculate"
-                className="h-4 w-4 rounded border-gray-300 text-[#643ae5] focus:ring-[#643ae5]"
-                checked={editEmiFormData.recalculate}
-                onChange={e => setEditEmiFormData({ ...editEmiFormData, recalculate: e.target.checked })}
-              />
-              <Label htmlFor="recalculate" className="font-normal cursor-pointer">
-                Recalculate remaining installments?
-              </Label>
-            </div>
-            {editEmiFormData.recalculate && (
-              <>
-                <div className="space-y-2 border-t pt-3">
-                  <Label>Recalculation Method</Label>
-                  <div className="grid grid-cols-1 gap-2">
-                    <div
-                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${editEmiFormData.strategy === 'distribute' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      onClick={() => setEditEmiFormData(prev => ({ ...prev, strategy: 'distribute' }))}
-                    >
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="strategy"
-                          value="distribute"
-                          checked={editEmiFormData.strategy === 'distribute'}
-                          onChange={() => setEditEmiFormData(prev => ({ ...prev, strategy: 'distribute' }))}
-                          className="text-primary"
-                        />
-                        <div>
-                          <div className="font-medium">Distribute over existing</div>
-                          <div className="text-xs text-muted-foreground">Increase amount of unpaid installments</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${editEmiFormData.strategy === 'add_installments' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      onClick={() => {
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="strategy"
+                      value="add_installments"
+                      checked={editEmiFormData.strategy === 'add_installments'}
+                      onChange={() => {
                         setEditEmiFormData(prev => {
                           // Initialize dates if switching to add_installments
                           if (prev.strategy !== 'add_installments' && prev.newInstallmentDates.length === 0) {
@@ -3368,760 +3836,742 @@ export default function StudentFees() {
                           return { ...prev, strategy: 'add_installments' };
                         });
                       }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="strategy"
-                          value="add_installments"
-                          checked={editEmiFormData.strategy === 'add_installments'}
-                          onChange={() => {
-                            setEditEmiFormData(prev => {
-                              // Initialize dates if switching to add_installments
-                              if (prev.strategy !== 'add_installments' && prev.newInstallmentDates.length === 0) {
-                                const date = new Date();
-                                date.setMonth(date.getMonth() + 1);
-                                return {
-                                  ...prev,
-                                  strategy: 'add_installments',
-                                  newInstallmentDates: [date.toISOString().split('T')[0]]
-                                };
-                              }
-                              return { ...prev, strategy: 'add_installments' };
-                            });
-                          }}
-                          className="text-primary"
-                        />
-                        <div>
-                          <div className="font-medium">Add new installments</div>
-                          <div className="text-xs text-muted-foreground">Create additional EMI installments</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${editEmiFormData.strategy === 'remove_installments' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      onClick={() => setEditEmiFormData(prev => ({ ...prev, strategy: 'remove_installments' }))}
-                    >
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="strategy"
-                          value="remove_installments"
-                          checked={editEmiFormData.strategy === 'remove_installments'}
-                          onChange={() => setEditEmiFormData(prev => ({ ...prev, strategy: 'remove_installments' }))}
-                          className="text-primary"
-                        />
-                        <div>
-                          <div className="font-medium">Remove last installments</div>
-                          <div className="text-xs text-muted-foreground">Delete unnecessary unpaid installments</div>
-                        </div>
-                      </div>
+                      className="text-primary"
+                    />
+                    <div>
+                      <div className="font-medium">Add new installments</div>
+                      <div className="text-xs text-muted-foreground">Create additional EMI installments</div>
                     </div>
                   </div>
                 </div>
-
-                {editEmiFormData.strategy === 'add_installments' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="numNewInstallments">Number of New Installments</Label>
-                    <Input
-                      id="numNewInstallments"
-                      type="number"
-                      min="1"
-                      max="12"
-                      value={editEmiFormData.numNewInstallments}
-                      onChange={(e) => {
-                        const num = parseInt(e.target.value) || 1;
-                        setEditEmiFormData(prev => ({
-                          ...prev,
-                          numNewInstallments: num,
-                          newInstallmentDates: Array(num).fill('').map((_, i) => {
-                            const date = new Date();
-                            date.setMonth(date.getMonth() + i + 1);
-                            return date.toISOString().split('T')[0];
-                          })
-                        }));
-                      }}
+                <div
+                  className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${editEmiFormData.strategy === 'remove_installments' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  onClick={() => setEditEmiFormData(prev => ({ ...prev, strategy: 'remove_installments' }))}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="strategy"
+                      value="remove_installments"
+                      checked={editEmiFormData.strategy === 'remove_installments'}
+                      onChange={() => setEditEmiFormData(prev => ({ ...prev, strategy: 'remove_installments' }))}
+                      className="text-primary"
                     />
-                    <div className="space-y-2 mt-3">
-                      <Label>Due Dates for New Installments</Label>
-                      {editEmiFormData.newInstallmentDates.map((date, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <Label className="w-24 text-sm">Inst #{(selectedEmiPlanForEdit?.numberOfInstallments || 0) + idx + 1}</Label>
-                          <Input
-                            type="date"
-                            value={date}
-                            onChange={(e) => {
-                              const newDates = [...editEmiFormData.newInstallmentDates];
-                              newDates[idx] = e.target.value;
-                              setEditEmiFormData(prev => ({ ...prev, newInstallmentDates: newDates }));
-                            }}
-                          />
-                        </div>
-                      ))}
+                    <div>
+                      <div className="font-medium">Remove last installments</div>
+                      <div className="text-xs text-muted-foreground">Delete unnecessary unpaid installments</div>
                     </div>
                   </div>
-                )}
+                </div>
+              </div>
+            </div>
 
-                {editEmiFormData.strategy === 'remove_installments' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="numInstallmentsToRemove">Number of Installments to Remove</Label>
-                    <Input
-                      id="numInstallmentsToRemove"
-                      type="number"
-                      min="1"
-                      max={selectedEmiPlanForEdit?.numberOfInstallments || 1}
-                      value={editEmiFormData.numInstallmentsToRemove}
-                      onChange={e => setEditEmiFormData(prev => ({ ...prev, numInstallmentsToRemove: parseInt(e.target.value) || 1 }))}
-                    />
-                    <p className="text-xs text-amber-600">
-                      ⚠ This will delete the last {editEmiFormData.numInstallmentsToRemove} unpaid installment(s)
-                    </p>
-                  </div>
-                )}
-              </>
+            {editEmiFormData.strategy === 'add_installments' && (
+              <div className="space-y-2">
+                <Label htmlFor="numNewInstallments">Number of New Installments</Label>
+                <Input
+                  id="numNewInstallments"
+                  type="number"
+                  min="1"
+                  max="12"
+                  value={editEmiFormData.numNewInstallments}
+                  onChange={(e) => {
+                    const num = parseInt(e.target.value) || 1;
+                    setEditEmiFormData(prev => ({
+                      ...prev,
+                      numNewInstallments: num,
+                      newInstallmentDates: Array(num).fill('').map((_, i) => {
+                        const date = new Date();
+                        date.setMonth(date.getMonth() + i + 1);
+                        return date.toISOString().split('T')[0];
+                      })
+                    }));
+                  }}
+                />
+                <div className="space-y-2 mt-3">
+                  <Label>Due Dates for New Installments</Label>
+                  {editEmiFormData.newInstallmentDates.map((date, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <Label className="w-24 text-sm">Inst #{(selectedEmiPlanForEdit?.numberOfInstallments || 0) + idx + 1}</Label>
+                      <Input
+                        type="date"
+                        value={date}
+                        onChange={(e) => {
+                          const newDates = [...editEmiFormData.newInstallmentDates];
+                          newDates[idx] = e.target.value;
+                          setEditEmiFormData(prev => ({ ...prev, newInstallmentDates: newDates }));
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
-            <p className="text-xs text-amber-600">
-              * {editEmiFormData.strategy === 'distribute'
-                ? 'Recalculating will distribute the remaining amount evenly across unpaid installments.'
-                : 'New installments will be added for the fee increase.'}
-            </p>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditEmiModalOpen(false)}>
+
+            {editEmiFormData.strategy === 'remove_installments' && (
+              <div className="space-y-2">
+                <Label htmlFor="numInstallmentsToRemove">Number of Installments to Remove</Label>
+                <Input
+                  id="numInstallmentsToRemove"
+                  type="number"
+                  min="1"
+                  max={selectedEmiPlanForEdit?.numberOfInstallments || 1}
+                  value={editEmiFormData.numInstallmentsToRemove}
+                  onChange={e => setEditEmiFormData(prev => ({ ...prev, numInstallmentsToRemove: parseInt(e.target.value) || 1 }))}
+                />
+                <p className="text-xs text-amber-600">
+                  ⚠ This will delete the last {editEmiFormData.numInstallmentsToRemove} unpaid installment(s)
+                </p>
+              </div>
+            )}
+          </>
+        )}
+        <p className="text-xs text-amber-600">
+          * {editEmiFormData.strategy === 'distribute'
+            ? 'Recalculating will distribute the remaining amount evenly across unpaid installments.'
+            : 'New installments will be added for the fee increase.'}
+        </p>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setEditEmiModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" className="bg-[#643ae5] text-white hover:bg-[#552dbf]">
+            Update Plan
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+      </Dialog >
+  {/* Student Edit Modal */ }
+{
+  selectedStudent && (
+    <Dialog
+      open={isEditModalOpen}
+      onOpenChange={(open) => {
+        console.log("Dialog onOpenChange:", { open, selectedStudent });
+        setIsEditModalOpen(open);
+        if (open && selectedStudent) {
+          console.log("Setting editedStudent to:", selectedStudent);
+          setEditedStudent({ ...selectedStudent });
+          setFormErrors({});
+        } else {
+          setEditedStudent(null);
+          setFormErrors({});
+        }
+      }}
+    >
+      <DialogContent className="max-w-2xl max-h-[75vh] overflow-y-auto border-4">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <User size={24} />
+            <div>
+              <h2 className="text-xl font-bold">{selectedStudent.name}</h2>
+              <p className="text-sm text-gray-600">{selectedStudent.class}</p>
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="edit-name">Full Name</Label>
+              <Input
+                id="edit-name"
+                value={editedStudent?.name || ''}
+                onChange={(e) => setEditedStudent(prev => ({ ...prev!, name: e.target.value }))}
+                className={formErrors.name ? "border-red-500" : ""}
+              />
+              {formErrors.name && <p className="text-red-500 text-sm mt-1">{formErrors.name}</p>}
+            </div>
+            <div>
+              <Label htmlFor="edit-class">Class</Label>
+              <Select
+                value={editedStudent?.class || ''}
+                onValueChange={(value) => setEditedStudent(prev => ({ ...prev!, class: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from(new Set(allStudents.map(s => s.class).filter(Boolean))).map(cls => (
+                    <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="edit-parent-name">Parent Name</Label>
+              <Input
+                id="edit-parent-name"
+                value={editedStudent?.parentName || ''}
+                onChange={(e) => setEditedStudent(prev => ({ ...prev!, parentName: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-parent-phone">Parent Phone</Label>
+              <Input
+                id="edit-parent-phone"
+                type="tel"
+                value={editedStudent?.parentPhone || ''}
+                onChange={(e) => setEditedStudent(prev => ({ ...prev!, parentPhone: e.target.value }))}
+                className={formErrors.parentPhone ? "border-red-500" : ""}
+              />
+              {formErrors.parentPhone && <p className="text-red-500 text-sm mt-1">{formErrors.parentPhone}</p>}
+            </div>
+            <div>
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={(editedStudent as any)?.email || ''}
+                onChange={(e) => setEditedStudent(prev => ({ ...prev!, email: e.target.value }))}
+                className={formErrors.email ? "border-red-500" : ""}
+              />
+              {formErrors.email && <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>}
+            </div>
+            <div>
+              <Label htmlFor="edit-student-id">Student ID</Label>
+              <Input
+                id="edit-student-id"
+                value={editedStudent?.studentId || ''}
+                onChange={(e) => setEditedStudent(prev => ({ ...prev!, studentId: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="edit-address">Address</Label>
+            <Input
+              id="edit-address"
+              value={(editedStudent as any)?.address || ''}
+              onChange={(e) => setEditedStudent(prev => ({ ...prev!, address: e.target.value }))}
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={updateStudentMutation.isPending}>
+            {updateStudentMutation.isPending ? "Saving..." : "Save Changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+{/* Financial Blocking Dialog */ }
+<AlertDialog open={financialBlockingOpen} onOpenChange={setFinancialBlockingOpen}>
+  <AlertDialogContent className="max-w-2xl">
+    <AlertDialogHeader>
+      <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+        </svg>
+        Cannot Delete Student
+      </AlertDialogTitle>
+      <AlertDialogDescription asChild>
+        <div className="space-y-4">
+          {financialBlockingDetails && (
+            <>
+              <p className="text-sm text-gray-600">
+                <strong>{financialBlockingDetails.student?.name}</strong> cannot be deleted because they have active financial obligations that must be resolved first.
+              </p>
+
+              {/* Outstanding EMI Payments */}
+              {financialBlockingDetails.activePayments?.length > 0 && (
+                <div className="bg-red-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-red-900 mb-3">
+                    📋 Pending EMI Payments ({financialBlockingDetails.activePayments.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {financialBlockingDetails.activePayments.map((payment: any, index: number) => (
+                      <div key={payment.id} className="flex justify-between items-center bg-white p-3 rounded border-l-4 border-red-400">
+                        <div>
+                          <p className="font-medium">Installment #{payment.installmentNumber}</p>
+                          <p className="text-sm text-gray-600">Due: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(payment.dueDate))}</p>
+                          <p className="text-sm">
+                            <span className={`px-2 py-1 rounded-full text-xs ${payment.status === 'overdue' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                              {payment.status}
+                            </span>
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-lg">{formatAmount(payment.amount)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Active EMI Plans */}
+              {financialBlockingDetails.activePlans?.length > 0 && (
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-3">
+                    📅 Active EMI Plans ({financialBlockingDetails.activePlans.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {financialBlockingDetails.activePlans.map((plan: any) => (
+                      <div key={plan.id} className="bg-white p-3 rounded border-l-4 border-blue-400">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">EMI Plan #{plan.id}</p>
+                            <p className="text-sm text-gray-600">
+                              {plan.numberOfInstallments} installments of {formatAmount(plan.installmentAmount)} each
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Period: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(plan.startDate))} to {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(plan.endDate))}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">{formatAmount(plan.totalAmount)}</p>
+                            <p className="text-sm text-gray-600">Total Amount</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Pending Fee Payments */}
+              {financialBlockingDetails.pendingFeePayments?.length > 0 && (
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-yellow-900 mb-3">
+                    💳 Pending Fee Payments ({financialBlockingDetails.pendingFeePayments.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {financialBlockingDetails.pendingFeePayments.map((payment: any) => (
+                      <div key={payment.id} className="bg-white p-3 rounded border-l-4 border-yellow-400">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">Payment #{payment.id}</p>
+                            <p className="text-sm text-gray-600">Mode: {payment.paymentMode}</p>
+                            {payment.receiptNumber && (
+                              <p className="text-sm text-gray-600">Receipt: {payment.receiptNumber}</p>
+                            )}
+                            {payment.installmentNumber && (
+                              <p className="text-sm text-gray-600">Installment: #{payment.installmentNumber}</p>
+                            )}
+                            <p className="text-sm text-gray-600">Due: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(payment.paymentDate))}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-lg">{formatAmount(payment.amount)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Active Mandates */}
+              {financialBlockingDetails.activeMandates?.length > 0 && (
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-green-900 mb-3">
+                    🏦 Active Mandates ({financialBlockingDetails.activeMandates.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {financialBlockingDetails.activeMandates.map((mandate: any) => (
+                      <div key={mandate.id} className="bg-white p-3 rounded border-l-4 border-green-400">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">Mandate: {mandate.mandateId}</p>
+                            <p className="text-sm text-gray-600">{mandate.bankName}</p>
+                            <p className="text-sm text-gray-600">Account: {mandate.bankAccount}</p>
+                            <p className="text-sm text-gray-600">
+                              Valid: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(mandate.startDate))} to {mandate.endDate ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(mandate.endDate)) : 'Ongoing'}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">{formatAmount(mandate.maxAmount)}</p>
+                            <p className="text-sm text-gray-600">Max Amount</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Total Outstanding */}
+              {financialBlockingDetails.totalOutstanding > 0 && (
+                <div className="bg-orange-50 p-4 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-orange-900">Total Outstanding Amount:</span>
+                    <span className="text-xl font-bold text-orange-900">{formatAmount(financialBlockingDetails.totalOutstanding)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">💡 What you can do:</h4>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• Clear all pending fee payments before attempting to delete</li>
+                  <li>• Complete or cancel active EMI plans</li>
+                  <li>• Mark outstanding EMI installments as paid</li>
+                  <li>• Deactivate or cancel active bank mandates</li>
+                  <li>• Process all pending transactions</li>
+                  <li>• Contact the finance team for assistance</li>
+                </ul>
+              </div>
+            </>
+          )}
+        </div>
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel onClick={() => {
+        setFinancialBlockingOpen(false);
+        setFinancialBlockingDetails(null);
+      }}>
+        Got it
+      </AlertDialogCancel>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+
+{/* EMI Payment Recording Modal */ }
+{
+  selectedEmiPlan && (
+    <Dialog open={emiPaymentModalOpen} onOpenChange={setEmiPaymentModalOpen}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Record EMI Payment</DialogTitle>
+          <DialogDescription>
+            Record a payment for this EMI plan. Enter the actual amount received — any shortfall will be carried over to the next installment automatically.
+          </DialogDescription>
+        </DialogHeader>
+        {selectedEmiPlan && (
+          <form onSubmit={handleEmiPayment}>
+            <div className="space-y-4">
+              {/* EMI Plan Summary */}
+              <div className="bg-slate-50 p-4 rounded-lg">
+                <h4 className="font-semibold mb-2">EMI Plan Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="text-gray-600">Total Amount:</span> {formatAmount(parseFloat(selectedEmiPlan.totalAmount))}</div>
+                  <div><span className="text-gray-600">Base EMI:</span> {formatAmount(parseFloat(selectedEmiPlan.installmentAmount))}</div>
+                  <div><span className="text-gray-600">Next Due:</span> <span className="font-bold text-[#643ae5]">{emiPaymentFormData.amount ? formatAmount(parseFloat(emiPaymentFormData.amount.toString())) : 'N/A'}</span></div>
+                  <div><span className="text-gray-600">Status:</span> {selectedEmiPlan.status}</div>
+                </div>
+              </div>
+
+              {/* Pending EMI selector */}
+              {pendingEmis.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm font-semibold text-amber-800 mb-2">Pending Installments</p>
+                  <div className="flex flex-wrap gap-2">
+                    {pendingEmis.map((emi: any) => (
+                      <button
+                        key={emi.installmentNumber}
+                        type="button"
+                        onClick={() => setEmiPaymentFormData(prev => ({
+                          ...prev,
+                          installmentNumber: emi.installmentNumber,
+                          amount: emi.amount,
+                          actualAmountReceived: emi.amount
+                        }))}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${emiPaymentFormData.installmentNumber === emi.installmentNumber
+                          ? 'bg-[#643ae5] text-white border-[#643ae5]'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-[#643ae5]'
+                          }`}
+                      >
+                        #{emi.installmentNumber} — {formatAmount(parseFloat(emi.amount))}
+                        {parseFloat(emi.carryoverAmount || '0') > 0 && (
+                          <span className="ml-1 text-orange-500">(+{formatAmount(parseFloat(emi.carryoverAmount))} carryover)</span>
+                        )}
+                        {parseFloat(emi.carryoverAmount || '0') < 0 && (
+                          <span className="ml-1 text-green-500">(-{formatAmount(Math.abs(parseFloat(emi.carryoverAmount)))} adjustment)</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Scheduled vs Actual Amount */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Scheduled Due Amount</Label>
+                  <div className="flex items-center h-10 px-3 rounded-md border bg-gray-50 font-semibold text-gray-700">
+                    {formatAmount(parseFloat(emiPaymentFormData.amount || '0'))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Includes any carryover from previous</p>
+                </div>
+                <div>
+                  <Label htmlFor="actualAmountReceived">Actual Amount Received *</Label>
+                  <Input
+                    id="actualAmountReceived"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    value={emiPaymentFormData.actualAmountReceived || ''}
+                    onChange={e => setEmiPaymentFormData(prev => ({ ...prev, actualAmountReceived: e.target.value }))}
+                    className="font-medium"
+                    placeholder="Enter amount received"
+                  />
+                  {/* Shortfall / Excess indicator */}
+                  {emiPaymentFormData.actualAmountReceived && emiPaymentFormData.amount && (() => {
+                    const scheduled = parseFloat(emiPaymentFormData.amount);
+                    const actual = parseFloat(emiPaymentFormData.actualAmountReceived);
+                    const diff = actual - scheduled;
+                    if (Math.abs(diff) < 0.01) return null;
+                    const isLastInstallment = pendingEmis.length <= 1;
+                    return (
+                      <div className={`mt-1 text-xs font-medium px-2 py-1 rounded ${diff < 0 ? 'bg-orange-50 text-orange-700' : 'bg-green-50 text-green-700'}`}>
+                        {diff < 0
+                          ? `⚠ ${formatAmount(Math.abs(diff))} shortfall → will carry over to ${isLastInstallment ? 'a new installment (EMI count will increase)' : 'next EMI'}`
+                          : `✓ ${formatAmount(diff)} excess received`}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Date and Mode */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="emiPayDate">Payment Date *</Label>
+                  <Input
+                    id="emiPayDate"
+                    type="date"
+                    required
+                    value={emiPaymentFormData.paymentDate}
+                    onChange={e => setEmiPaymentFormData(prev => ({ ...prev, paymentDate: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Payment Mode *</Label>
+                  <Select
+                    value={emiPaymentFormData.paymentMode}
+                    onValueChange={v => setEmiPaymentFormData(prev => ({ ...prev, paymentMode: v }))}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UPI">UPI</SelectItem>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Card">Card</SelectItem>
+                      <SelectItem value="Cheque">Cheque</SelectItem>
+                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Transaction ID */}
+              <div>
+                <Label htmlFor="emiTransId">Transaction ID (Optional)</Label>
+                <Input
+                  id="emiTransId"
+                  type="text"
+                  placeholder="Optional"
+                  value={emiPaymentFormData.transactionId || ''}
+                  onChange={e => setEmiPaymentFormData(prev => ({ ...prev, transactionId: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="outline" onClick={() => setEmiPaymentModalOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-[#643ae5] text-white hover:bg-[#552dbf]">
-                Update Plan
+              <Button
+                type="submit"
+                className="bg-[#643ae5] hover:bg-[#552dbf]"
+                disabled={!emiPaymentFormData.paymentMode || !emiPaymentFormData.actualAmountReceived}
+              >
+                Record Payment
               </Button>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-      {/* Student Edit Modal */}
-      {
-        selectedStudent && (
-          <Dialog
-            open={isEditModalOpen}
-            onOpenChange={(open) => {
-              console.log("Dialog onOpenChange:", { open, selectedStudent });
-              setIsEditModalOpen(open);
-              if (open && selectedStudent) {
-                console.log("Setting editedStudent to:", selectedStudent);
-                setEditedStudent({ ...selectedStudent });
-                setFormErrors({});
-              } else {
-                setEditedStudent(null);
-                setFormErrors({});
-              }
-            }}
-          >
-            <DialogContent className="max-w-2xl max-h-[75vh] overflow-y-auto border-4">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-3">
-                  <User size={24} />
-                  <div>
-                    <h2 className="text-xl font-bold">{selectedStudent.name}</h2>
-                    <p className="text-sm text-gray-600">{selectedStudent.class}</p>
-                  </div>
-                </DialogTitle>
-              </DialogHeader>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit-name">Full Name</Label>
-                    <Input
-                      id="edit-name"
-                      value={editedStudent?.name || ''}
-                      onChange={(e) => setEditedStudent(prev => ({ ...prev!, name: e.target.value }))}
-                      className={formErrors.name ? "border-red-500" : ""}
-                    />
-                    {formErrors.name && <p className="text-red-500 text-sm mt-1">{formErrors.name}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-class">Class</Label>
-                    <Select
-                      value={editedStudent?.class || ''}
-                      onValueChange={(value) => setEditedStudent(prev => ({ ...prev!, class: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a class" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from(new Set(allStudents.map(s => s.class).filter(Boolean))).map(cls => (
-                          <SelectItem key={cls} value={cls}>{cls}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-parent-name">Parent Name</Label>
-                    <Input
-                      id="edit-parent-name"
-                      value={editedStudent?.parentName || ''}
-                      onChange={(e) => setEditedStudent(prev => ({ ...prev!, parentName: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-parent-phone">Parent Phone</Label>
-                    <Input
-                      id="edit-parent-phone"
-                      type="tel"
-                      value={editedStudent?.parentPhone || ''}
-                      onChange={(e) => setEditedStudent(prev => ({ ...prev!, parentPhone: e.target.value }))}
-                      className={formErrors.parentPhone ? "border-red-500" : ""}
-                    />
-                    {formErrors.parentPhone && <p className="text-red-500 text-sm mt-1">{formErrors.parentPhone}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-email">Email</Label>
-                    <Input
-                      id="edit-email"
-                      type="email"
-                      value={(editedStudent as any)?.email || ''}
-                      onChange={(e) => setEditedStudent(prev => ({ ...prev!, email: e.target.value }))}
-                      className={formErrors.email ? "border-red-500" : ""}
-                    />
-                    {formErrors.email && <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-student-id">Student ID</Label>
-                    <Input
-                      id="edit-student-id"
-                      value={editedStudent?.studentId || ''}
-                      onChange={(e) => setEditedStudent(prev => ({ ...prev!, studentId: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="edit-address">Address</Label>
-                  <Input
-                    id="edit-address"
-                    value={(editedStudent as any)?.address || ''}
-                    onChange={(e) => setEditedStudent(prev => ({ ...prev!, address: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <DialogFooter className="flex gap-2">
-                <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={updateStudentMutation.isPending}>
-                  {updateStudentMutation.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )
-      }
-
-      {/* Financial Blocking Dialog */}
-      <AlertDialog open={financialBlockingOpen} onOpenChange={setFinancialBlockingOpen}>
-        <AlertDialogContent className="max-w-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              Cannot Delete Student
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-4">
-                {financialBlockingDetails && (
-                  <>
-                    <p className="text-sm text-gray-600">
-                      <strong>{financialBlockingDetails.student?.name}</strong> cannot be deleted because they have active financial obligations that must be resolved first.
-                    </p>
-
-                    {/* Outstanding EMI Payments */}
-                    {financialBlockingDetails.activePayments?.length > 0 && (
-                      <div className="bg-red-50 p-4 rounded-lg">
-                        <h4 className="font-medium text-red-900 mb-3">
-                          📋 Pending EMI Payments ({financialBlockingDetails.activePayments.length})
-                        </h4>
-                        <div className="space-y-2">
-                          {financialBlockingDetails.activePayments.map((payment: any, index: number) => (
-                            <div key={payment.id} className="flex justify-between items-center bg-white p-3 rounded border-l-4 border-red-400">
-                              <div>
-                                <p className="font-medium">Installment #{payment.installmentNumber}</p>
-                                <p className="text-sm text-gray-600">Due: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(payment.dueDate))}</p>
-                                <p className="text-sm">
-                                  <span className={`px-2 py-1 rounded-full text-xs ${payment.status === 'overdue' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                                    }`}>
-                                    {payment.status}
-                                  </span>
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-semibold text-lg">{formatAmount(payment.amount)}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Active EMI Plans */}
-                    {financialBlockingDetails.activePlans?.length > 0 && (
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <h4 className="font-medium text-blue-900 mb-3">
-                          📅 Active EMI Plans ({financialBlockingDetails.activePlans.length})
-                        </h4>
-                        <div className="space-y-2">
-                          {financialBlockingDetails.activePlans.map((plan: any) => (
-                            <div key={plan.id} className="bg-white p-3 rounded border-l-4 border-blue-400">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <p className="font-medium">EMI Plan #{plan.id}</p>
-                                  <p className="text-sm text-gray-600">
-                                    {plan.numberOfInstallments} installments of {formatAmount(plan.installmentAmount)} each
-                                  </p>
-                                  <p className="text-sm text-gray-600">
-                                    Period: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(plan.startDate))} to {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(plan.endDate))}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-semibold">{formatAmount(plan.totalAmount)}</p>
-                                  <p className="text-sm text-gray-600">Total Amount</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Pending Fee Payments */}
-                    {financialBlockingDetails.pendingFeePayments?.length > 0 && (
-                      <div className="bg-yellow-50 p-4 rounded-lg">
-                        <h4 className="font-medium text-yellow-900 mb-3">
-                          💳 Pending Fee Payments ({financialBlockingDetails.pendingFeePayments.length})
-                        </h4>
-                        <div className="space-y-2">
-                          {financialBlockingDetails.pendingFeePayments.map((payment: any) => (
-                            <div key={payment.id} className="bg-white p-3 rounded border-l-4 border-yellow-400">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <p className="font-medium">Payment #{payment.id}</p>
-                                  <p className="text-sm text-gray-600">Mode: {payment.paymentMode}</p>
-                                  {payment.receiptNumber && (
-                                    <p className="text-sm text-gray-600">Receipt: {payment.receiptNumber}</p>
-                                  )}
-                                  {payment.installmentNumber && (
-                                    <p className="text-sm text-gray-600">Installment: #{payment.installmentNumber}</p>
-                                  )}
-                                  <p className="text-sm text-gray-600">Due: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(payment.paymentDate))}</p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-semibold text-lg">{formatAmount(payment.amount)}</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Active Mandates */}
-                    {financialBlockingDetails.activeMandates?.length > 0 && (
-                      <div className="bg-green-50 p-4 rounded-lg">
-                        <h4 className="font-medium text-green-900 mb-3">
-                          🏦 Active Mandates ({financialBlockingDetails.activeMandates.length})
-                        </h4>
-                        <div className="space-y-2">
-                          {financialBlockingDetails.activeMandates.map((mandate: any) => (
-                            <div key={mandate.id} className="bg-white p-3 rounded border-l-4 border-green-400">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <p className="font-medium">Mandate: {mandate.mandateId}</p>
-                                  <p className="text-sm text-gray-600">{mandate.bankName}</p>
-                                  <p className="text-sm text-gray-600">Account: {mandate.bankAccount}</p>
-                                  <p className="text-sm text-gray-600">
-                                    Valid: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(mandate.startDate))} to {mandate.endDate ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(mandate.endDate)) : 'Ongoing'}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-semibold">{formatAmount(mandate.maxAmount)}</p>
-                                  <p className="text-sm text-gray-600">Max Amount</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Total Outstanding */}
-                    {financialBlockingDetails.totalOutstanding > 0 && (
-                      <div className="bg-orange-50 p-4 rounded-lg">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium text-orange-900">Total Outstanding Amount:</span>
-                          <span className="text-xl font-bold text-orange-900">{formatAmount(financialBlockingDetails.totalOutstanding)}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <h4 className="font-medium text-blue-900 mb-2">💡 What you can do:</h4>
-                      <ul className="text-sm text-blue-800 space-y-1">
-                        <li>• Clear all pending fee payments before attempting to delete</li>
-                        <li>• Complete or cancel active EMI plans</li>
-                        <li>• Mark outstanding EMI installments as paid</li>
-                        <li>• Deactivate or cancel active bank mandates</li>
-                        <li>• Process all pending transactions</li>
-                        <li>• Contact the finance team for assistance</li>
-                      </ul>
-                    </div>
-                  </>
-                )}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setFinancialBlockingOpen(false);
-              setFinancialBlockingDetails(null);
-            }}>
-              Got it
-            </AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* EMI Payment Recording Modal */}
-      {
-        selectedEmiPlan && (
-          <Dialog open={emiPaymentModalOpen} onOpenChange={setEmiPaymentModalOpen}>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Record EMI Payment</DialogTitle>
-                <DialogDescription>
-                  Record a payment for this EMI plan. Enter the actual amount received — any shortfall will be carried over to the next installment automatically.
-                </DialogDescription>
-              </DialogHeader>
-              {selectedEmiPlan && (
-                <form onSubmit={handleEmiPayment}>
-                  <div className="space-y-4">
-                    {/* EMI Plan Summary */}
-                    <div className="bg-slate-50 p-4 rounded-lg">
-                      <h4 className="font-semibold mb-2">EMI Plan Details</h4>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div><span className="text-gray-600">Total Amount:</span> {formatAmount(parseFloat(selectedEmiPlan.totalAmount))}</div>
-                        <div><span className="text-gray-600">Base EMI:</span> {formatAmount(parseFloat(selectedEmiPlan.installmentAmount))}</div>
-                        <div><span className="text-gray-600">Next Due:</span> <span className="font-bold text-[#643ae5]">{emiPaymentFormData.amount ? formatAmount(parseFloat(emiPaymentFormData.amount.toString())) : 'N/A'}</span></div>
-                        <div><span className="text-gray-600">Status:</span> {selectedEmiPlan.status}</div>
-                      </div>
-                    </div>
-
-                    {/* Pending EMI selector */}
-                    {pendingEmis.length > 0 && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                        <p className="text-sm font-semibold text-amber-800 mb-2">Pending Installments</p>
-                        <div className="flex flex-wrap gap-2">
-                          {pendingEmis.map((emi: any) => (
-                            <button
-                              key={emi.installmentNumber}
-                              type="button"
-                              onClick={() => setEmiPaymentFormData(prev => ({
-                                ...prev,
-                                installmentNumber: emi.installmentNumber,
-                                amount: emi.amount,
-                                actualAmountReceived: emi.amount
-                              }))}
-                              className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${emiPaymentFormData.installmentNumber === emi.installmentNumber
-                                  ? 'bg-[#643ae5] text-white border-[#643ae5]'
-                                  : 'bg-white text-gray-700 border-gray-300 hover:border-[#643ae5]'
-                                }`}
-                            >
-                              #{emi.installmentNumber} — {formatAmount(parseFloat(emi.amount))}
-                              {parseFloat(emi.carryoverAmount || '0') > 0 && (
-                                <span className="ml-1 text-orange-500">(+{formatAmount(parseFloat(emi.carryoverAmount))} carryover)</span>
-                              )}
-                              {parseFloat(emi.carryoverAmount || '0') < 0 && (
-                                <span className="ml-1 text-green-500">(-{formatAmount(Math.abs(parseFloat(emi.carryoverAmount)))} adjustment)</span>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Scheduled vs Actual Amount */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Scheduled Due Amount</Label>
-                        <div className="flex items-center h-10 px-3 rounded-md border bg-gray-50 font-semibold text-gray-700">
-                          {formatAmount(parseFloat(emiPaymentFormData.amount || '0'))}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">Includes any carryover from previous</p>
-                      </div>
-                      <div>
-                        <Label htmlFor="actualAmountReceived">Actual Amount Received *</Label>
-                        <Input
-                          id="actualAmountReceived"
-                          type="number"
-                          step="0.01"
-                          min="0.01"
-                          required
-                          value={emiPaymentFormData.actualAmountReceived || ''}
-                          onChange={e => setEmiPaymentFormData(prev => ({ ...prev, actualAmountReceived: e.target.value }))}
-                          className="font-medium"
-                          placeholder="Enter amount received"
-                        />
-                        {/* Shortfall / Excess indicator */}
-                        {emiPaymentFormData.actualAmountReceived && emiPaymentFormData.amount && (() => {
-                          const scheduled = parseFloat(emiPaymentFormData.amount);
-                          const actual = parseFloat(emiPaymentFormData.actualAmountReceived);
-                          const diff = actual - scheduled;
-                          if (Math.abs(diff) < 0.01) return null;
-                          return (
-                            <div className={`mt-1 text-xs font-medium px-2 py-1 rounded ${diff < 0 ? 'bg-orange-50 text-orange-700' : 'bg-green-50 text-green-700'}`}>
-                              {diff < 0
-                                ? `⚠ ${formatAmount(Math.abs(diff))} shortfall → will carry over to next EMI`
-                                : `✓ ${formatAmount(diff)} excess received`}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Date and Mode */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="emiPayDate">Payment Date *</Label>
-                        <Input
-                          id="emiPayDate"
-                          type="date"
-                          required
-                          value={emiPaymentFormData.paymentDate}
-                          onChange={e => setEmiPaymentFormData(prev => ({ ...prev, paymentDate: e.target.value }))}
-                        />
-                      </div>
-                      <div>
-                        <Label>Payment Mode *</Label>
-                        <Select
-                          value={emiPaymentFormData.paymentMode}
-                          onValueChange={v => setEmiPaymentFormData(prev => ({ ...prev, paymentMode: v }))}
-                          required
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select mode" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="UPI">UPI</SelectItem>
-                            <SelectItem value="Cash">Cash</SelectItem>
-                            <SelectItem value="Card">Card</SelectItem>
-                            <SelectItem value="Cheque">Cheque</SelectItem>
-                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* Transaction ID */}
-                    <div>
-                      <Label htmlFor="emiTransId">Transaction ID (Optional)</Label>
-                      <Input
-                        id="emiTransId"
-                        type="text"
-                        placeholder="Optional"
-                        value={emiPaymentFormData.transactionId || ''}
-                        onChange={e => setEmiPaymentFormData(prev => ({ ...prev, transactionId: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <DialogFooter className="mt-6">
-                    <Button type="button" variant="outline" onClick={() => setEmiPaymentModalOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="bg-[#643ae5] hover:bg-[#552dbf]"
-                      disabled={!emiPaymentFormData.paymentMode || !emiPaymentFormData.actualAmountReceived}
-                    >
-                      Record Payment
-                    </Button>
-                  </DialogFooter>
-                </form>
-              )}
-            </DialogContent>
-          </Dialog>
         )}
+      </DialogContent>
+    </Dialog>
+  )
+}
 
-      {/* Payment Details Modal */}
-      {selectedPaymentForDetails && (
-        <Dialog open={paymentDetailsOpen} onOpenChange={setPaymentDetailsOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Payment Details</DialogTitle>
-              <DialogDescription>
-                View complete payment information
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-gray-500">Amount</Label>
-                  <div className="font-semibold text-lg">{formatAmount(parseFloat(selectedPaymentForDetails.amount))}</div>
-                </div>
-                <div>
-                  <Label className="text-gray-500">Payment Date</Label>
-                  <div className="font-medium">{format(new Date(selectedPaymentForDetails.paymentDate), "MMM dd, yyyy")}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-gray-500">Payment Mode</Label>
-                  <div className="font-medium capitalize">{selectedPaymentForDetails.paymentMode}</div>
-                </div>
-                <div>
-                  <Label className="text-gray-500">Status</Label>
-                  <Badge className={selectedPaymentForDetails.status === 'completed' ? 'bg-green-500' : 'bg-orange-500'}>
-                    {selectedPaymentForDetails.status}
-                  </Badge>
-                </div>
-              </div>
-
-              {selectedPaymentForDetails.installmentNumber !== null && selectedPaymentForDetails.installmentNumber !== undefined && (
-                <div>
-                  <Label className="text-gray-500">Installment Number</Label>
-                  <div className="font-medium">#{selectedPaymentForDetails.installmentNumber}</div>
-                </div>
-              )}
-
-              <div>
-                <Label className="text-gray-500">Payment Type</Label>
-                <div className="font-medium">
-                  {selectedPaymentForDetails.paymentCategory === 'additional_charge' ? (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-800">
-                      {selectedPaymentForDetails.chargeType ?
-                        selectedPaymentForDetails.chargeType.split('_').map((word: string) =>
-                          word.charAt(0).toUpperCase() + word.slice(1)
-                        ).join(' ')
-                        : 'Additional Charge'}
-                    </span>
-                  ) : selectedPaymentForDetails.installmentNumber === 0 ? (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                      Registration Fee
-                    </span>
-                  ) : selectedPaymentForDetails.installmentNumber && selectedPaymentForDetails.installmentNumber > 0 ? (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                      EMI Installment #{selectedPaymentForDetails.installmentNumber}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
-                      Fee Payment
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {selectedPaymentForDetails.receiptNumber && (
-                <div>
-                  <Label className="text-gray-500">Receipt Number</Label>
-                  <div className="font-medium">{selectedPaymentForDetails.receiptNumber}</div>
-                </div>
-              )}
-
-              {selectedPaymentForDetails.transactionId && (
-                <div>
-                  <Label className="text-gray-500">Transaction ID</Label>
-                  <div className="font-mono text-sm bg-slate-100 p-2 rounded">{selectedPaymentForDetails.transactionId}</div>
-                </div>
-              )}
-
-              {selectedPaymentForDetails.discount && parseFloat(selectedPaymentForDetails.discount) > 0 && (
-                <div>
-                  <Label className="text-gray-500">Discount Applied</Label>
-                  <div className="font-medium text-green-600">{formatAmount(parseFloat(selectedPaymentForDetails.discount))}</div>
-                </div>
-              )}
-
-              <div className="border-t pt-4">
-                <Label className="text-gray-500">Recorded On</Label>
-                <div className="text-sm text-gray-600">{selectedPaymentForDetails.createdAt ? formatDateTimeIST(selectedPaymentForDetails.createdAt) : 'N/A'}</div>
-              </div>
+{/* Payment Details Modal */ }
+{
+  selectedPaymentForDetails && (
+    <Dialog open={paymentDetailsOpen} onOpenChange={setPaymentDetailsOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Payment Details</DialogTitle>
+          <DialogDescription>
+            View complete payment information
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-gray-500">Amount</Label>
+              <div className="font-semibold text-lg">{formatAmount(parseFloat(selectedPaymentForDetails.amount))}</div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setPaymentDetailsOpen(false)}>
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+            <div>
+              <Label className="text-gray-500">Payment Date</Label>
+              <div className="font-medium">{format(new Date(selectedPaymentForDetails.paymentDate), "MMM dd, yyyy")}</div>
+            </div>
+          </div>
 
-      {/* Deletion Confirmation Dialog */}
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              {itemToDelete?.type === 'emi_cancel' ? 'Cancel EMI Plan' : 'Confirm Deletion'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {itemToDelete?.type === 'emi_plan' ? (
-                <>
-                  Are you sure you want to delete this EMI plan? This will also remove the payment schedule.
-                  <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive font-medium">
-                    <strong>Warning:</strong> This action cannot be undone. All pending installments for this plan will be removed.
-                  </div>
-                  <div className="mt-4 space-y-2">
-                    <Label htmlFor="confirm-delete" className="text-foreground">Type <span className="font-bold">DELETE</span> to confirm:</Label>
-                    <Input
-                      id="confirm-delete"
-                      value={confirmText}
-                      onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
-                      placeholder="Type DELETE"
-                      className="border-destructive/20 focus-visible:ring-destructive"
-                    />
-                  </div>
-                </>
-              ) : itemToDelete?.type === 'emi_cancel' ? (
-                <>
-                  Are you sure you want to cancel this EMI plan?
-                  <div className="mt-2 p-3 bg-amber-100 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-md text-sm text-amber-950 dark:text-amber-200 font-medium">
-                    The plan will be marked as <strong>Cancelled</strong>. Existing payments will remain.
-                  </div>
-                </>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-gray-500">Payment Mode</Label>
+              <div className="font-medium capitalize">{selectedPaymentForDetails.paymentMode}</div>
+            </div>
+            <div>
+              <Label className="text-gray-500">Status</Label>
+              <Badge className={selectedPaymentForDetails.status === 'completed' ? 'bg-green-500' : 'bg-orange-500'}>
+                {selectedPaymentForDetails.status}
+              </Badge>
+            </div>
+          </div>
+
+          {selectedPaymentForDetails.installmentNumber !== null && selectedPaymentForDetails.installmentNumber !== undefined && (
+            <div>
+              <Label className="text-gray-500">Installment Number</Label>
+              <div className="font-medium">#{selectedPaymentForDetails.installmentNumber}</div>
+            </div>
+          )}
+
+          <div>
+            <Label className="text-gray-500">Payment Type</Label>
+            <div className="font-medium">
+              {selectedPaymentForDetails.paymentCategory === 'additional_charge' ? (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-800">
+                  {selectedPaymentForDetails.chargeType ?
+                    selectedPaymentForDetails.chargeType.split('_').map((word: string) =>
+                      word.charAt(0).toUpperCase() + word.slice(1)
+                    ).join(' ')
+                    : 'Additional Charge'}
+                </span>
+              ) : selectedPaymentForDetails.installmentNumber === 0 ? (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                  Registration Fee
+                </span>
+              ) : selectedPaymentForDetails.installmentNumber && selectedPaymentForDetails.installmentNumber > 0 ? (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                  EMI Installment #{selectedPaymentForDetails.installmentNumber}
+                </span>
               ) : (
-                <>
-                  Are you sure you want to delete this payment record?
-                  {itemToDelete?.details && <div className="mt-1 font-medium text-foreground">{itemToDelete.details}</div>}
-                  <div className="mt-2 p-3 bg-amber-100 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-md text-sm text-amber-950 dark:text-amber-200 font-medium">
-                    If this was an EMI payment, the installment will be marked as <strong>Pending</strong> again.
-                  </div>
-                </>
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+                  Fee Payment
+                </span>
               )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConfirmText("")}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={itemToDelete?.type === 'emi_plan' && confirmText !== "DELETE"}
-              onClick={() => {
-                  if (itemToDelete) {
-                    if (itemToDelete.type === 'emi_plan') {
-                      handleDeleteEmiPlan(itemToDelete.id);
-                    } else if (itemToDelete.type === 'emi_cancel') {
-                      handleCancelEmiPlan(itemToDelete.id);
-                    } else {
-                      deletePaymentMutation.mutate(itemToDelete.id);
-                    }
-                  }
-                  setConfirmText("");
-                  setDeleteConfirmOpen(false);
-                }}
-              >
-                {itemToDelete?.type === 'emi_cancel' ? 'Cancel Plan' : 'Delete'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+            </div>
+          </div>
+
+          {selectedPaymentForDetails.receiptNumber && (
+            <div>
+              <Label className="text-gray-500">Receipt Number</Label>
+              <div className="font-medium">{selectedPaymentForDetails.receiptNumber}</div>
+            </div>
+          )}
+
+          {selectedPaymentForDetails.transactionId && (
+            <div>
+              <Label className="text-gray-500">Transaction ID</Label>
+              <div className="font-mono text-sm bg-slate-100 p-2 rounded">{selectedPaymentForDetails.transactionId}</div>
+            </div>
+          )}
+
+          {selectedPaymentForDetails.discount && parseFloat(selectedPaymentForDetails.discount) > 0 && (
+            <div>
+              <Label className="text-gray-500">Discount Applied</Label>
+              <div className="font-medium text-green-600">{formatAmount(parseFloat(selectedPaymentForDetails.discount))}</div>
+            </div>
+          )}
+
+          <div className="border-t pt-4">
+            <Label className="text-gray-500">Recorded On</Label>
+            <div className="text-sm text-gray-600">{selectedPaymentForDetails.createdAt ? formatDateTimeIST(selectedPaymentForDetails.createdAt) : 'N/A'}</div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setPaymentDetailsOpen(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+{/* Deletion Confirmation Dialog */ }
+<AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+  <AlertDialogContent className="max-w-md">
+    <AlertDialogHeader>
+      <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+        <AlertCircle className="h-5 w-5" />
+        {itemToDelete?.type === 'emi_cancel' ? 'Cancel EMI Plan' : 'Confirm Deletion'}
+      </AlertDialogTitle>
+      <AlertDialogDescription>
+        {itemToDelete?.type === 'emi_plan' ? (
+          <>
+            Are you sure you want to delete this EMI plan? This will also remove the payment schedule.
+            <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive font-medium">
+              <strong>Warning:</strong> This action cannot be undone. All pending installments for this plan will be removed.
+            </div>
+            <div className="mt-4 space-y-2">
+              <Label htmlFor="confirm-delete" className="text-foreground">Type <span className="font-bold">DELETE</span> to confirm:</Label>
+              <Input
+                id="confirm-delete"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
+                placeholder="Type DELETE"
+                className="border-destructive/20 focus-visible:ring-destructive"
+              />
+            </div>
+          </>
+        ) : itemToDelete?.type === 'emi_cancel' ? (
+          <>
+            Are you sure you want to cancel this EMI plan?
+            <div className="mt-2 p-3 bg-amber-100 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-md text-sm text-amber-950 dark:text-amber-200 font-medium">
+              The plan will be marked as <strong>Cancelled</strong>. Existing payments will remain.
+            </div>
+          </>
+        ) : (
+          <>
+            Are you sure you want to delete this payment record?
+            {itemToDelete?.details && <div className="mt-1 font-medium text-foreground">{itemToDelete.details}</div>}
+            <div className="mt-2 p-3 bg-amber-100 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-md text-sm text-amber-950 dark:text-amber-200 font-medium">
+              If this was an EMI payment, the installment will be marked as <strong>Pending</strong> again.
+            </div>
+          </>
+        )}
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel onClick={() => setConfirmText("")}>Cancel</AlertDialogCancel>
+      <AlertDialogAction
+        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+        disabled={itemToDelete?.type === 'emi_plan' && confirmText !== "DELETE"}
+        onClick={() => {
+          if (itemToDelete) {
+            if (itemToDelete.type === 'emi_plan') {
+              handleDeleteEmiPlan(itemToDelete.id);
+            } else if (itemToDelete.type === 'emi_cancel') {
+              handleCancelEmiPlan(itemToDelete.id);
+            } else {
+              deletePaymentMutation.mutate(itemToDelete.id);
+            }
+          }
+          setConfirmText("");
+          setDeleteConfirmOpen(false);
+        }}
+      >
+        {itemToDelete?.type === 'emi_cancel' ? 'Cancel Plan' : 'Delete'}
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
       </>
     );
-  }
+  }

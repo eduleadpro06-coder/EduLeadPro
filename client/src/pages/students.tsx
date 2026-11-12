@@ -918,6 +918,7 @@ export default function Students() {
                             <SelectItem value="active">Active</SelectItem>
                             <SelectItem value="graduated">Graduated</SelectItem>
                             <SelectItem value="dropped_out">Dropped Out</SelectItem>
+                            <SelectItem value="defaulter">Fee Defaulter</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />

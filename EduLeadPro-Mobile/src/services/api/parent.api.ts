@@ -61,6 +61,21 @@ export const parentAPI = {
     async getTodayAttendance(childId: number): Promise<any> {
         const attendance = await this.getAttendance(childId, 1);
         return attendance[0] || null;
+    },
+
+    /**
+     * Get leave history for a child
+     */
+    async getChildLeaves(childId: number): Promise<any[]> {
+        const response = await apiClient.get(`/parent/child/${childId}/leaves`);
+        return response?.leaves ?? [];
+    },
+
+    /**
+     * Apply a leave for a child
+     */
+    async applyChildLeave(childId: number, payload: { startDate: string; endDate: string; reason: string }): Promise<any> {
+        return await apiClient.post(`/parent/child/${childId}/leaves`, payload);
     }
 };
 

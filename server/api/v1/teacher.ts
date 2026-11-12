@@ -1154,4 +1154,70 @@ router.post('/notifications/read', async (req: Request, res: Response) => {
     }
 });
 
+
+// =====================================================
+// STUDENT LEAVES - Teacher review/approve/reject
+// =====================================================
+
+/**
+ * GET /api/v1/mobile/teacher/student-leaves
+ * Get all student leave requests for the organization
+ */
+router.get('/student-leaves', async (req: Request, res: Response) => {
+    try {
+        const organizationId = req.user!.organizationId;
+        const { storage } = await import('../../storage.js');
+
+        const status = req.query.status as string | undefined;
+
+        const leaves = await storage.getStudentLeaves(organizationId, status ? { status } : undefined);
+
+        res.json({
+            success: true,
+            data: { leaves }
+        });
+    } catch (error) {
+        console.error('[Mobile API] Get student leaves (teacher) error:', error);
+        res.status(500).json({ success: false, error: { code: 'FETCH_LEAVES_ERROR', message: 'Failed to fetch student leaves' } });
+    }
+});
+
+/**
+ * PATCH /api/v1/mobile/teacher/student-leaves/:leaveId
+ * Approve or reject a student leave
+ * Body: { status: 'approved' | 'rejected', rejectionReason?: string }
+ */
+router.patch('/student-leaves/:leaveId', async (req: Request, res: Response) => {
+    try {
+        const leaveId = parseInt(req.params.leaveId);
+        const { status, rejectionReason } = req.body;
+
+        if (isNaN(leaveId)) {
+            return res.status(400).json({ success: false, error: { code: 'INVALID_LEAVE_ID', message: 'Invalid leave ID' } });
+        }
+        if (!status || !['approved', 'rejected'].includes(status)) {
+            return res.status(400).json({ success: false, error: { code: 'INVALID_STATUS', message: 'Status must be approved or rejected' } });
+        }
+        if (status === 'rejected' && !rejectionReason) {
+            return res.status(400).json({ success: false, error: { code: 'REJECTION_REASON_REQUIRED', message: 'Rejection reason is required when rejecting' } });
+        }
+
+        const { storage } = await import('../../storage.js');
+        const leave = await storage.updateStudentLeaveStatus(leaveId, status, rejectionReason);
+
+        if (!leave) {
+            return res.status(404).json({ success: false, error: { code: 'LEAVE_NOT_FOUND', message: 'Leave request not found' } });
+        }
+
+        res.json({
+            success: true,
+            data: { leave },
+            message: `Leave ${status} successfully`
+        });
+    } catch (error) {
+        console.error('[Mobile API] Update student leave status error:', error);
+        res.status(500).json({ success: false, error: { code: 'UPDATE_LEAVE_ERROR', message: 'Failed to update leave status' } });
+    }
+});
+
 export default router;

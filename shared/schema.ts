@@ -1823,3 +1823,24 @@ export type VisitorLog = typeof visitorLogs.$inferSelect;
 export type InsertStudentGateLog = z.infer<typeof insertStudentGateLogSchema>;
 export type InsertVisitorLog = z.infer<typeof insertVisitorLogSchema>;
 
+// =====================================================
+// STUDENT LEAVES - Applied by parents from mobile app
+// =====================================================
+
+export const studentLeaves = pgTable("student_leaves", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").references(() => leads.id).notNull(), // References leads (enrolled students)
+  organizationId: integer("organization_id").references(() => organizations.id).notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  reason: text("reason").notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, approved, rejected
+  rejectionReason: text("rejection_reason"),
+  appliedAt: timestamp("applied_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const insertStudentLeaveSchema = createInsertSchema(studentLeaves).omit({ id: true, appliedAt: true, updatedAt: true });
+
+export type StudentLeave = typeof studentLeaves.$inferSelect;
+export type InsertStudentLeave = z.infer<typeof insertStudentLeaveSchema>;
