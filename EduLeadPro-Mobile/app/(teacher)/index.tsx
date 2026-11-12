@@ -234,7 +234,7 @@ export default function TeacherHomeScreen() {
                             style={styles.menuBtnFixed} 
                             onPress={() => {
                                 setHasUnread(false);
-                                router.push('/(teacher)/notifications');
+                                router.push('/(teacher)/notifications' as any);
                             }} 
                             activeOpacity={0.7}
                         >
