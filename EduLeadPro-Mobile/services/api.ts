@@ -261,6 +261,14 @@ class APIService {
     }
 
     async getAttendance(childId: number, days: number = 30): Promise<Attendance[]> {
+        if (childId >= 99000) {
+            const today = new Date().toISOString().split('T')[0];
+            return [
+                { id: 1, date: `${today}T08:30:00.000Z`, status: 'present', checkInTime: '08:30 AM', checkOutTime: '01:30 PM' },
+                { id: 2, date: new Date(Date.now() - 86400000).toISOString(), status: 'present', checkInTime: '08:32 AM', checkOutTime: '01:30 PM' },
+                { id: 3, date: new Date(Date.now() - 172800000).toISOString(), status: 'present', checkInTime: '08:29 AM', checkOutTime: '01:30 PM' }
+            ];
+        }
         const data = await this.fetchWithAuth<{ attendance: any[] }>(
             `/parent/child/${childId}/attendance?days=${days}`
         );
@@ -274,6 +282,40 @@ class APIService {
     }
 
     async getDailyUpdates(childId: number): Promise<DailyUpdate[]> {
+        if (childId >= 99000) {
+            return [
+                {
+                    id: 1,
+                    title: 'Sensory Art & Colors',
+                    content: 'Explored watercolors and hand prints with classmates.',
+                    mediaUrls: [],
+                    activityType: 'Activity',
+                    mood: 'happy',
+                    teacherName: 'Ananya Verma',
+                    postedAt: new Date().toISOString()
+                },
+                {
+                    id: 2,
+                    title: 'Healthy Snack Time',
+                    content: 'Ate fresh fruits and drank milk happily.',
+                    mediaUrls: [],
+                    activityType: 'Food',
+                    mood: 'great',
+                    teacherName: 'Ananya Verma',
+                    postedAt: new Date(Date.now() - 7200000).toISOString()
+                },
+                {
+                    id: 3,
+                    title: 'Afternoon Nap',
+                    content: 'Rested peacefully from 12:30 PM to 01:30 PM.',
+                    mediaUrls: [],
+                    activityType: 'Nap',
+                    mood: 'calm',
+                    teacherName: 'Ananya Verma',
+                    postedAt: new Date(Date.now() - 14400000).toISOString()
+                }
+            ];
+        }
         const data = await this.fetchWithAuth<{ activities: any[] }>(
             `/parent/child/${childId}/activities?limit=20`
         );
@@ -290,10 +332,32 @@ class APIService {
     }
 
     async getStudentFees(childId: number): Promise<any> {
+        if (childId >= 99000) {
+            return {
+                totalFees: 36000,
+                paidAmount: 20000,
+                pendingAmount: 16000,
+                nextDueDate: '2026-11-20',
+                nextDueAmount: 5000,
+                payments: [
+                    { id: 1, amount: 10000, paymentDate: '2026-09-08', paymentMode: 'UPI', receiptNumber: 'REC-001' },
+                    { id: 2, amount: 10000, paymentDate: '2026-10-05', paymentMode: 'UPI', receiptNumber: 'REC-002' }
+                ]
+            };
+        }
         return this.fetchWithAuth(`/parent/child/${childId}/fees`);
     }
 
     async getTodayAttendance(childId: number): Promise<Attendance | null> {
+        if (childId >= 99000) {
+            return {
+                id: 1,
+                date: new Date().toISOString(),
+                status: 'present',
+                checkInTime: '08:30 AM',
+                checkOutTime: '01:30 PM'
+            };
+        }
         try {
             const allAttendance = await this.getAttendance(childId, 1);
             if (allAttendance.length > 0) {

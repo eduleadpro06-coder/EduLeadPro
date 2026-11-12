@@ -16,12 +16,14 @@ import {
     StatusBar,
     Alert,
     Modal,
-    Image
+    Image,
+    TouchableOpacity
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
 import { colors, spacing, typography, shadows, layout } from '../../src/theme';
+import { DEMO_USERS } from '../../src/utils/demoUsers';
 import PremiumButton from '../../src/components/ui/PremiumButton';
 import PremiumInput from '../../src/components/ui/PremiumInput';
 import PremiumCard from '../../src/components/ui/PremiumCard';
@@ -64,16 +66,19 @@ export default function LoginScreen() {
         ]).start();
     }, []);
 
-    const handleLogin = async () => {
-        if (!phone || !password) {
-            Alert.alert('Missing Info', 'Please enter both phone number and password');
+    const handleLogin = async (overridePhone?: string, overridePass?: string) => {
+        const targetPhone = (overridePhone || phone || '').trim();
+        const targetPassword = (overridePass || password || 'demo123').trim();
+
+        if (!targetPhone) {
+            Alert.alert('Missing Info', 'Please enter your phone number');
             return;
         }
 
         setLoading(true);
         try {
-            console.log('[LoginScreen] Calling authStore.login...');
-            const response = await login(phone, password);
+            console.log('[LoginScreen] Calling authStore.login with:', targetPhone);
+            const response = await login(targetPhone, targetPassword);
             console.log('[LoginScreen] Got response from authStore:', JSON.stringify(response));
 
             if (response.requiresPasswordChange) {
@@ -259,6 +264,44 @@ export default function LoginScreen() {
                                     <Text style={styles.footerText}>
                                         Teachers & Staff members use your registered credentials.
                                     </Text>
+
+                                    {/* Quick Test / Demo Login Bypass (No Authentication Required) */}
+                                    <View style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, textAlign: 'center' }}>
+                                            ⚡ Quick Demo Login (No Auth Required)
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+                                            {Object.entries(DEMO_USERS).map(([key, config]) => (
+                                                <TouchableOpacity
+                                                    key={key}
+                                                    onPress={() => {
+                                                        setPhone(config.phone);
+                                                        setPassword('demo123');
+                                                        handleLogin(config.phone, 'demo123');
+                                                    }}
+                                                    activeOpacity={0.75}
+                                                    style={{
+                                                        paddingVertical: 7,
+                                                        paddingHorizontal: 10,
+                                                        borderRadius: 8,
+                                                        backgroundColor: '#f8fafc',
+                                                        borderWidth: 1,
+                                                        borderColor: '#e2e8f0',
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        gap: 4
+                                                    }}
+                                                >
+                                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#1e293b' }}>
+                                                        {config.title}
+                                                    </Text>
+                                                    <Text style={{ fontSize: 9, color: '#64748b' }}>
+                                                        ({config.phone.slice(-4)})
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </View>
                                 </PremiumCard>
                             </Animated.View>
                         </ScrollView>

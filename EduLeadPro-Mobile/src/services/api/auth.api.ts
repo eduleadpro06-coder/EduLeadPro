@@ -6,12 +6,25 @@ import apiClient from './client';
 import * as SecureStore from 'expo-secure-store';
 import { LoginRequest, LoginResponse, User } from '../../types/user.types';
 import { STORAGE_KEYS } from '../../utils/constants';
+import { getDemoUser } from '../../utils/demoUsers';
 
 export const authAPI = {
     /**
      * Login with email and password
      */
     async login(credentials: LoginRequest): Promise<LoginResponse> {
+        // Instant Demo / Test User Bypass (No DB or authentication required)
+        const demoUser = getDemoUser(credentials.phone);
+        if (demoUser) {
+            console.log('[AuthAPI] Bypassing authentication for DEMO user:', demoUser.user.name, `(${demoUser.user.role})`);
+            await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, demoUser.accessToken);
+            if (demoUser.refreshToken) {
+                await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, demoUser.refreshToken);
+            }
+            await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(demoUser.user));
+            return demoUser;
+        }
+
         const response: LoginResponse = await apiClient.post('/auth/login', credentials);
         
         console.log('[AuthAPI] Received login response success:', response.success);

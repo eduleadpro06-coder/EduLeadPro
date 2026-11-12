@@ -7,6 +7,7 @@ import express, { Request, Response } from 'express';
 import { supabase } from '../../supabase.js';
 import { generateAccessToken, generateRefreshToken, verifyToken } from '../../middleware/auth.js';
 import { comparePassword, hashPassword } from '../../utils/password.js'; // Security: bcrypt password comparison
+import { getDemoAuthPayload } from './demoUsers.js';
 
 const router = express.Router();
 
@@ -18,8 +19,19 @@ router.post('/login', async (req: Request, res: Response) => {
     try {
         const { phone, password } = req.body;
 
-        if (!phone || !password) {
-            return res.status(400).json({ error: 'Phone number and password required' });
+        if (!phone) {
+            return res.status(400).json({ error: 'Phone number required' });
+        }
+
+        // Test/Demo user bypass - No database check, instant login for all roles with dummy data
+        const demoAuth = getDemoAuthPayload(phone);
+        if (demoAuth) {
+            console.log(`[API] Bypassing authentication for DEMO user: ${demoAuth.user.name} (${demoAuth.user.role})`);
+            return res.json(demoAuth);
+        }
+
+        if (!password) {
+            return res.status(400).json({ error: 'Password required' });
         }
 
         // First, check if this is a STAFF member (Teacher/Driver)
