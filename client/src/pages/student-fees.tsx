@@ -856,7 +856,6 @@ export default function StudentFees() {
         } catch (e) { console.error("Error parsing auth", e); }
       }
 
-      const response = await fetch("/api/leads?status=enrolled,dropped,dropped_out,defaulter", { headers });
       const response = await fetch("/api/leads?status=enrolled,defaulter", { headers });
       if (!response.ok) return [];
       const data = await response.json();
@@ -1896,15 +1895,7 @@ export default function StudentFees() {
 
       setSelectedStudent(prev => prev ? ({ ...prev, status: newStatus } as any) : null);
 
-      const statusLabels: Record<string, string> = {
-        enrolled: "Enrolled (Active)",
-        dropped_out: "Dropped Out",
-        defaulter: "Fee Defaulter",
-      };
-
       toast({
-        title: "Status Updated",
-        description: `${selectedStudent.name} is now marked as ${statusLabels[newStatus] || newStatus}. Fee calculations updated.`,
         title: newStatus === 'defaulter' ? "Marked as Fee Defaulter" : "Status Restored",
         description: newStatus === 'defaulter'
           ? `${selectedStudent.name} is marked as Fee Defaulter. Remaining unpaid fees are excluded from receivables.`
@@ -2067,59 +2058,43 @@ export default function StudentFees() {
             <ul className="divide-y divide-gray-200">
               {paginatedStudents.map((student) => {
                 const isDefaulter = student.status === 'defaulter';
-                const isDropped = student.status === 'dropped_out' || student.status === 'dropped';
-                const isInactive = isDefaulter || isDropped;
                 return (
                   <li
                     key={`${student.type}-${student.id}`}
-                    className={`flex items-center gap-3 px-6 py-4 cursor-pointer transition rounded-xl ${selectedStudent?.id === student.id && selectedStudent?.type === student.type ? 'bg-purple-50 border border-[#643ae5]' : 'hover:bg-white'} ${isInactive ? 'bg-rose-50/20' : ''} text-gray-800`}
                     className={`flex items-center gap-3 px-6 py-4 cursor-pointer transition rounded-xl ${selectedStudent?.id === student.id && selectedStudent?.type === student.type ? 'bg-purple-50 border border-[#643ae5]' : 'hover:bg-white'} ${isDefaulter ? 'bg-amber-50/30' : ''} text-gray-800`}
                     onClick={() => setSelectedStudent(student as Student)}
                   >
                     <div className="relative">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm border-2 ${isDefaulter
-                          ? 'bg-amber-100 text-amber-800 border-amber-300'
-                          : isDropped
-                            ? 'bg-rose-100 text-rose-800 border-rose-300'
-                            : 'bg-purple-100 text-gray-800 border-gray-200'
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm border-2 ${
+                        isDefaulter 
+                          ? 'bg-amber-100 text-amber-800 border-amber-300' 
                           : 'bg-purple-100 text-gray-800 border-gray-200'
                       }`}>
-                      {student.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                    </div>
-                    <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${isDefaulter
-                        ? 'bg-amber-500'
-                        : isDropped
-                          ? 'bg-rose-500'
-                          : ((student as any).status === 'active' || (student as any).status === 'enrolled')
-                            ? 'bg-green-500'
-                            : 'bg-gray-400'
+                        {student.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
+                        isDefaulter 
+                          ? 'bg-amber-500' 
                           : 'bg-green-500'
                       }`}></span>
                     </div>
-          <div className="flex-1 min-w-0">
-            <div className="font-medium text-gray-800 truncate mb-1">{student.name}</div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold border border-slate-200">
-                {student.class || 'No Class'}
-              </span>
-              {isDefaulter && (
-                <span className="inline-block px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-semibold border border-amber-200">
-                  Defaulter
-                  <span className="inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-semibold border border-amber-300">
-                    Fee Defaulter
-                  </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-800 truncate mb-1">{student.name}</div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold border border-slate-200">
+                          {student.class || 'No Class'}
+                        </span>
+                        {isDefaulter && (
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-semibold border border-amber-300">
+                            Fee Defaulter
+                          </span>
                         )}
-                  {isDropped && (
-                    <span className="inline-block px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-semibold border border-rose-200">
-                      Dropped Out
-                    </span>
-                  )}
-                </div>
+                      </div>
                     </div>
-          </li>
-          );
+                  </li>
+                );
               })}
-        </ul>
+            </ul>
       </div>
       {/* Pagination Controls */}
       {/* Pagination Controls */}
@@ -2324,22 +2299,18 @@ export default function StudentFees() {
                     <div><span className="font-semibold text-gray-700">Tuition Paid:</span> <span className="text-green-600 font-medium">{formatAmount(tuitionPaid)}</span></div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-gray-700">Outstanding:</span>{' '}
-                      <span className={(selectedStudent.status === 'dropped_out' || selectedStudent.status === 'dropped' || selectedStudent.status === 'defaulter') ? "text-gray-400 line-through font-medium" : "text-red-500 font-semibold"}>
-                        <span className={selectedStudent.status === 'defaulter' ? "text-gray-400 line-through font-medium" : "text-red-500 font-semibold"}>
-                          {formatAmount(outstanding)}
+                      <span className={selectedStudent.status === 'defaulter' ? "text-gray-400 line-through font-medium" : "text-red-500 font-semibold"}>
+                        {formatAmount(outstanding)}
+                      </span>
+                      {selectedStudent.status === 'defaulter' && (
+                        <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-300">
+                          Fee Defaulter - Excluded from Receivables
                         </span>
-                        {(selectedStudent.status === 'dropped_out' || selectedStudent.status === 'dropped' || selectedStudent.status === 'defaulter') && (
-                          <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                            {selectedStudent.status === 'defaulter' ? 'Defaulter - Excluded from Receivables' : 'Dropped Out - Excluded from Receivables'}
-                            {selectedStudent.status === 'defaulter' && (
-                              <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-300">
-                                Fee Defaulter - Excluded from Receivables
-                              </span>
-                            )}
-                          </div>
-                              </>
-                      );
-                          })()}
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
 
                       <div className="my-2 border-t border-gray-100"></div>
 
@@ -2832,17 +2803,13 @@ export default function StudentFees() {
           {studentDetailsTab === 'EMI' && selectedStudent && (
             <div>
               {/* EMI content: list, add, edit EMI plans for selectedStudent */}
-              {(selectedStudent.status === 'dropped_out' || selectedStudent.status === 'dropped' || selectedStudent.status === 'defaulter') && (
-                {
-                  selectedStudent.status === 'defaulter' && (
-                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-                      <span>Student is marked as <strong>{selectedStudent.status === 'defaulter' ? 'Fee Defaulter' : 'Dropped Out'}</strong>. Any remaining unpaid installments are excluded from active school receivables and pending fees.</span>
-                      <span>Student is marked as <strong>Fee Defaulter</strong>. Any remaining unpaid installments are excluded from active school receivables and pending fees.</span>
-                    </div>
-                  )
-                }
-                < div className="mb-4 flex justify-between items-center">
+              {selectedStudent.status === 'defaulter' && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span>Student is marked as <strong>Fee Defaulter</strong>. Any remaining unpaid installments are excluded from active school receivables and pending fees.</span>
+                </div>
+              )}
+              <div className="mb-4 flex justify-between items-center">
               <div className="font-semibold">EMI Plans</div>
               <button
                 className={`px-6 py-2 rounded-lg font-semibold shadow transition ${emiPlans.filter(plan => plan.studentId === selectedStudent.id && plan.status === 'active').length > 0 ||
