@@ -2169,33 +2169,6 @@ export default function StudentFees() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-gray-500">Status:</span>
-                  <Select
-                    value={selectedStudent.status || 'enrolled'}
-                    onValueChange={(val) => handleStudentStatusChange(val)}
-                  >
-                    <SelectTrigger className={`h-8 min-w-[155px] rounded-lg text-xs font-semibold border ${(selectedStudent.status === 'enrolled' || selectedStudent.status === 'active')
-                        ? 'bg-green-50 text-green-700 border-green-200'
-                        : selectedStudent.status === 'defaulter'
-                          ? 'bg-amber-50 text-amber-800 border-amber-300'
-                          : 'bg-rose-50 text-rose-700 border-rose-200'
-                      }`}>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`h-2 w-2 rounded-full ${(selectedStudent.status === 'enrolled' || selectedStudent.status === 'active')
-                            ? 'bg-green-500'
-                            : selectedStudent.status === 'defaulter'
-                              ? 'bg-amber-500'
-                              : 'bg-rose-500'
-                          }`} />
-                        <SelectValue />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-gray-200 shadow-lg">
-                      <SelectItem value="enrolled">Enrolled (Active)</SelectItem>
-                      <SelectItem value="dropped_out">Dropped Out</SelectItem>
-                      <SelectItem value="defaulter">Fee Defaulter</SelectItem>
-                    </SelectContent>
-                  </Select>
                   {selectedStudent.status === 'defaulter' ? (
                     <Button
                       variant="outline"
